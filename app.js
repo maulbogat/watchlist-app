@@ -1,14 +1,27 @@
 import { movies } from "./data.js";
+import {
+  auth,
+  signInWithPopup,
+  GoogleAuthProvider,
+  fbSignOut,
+  onAuthStateChanged,
+  movieKey,
+  getWatchedList,
+  addWatched,
+  removeWatched,
+} from "./firebase.js";
 
 let currentFilter = "both"; // 'both' | 'movie' | 'show'
 let currentStatus = "to-watch"; // 'to-watch' | 'watched'
+let watchedSet = new Set(); // movie keys from Firestore
+let currentModalMovie = null; // movie currently shown in modal
 
 function getFilteredTitles() {
   const byType = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
   const byStatus =
     currentStatus === "watched"
-      ? byType.filter((m) => m.watched === true)
-      : byType.filter((m) => m.watched !== true);
+      ? byType.filter((m) => watchedSet.has(movieKey(m)))
+      : byType.filter((m) => !watchedSet.has(movieKey(m)));
 
   return [...byStatus].sort((a, b) =>
     String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" })
@@ -70,9 +83,14 @@ function buildCards() {
     const badgeLabel = m.type === "show" ? "TV" : "Film";
     const serviceChips = renderServiceChips(m.services, { limit: 3 });
     const serviceRow = serviceChips ? `<div class="service-row">${serviceChips}</div>` : "";
+    const isWatched = watchedSet.has(movieKey(m));
+    const watchedBadge = `<button type="button" class="watched-badge ${isWatched ? "watched" : ""}" aria-label="${isWatched ? "Mark as unwatched" : "Mark as watched"}" title="${isWatched ? "Mark as unwatched" : "Mark as watched"}">
+      <svg viewBox="0 0 24 24" fill="${isWatched ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+    </button>`;
 
     card.innerHTML = `
       <div class="thumb-wrap">
+        ${watchedBadge}
         ${thumbHTML}
         <div class="thumb-overlay"></div>
         <div class="play-btn">
@@ -89,15 +107,58 @@ function buildCards() {
       </div>
     `;
 
-    card.addEventListener("click", () => openModal(m));
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".watched-badge")) return;
+      openModal(m);
+    });
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") openModal(m);
     });
+    const badgeBtn = card.querySelector(".watched-badge");
+    if (badgeBtn) {
+      badgeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        toggleWatched(m);
+      });
+    }
     grid.appendChild(card);
   });
 }
 
+async function toggleWatched(m) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    alert("Sign in with Google to save your watched list across devices.");
+    return;
+  }
+  const key = movieKey(m);
+  const isWatched = watchedSet.has(key);
+  try {
+    if (isWatched) {
+      await removeWatched(uid, key);
+      watchedSet.delete(key);
+    } else {
+      await addWatched(uid, key);
+      watchedSet.add(key);
+    }
+    buildCards();
+    if (currentModalMovie && movieKey(currentModalMovie) === key) {
+      const btn = document.querySelector(".modal-watched-btn");
+      if (btn) {
+        const nowWatched = watchedSet.has(key);
+        btn.textContent = nowWatched ? "✓ Watched" : "Mark as watched";
+        btn.classList.toggle("watched", nowWatched);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to update watched:", err);
+    alert("Failed to update. Please try again.");
+  }
+}
+
 function openModal(m) {
+  currentModalMovie = m;
   const modal = document.getElementById("modal");
   const titleEl = document.getElementById("modal-title");
   const footer = document.getElementById("modal-footer");
@@ -106,13 +167,19 @@ function openModal(m) {
 
   if (m.youtubeId === "SEARCH") {
     const query = encodeURIComponent(m.title + " official trailer");
+    const isWatched = watchedSet.has(movieKey(m));
     footer.innerHTML = `
+      <button type="button" class="modal-watched-btn ${isWatched ? "watched" : ""}" title="${isWatched ? "Mark as unwatched" : "Mark as watched"}">
+        ${isWatched ? "✓ Watched" : "Mark as watched"}
+      </button>
+      <span style="opacity:0.4">·</span>
       <span>No trailer ID yet &mdash;</span>
       <a href="https://www.youtube.com/results?search_query=${query}" target="_blank"
          style="color: var(--accent); text-decoration: none;">
         Search on YouTube &#x2197;
       </a>
     `;
+    footer.querySelector(".modal-watched-btn")?.addEventListener("click", () => toggleWatched(m));
     const placeholder = modal.querySelector(".video-wrap");
     placeholder.style.background = "#0d0d10";
     placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
@@ -141,16 +208,22 @@ function openModal(m) {
       referrerpolicy="strict-origin-when-cross-origin"
       src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(m.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1${originParam}"></iframe>`;
 
+    const isWatched = watchedSet.has(movieKey(m));
     footer.innerHTML = `
       <span>${m.title}</span>
       <span style="opacity:0.4">·</span>
       <span>${m.year || ""} ${m.genre}</span>
       ${serviceInline}
       <span style="opacity:0.4">·</span>
+      <button type="button" class="modal-watched-btn ${isWatched ? "watched" : ""}" data-movie-key="${movieKey(m)}" title="${isWatched ? "Mark as unwatched" : "Mark as watched"}">
+        ${isWatched ? "✓ Watched" : "Mark as watched"}
+      </button>
+      <span style="opacity:0.4">·</span>
       <a href="${watchUrl}" target="_blank" style="color: var(--accent); text-decoration: none;">
         Watch on YouTube &#x2197;
       </a>
     `;
+    footer.querySelector(".modal-watched-btn")?.addEventListener("click", () => toggleWatched(m));
   }
 
   modal.classList.add("open");
@@ -158,6 +231,7 @@ function openModal(m) {
 }
 
 function closeModal() {
+  currentModalMovie = null;
   const modal = document.getElementById("modal");
   modal.classList.remove("open");
   const videoWrap = modal.querySelector(".video-wrap");
@@ -206,6 +280,54 @@ document.querySelectorAll(".tab-group .tab").forEach((btn) => {
     });
     buildCards();
   });
+});
+
+// Auth UI
+function updateAuthUI(user) {
+  const signInBtn = document.getElementById("sign-in-btn");
+  const signedIn = document.getElementById("signed-in");
+  const userPhoto = document.getElementById("user-photo");
+  const userEmail = document.getElementById("user-email");
+  const signOutBtn = document.getElementById("sign-out-btn");
+
+  if (user) {
+    signInBtn.style.display = "none";
+    signedIn.style.display = "flex";
+    userPhoto.src = user.photoURL || "";
+    userPhoto.alt = user.displayName || "User";
+    userEmail.textContent = user.email || "";
+  } else {
+    signInBtn.style.display = "inline-flex";
+    signedIn.style.display = "none";
+  }
+}
+
+document.getElementById("sign-in-btn").addEventListener("click", async () => {
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (err) {
+    console.error("Sign-in error:", err);
+    alert("Sign-in failed. Please try again.");
+  }
+});
+
+document.getElementById("sign-out-btn").addEventListener("click", () => {
+  fbSignOut(auth);
+});
+
+// Auth state + load watched list
+onAuthStateChanged(auth, async (user) => {
+  updateAuthUI(user);
+  watchedSet = new Set();
+  if (user) {
+    try {
+      const list = await getWatchedList(user.uid);
+      watchedSet = new Set(list);
+    } catch (err) {
+      console.error("Failed to load watched list:", err);
+    }
+  }
+  buildCards();
 });
 
 buildCards();

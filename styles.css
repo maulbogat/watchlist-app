@@ -471,6 +471,78 @@ header h1 span {
   .grid { gap: 1rem; }
 }
 
+/* Firebase + watched badge + auth */
+.watched-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.5);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.watched-badge:hover {
+  background: rgba(0,0,0,0.7);
+  color: var(--text);
+  border-color: rgba(255,255,255,0.2);
+}
+.watched-badge.watched {
+  background: rgba(232,201,106,0.25);
+  color: var(--accent);
+  border-color: rgba(232,201,106,0.5);
+}
+.watched-badge svg { width: 18px; height: 18px; }
+.auth-ui { display: flex; align-items: center; gap: 0.75rem; }
+.auth-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.auth-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.15);
+}
+.auth-btn-outline { background: transparent; }
+.signed-in { display: flex; align-items: center; gap: 0.5rem; }
+.user-photo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.user-email {
+  font-size: 0.8rem;
+  color: var(--muted);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modal-watched-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px 0;
+  transition: color 0.2s;
+}
+.modal-watched-btn:hover { color: var(--accent); }
+.modal-watched-btn.watched { color: var(--accent); }
+.modal-footer { flex-wrap: wrap; }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -900,4 +972,76 @@ header h1 span {
   .content { padding: 0 1rem 3rem; }
   .grid { gap: 1rem; }
 }
+
+/* Firebase + watched badge + auth */
+.watched-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.5);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.watched-badge:hover {
+  background: rgba(0,0,0,0.7);
+  color: var(--text);
+  border-color: rgba(255,255,255,0.2);
+}
+.watched-badge.watched {
+  background: rgba(232,201,106,0.25);
+  color: var(--accent);
+  border-color: rgba(232,201,106,0.5);
+}
+.watched-badge svg { width: 18px; height: 18px; }
+.auth-ui { display: flex; align-items: center; gap: 0.75rem; }
+.auth-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.auth-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.15);
+}
+.auth-btn-outline { background: transparent; }
+.signed-in { display: flex; align-items: center; gap: 0.5rem; }
+.user-photo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.user-email {
+  font-size: 0.8rem;
+  color: var(--muted);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modal-watched-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px 0;
+  transition: color 0.2s;
+}
+.modal-watched-btn:hover { color: var(--accent); }
+.modal-watched-btn.watched { color: var(--accent); }
+.modal-footer { flex-wrap: wrap; }
 
