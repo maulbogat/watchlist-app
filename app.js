@@ -342,14 +342,14 @@ async function init() {
     movies = await getMoviesCatalog();
     if (!movies.length) {
       grid.innerHTML =
-        '<div class="empty-state">No catalog found. Run <code>node scripts/upload-to-firebase.js</code> to upload data.</div>';
+        '<div class="empty-state">No catalog found. Add movies to Firestore <code>catalog/movies</code> in Firebase Console.</div>';
       return;
     }
     initAfterMoviesLoaded();
   } catch (err) {
     console.error("Failed to load catalog:", err);
     grid.innerHTML =
-      '<div class="empty-state">Failed to load catalog. Check console. Run the upload script if you haven\'t yet.</div>';
+      '<div class="empty-state">Failed to load catalog. Check console and Firestore setup.</div>';
   }
 }
 

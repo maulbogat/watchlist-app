@@ -20,11 +20,7 @@ Then open `http://localhost:5173`. (YouTube embeds can fail when opened via `fil
    ```
    Or paste the rules in Firebase Console → Firestore → Rules
 
-4. **Upload movie catalog** (one-time):
-   - Firebase Console → Project Settings → Service Accounts → Generate new private key
-   - Save as `serviceAccountKey.json` in project root (already in .gitignore)
-   - Run: `npm install && npm run upload-catalog`
-   - To add/update movies: edit `data.json` and run `npm run upload-catalog` again
+4. **Movie catalog** is stored in Firestore. To add/update movies, edit the `catalog/movies` document in Firebase Console → Firestore.
 
 ## Features
 
