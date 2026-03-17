@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="referrer" content="strict-origin-when-cross-origin" />
+<title>My Watchlist</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+<div class="file-protocol-banner" id="file-banner" role="status" aria-live="polite">
+  <div>
+    <strong>Tip:</strong> You opened this page via <code>file://</code>. YouTube embeds can fail (Error 153).
+    Run a local server: <code>python3 -m http.server 5173</code> then open <code>http://localhost:5173</code>.
+  </div>
+  <button type="button" id="file-banner-close" aria-label="Dismiss">✕</button>
+</div>
+
+<header>
+  <h1>My <span>Watchlist</span></h1>
+  <div class="filters">
+    <div class="header-meta" id="header-meta">16 titles &nbsp;·&nbsp; Trailers</div>
+  </div>
+</header>
+
+<main class="content">
+  <div class="content-filters">
+    <div class="tab-group" role="tablist" aria-label="Watch status">
+      <button type="button" class="tab active" role="tab" aria-selected="true" aria-controls="grid" id="tab-to-watch" data-status="to-watch">
+        To Watch
+      </button>
+      <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="grid" id="tab-watched" data-status="watched">
+        Watched
+      </button>
+    </div>
+    <div class="filter-group" role="radiogroup" aria-label="Filter titles">
+      <input type="radio" name="typeFilter" id="filter-both" value="both" checked />
+      <label for="filter-both">Both</label>
+      <input type="radio" name="typeFilter" id="filter-movies" value="movie" />
+      <label for="filter-movies">Movies</label>
+      <input type="radio" name="typeFilter" id="filter-shows" value="show" />
+      <label for="filter-shows">Series</label>
+    </div>
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<div class="modal-bg" id="modal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title"></span>
+      <button class="modal-close" id="modal-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="video-wrap">
+      <iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+    </div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
