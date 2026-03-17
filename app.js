@@ -339,6 +339,17 @@ function initAfterMoviesLoaded() {
       try {
         const list = await getWatchedList(user.uid);
         watchedSet = new Set(list);
+        // One-time: add "A Man on the Inside" to watched if list was empty
+        if (list.length === 0) {
+          const manOnInside = movies.find(
+            (m) => m.title.toLowerCase() === "a man on the inside"
+          );
+          if (manOnInside) {
+            const key = movieKey(manOnInside);
+            await addWatched(user.uid, key);
+            watchedSet.add(key);
+          }
+        }
       } catch (err) {
         console.error("Failed to load watched list:", err);
       }
