@@ -320,7 +320,10 @@ document.getElementById("sign-in-btn").addEventListener("click", async () => {
     await signInWithPopup(auth, new GoogleAuthProvider());
   } catch (err) {
     console.error("Sign-in error:", err);
-    alert("Sign-in failed. Please try again.");
+    const msg = err.code === "auth/unauthorized-domain"
+      ? "Add this domain in Firebase Console → Authentication → Settings → Authorized domains: " + window.location.hostname
+      : err.message || "Sign-in failed. Please try again.";
+    alert(msg);
   }
 });
 
