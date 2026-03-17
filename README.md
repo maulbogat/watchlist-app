@@ -24,6 +24,7 @@ Then open `http://localhost:5173`. (YouTube embeds can fail when opened via `fil
    - Firebase Console → Project Settings → Service Accounts → Generate new private key
    - Save as `serviceAccountKey.json` in project root (already in .gitignore)
    - Run: `npm install && npm run upload-catalog`
+   - To add/update movies: edit `data.json` and run `npm run upload-catalog` again
 
 ## Features
 

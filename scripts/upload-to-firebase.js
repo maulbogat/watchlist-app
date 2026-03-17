@@ -1,9 +1,9 @@
 /**
- * One-time script to upload movie catalog from data.js to Firestore.
+ * Upload movie catalog from data.json to Firestore.
  * Run: node scripts/upload-to-firebase.js
  *
- * Requires: GOOGLE_APPLICATION_CREDENTIALS env var pointing to your Firebase service account JSON.
- * Or: Create a serviceAccountKey.json in project root (add to .gitignore).
+ * Requires: serviceAccountKey.json in project root (add to .gitignore).
+ * Download from: Firebase Console → Project Settings → Service Accounts → Generate new private key
  */
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -14,12 +14,8 @@ import { getFirestore } from "firebase-admin/firestore";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
 
-// Load data.js and extract movies array (JS object syntax, not JSON)
-const dataPath = join(rootDir, "data.js");
-const dataContent = readFileSync(dataPath, "utf-8");
-const match = dataContent.match(/export const movies = (\[[\s\S]*\]);/);
-if (!match) throw new Error("Could not parse movies from data.js");
-const movies = new Function("return " + match[1])();
+const dataPath = join(rootDir, "data.json");
+const movies = JSON.parse(readFileSync(dataPath, "utf-8"));
 
 // Initialize Firebase Admin
 const keyPath = join(rootDir, "serviceAccountKey.json");
