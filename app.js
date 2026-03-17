@@ -14,15 +14,14 @@ import {
 let movies = [];
 let currentFilter = "both"; // 'both' | 'movie' | 'show'
 let currentStatus = "to-watch"; // 'to-watch' | 'watched'
-let watchedSet = new Set(); // movie keys from Firestore
 let currentModalMovie = null; // movie currently shown in modal
 
 function getFilteredTitles() {
   const byType = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
   const byStatus =
     currentStatus === "watched"
-      ? byType.filter((m) => watchedSet.has(movieKey(m)))
-      : byType.filter((m) => !watchedSet.has(movieKey(m)));
+      ? byType.filter((m) => m.watched === true)
+      : byType.filter((m) => m.watched !== true);
 
   return [...byStatus].sort((a, b) =>
     String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" })
@@ -84,7 +83,7 @@ function buildCards() {
     const badgeLabel = m.type === "show" ? "TV" : "Film";
     const serviceChips = renderServiceChips(m.services, { limit: 3 });
     const serviceRow = serviceChips ? `<div class="service-row">${serviceChips}</div>` : "";
-    const isWatched = watchedSet.has(movieKey(m));
+    const isWatched = m.watched === true;
     const watchedBadge = `<button type="button" class="watched-badge ${isWatched ? "watched" : ""}" aria-label="${isWatched ? "Mark as unwatched" : "Mark as watched"}" title="${isWatched ? "Mark as unwatched" : "Mark as watched"}">
       <svg viewBox="0 0 24 24" fill="${isWatched ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
     </button>`;
@@ -134,22 +133,21 @@ async function toggleWatched(m) {
     return;
   }
   const key = movieKey(m);
-  const isWatched = watchedSet.has(key);
+  const isWatched = m.watched === true;
   try {
     if (isWatched) {
       await removeWatched(uid, key);
-      watchedSet.delete(key);
+      m.watched = false;
     } else {
       await addWatched(uid, key);
-      watchedSet.add(key);
+      m.watched = true;
     }
     buildCards();
     if (currentModalMovie && movieKey(currentModalMovie) === key) {
       const btn = document.querySelector(".modal-watched-btn");
       if (btn) {
-        const nowWatched = watchedSet.has(key);
-        btn.textContent = nowWatched ? "✓ Watched" : "Mark as watched";
-        btn.classList.toggle("watched", nowWatched);
+        btn.textContent = m.watched ? "✓ Watched" : "Mark as watched";
+        btn.classList.toggle("watched", m.watched);
       }
     }
   } catch (err) {
@@ -168,7 +166,7 @@ function openModal(m) {
 
   if (m.youtubeId === "SEARCH") {
     const query = encodeURIComponent(m.title + " official trailer");
-    const isWatched = watchedSet.has(movieKey(m));
+    const isWatched = m.watched === true;
     footer.innerHTML = `
       <button type="button" class="modal-watched-btn ${isWatched ? "watched" : ""}" title="${isWatched ? "Mark as unwatched" : "Mark as watched"}">
         ${isWatched ? "✓ Watched" : "Mark as watched"}
@@ -209,7 +207,7 @@ function openModal(m) {
       referrerpolicy="strict-origin-when-cross-origin"
       src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(m.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1${originParam}"></iframe>`;
 
-    const isWatched = watchedSet.has(movieKey(m));
+    const isWatched = m.watched === true;
     footer.innerHTML = `
       <span>${m.title}</span>
       <span style="opacity:0.4">·</span>
@@ -330,30 +328,17 @@ document.getElementById("sign-out-btn").addEventListener("click", () => {
   fbSignOut(auth);
 });
 
-// Auth state + load watched list
+// Auth state + load watched list, apply watched attribute from Firebase
 function initAfterMoviesLoaded() {
   onAuthStateChanged(auth, async (user) => {
     updateAuthUI(user);
-    watchedSet = new Set();
-    if (user) {
-      try {
-        const list = await getWatchedList(user.uid);
-        watchedSet = new Set(list);
-        // One-time: add "A Man on the Inside" to watched if list was empty
-        if (list.length === 0) {
-          const manOnInside = movies.find(
-            (m) => m.title.toLowerCase() === "a man on the inside"
-          );
-          if (manOnInside) {
-            const key = movieKey(manOnInside);
-            await addWatched(user.uid, key);
-            watchedSet.add(key);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load watched list:", err);
-      }
-    }
+    const watchedKeys = user
+      ? await getWatchedList(user.uid).catch(() => [])
+      : [];
+    const watchedSet = new Set(watchedKeys);
+    movies.forEach((m) => {
+      m.watched = watchedSet.has(movieKey(m));
+    });
     buildCards();
   });
 }

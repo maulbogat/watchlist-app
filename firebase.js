@@ -42,6 +42,11 @@ async function getMoviesCatalog() {
   return snap.data().items;
 }
 
+/**
+ * Returns the watched list from Firestore.
+ * Data model: users/{uid}.watched = string[] (movie keys)
+ * A movie is watched iff its key is in this array.
+ */
 async function getWatchedList(uid) {
   const ref = doc(db, "users", uid);
   const snap = await getDoc(ref);
