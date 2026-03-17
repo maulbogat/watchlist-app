@@ -35,6 +35,13 @@ function movieKey(m) {
   return `${m.title}|${m.year ?? ""}`;
 }
 
+async function getMoviesCatalog() {
+  const ref = doc(db, "catalog", "movies");
+  const snap = await getDoc(ref);
+  if (!snap.exists() || !Array.isArray(snap.data().items)) return [];
+  return snap.data().items;
+}
+
 async function getWatchedList(uid) {
   const ref = doc(db, "users", uid);
   const snap = await getDoc(ref);
@@ -60,6 +67,7 @@ export {
   fbSignOut,
   onAuthStateChanged,
   movieKey,
+  getMoviesCatalog,
   getWatchedList,
   addWatched,
   removeWatched,

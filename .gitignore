@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.*.local
+serviceAccountKey.json
 
 # Dependencies
 node_modules/

@@ -1,0 +1,10 @@
+{
+  "name": "movie-trailer-site",
+  "type": "module",
+  "scripts": {
+    "upload-catalog": "node scripts/upload-to-firebase.js"
+  },
+  "devDependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

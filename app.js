@@ -1,4 +1,3 @@
-import { movies } from "./data.js";
 import {
   auth,
   signInWithPopup,
@@ -6,11 +5,13 @@ import {
   fbSignOut,
   onAuthStateChanged,
   movieKey,
+  getMoviesCatalog,
   getWatchedList,
   addWatched,
   removeWatched,
 } from "./firebase.js";
 
+let movies = [];
 let currentFilter = "both"; // 'both' | 'movie' | 'show'
 let currentStatus = "to-watch"; // 'to-watch' | 'watched'
 let watchedSet = new Set(); // movie keys from Firestore
@@ -316,19 +317,41 @@ document.getElementById("sign-out-btn").addEventListener("click", () => {
 });
 
 // Auth state + load watched list
-onAuthStateChanged(auth, async (user) => {
-  updateAuthUI(user);
-  watchedSet = new Set();
-  if (user) {
-    try {
-      const list = await getWatchedList(user.uid);
-      watchedSet = new Set(list);
-    } catch (err) {
-      console.error("Failed to load watched list:", err);
+function initAfterMoviesLoaded() {
+  onAuthStateChanged(auth, async (user) => {
+    updateAuthUI(user);
+    watchedSet = new Set();
+    if (user) {
+      try {
+        const list = await getWatchedList(user.uid);
+        watchedSet = new Set(list);
+      } catch (err) {
+        console.error("Failed to load watched list:", err);
+      }
     }
-  }
-  buildCards();
-});
+    buildCards();
+  });
+}
 
-buildCards();
+// Load movies from Firestore, then init auth + build
+async function init() {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = '<div class="empty-state">Loading catalog…</div>';
+
+  try {
+    movies = await getMoviesCatalog();
+    if (!movies.length) {
+      grid.innerHTML =
+        '<div class="empty-state">No catalog found. Run <code>node scripts/upload-to-firebase.js</code> to upload data.</div>';
+      return;
+    }
+    initAfterMoviesLoaded();
+  } catch (err) {
+    console.error("Failed to load catalog:", err);
+    grid.innerHTML =
+      '<div class="empty-state">Failed to load catalog. Check console. Run the upload script if you haven\'t yet.</div>';
+  }
+}
+
+init();
 
