@@ -519,6 +519,8 @@ header h1 span {
   border-color: rgba(255,255,255,0.15);
 }
 .auth-btn-outline { background: transparent; }
+.auth-btn-ghost { background: transparent; border-color: transparent; font-size: 0.8rem; color: var(--muted); }
+.auth-btn-ghost:hover { color: var(--text); }
 .signed-in { display: flex; align-items: center; gap: 0.5rem; }
 .user-photo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
 .user-email {
@@ -1021,6 +1023,8 @@ header h1 span {
   border-color: rgba(255,255,255,0.15);
 }
 .auth-btn-outline { background: transparent; }
+.auth-btn-ghost { background: transparent; border-color: transparent; font-size: 0.8rem; color: var(--muted); }
+.auth-btn-ghost:hover { color: var(--text); }
 .signed-in { display: flex; align-items: center; gap: 0.5rem; }
 .user-photo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
 .user-email {

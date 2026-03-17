@@ -284,12 +284,14 @@ document.querySelectorAll(".tab-group .tab").forEach((btn) => {
 });
 
 // Auth UI
+let currentUser = null;
 function updateAuthUI(user) {
+  currentUser = user;
   const signInBtn = document.getElementById("sign-in-btn");
   const signedIn = document.getElementById("signed-in");
   const userPhoto = document.getElementById("user-photo");
   const userEmail = document.getElementById("user-email");
-  const signOutBtn = document.getElementById("sign-out-btn");
+  const copyUidBtn = document.getElementById("copy-uid-btn");
 
   if (user) {
     signInBtn.style.display = "none";
@@ -297,11 +299,23 @@ function updateAuthUI(user) {
     userPhoto.src = user.photoURL || "";
     userPhoto.alt = user.displayName || "User";
     userEmail.textContent = user.email || "";
+    copyUidBtn.style.display = "inline-flex";
   } else {
     signInBtn.style.display = "inline-flex";
     signedIn.style.display = "none";
+    copyUidBtn.style.display = "none";
   }
 }
+
+document.getElementById("copy-uid-btn").addEventListener("click", () => {
+  if (currentUser) {
+    navigator.clipboard.writeText(currentUser.uid);
+    const btn = document.getElementById("copy-uid-btn");
+    const orig = btn.textContent;
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  }
+});
 
 document.getElementById("sign-in-btn").addEventListener("click", async () => {
   try {
