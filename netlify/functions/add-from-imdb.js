@@ -1,6 +1,7 @@
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
+const https = require("https");
 
 function getApp() {
   if (global.__fbAdmin) return global.__fbAdmin;
@@ -33,6 +34,30 @@ function jsonRes(status, body, event) {
     headers: corsHeaders(event),
     body: JSON.stringify(body),
   };
+}
+
+function fetchOMDb(imdbId) {
+  const apiKey = process.env.OMDB_API_KEY;
+  if (!apiKey) return Promise.reject(new Error("OMDB_API_KEY not set in Netlify environment"));
+  const url = `https://www.omdbapi.com/?i=${encodeURIComponent(imdbId)}&apikey=${apiKey}`;
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.Response === "False") {
+            reject(new Error(json.Error || "OMDb lookup failed"));
+          } else {
+            resolve(json);
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on("error", reject);
+  });
 }
 
 exports.handler = async (event, context) => {
@@ -69,15 +94,26 @@ exports.handler = async (event, context) => {
   } catch (e) {
     return jsonRes(400, { ok: false, error: "Invalid JSON body" }, event);
   }
-  const { imdbId, title, year, type, genre, thumb, youtubeId } = body;
-  if (!imdbId || !title) {
-    return jsonRes(400, { ok: false, error: "imdbId and title required" }, event);
+  const { imdbId } = body;
+  if (!imdbId) {
+    return jsonRes(400, { ok: false, error: "imdbId required" }, event);
   }
 
   const norm = (id) => (String(id).startsWith("tt") ? id : `tt${id}`);
   const nImdb = norm(imdbId);
-  const nYear = year ? Number(year) : null;
-  const nType = type === "show" ? "show" : "movie";
+
+  let omdb;
+  try {
+    omdb = await fetchOMDb(nImdb);
+  } catch (e) {
+    return jsonRes(502, { ok: false, error: e.message || "Failed to fetch title from OMDb" }, event);
+  }
+
+  const title = omdb.Title || "Unknown";
+  const year = omdb.Year ? parseInt(String(omdb.Year).replace(/\D/g, "").slice(0, 4), 10) : null;
+  const nType = (omdb.Type || "").toLowerCase() === "series" ? "show" : "movie";
+  const genre = omdb.Genre || "";
+  const thumb = omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
 
   const db = getFirestore(getApp());
   const catalogRef = db.collection("catalog").doc("movies");
@@ -94,17 +130,14 @@ exports.handler = async (event, context) => {
   if (!movie) {
     const newMovie = {
       title,
-      year: nYear,
+      year: isNaN(year) ? null : year,
       type: nType,
       genre: genre || "",
-      youtubeId: youtubeId || "SEARCH",
+      youtubeId: "SEARCH",
       imdbId: nImdb,
-      thumb: thumb || null,
+      thumb,
       services: [],
     };
-    if (!newMovie.thumb && youtubeId) {
-      newMovie.thumb = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
-    }
     items.push(newMovie);
     await catalogRef.set({
       items,
