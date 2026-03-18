@@ -113,12 +113,25 @@ header h1 span {
   color: var(--accent);
 }
 
+.header-link-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .filters {
   display: flex;
   align-items: center;
   gap: 0.55rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.list-selector-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .list-selector {

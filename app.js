@@ -571,6 +571,15 @@ function renderListSelector() {
   sel.appendChild(optJoin);
 }
 
+function updateCopyInviteButton() {
+  const btn = document.getElementById("copy-invite-btn");
+  if (!btn) return;
+  const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
+  btn.style.display = isShared ? "inline" : "none";
+  btn.textContent = "Copy invite link";
+  btn.disabled = false;
+}
+
 function showSharedModal(title, bodyHtml) {
   const modal = document.getElementById("shared-modal");
   const titleEl = document.getElementById("shared-modal-title");
@@ -621,6 +630,7 @@ function init() {
     const wrap = document.getElementById("list-selector-wrap");
     if (wrap) wrap.style.display = "flex";
     renderListSelector();
+    updateCopyInviteButton();
 
     if (joinListId) {
       const apiBase = window.location.origin;
@@ -636,6 +646,7 @@ function init() {
           sharedLists = await getSharedListsForUser(user.uid);
           currentListMode = { type: "shared", listId: joinListId, name: data.name || "Shared list" };
           renderListSelector();
+          updateCopyInviteButton();
           window.history.replaceState({}, "", window.location.pathname);
         }
       } catch (e) {
@@ -671,6 +682,20 @@ function init() {
     if (val === "personal") {
       currentListMode = "personal";
       movies = await loadList(user);
+      setBookmarkletCookie(user);
+      const filters = document.getElementById("content-filters");
+      const grid = document.getElementById("grid");
+      if (!movies.length) {
+        if (filters) filters.style.display = "none";
+        const meta = document.getElementById("header-meta");
+        if (meta) meta.textContent = "0 titles";
+        if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
+      } else {
+        if (filters) filters.style.display = "";
+        buildCards();
+        renderGenreFilter();
+      }
+      updateCopyInviteButton();
     } else if (val === "__create__") {
       const name = prompt("Enter a name for the shared list:", "Family watchlist");
       if (!name) return;
@@ -682,9 +707,19 @@ function init() {
         const shareUrl = window.location.origin + window.location.pathname + "?join=" + listId;
         showSharedModal("Shared list created", `
           <p>Share this link for others to join:</p>
-          <p class="share-link">${shareUrl}</p>
-          <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--muted)">Anyone with the link can join. They must be signed in.</p>
+          <p class="share-link" id="share-link-text">${shareUrl}</p>
+          <button type="button" class="auth-btn" id="copy-share-link-btn" style="margin-top:0.75rem">Copy link</button>
+          <p style="margin-top:0.75rem;font-size:0.85rem;color:var(--muted)">Anyone with the link can join. They must be signed in.</p>
         `);
+        document.getElementById("copy-share-link-btn")?.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(shareUrl);
+            const btn = document.getElementById("copy-share-link-btn");
+            if (btn) { btn.textContent = "Copied!"; btn.disabled = true; }
+          } catch (e) {
+            alert("Could not copy. Select and copy the link above.");
+          }
+        });
         movies = await loadList(user);
         setBookmarkletCookie(user);
         const filters = document.getElementById("content-filters");
@@ -692,6 +727,7 @@ function init() {
         buildCards();
         renderGenreFilter();
         sel.value = listId;
+        updateCopyInviteButton();
       } catch (err) {
         alert("Failed to create: " + (err.message || "Unknown error"));
         sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
@@ -724,6 +760,7 @@ function init() {
           if (filters) filters.style.display = "";
           buildCards();
           renderGenreFilter();
+          updateCopyInviteButton();
         } else {
           alert(data.error || "Failed to join");
           sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
@@ -747,6 +784,19 @@ function init() {
         if (meta) meta.textContent = "0 titles";
         grid.innerHTML = '<div class="empty-state">This shared list is empty.</div>';
       }
+      updateCopyInviteButton();
+    }
+  });
+
+  document.getElementById("copy-invite-btn")?.addEventListener("click", async () => {
+    if (typeof currentListMode !== "object" || currentListMode?.type !== "shared") return;
+    const shareUrl = window.location.origin + window.location.pathname + "?join=" + currentListMode.listId;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      const btn = document.getElementById("copy-invite-btn");
+      if (btn) { btn.textContent = "Copied!"; btn.disabled = true; setTimeout(() => { btn.textContent = "Copy invite link"; btn.disabled = false; }, 2000); }
+    } catch (e) {
+      alert("Could not copy. The link is: " + shareUrl);
     }
   });
 
