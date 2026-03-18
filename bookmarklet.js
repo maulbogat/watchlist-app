@@ -18,19 +18,35 @@
   var genre = "";
   var thumb = "";
 
-  var metaTitle = document.querySelector('meta[property="og:title"]');
-  if (metaTitle && metaTitle.content) {
-    var raw = metaTitle.content;
-    var y = raw.match(/\((\d{4})(?:–|-|\s*)?(?:\d{4})?\)/);
-    if (y) { year = (y[1].match(/\d{4}/) || [""])[0]; }
-    title = raw.split(" - ")[0].replace(/\s*\(\d{4}[^)]*\)\s*$/, "").trim();
+  var heroTitle = document.querySelector("[data-testid='hero__pageTitle']") || document.querySelector("[data-testid='hero-title-block__title']");
+  if (heroTitle && heroTitle.textContent) {
+    title = heroTitle.textContent.trim();
   }
   if (!title) {
     var h1 = document.querySelector("h1");
     if (h1) {
-      title = (h1.textContent || "").replace(/\s*\(\d{4}[^)]*\)?\s*$/, "").trim();
+      var firstSpan = h1.querySelector("span");
+      if (firstSpan && firstSpan.textContent && !/[•|⭐]/.test(firstSpan.textContent)) {
+        title = firstSpan.textContent.trim();
+      }
+      if (!title) {
+        var h1Text = (h1.textContent || "").trim();
+        h1Text = h1Text.split("|")[0].split("•")[0].trim();
+        h1Text = h1Text.replace(/\s*⭐\s*[\d.]*\s*$/i, "").trim();
+        title = h1Text.replace(/\s*\([^)]*\)\s*$/, "").trim();
+      }
       var yearMatch = (h1.textContent || "").match(/\((\d{4})/);
       if (yearMatch) year = yearMatch[1];
+    }
+  }
+  if (!title) {
+    var metaTitle = document.querySelector('meta[property="og:title"]');
+    if (metaTitle && metaTitle.content) {
+      var raw = metaTitle.content.split(" - ")[0].split("|")[0].trim();
+      var y = raw.match(/\((\d{4})(?:–|-|\s*)?(?:\d{4})?\)/);
+      if (y) { year = (y[1].match(/\d{4}/) || [""])[0]; }
+      title = raw.replace(/\s*⭐\s*[\d.]*\s*$/i, "").trim();
+      title = title.replace(/\s*\([^)]*\)\s*$/, "").trim();
     }
   }
   if (!title) title = "Unknown";
