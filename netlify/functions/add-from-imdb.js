@@ -1,5 +1,5 @@
 const { initializeApp, cert } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 
 function getApp() {
@@ -130,6 +130,7 @@ exports.handler = async (event, context) => {
       watched: watched.filter((k) => k !== key),
       maybeLater: maybeLater.filter((k) => k !== key),
       archive: archive.filter((k) => k !== key),
+      removed: FieldValue.arrayRemove(key),
     },
     { merge: true }
   );

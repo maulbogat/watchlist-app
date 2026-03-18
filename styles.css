@@ -556,6 +556,31 @@ header h1 span {
   right: 8px;
   z-index: 3;
 }
+.card-delete-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.5);
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.card-delete-btn:hover {
+  background: rgba(201,106,106,0.4);
+  color: var(--accent2);
+  border-color: rgba(201,106,106,0.6);
+}
 .status-dropdown {
   position: absolute;
   top: 100%;
@@ -1147,6 +1172,31 @@ header h1 span {
   top: 8px;
   right: 8px;
   z-index: 3;
+}
+.card-delete-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.5);
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.card-delete-btn:hover {
+  background: rgba(201,106,106,0.4);
+  color: var(--accent2);
+  border-color: rgba(201,106,106,0.6);
 }
 .status-dropdown {
   position: absolute;

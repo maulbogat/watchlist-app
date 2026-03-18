@@ -35,21 +35,37 @@
         h1Text = h1Text.replace(/\s*⭐\s*[\d.]*\s*$/i, "").trim();
         title = h1Text.replace(/\s*\([^)]*\)\s*$/, "").trim();
       }
-      var yearMatch = (h1.textContent || "").match(/\((\d{4})/);
-      if (yearMatch) year = yearMatch[1];
     }
   }
   if (!title) {
     var metaTitle = document.querySelector('meta[property="og:title"]');
     if (metaTitle && metaTitle.content) {
       var raw = metaTitle.content.split(" - ")[0].split("|")[0].trim();
-      var y = raw.match(/\((\d{4})(?:–|-|\s*)?(?:\d{4})?\)/);
-      if (y) { year = (y[1].match(/\d{4}/) || [""])[0]; }
       title = raw.replace(/\s*⭐\s*[\d.]*\s*$/i, "").trim();
       title = title.replace(/\s*\([^)]*\)\s*$/, "").trim();
     }
   }
   if (!title) title = "Unknown";
+
+  if (!year) {
+    var metaEl = document.querySelector("[data-testid='hero-title-block__metadata']");
+    if (metaEl && metaEl.textContent) {
+      var parts = metaEl.textContent.split(/[•·]/).map(function (p) { return p.trim(); });
+      for (var i = 0; i < parts.length; i++) {
+        var ym = parts[i].match(/^(\d{4})(?:[–\-]\s*\d{0,4})?$/);
+        if (ym) { year = ym[1]; break; }
+      }
+    }
+  }
+  if (!year) {
+    var yInPage = (document.body && document.body.innerText || "").match(/\b(19|20)\d{2}(?:[–\-]\s*(?:19|20)\d{2})?[–\-]?\b/);
+    if (yInPage) year = (yInPage[0].match(/\d{4}/) || [""])[0];
+  }
+  if (!year && document.querySelector('meta[property="og:title"]')) {
+    var raw = document.querySelector('meta[property="og:title"]').content;
+    var yParen = raw.match(/\([^)]*?(\d{4})(?:[–\-]\s*(\d{4})?)?[–\-]?[^)]*\)/);
+    if (yParen) year = yParen[1];
+  }
 
   var bodyText = (document.body && document.body.innerText) || "";
   if (/TV Series|TV Mini Series|TV Movie|TV Special|TV Short/i.test(bodyText)) type = "show";

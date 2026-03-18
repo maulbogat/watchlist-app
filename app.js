@@ -8,6 +8,7 @@ import {
   getMoviesCatalog,
   getStatusData,
   setStatus,
+  removeTitle,
 } from "./firebase.js";
 
 const STATUS_ORDER = ["to-watch", "maybe-later", "watched", "archive"];
@@ -38,14 +39,12 @@ function getUniqueGenres() {
 
 function getFilteredTitles() {
   let list = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
-  const byStatus = list.filter((m) => (m.status || "to-watch") === currentStatus);
+  list = list.filter((m) => !m.removed && (m.status || "to-watch") === currentStatus);
   if (currentGenre) {
-    list = byStatus.filter((m) => {
+    list = list.filter((m) => {
       const g = String(m.genre || "");
       return g.split(/\s*\/\s*/).some((s) => s.trim().toLowerCase() === currentGenre.toLowerCase());
     });
-  } else {
-    list = byStatus;
   }
 
   return [...list].sort((a, b) =>
@@ -127,9 +126,11 @@ function buildCards() {
         ${STATUS_ORDER.map((st) => `<button type="button" class="status-dropdown-item ${st === s ? "active" : ""}" role="menuitem" data-status="${st}">${statusLabels[st]}</button>`).join("")}
       </div>
     </div>`;
+    const deleteBtn = `<button type="button" class="card-delete-btn" aria-label="Remove from list" title="Remove">&#215;</button>`;
 
     card.innerHTML = `
       <div class="thumb-wrap">
+        ${deleteBtn}
         ${statusBadge}
         ${thumbHTML}
         <div class="thumb-overlay"></div>
@@ -148,7 +149,7 @@ function buildCards() {
     `;
 
     card.addEventListener("click", (e) => {
-      if (e.target.closest(".status-badge-wrap")) return;
+      if (e.target.closest(".status-badge-wrap") || e.target.closest(".card-delete-btn")) return;
       openModal(m);
     });
     card.addEventListener("keydown", (e) => {
@@ -156,6 +157,14 @@ function buildCards() {
     });
     const badgeBtn = card.querySelector(".status-badge");
     const dropdown = card.querySelector(".status-dropdown");
+    const deleteBtnEl = card.querySelector(".card-delete-btn");
+    if (deleteBtnEl) {
+      deleteBtnEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        removeFromCard(m);
+      });
+    }
     if (badgeBtn && dropdown) {
       badgeBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -168,7 +177,7 @@ function buildCards() {
         item.addEventListener("click", (e) => {
           e.stopPropagation();
           const status = item.dataset.status;
-          if (status !== (m.status || "to-watch")) setStatusFromCard(m, status);
+          if (status && status !== (m.status || "to-watch")) setStatusFromCard(m, status);
           dropdown.classList.remove("open");
           badgeBtn.setAttribute("aria-expanded", "false");
         });
@@ -198,6 +207,24 @@ async function setStatusFromCard(m, status) {
   } catch (err) {
     console.error("Failed to update status:", err);
     alert("Failed to update. Please try again.");
+  }
+}
+
+async function removeFromCard(m) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    alert("Sign in with Google to save your status across devices.");
+    return;
+  }
+  const key = movieKey(m);
+  try {
+    await removeTitle(uid, key);
+    m.removed = true;
+    buildCards();
+    closeModal();
+  } catch (err) {
+    console.error("Failed to remove:", err);
+    alert("Failed to remove. Please try again.");
   }
 }
 
@@ -408,8 +435,10 @@ function initAfterMoviesLoaded() {
     const watchedSet = new Set(data.watched);
     const maybeLaterSet = new Set(data.maybeLater);
     const archiveSet = new Set(data.archive);
+    const removedSet = new Set(data.removed || []);
     movies.forEach((m) => {
       const key = movieKey(m);
+      m.removed = removedSet.has(key);
       if (watchedSet.has(key)) m.status = "watched";
       else if (maybeLaterSet.has(key)) m.status = "maybe-later";
       else if (archiveSet.has(key)) m.status = "archive";

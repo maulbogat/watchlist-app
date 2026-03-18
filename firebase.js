@@ -44,8 +44,8 @@ async function getMoviesCatalog() {
 
 /**
  * Returns status data from Firestore.
- * Data model: users/{uid} = { watched: string[], maybeLater: string[], archive: string[] }
- * Status: to-watch (default), watched, maybe-later, archive
+ * Data model: users/{uid} = { watched: string[], maybeLater: string[], archive: string[], removed: string[] }
+ * Status: to-watch (default), watched, maybe-later, archive. Removed titles are hidden unless viewing Removed tab.
  */
 async function getStatusData(uid) {
   const ref = doc(db, "users", uid);
@@ -55,6 +55,7 @@ async function getStatusData(uid) {
     watched: Array.isArray(data.watched) ? data.watched : [],
     maybeLater: Array.isArray(data.maybeLater) ? data.maybeLater : [],
     archive: Array.isArray(data.archive) ? data.archive : [],
+    removed: Array.isArray(data.removed) ? data.removed : [],
   };
 }
 
@@ -87,6 +88,20 @@ async function removeWatched(uid, key) {
   await setStatus(uid, key, "to-watch");
 }
 
+async function removeTitle(uid, key) {
+  const ref = doc(db, "users", uid);
+  await setDoc(
+    ref,
+    {
+      watched: arrayRemove(key),
+      maybeLater: arrayRemove(key),
+      archive: arrayRemove(key),
+      removed: arrayUnion(key),
+    },
+    { merge: true }
+  );
+}
+
 export {
   auth,
   db,
@@ -102,4 +117,5 @@ export {
   setStatus,
   addWatched,
   removeWatched,
+  removeTitle,
 };

@@ -28,6 +28,13 @@
   var metaTitle = document.querySelector('meta[property="og:title"]');
   console.log("5. og:title:", metaTitle ? metaTitle.content : "NOT FOUND");
 
+  var metaEl = document.querySelector("[data-testid='hero-title-block__metadata']");
+  console.log("6. hero-title-block__metadata:", metaEl ? metaEl.textContent.trim() : "NOT FOUND");
+  if (metaEl) {
+    var parts = metaEl.textContent.split(/[•·]/).map(function (p) { return p.trim(); });
+    parts.forEach(function (p, i) { console.log("   part[" + i + "]:", JSON.stringify(p)); });
+  }
+
   console.log("\n--- Simulated extraction result ---");
   var title = "";
   if (heroTitle && heroTitle.textContent) {
@@ -52,4 +59,22 @@
     console.log("Using: og:title stripped ->", title);
   }
   console.log("FINAL TITLE:", title || "(empty)");
+
+  var year = "";
+  if (metaEl && metaEl.textContent) {
+    var parts = metaEl.textContent.split(/[•·]/).map(function (p) { return p.trim(); });
+    for (var i = 0; i < parts.length; i++) {
+      var ym = parts[i].match(/^(\d{4})(?:[–\-]\s*\d{0,4})?$/);
+      if (ym) { year = ym[1]; break; }
+    }
+  }
+  if (!year && document.body) {
+    var yInPage = document.body.innerText.match(/\b(19|20)\d{2}(?:[–\-]\s*(?:19|20)\d{2})?[–\-]?\b/);
+    if (yInPage) year = (yInPage[0].match(/\d{4}/) || [""])[0];
+  }
+  if (!year && metaTitle && metaTitle.content) {
+    var yParen = metaTitle.content.match(/\([^)]*?(\d{4})(?:[–\-]\s*(\d{4})?)?[–\-]?[^)]*\)/);
+    if (yParen) year = yParen[1];
+  }
+  console.log("FINAL YEAR:", year || "(empty)");
 })();
