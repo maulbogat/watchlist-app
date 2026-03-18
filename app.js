@@ -175,6 +175,15 @@ async function setStatusFromCard(m, status) {
   }
 }
 
+function renderModalStatusBtns(m) {
+  const s = m.status || "to-watch";
+  const labels = { "to-watch": "To Watch", "maybe-later": "Maybe later", watched: "Watched", archive: "Archive" };
+  return STATUS_ORDER.map(
+    (status) =>
+      `<button type="button" class="modal-status-btn ${status === s ? "active" : ""}" data-status="${status}" title="${labels[status]}">${labels[status]}</button>`
+  ).join("");
+}
+
 function updateModalStatusBtn() {
   if (!currentModalMovie) return;
   const btns = document.querySelectorAll(".modal-status-btn");
