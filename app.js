@@ -474,10 +474,25 @@ function showToast(msg, duration = 4000) {
   setTimeout(() => el.remove(), duration);
 }
 
+async function setBookmarkletCookie(user) {
+  if (window.location.protocol !== "https:") return;
+  try {
+    if (!user) {
+      document.cookie = "bookmarklet_token=; path=/; max-age=0";
+      return;
+    }
+    const token = await user.getIdToken();
+    document.cookie = `bookmarklet_token=${token}; path=/; max-age=2592000; SameSite=None; Secure`;
+  } catch (e) {
+    console.warn("Bookmarklet cookie:", e);
+  }
+}
+
 // Auth state + load status data, apply status attribute from Firebase
 function initAfterMoviesLoaded() {
   onAuthStateChanged(auth, async (user) => {
     updateAuthUI(user);
+    setBookmarkletCookie(user);
     let data = { watched: [], maybeLater: [], archive: [] };
     if (user) {
       try {
