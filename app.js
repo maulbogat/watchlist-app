@@ -276,10 +276,40 @@ function openModal(m) {
     placeholder.style.background = "#0d0d10";
     placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
       <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
-      ${imdbUrl
-        ? `<a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>`
-        : `<a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Find Trailer on YouTube &#x2197;</a>`}
+      <div class="trailer-loading" style="font-size:0.9rem;color:var(--muted)">Loading trailer…</div>
     </div>`;
+
+    if (m.imdbId) {
+      const apiBase = window.location.origin;
+      fetch(`${apiBase}/.netlify/functions/get-imdb-trailer?imdbId=${encodeURIComponent(m.imdbId)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.ok && data.embedUrl && currentModalMovie === m) {
+            placeholder.style.background = "#000";
+            placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
+              referrerpolicy="strict-origin-when-cross-origin"
+              src="${String(data.embedUrl).replace(/"/g, "&quot;")}"></iframe>`;
+          } else if (currentModalMovie === m) {
+            placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
+              <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
+              <a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>
+            </div>`;
+          }
+        })
+        .catch(() => {
+          if (currentModalMovie === m) {
+            placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
+              <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
+              <a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>
+            </div>`;
+          }
+        });
+    } else {
+      placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
+        <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
+        <a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Find Trailer on YouTube &#x2197;</a>
+      </div>`;
+    }
   } else {
     const videoWrap = modal.querySelector(".video-wrap");
     videoWrap.style.background = "#000";
