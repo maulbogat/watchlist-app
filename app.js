@@ -13,15 +13,35 @@ import {
 
 let movies = [];
 let currentFilter = "both"; // 'both' | 'movie' | 'show'
+let currentGenre = ""; // '' = all, or genre name
 let currentStatus = "to-watch"; // 'to-watch' | 'watched'
 let currentModalMovie = null; // movie currently shown in modal
 
+function getUniqueGenres() {
+  const set = new Set();
+  movies.forEach((m) => {
+    const g = String(m.genre || "").trim();
+    if (!g) return;
+    g.split(/\s*\/\s*/).forEach((s) => {
+      const t = s.trim();
+      if (t) set.add(t);
+    });
+  });
+  return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
 function getFilteredTitles() {
-  const byType = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
+  let list = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
+  if (currentGenre) {
+    list = list.filter((m) => {
+      const g = String(m.genre || "");
+      return g.split(/\s*\/\s*/).some((s) => s.trim().toLowerCase() === currentGenre.toLowerCase());
+    });
+  }
   const byStatus =
     currentStatus === "watched"
-      ? byType.filter((m) => m.watched === true)
-      : byType.filter((m) => m.watched !== true);
+      ? list.filter((m) => m.watched === true)
+      : list.filter((m) => m.watched !== true);
 
   return [...byStatus].sort((a, b) =>
     String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" })
@@ -342,11 +362,34 @@ async function init() {
       return;
     }
     initAfterMoviesLoaded();
+    renderGenreFilter();
   } catch (err) {
     console.error("Failed to load catalog:", err);
     grid.innerHTML =
       '<div class="empty-state">Failed to load catalog. Check console and Firestore setup.</div>';
   }
+}
+
+function renderGenreFilter() {
+  const container = document.getElementById("genre-filter-wrap");
+  if (!container) return;
+  const genres = getUniqueGenres();
+  if (!genres.length) {
+    container.style.display = "none";
+    return;
+  }
+  container.style.display = "flex";
+  container.innerHTML = `
+    <label for="genre-filter" class="genre-filter-label">Genre</label>
+    <select id="genre-filter" class="genre-filter-select" aria-label="Filter by genre">
+      <option value="">All</option>
+      ${genres.map((g) => `<option value="${g}">${g}</option>`).join("")}
+    </select>
+  `;
+  container.querySelector("#genre-filter").addEventListener("change", (e) => {
+    currentGenre = e.target.value;
+    buildCards();
+  });
 }
 
 init();
