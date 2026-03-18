@@ -12,16 +12,43 @@ import {
 
 const STATUS_ORDER = ["to-watch", "maybe-later", "watched", "archive"];
 
+const GENRE_LIMIT = 10;
+
 let movies = [];
 let currentFilter = "both"; // 'both' | 'movie' | 'show'
+let currentGenre = ""; // '' = all, or genre name
 let currentStatus = "to-watch"; // 'to-watch' | 'maybe-later' | 'watched' | 'archive'
 let currentModalMovie = null; // movie currently shown in modal
+
+function getUniqueGenres() {
+  const count = new Map();
+  movies.forEach((m) => {
+    const g = String(m.genre || "").trim();
+    if (!g) return;
+    g.split(/\s*\/\s*/).forEach((s) => {
+      const t = s.trim();
+      if (t) count.set(t, (count.get(t) || 0) + 1);
+    });
+  });
+  return [...count.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], undefined, { sensitivity: "base" }))
+    .slice(0, GENRE_LIMIT)
+    .map(([name]) => name);
+}
 
 function getFilteredTitles() {
   let list = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
   const byStatus = list.filter((m) => (m.status || "to-watch") === currentStatus);
+  if (currentGenre) {
+    list = byStatus.filter((m) => {
+      const g = String(m.genre || "");
+      return g.split(/\s*\/\s*/).some((s) => s.trim().toLowerCase() === currentGenre.toLowerCase());
+    });
+  } else {
+    list = byStatus;
+  }
 
-  return [...byStatus].sort((a, b) =>
+  return [...list].sort((a, b) =>
     String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" })
   );
 }
@@ -391,11 +418,38 @@ async function init() {
       return;
     }
     initAfterMoviesLoaded();
+    renderGenreFilter();
   } catch (err) {
     console.error("Failed to load catalog:", err);
     grid.innerHTML =
       '<div class="empty-state">Failed to load catalog. Check console and Firestore setup.</div>';
   }
+}
+
+function renderGenreFilter() {
+  const container = document.getElementById("genre-filter-wrap");
+  if (!container) return;
+  const genres = getUniqueGenres();
+  if (!genres.length) {
+    container.style.display = "none";
+    return;
+  }
+  container.style.display = "flex";
+  container.innerHTML = `
+    <button type="button" class="genre-chip ${!currentGenre ? "active" : ""}" data-genre="" aria-pressed="${!currentGenre}">All</button>
+    ${genres.map((g) => `<button type="button" class="genre-chip ${currentGenre === g ? "active" : ""}" data-genre="${g}" aria-pressed="${currentGenre === g}">${g}</button>`).join("")}
+  `;
+  container.querySelectorAll(".genre-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentGenre = btn.dataset.genre || "";
+      container.querySelectorAll(".genre-chip").forEach((b) => {
+        const isActive = (b.dataset.genre || "") === currentGenre;
+        b.classList.toggle("active", isActive);
+        b.setAttribute("aria-pressed", isActive);
+      });
+      buildCards();
+    });
+  });
 }
 
 init();
