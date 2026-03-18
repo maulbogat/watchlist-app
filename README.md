@@ -22,16 +22,6 @@ Then open `http://localhost:5173`. (YouTube embeds can fail when opened via `fil
 
 4. **Movie catalog** is stored in Firestore. To add/update movies, edit the `catalog/movies` document in Firebase Console → Firestore.
 
-## Netlify deployment (bookmarklet)
-
-For the IMDb bookmarklet to add titles to the catalog, set `FIREBASE_SERVICE_ACCOUNT` in Netlify → Site settings → Environment variables:
-
-```bash
-base64 -i serviceAccountKey.json | tr -d '\n'
-```
-
-Paste the output as the value. The bookmarklet calls `/.netlify/functions/add-from-imdb` to add movies and deduplicate.
-
 ## Features
 
 - Movie catalog stored in Firestore

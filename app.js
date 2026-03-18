@@ -378,121 +378,10 @@ document.getElementById("sign-out-btn").addEventListener("click", () => {
   fbSignOut(auth);
 });
 
-// Handle ?add=tt1234567 from IMDb bookmarklet
-async function handleAddFromParams(user) {
-  const params = new URLSearchParams(window.location.search);
-  const imdbId = params.get("add") || params.get("imdb");
-  if (!imdbId) return;
-
-  const norm = (id) => (String(id).startsWith("tt") ? id : `tt${id}`);
-  const urlTitle = (params.get("title") || "").trim();
-  const urlYear = params.get("year") || "";
-
-  const normTitle = (s) =>
-    String(s || "")
-      .toLowerCase()
-      .replace(/^the\s+/i, "")
-      .replace(/\s*[:\-–—]\s*.*$/, "") // strip ": Subtitle" or " - Part 2"
-      .replace(/\s+/g, " ")
-      .trim();
-
-  // Match by imdbId first, then by title+year, then by title only
-  let movie = movies.find((m) => m.imdbId && norm(m.imdbId) === norm(imdbId));
-  if (!movie && urlTitle) {
-    const titleLower = normTitle(urlTitle);
-    const yearNum = urlYear ? parseInt(urlYear, 10) : null;
-    movie = movies.find((m) => {
-      const t = normTitle(m.title);
-      const matchTitle = t === titleLower || String(m.title || "").toLowerCase() === urlTitle.toLowerCase();
-      const matchYear = !yearNum || (m.year != null && Number(m.year) === yearNum);
-      return matchTitle && matchYear;
-    });
-    if (!movie) {
-      const byTitle = movies.filter((m) => normTitle(m.title) === titleLower);
-      if (byTitle.length === 1) movie = byTitle[0];
-    }
-  }
-
-  const clearUrl = () => {
-    const u = new URL(window.location.href);
-    u.searchParams.delete("add");
-    u.searchParams.delete("imdb");
-    u.searchParams.delete("title");
-    u.searchParams.delete("year");
-    u.searchParams.delete("type");
-    window.history.replaceState({}, "", u.pathname + (u.search || ""));
-  };
-
-  const inIframe = window !== window.top;
-  const notify = (msg, isSuccess) => {
-    if (inIframe) {
-      window.parent.postMessage({ type: "watchlist-add", message: msg, success: isSuccess }, "*");
-    } else {
-      showToast(msg, isSuccess ? 4000 : 6000);
-    }
-  };
-
-  if (!movie) {
-    const title = params.get("title") || "Unknown";
-    const year = params.get("year") || "";
-    const type = params.get("type") || "movie";
-    const yearPart = year || "YEAR";
-    notify(`"${title}" not in catalog. Add via: node scripts/add-movie.js "${title}" ${yearPart} ${type} SEARCH ${imdbId}`, false);
-    clearUrl();
-    return;
-  }
-  if (!user) {
-    notify("Sign in with Google to add to your watchlist.", false);
-    clearUrl();
-    return;
-  }
-  try {
-    await setStatus(user.uid, movieKey(movie), "to-watch");
-    movie.status = "to-watch";
-    currentStatus = "to-watch";
-    document.querySelectorAll(".tab-group .tab").forEach((b) => {
-      const isActive = (b.dataset.status || "") === "to-watch";
-      b.classList.toggle("active", isActive);
-      b.setAttribute("aria-selected", isActive ? "true" : "false");
-    });
-    buildCards();
-    notify(`Added "${movie.title}" to To Watch`, true);
-  } catch (e) {
-    console.error(e);
-    notify("Failed to add. Try again.", false);
-  }
-  clearUrl();
-}
-
-function showToast(msg, duration = 4000) {
-  const el = document.createElement("div");
-  el.className = "toast";
-  el.textContent = msg;
-  el.style.cssText =
-    "position:fixed;top:1rem;left:50%;transform:translateX(-50%);background:var(--accent);color:#0a0a0c;padding:0.75rem 1.25rem;border-radius:8px;font-size:0.9rem;z-index:1001;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-weight:500;";
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), duration);
-}
-
-async function setBookmarkletCookie(user) {
-  if (window.location.protocol !== "https:") return;
-  try {
-    if (!user) {
-      document.cookie = "bookmarklet_token=; path=/; max-age=0";
-      return;
-    }
-    const token = await user.getIdToken();
-    document.cookie = `bookmarklet_token=${token}; path=/; max-age=2592000; SameSite=None; Secure`;
-  } catch (e) {
-    console.warn("Bookmarklet cookie:", e);
-  }
-}
-
 // Auth state + load status data, apply status attribute from Firebase
 function initAfterMoviesLoaded() {
   onAuthStateChanged(auth, async (user) => {
     updateAuthUI(user);
-    setBookmarkletCookie(user);
     let data = { watched: [], maybeLater: [], archive: [] };
     if (user) {
       try {
@@ -512,14 +401,6 @@ function initAfterMoviesLoaded() {
       else m.status = "to-watch";
     });
     buildCards();
-    const hasAddParams = new URLSearchParams(window.location.search).get("add") || new URLSearchParams(window.location.search).get("imdb");
-    if (hasAddParams && !user) {
-      await new Promise((r) => setTimeout(r, 2000));
-      const retryUser = auth.currentUser;
-      await handleAddFromParams(retryUser);
-    } else {
-      await handleAddFromParams(user);
-    }
   });
 }
 
