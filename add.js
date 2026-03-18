@@ -29,6 +29,10 @@ if (!imdbId || !/^tt\d+$/.test(nImdb)) {
       if (window.self !== window.top) {
         window.parent.postMessage({ type: "add-result", ok: false, error: msg }, "*");
       }
+      if (window.opener) {
+        window.opener.postMessage({ type: "add-result", ok: false, error: msg }, "*");
+        setTimeout(function () { window.close(); }, 300);
+      }
       setStatus(msg, true);
       statusEl.innerHTML = 'Sign in on the <a href="./">watchlist</a> first, then try again.';
       return;
@@ -57,6 +61,13 @@ if (!imdbId || !/^tt\d+$/.test(nImdb)) {
           "*"
         );
       }
+      if (window.opener) {
+        window.opener.postMessage(
+          { type: "add-result", ok: data.ok, message: data.message, error: data.error },
+          "*"
+        );
+        setTimeout(function () { window.close(); }, 300);
+      }
       if (data.ok) {
         setStatus(data.message || "Added to watchlist!");
       } else {
@@ -69,6 +80,13 @@ if (!imdbId || !/^tt\d+$/.test(nImdb)) {
           { type: "add-result", ok: false, error: errMsg },
           "*"
         );
+      }
+      if (window.opener) {
+        window.opener.postMessage(
+          { type: "add-result", ok: false, error: errMsg },
+          "*"
+        );
+        setTimeout(function () { window.close(); }, 300);
       }
       setStatus(errMsg, true);
     }

@@ -6,23 +6,30 @@
     return;
   }
   var url = "https://watchlist-trailers.netlify.app/add.html?imdbId=" + encodeURIComponent(imdbId) + "&embed=1";
-  var iframe = document.createElement("iframe");
-  iframe.src = url;
-  iframe.style.cssText = "position:fixed;width:1px;height:1px;border:0;opacity:0;pointer-events:none";
-  document.body.appendChild(iframe);
-  var timeoutId = setTimeout(function () {
-    if (iframe.parentNode) {
+  var popup = window.open(url, "addToWatchlist", "width=420,height=220,menubar=no,toolbar=no,location=no,status=no");
+  if (!popup) {
+    alert("Popup blocked. Allow popups for this site and try again.");
+    return;
+  }
+  var checkClosed = setInterval(function () {
+    if (popup.closed) {
+      clearInterval(checkClosed);
       window.removeEventListener("message", handleMessage);
-      document.body.removeChild(iframe);
-      showToast("Timed out. Sign in on the watchlist first.", true);
     }
+  }, 200);
+  var timeoutId = setTimeout(function () {
+    clearInterval(checkClosed);
+    window.removeEventListener("message", handleMessage);
+    if (!popup.closed) popup.close();
+    showToast("Timed out. Sign in on the watchlist first.", true);
   }, 15000);
   function handleMessage(e) {
     var okOrigin = e.origin === "https://watchlist-trailers.netlify.app" || /^https?:\/\/localhost(:\d+)?$/.test(e.origin);
     if (!okOrigin || !e.data || e.data.type !== "add-result") return;
     clearTimeout(timeoutId);
+    clearInterval(checkClosed);
     window.removeEventListener("message", handleMessage);
-    if (iframe.parentNode) document.body.removeChild(iframe);
+    if (!popup.closed) popup.close();
     var msg = e.data.ok ? (e.data.message || "Added to watchlist!") : (e.data.error || "Failed to add.");
     showToast(msg, !e.data.ok);
   }
