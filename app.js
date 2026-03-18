@@ -154,7 +154,6 @@ function buildCards() {
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") openModal(m);
     });
-    const wrap = card.querySelector(".status-badge-wrap");
     const badgeBtn = card.querySelector(".status-badge");
     const dropdown = card.querySelector(".status-dropdown");
     if (badgeBtn && dropdown) {
