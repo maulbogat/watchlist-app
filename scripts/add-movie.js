@@ -1,9 +1,9 @@
 /**
  * Add a movie to the Firestore catalog.
- * Run: node scripts/add-movie.js "Title" [year] [type] [youtubeId]
- * Example: node scripts/add-movie.js "10 קילו קוקאין" 2025 movie
+ * Run: node scripts/add-movie.js "Title" [year] [type] [youtubeId] [imdbId]
+ * Example: node scripts/add-movie.js "Action" 1999 show "" tt0206467
  *
- * If youtubeId omitted, uses "SEARCH" (user can search YouTube).
+ * If youtubeId omitted, uses "SEARCH". Use imdbId (e.g. tt0206467) for IMDB trailer link.
  * Requires: serviceAccountKey.json in project root.
  */
 import { readFileSync } from "fs";
@@ -27,7 +27,7 @@ try {
 
 const db = getFirestore(app);
 
-async function addMovie(title, year, type, youtubeId) {
+async function addMovie(title, year, type, youtubeId, imdbId) {
   const ref = db.collection("catalog").doc("movies");
   const snap = await ref.get();
   if (!snap.exists || !Array.isArray(snap.data().items)) {
@@ -45,12 +45,15 @@ async function addMovie(title, year, type, youtubeId) {
     title,
     year: year ? Number(year) : null,
     type: type === "show" ? "show" : "movie",
-    genre: "Drama / Crime",
+    genre: "Comedy / Drama",
     youtubeId: yt,
     services: [],
   };
   if (yt !== "SEARCH") {
     movie.thumb = `https://img.youtube.com/vi/${yt}/hqdefault.jpg`;
+  }
+  if (imdbId) {
+    movie.imdbId = imdbId.startsWith("tt") ? imdbId : `tt${imdbId}`;
   }
   items.push(movie);
   await ref.set({
@@ -60,13 +63,13 @@ async function addMovie(title, year, type, youtubeId) {
   console.log(`Added "${title}" (${year || "—"}) to catalog.`);
 }
 
-const [, , title, year, type, youtubeId] = process.argv;
+const [, , title, year, type, youtubeId, imdbId] = process.argv;
 if (!title) {
-  console.error('Usage: node scripts/add-movie.js "Title" [year] [type] [youtubeId]');
+  console.error('Usage: node scripts/add-movie.js "Title" [year] [type] [youtubeId] [imdbId]');
   process.exit(1);
 }
 
-addMovie(title, year, type, youtubeId).catch((err) => {
+addMovie(title, year, type, youtubeId, imdbId).catch((err) => {
   console.error(err);
   process.exit(1);
 });

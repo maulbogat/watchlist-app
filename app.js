@@ -167,27 +167,29 @@ function openModal(m) {
 
   if (m.youtubeId === "SEARCH") {
     const query = encodeURIComponent(m.title + " official trailer");
+    const imdbUrl = m.imdbId
+      ? `https://www.imdb.com/title/${m.imdbId}/`
+      : null;
     const isWatched = m.watched === true;
+    const trailerLink = imdbUrl
+      ? `<a href="${imdbUrl}" target="_blank" style="color: var(--accent); text-decoration: none;">Watch on IMDb &#x2197;</a>`
+      : `<a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="color: var(--accent); text-decoration: none;">Search on YouTube &#x2197;</a>`;
     footer.innerHTML = `
       <button type="button" class="modal-watched-btn ${isWatched ? "watched" : ""}" title="${isWatched ? "Mark as unwatched" : "Mark as watched"}">
         ${isWatched ? "✓ Watched" : "Mark as watched"}
       </button>
       <span style="opacity:0.4">·</span>
-      <span>No trailer ID yet &mdash;</span>
-      <a href="https://www.youtube.com/results?search_query=${query}" target="_blank"
-         style="color: var(--accent); text-decoration: none;">
-        Search on YouTube &#x2197;
-      </a>
+      <span>No YouTube trailer &mdash;</span>
+      ${trailerLink}
     `;
     footer.querySelector(".modal-watched-btn")?.addEventListener("click", () => toggleWatched(m));
     const placeholder = modal.querySelector(".video-wrap");
     placeholder.style.background = "#0d0d10";
     placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
       <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
-      <a href="https://www.youtube.com/results?search_query=${query}" target="_blank"
-         style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">
-        Find Trailer on YouTube &#x2197;
-      </a>
+      ${imdbUrl
+        ? `<a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>`
+        : `<a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Find Trailer on YouTube &#x2197;</a>`}
     </div>`;
   } else {
     const videoWrap = modal.querySelector(".video-wrap");

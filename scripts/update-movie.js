@@ -41,7 +41,11 @@ async function updateMovie(title, youtubeId) {
     process.exit(1);
   }
   items[idx].youtubeId = youtubeId;
-  items[idx].thumb = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+  if (youtubeId === "SEARCH") {
+    delete items[idx].thumb;
+  } else {
+    items[idx].thumb = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+  }
   await ref.set({
     items,
     updatedAt: new Date().toISOString(),
