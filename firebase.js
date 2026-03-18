@@ -12,6 +12,11 @@ import {
   doc,
   getDoc,
   setDoc,
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
   arrayUnion,
   arrayRemove,
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
@@ -155,6 +160,105 @@ async function removeTitle(uid, key) {
   );
 }
 
+// --- Shared lists ---
+
+function randomId() {
+  return Math.random().toString(36).slice(2, 12);
+}
+
+async function createSharedList(uid, name) {
+  const listId = randomId() + randomId();
+  const ref = doc(db, "sharedLists", listId);
+  await setDoc(ref, {
+    name: name || "Shared list",
+    ownerId: uid,
+    members: [uid],
+    items: [],
+    watched: [],
+    maybeLater: [],
+    archive: [],
+    removed: [],
+    createdAt: new Date().toISOString(),
+  });
+  return listId;
+}
+
+async function getSharedList(listId) {
+  const ref = doc(db, "sharedLists", listId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+  return { id: listId, ...snap.data() };
+}
+
+async function getSharedListsForUser(uid) {
+  const q = query(
+    collection(db, "sharedLists"),
+    where("members", "array-contains", uid)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+async function getSharedListMovies(listId) {
+  const data = await getSharedList(listId);
+  if (!data) return [];
+  const items = Array.isArray(data.items) ? data.items : [];
+  const watchedSet = new Set(data.watched || []);
+  const maybeLaterSet = new Set(data.maybeLater || []);
+  const archiveSet = new Set(data.archive || []);
+  const removedSet = new Set(data.removed || []);
+  return items.map((m) => {
+    const key = movieKey(m);
+    let status = "to-watch";
+    if (watchedSet.has(key)) status = "watched";
+    else if (maybeLaterSet.has(key)) status = "maybe-later";
+    else if (archiveSet.has(key)) status = "archive";
+    return { ...m, status, removed: removedSet.has(key) };
+  });
+}
+
+async function setSharedListStatus(listId, key, status) {
+  const ref = doc(db, "sharedLists", listId);
+  const removeFromAll = {
+    watched: arrayRemove(key),
+    maybeLater: arrayRemove(key),
+    archive: arrayRemove(key),
+  };
+  if (status === "to-watch") {
+    await setDoc(ref, removeFromAll, { merge: true });
+    return;
+  }
+  const addTo = status === "watched" ? "watched" : status === "maybe-later" ? "maybeLater" : "archive";
+  await setDoc(ref, { ...removeFromAll, [addTo]: arrayUnion(key) }, { merge: true });
+}
+
+async function removeFromSharedList(listId, key) {
+  const ref = doc(db, "sharedLists", listId);
+  await setDoc(
+    ref,
+    {
+      watched: arrayRemove(key),
+      maybeLater: arrayRemove(key),
+      archive: arrayRemove(key),
+      removed: arrayUnion(key),
+    },
+    { merge: true }
+  );
+}
+
+async function addToSharedList(listId, movie) {
+  const ref = doc(db, "sharedLists", listId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("Shared list not found");
+  const data = snap.data();
+  const items = Array.isArray(data.items) ? [...data.items] : [];
+  const key = movieKey(movie);
+  const exists = items.some((m) => movieKey(m) === key);
+  if (exists) return;
+  items.push(movie);
+  await setDoc(ref, { items, removed: (data.removed || []).filter((k) => k !== key) }, { merge: true });
+}
+
 export {
   auth,
   db,
@@ -172,4 +276,11 @@ export {
   addWatched,
   removeWatched,
   removeTitle,
+  createSharedList,
+  getSharedList,
+  getSharedListsForUser,
+  getSharedListMovies,
+  setSharedListStatus,
+  removeFromSharedList,
+  addToSharedList,
 };

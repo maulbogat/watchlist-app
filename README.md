@@ -42,6 +42,17 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 Multiple people can use the app with their own Google accounts. Each account has its own list of titles—items added via the bookmarklet go only to that account's list.
 
+## Shared lists
+
+Create shared lists that multiple people can add to and update together:
+
+1. **Create:** Use the list dropdown → "+ Create shared list" → enter a name
+2. **Share:** Copy the link shown and send it to others
+3. **Join:** Others open the link while signed in to join the list
+4. **Add items:** When viewing a shared list, the bookmarklet adds to that list (sign in and switch to the shared list first)
+
+Deploy Firestore rules: `firebase deploy --only firestore:rules`
+
 **Verify in Firebase Console:**
 
 1. **Authentication → Sign-in method** → Google → Enabled

@@ -8,6 +8,13 @@ import {
   getUserMovies,
   setStatus,
   removeTitle,
+  createSharedList,
+  getSharedList,
+  getSharedListsForUser,
+  getSharedListMovies,
+  setSharedListStatus,
+  removeFromSharedList,
+  addToSharedList,
 } from "./firebase.js";
 
 const STATUS_ORDER = ["to-watch", "maybe-later", "watched", "archive"];
@@ -19,6 +26,8 @@ let currentFilter = "both"; // 'both' | 'movie' | 'show'
 let currentGenre = ""; // '' = all, or genre name
 let currentStatus = "to-watch"; // 'to-watch' | 'maybe-later' | 'watched' | 'archive'
 let currentModalMovie = null; // movie currently shown in modal
+let currentListMode = "personal"; // "personal" | { type: "shared", listId, name }
+let sharedLists = [];
 
 function getUniqueGenres() {
   const count = new Map();
@@ -216,7 +225,11 @@ async function setStatusFromCard(m, status) {
   }
   const key = movieKey(m);
   try {
-    await setStatus(uid, key, status);
+    if (typeof currentListMode === "object" && currentListMode?.type === "shared") {
+      await setSharedListStatus(currentListMode.listId, key, status);
+    } else {
+      await setStatus(uid, key, status);
+    }
     m.status = status;
     buildCards();
     updateModalStatusBtn();
@@ -234,7 +247,11 @@ async function removeFromCard(m) {
   }
   const key = movieKey(m);
   try {
-    await removeTitle(uid, key);
+    if (typeof currentListMode === "object" && currentListMode?.type === "shared") {
+      await removeFromSharedList(currentListMode.listId, key);
+    } else {
+      await removeTitle(uid, key);
+    }
     m.removed = true;
     buildCards();
     closeModal();
@@ -491,12 +508,86 @@ async function setBookmarkletCookie(user) {
   try {
     if (!user) {
       document.cookie = "bookmarklet_token=; path=/; max-age=0";
+      document.cookie = "bookmarklet_list_id=; path=/; max-age=0";
       return;
     }
     const token = await user.getIdToken();
     document.cookie = `bookmarklet_token=${token}; path=/; max-age=2592000; SameSite=None; Secure`;
+    if (typeof currentListMode === "object" && currentListMode?.type === "shared") {
+      document.cookie = `bookmarklet_list_id=${encodeURIComponent(currentListMode.listId)}; path=/; max-age=2592000; SameSite=None; Secure`;
+    } else {
+      document.cookie = "bookmarklet_list_id=; path=/; max-age=0";
+    }
   } catch (e) {
     console.warn("Bookmarklet cookie:", e);
+  }
+}
+
+async function loadList(user) {
+  const grid = document.getElementById("grid");
+  if (currentListMode === "personal" || (typeof currentListMode === "object" && currentListMode?.type !== "shared")) {
+    try {
+      movies = await getUserMovies(user.uid);
+    } catch (e) {
+      console.error("Failed to load your list:", e);
+      movies = [];
+    }
+  } else {
+    try {
+      movies = await getSharedListMovies(currentListMode.listId);
+    } catch (e) {
+      console.error("Failed to load shared list:", e);
+      movies = [];
+    }
+  }
+  return movies;
+}
+
+function renderListSelector() {
+  const sel = document.getElementById("list-selector");
+  if (!sel) return;
+  const currentVal = currentListMode === "personal" ? "personal"
+    : (typeof currentListMode === "object" && currentListMode?.type === "shared") ? currentListMode.listId : "personal";
+  sel.innerHTML = "";
+  const optPersonal = document.createElement("option");
+  optPersonal.value = "personal";
+  optPersonal.textContent = "My list";
+  if (currentVal === "personal") optPersonal.selected = true;
+  sel.appendChild(optPersonal);
+  sharedLists.forEach((l) => {
+    const opt = document.createElement("option");
+    opt.value = l.id;
+    opt.textContent = l.name || "Shared list";
+    if (currentVal === l.id) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  const optCreate = document.createElement("option");
+  optCreate.value = "__create__";
+  optCreate.textContent = "+ Create shared list";
+  sel.appendChild(optCreate);
+  const optJoin = document.createElement("option");
+  optJoin.value = "__join__";
+  optJoin.textContent = "Join with link";
+  sel.appendChild(optJoin);
+}
+
+function showSharedModal(title, bodyHtml) {
+  const modal = document.getElementById("shared-modal");
+  const titleEl = document.getElementById("shared-modal-title");
+  const bodyEl = document.getElementById("shared-modal-body");
+  if (titleEl) titleEl.textContent = title;
+  if (bodyEl) bodyEl.innerHTML = bodyHtml;
+  if (modal) {
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function hideSharedModal() {
+  const modal = document.getElementById("shared-modal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
   }
 }
 
@@ -505,38 +596,163 @@ function init() {
   const grid = document.getElementById("grid");
   grid.innerHTML = '<div class="empty-state">Loading…</div>';
 
+  const joinListId = new URLSearchParams(window.location.search).get("join");
+
   onAuthStateChanged(auth, async (user) => {
     updateAuthUI(user);
-    setBookmarkletCookie(user);
-
-    if (user) {
-      try {
-        movies = await getUserMovies(user.uid);
-      } catch (e) {
-        console.error("Failed to load your list:", e);
-        movies = [];
-        grid.innerHTML =
-          '<div class="empty-state">Failed to load your list. Check console.</div>';
-        return;
-      }
-    } else {
+    if (!user) {
+      currentListMode = "personal";
+      sharedLists = [];
       movies = [];
+      const wrap = document.getElementById("list-selector-wrap");
+      if (wrap) wrap.style.display = "none";
+      const meta = document.getElementById("header-meta");
+      if (meta) meta.textContent = "";
+      grid.innerHTML = '<div class="empty-state">Sign in to see your watchlist.</div>';
+      return;
     }
+
+    try {
+      sharedLists = await getSharedListsForUser(user.uid);
+    } catch (e) {
+      sharedLists = [];
+    }
+
+    const wrap = document.getElementById("list-selector-wrap");
+    if (wrap) wrap.style.display = "flex";
+    renderListSelector();
+
+    if (joinListId) {
+      const apiBase = window.location.origin;
+      try {
+        const res = await fetch(apiBase + "/.netlify/functions/join-shared-list", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ listId: joinListId }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          sharedLists = await getSharedListsForUser(user.uid);
+          currentListMode = { type: "shared", listId: joinListId, name: data.name || "Shared list" };
+          renderListSelector();
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      } catch (e) {
+        console.warn("Join failed:", e);
+      }
+    }
+
+    movies = await loadList(user);
+    setBookmarkletCookie(user);
 
     if (!movies.length) {
       const filters = document.getElementById("content-filters");
       if (filters) filters.style.display = "none";
       const meta = document.getElementById("header-meta");
-      if (meta) meta.textContent = user ? "0 titles" : "";
-      grid.innerHTML = user
-        ? '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>'
-        : '<div class="empty-state">Sign in to see your watchlist.</div>';
+      if (meta) meta.textContent = "0 titles";
+      const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
+      grid.innerHTML = isShared
+        ? '<div class="empty-state">This shared list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>'
+        : '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
     } else {
       const filters = document.getElementById("content-filters");
       if (filters) filters.style.display = "";
       buildCards();
       renderGenreFilter();
     }
+  });
+
+  document.getElementById("list-selector")?.addEventListener("change", async (e) => {
+    const sel = e.target;
+    const val = sel.value;
+    const user = auth.currentUser;
+    if (!user) return;
+    if (val === "personal") {
+      currentListMode = "personal";
+      movies = await loadList(user);
+    } else if (val === "__create__") {
+      const name = prompt("Enter a name for the shared list:", "Family watchlist");
+      if (!name) return;
+      try {
+        const listId = await createSharedList(user.uid, name.trim());
+        sharedLists = await getSharedListsForUser(user.uid);
+        currentListMode = { type: "shared", listId, name: name.trim() };
+        renderListSelector();
+        const shareUrl = window.location.origin + window.location.pathname + "?join=" + listId;
+        showSharedModal("Shared list created", `
+          <p>Share this link for others to join:</p>
+          <p class="share-link">${shareUrl}</p>
+          <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--muted)">Anyone with the link can join. They must be signed in.</p>
+        `);
+        movies = await loadList(user);
+        setBookmarkletCookie(user);
+        const filters = document.getElementById("content-filters");
+        if (filters) filters.style.display = "";
+        buildCards();
+        renderGenreFilter();
+        sel.value = listId;
+      } catch (err) {
+        alert("Failed to create: " + (err.message || "Unknown error"));
+        sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
+      }
+    } else if (val === "__join__") {
+      const url = prompt("Paste the share link:");
+      if (!url) return;
+      const m = url.match(/[?&]join=([a-z0-9]+)/i);
+      const listId = m ? m[1] : null;
+      if (!listId) {
+        alert("Invalid link. Paste the full URL from the person who shared the list.");
+        return;
+      }
+      try {
+        const apiBase = window.location.origin;
+        const res = await fetch(apiBase + "/.netlify/functions/join-shared-list", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ listId }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          sharedLists = await getSharedListsForUser(user.uid);
+          currentListMode = { type: "shared", listId, name: data.name || "Shared list" };
+          renderListSelector();
+          movies = await loadList(user);
+          setBookmarkletCookie(user);
+          const filters = document.getElementById("content-filters");
+          if (filters) filters.style.display = "";
+          buildCards();
+          renderGenreFilter();
+        } else {
+          alert(data.error || "Failed to join");
+          sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
+        }
+      } catch (err) {
+        alert("Failed to join: " + (err.message || "Unknown error"));
+        sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
+      }
+    } else {
+      const list = sharedLists.find((l) => l.id === val);
+      currentListMode = list ? { type: "shared", listId: list.id, name: list.name } : "personal";
+      movies = await loadList(user);
+      setBookmarkletCookie(user);
+      const filters = document.getElementById("content-filters");
+      if (filters) filters.style.display = movies.length ? "" : "none";
+      if (movies.length) {
+        buildCards();
+        renderGenreFilter();
+      } else {
+        const meta = document.getElementById("header-meta");
+        if (meta) meta.textContent = "0 titles";
+        grid.innerHTML = '<div class="empty-state">This shared list is empty.</div>';
+      }
+    }
+  });
+
+  document.getElementById("shared-modal-close")?.addEventListener("click", hideSharedModal);
+  document.getElementById("shared-modal")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) hideSharedModal();
   });
 }
 

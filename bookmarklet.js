@@ -7,11 +7,14 @@
   }
   var base = "https://watchlist-trailers.netlify.app";
   var apiUrl = base + "/.netlify/functions/add-from-imdb";
+  var body = { imdbId: imdbId };
+  var listMatch = document.cookie.match(/bookmarklet_list_id=([^;]+)/);
+  if (listMatch) body.listId = decodeURIComponent(listMatch[1].trim());
   fetch(apiUrl, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imdbId: imdbId }),
+    body: JSON.stringify(body),
   })
     .then(function (r) { return r.json(); })
     .then(function (data) {

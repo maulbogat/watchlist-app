@@ -22,6 +22,11 @@
 <header>
   <h1>My <span>Watchlist</span></h1>
   <div class="filters">
+    <div class="list-selector-wrap" id="list-selector-wrap" style="display:none">
+      <select id="list-selector" class="list-selector" title="Switch list">
+        <option value="personal">My list</option>
+      </select>
+    </div>
     <div class="header-meta" id="header-meta"></div>
     <a href="./bookmarklet.html" class="header-link" title="Add titles from IMDb">+ from IMDb</a>
     <div id="auth-ui" class="auth-ui">
@@ -66,6 +71,16 @@
   </div>
   <div class="grid" id="grid"></div>
 </main>
+
+<div class="modal-bg" id="shared-modal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal shared-modal">
+    <div class="modal-header">
+      <span class="modal-title" id="shared-modal-title">Create shared list</span>
+      <button class="modal-close" id="shared-modal-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="shared-modal-body" id="shared-modal-body"></div>
+  </div>
+</div>
 
 <div class="modal-bg" id="modal" role="dialog" aria-modal="true">
   <div class="modal">

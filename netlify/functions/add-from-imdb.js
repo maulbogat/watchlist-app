@@ -178,7 +178,7 @@ exports.handler = async (event, context) => {
   } catch (e) {
     return jsonRes(400, { ok: false, error: "Invalid JSON body" }, event);
   }
-  const { imdbId } = body;
+  const { imdbId, listId } = body;
   if (!imdbId) {
     return jsonRes(400, { ok: false, error: "imdbId required" }, event);
   }
@@ -221,6 +221,30 @@ exports.handler = async (event, context) => {
   const key = movieKey(movie);
 
   const db = getFirestore(getApp());
+
+  if (listId) {
+    const listRef = db.collection("sharedLists").doc(listId);
+    const listSnap = await listRef.get();
+    if (!listSnap.exists) {
+      return jsonRes(404, { ok: false, error: "Shared list not found" }, event);
+    }
+    const listData = listSnap.data();
+    const members = Array.isArray(listData.members) ? listData.members : [];
+    if (!members.includes(uid)) {
+      return jsonRes(403, { ok: false, error: "Not a member of this shared list" }, event);
+    }
+    const items = Array.isArray(listData.items) ? [...listData.items] : [];
+    const existing = items.find((m) => m.imdbId && norm(m.imdbId) === nImdb)
+      || items.find((m) => m.title === title && String(m.year ?? "") === String(year ?? ""));
+    if (existing) {
+      return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in the list` }, event);
+    }
+    items.push(movie);
+    const removed = Array.isArray(listData.removed) ? listData.removed.filter((k) => k !== key) : [];
+    await listRef.update({ items, removed });
+    return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to shared list` }, event);
+  }
+
   const userRef = db.collection("users").doc(uid);
   const userSnap = await userRef.get();
   const data = userSnap.exists ? userSnap.data() : {};
