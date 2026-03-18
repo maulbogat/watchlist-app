@@ -1,0 +1,70 @@
+(function () {
+  var script = document.currentScript;
+  var base = script ? (function (u) {
+    try { return new URL(u).origin; } catch (e) { return ""; }
+  })(script.src) : "";
+  if (!base) base = "https://watchlist-trailers.netlify.app";
+
+  var m = window.location.pathname.match(/\/title\/(tt\d+)/);
+  var imdbId = m ? m[1] : null;
+  if (!imdbId) {
+    alert("Not an IMDb title page. Open a movie or TV show page first.");
+    return;
+  }
+
+  var title = "";
+  var year = "";
+  var type = "movie";
+  var genre = "";
+  var thumb = "";
+
+  var metaTitle = document.querySelector('meta[property="og:title"]');
+  if (metaTitle && metaTitle.content) {
+    var raw = metaTitle.content;
+    var y = raw.match(/\((\d{4}(?:–|-|\s*)?(?:\d{4})?\)/);
+    if (y) { year = (y[1].match(/\d{4}/) || [""])[0]; }
+    title = raw.split(" - ")[0].replace(/\s*\(\d{4}[^)]*\)\s*$/, "").trim();
+  }
+  if (!title) {
+    var h1 = document.querySelector("h1");
+    if (h1) {
+      title = (h1.textContent || "").replace(/\s*\(\d{4}[^)]*\)?\s*$/, "").trim();
+      var yearMatch = (h1.textContent || "").match(/\((\d{4})/);
+      if (yearMatch) year = yearMatch[1];
+    }
+  }
+  if (!title) title = "Unknown";
+
+  var bodyText = (document.body && document.body.innerText) || "";
+  if (/TV Series|TV Mini Series|TV Movie|TV Special|TV Short/i.test(bodyText)) type = "show";
+
+  var genreEl = document.querySelector("[data-testid='storyline-genres']");
+  if (genreEl) {
+    var links = genreEl.querySelectorAll("a");
+    genre = Array.from(links).map(function (a) { return (a.textContent || "").trim(); }).filter(Boolean).join(" / ");
+  }
+
+  var poster = document.querySelector("[data-testid='hero-media__poster'] img, .ipc-poster img, [data-testid='hero-media__poster'] img");
+  if (poster && poster.src) thumb = poster.src;
+
+  var payload = { imdbId: imdbId, title: title, year: year || null, type: type, genre: genre || "", thumb: thumb || null };
+
+  var apiUrl = base + "/.netlify/functions/add-from-imdb";
+  fetch(apiUrl, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.ok) {
+        alert(data.message || "Added to watchlist!");
+      } else {
+        alert(data.error || "Failed to add.");
+      }
+    })
+    .catch(function (err) {
+      alert("Error: " + (err.message || "Could not reach watchlist. Sign in at " + base + " first."));
+    });
+})();
