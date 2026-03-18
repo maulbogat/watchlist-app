@@ -281,7 +281,7 @@ function openModal(m) {
 
     if (m.imdbId) {
       const apiBase = window.location.origin;
-      fetch(`${apiBase}/.netlify/functions/get-imdb-trailer?imdbId=${encodeURIComponent(m.imdbId)}`)
+      fetch(`${apiBase}/.netlify/functions/add-from-imdb?imdbId=${encodeURIComponent(m.imdbId)}`)
         .then((r) => r.json())
         .then((data) => {
           if (data.ok && data.embedUrl && currentModalMovie === m) {
