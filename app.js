@@ -388,21 +388,27 @@ async function handleAddFromParams(user) {
   const urlTitle = (params.get("title") || "").trim();
   const urlYear = params.get("year") || "";
 
+  const normTitle = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .replace(/^the\s+/i, "")
+      .replace(/\s*[:\-–—]\s*.*$/, "") // strip ": Subtitle" or " - Part 2"
+      .replace(/\s+/g, " ")
+      .trim();
+
   // Match by imdbId first, then by title+year, then by title only
   let movie = movies.find((m) => m.imdbId && norm(m.imdbId) === norm(imdbId));
   if (!movie && urlTitle) {
-    const titleLower = urlTitle.toLowerCase().replace(/^the\s+/i, "").trim();
+    const titleLower = normTitle(urlTitle);
     const yearNum = urlYear ? parseInt(urlYear, 10) : null;
     movie = movies.find((m) => {
-      const t = String(m.title || "").toLowerCase().replace(/^the\s+/i, "").trim();
+      const t = normTitle(m.title);
       const matchTitle = t === titleLower || String(m.title || "").toLowerCase() === urlTitle.toLowerCase();
       const matchYear = !yearNum || (m.year != null && Number(m.year) === yearNum);
       return matchTitle && matchYear;
     });
     if (!movie) {
-      const byTitle = movies.filter((m) =>
-        String(m.title || "").toLowerCase().replace(/^the\s+/i, "").trim() === titleLower
-      );
+      const byTitle = movies.filter((m) => normTitle(m.title) === titleLower);
       if (byTitle.length === 1) movie = byTitle[0];
     }
   }
