@@ -16,10 +16,8 @@ import {
   removeFromSharedList,
   addToSharedList,
   moveAllToSharedList,
-  copySharedListToPersonal,
   moveItemFromSharedToPersonal,
   updateMovieMetadata,
-  removeDuplicatesFromPersonal,
 } from "./firebase.js";
 
 const STATUS_ORDER = ["to-watch", "watched"];
@@ -686,21 +684,6 @@ function updateCopyInviteButton() {
   btn.disabled = false;
 }
 
-function updateRestoreButton() {
-  const btn = document.getElementById("restore-btn");
-  if (!btn) return;
-  const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
-  const hasItems = movies.some((m) => !m.removed);
-  btn.style.display = isShared && hasItems ? "inline" : "none";
-}
-
-function updateDedupeButton() {
-  const btn = document.getElementById("dedupe-btn");
-  if (!btn) return;
-  const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
-  btn.style.display = isShared ? "inline" : "none";
-}
-
 function updateMoveAllButton() {
   const btn = document.getElementById("move-all-btn");
   if (!btn) return;
@@ -801,8 +784,6 @@ function init() {
 
     renderListSelector();
     updateCopyInviteButton();
-    updateRestoreButton();
-    updateDedupeButton();
     updateMoveAllButton();
 
     movies = await loadList(user);
@@ -824,8 +805,6 @@ function init() {
       renderGenreFilter();
     }
     updateCopyInviteButton();
-    updateRestoreButton();
-    updateDedupeButton();
     updateMoveAllButton();
   });
 
@@ -852,8 +831,6 @@ function init() {
         renderGenreFilter();
       }
       updateCopyInviteButton();
-      updateRestoreButton();
-      updateDedupeButton();
       updateMoveAllButton();
     } else if (val === "__create__") {
       const name = prompt("Enter a name for the shared list:", "Family watchlist");
@@ -888,8 +865,6 @@ function init() {
         renderGenreFilter();
         sel.value = listId;
         updateCopyInviteButton();
-        updateRestoreButton();
-        updateDedupeButton();
         updateMoveAllButton();
       } catch (err) {
         alert("Failed to create: " + (err.message || "Unknown error"));
@@ -925,8 +900,6 @@ function init() {
           buildCards();
           renderGenreFilter();
           updateCopyInviteButton();
-          updateRestoreButton();
-          updateDedupeButton();
           updateMoveAllButton();
         } else {
           alert(data.error || "Failed to join");
@@ -953,8 +926,6 @@ function init() {
         grid.innerHTML = '<div class="empty-state">This shared list is empty.</div>';
       }
       updateCopyInviteButton();
-      updateRestoreButton();
-      updateDedupeButton();
       updateMoveAllButton();
     }
   });
@@ -1001,52 +972,12 @@ function init() {
           buildCards();
           renderGenreFilter();
           updateCopyInviteButton();
-          updateRestoreButton();
-          updateDedupeButton();
           updateMoveAllButton();
         } catch (err) {
           alert(err.message || "Failed to copy items.");
         }
       });
     });
-  });
-
-  document.getElementById("dedupe-btn")?.addEventListener("click", async () => {
-    const user = auth.currentUser;
-    if (!user || typeof currentListMode !== "object" || currentListMode?.type !== "shared") return;
-    const listId = currentListMode.listId;
-    if (!confirm("Remove from My list any items that are in this shared list?")) return;
-    try {
-      const removed = await removeDuplicatesFromPersonal(user.uid, listId);
-      alert(removed > 0 ? `Removed ${removed} duplicate${removed === 1 ? "" : "s"} from My list.` : "No duplicates found.");
-    } catch (err) {
-      alert(err.message || "Failed to remove duplicates.");
-    }
-  });
-
-  document.getElementById("restore-btn")?.addEventListener("click", async () => {
-    const user = auth.currentUser;
-    if (!user || typeof currentListMode !== "object" || currentListMode?.type !== "shared") return;
-    const listId = currentListMode.listId;
-    const count = movies.filter((m) => !m.removed).length;
-    if (count === 0) return;
-    if (!confirm(`Copy ${count} item${count === 1 ? "" : "s"} from this shared list to your personal list?`)) return;
-    try {
-      await copySharedListToPersonal(user.uid, listId);
-      currentListMode = "personal";
-      saveLastList(user, currentListMode);
-      renderListSelector();
-      movies = await loadList(user);
-      setBookmarkletCookie(user);
-      buildCards();
-      renderGenreFilter();
-      updateCopyInviteButton();
-      updateRestoreButton();
-      updateDedupeButton();
-      updateMoveAllButton();
-    } catch (err) {
-      alert(err.message || "Failed to restore.");
-    }
   });
 
   document.getElementById("shared-modal-close")?.addEventListener("click", hideSharedModal);
