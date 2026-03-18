@@ -60,10 +60,29 @@ function fetchOMDb(imdbId) {
   });
 }
 
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on("error", reject);
+  });
+}
+
 function fetchHtml(url) {
   return new Promise((resolve, reject) => {
     https.get(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
     }, (res) => {
       let data = "";
       res.on("data", (chunk) => { data += chunk; });
@@ -72,12 +91,26 @@ function fetchHtml(url) {
   });
 }
 
+async function fetchTrailerFromTmdb(imdbId, apiKey) {
+  const findUrl = `https://api.themoviedb.org/3/find/${imdbId}?external_source=imdb_id&api_key=${apiKey}`;
+  const find = await fetchJson(findUrl);
+  const movie = find.movie_results?.[0];
+  const tv = find.tv_results?.[0];
+  const id = movie?.id ?? tv?.id;
+  const type = movie ? "movie" : "tv";
+  if (!id) return null;
+  const videosUrl = `https://api.themoviedb.org/3/${type}/${id}/videos?api_key=${apiKey}`;
+  const videos = await fetchJson(videosUrl);
+  const trailer = (videos.results || []).find((v) => v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser"));
+  return trailer?.key || null;
+}
+
 exports.handler = async (event, context) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(event) };
   }
 
-  // GET: fetch IMDb trailer video ID (no auth required)
+  // GET: fetch trailer (TMDB first, then IMDb scrape)
   if (event.httpMethod === "GET") {
     const imdbId = event.queryStringParameters?.imdbId || "";
     const norm = (id) => (String(id).startsWith("tt") ? id : `tt${id}`);
@@ -85,20 +118,34 @@ exports.handler = async (event, context) => {
     if (!nImdb || !/^tt\d+$/.test(nImdb)) {
       return jsonRes(400, { ok: false, error: "imdbId required (e.g. tt7235466)" }, event);
     }
-    const url = `https://www.imdb.com/title/${nImdb}/videogallery`;
-    let html;
+
+    // 1. Try TMDB API (reliable, returns YouTube keys)
+    const tmdbKey = process.env.TMDB_API_KEY;
+    if (tmdbKey) {
+      try {
+        const youtubeId = await fetchTrailerFromTmdb(nImdb, tmdbKey);
+        if (youtubeId) {
+          return jsonRes(200, { ok: true, youtubeId }, event);
+        }
+      } catch (e) {
+        // fall through to IMDb
+      }
+    }
+
+    // 2. Fallback: scrape IMDb videogallery (may fail from server IPs)
     try {
-      html = await fetchHtml(url);
+      const html = await fetchHtml(`https://www.imdb.com/title/${nImdb}/videogallery`);
+      const match = html.match(/\/video\/(vi\d+)/);
+      if (match) {
+        const videoId = match[1];
+        const embedUrl = `https://www.imdb.com/video/imdb/${videoId}/imdb/embed?autoplay=true`;
+        return jsonRes(200, { ok: true, embedUrl }, event);
+      }
     } catch (e) {
-      return jsonRes(502, { ok: false, error: "Failed to fetch IMDb page" }, event);
+      // ignore
     }
-    const match = html.match(/\/video\/(vi\d+)/);
-    if (!match) {
-      return jsonRes(404, { ok: false, error: "No trailer found for this title" }, event);
-    }
-    const videoId = match[1];
-    const embedUrl = `https://www.imdb.com/video/imdb/${videoId}/imdb/embed?autoplay=true`;
-    return jsonRes(200, { ok: true, videoId, embedUrl }, event);
+
+    return jsonRes(404, { ok: false, error: "No trailer found for this title" }, event);
   }
 
   if (event.httpMethod !== "POST") {

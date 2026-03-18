@@ -34,7 +34,9 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 2. Set `OMDB_API_KEY` in Netlify → Site settings → Environment variables. Get a free key at [omdbapi.com](https://www.omdbapi.com/apikey.aspx).
 
-3. Visit `/bookmarklet.html` on your deployed site, drag the button to your bookmarks bar, then sign in with Google. When on an IMDb title page, click the bookmarklet to add it to your watchlist.
+3. Set `TMDB_API_KEY` in Netlify → Site settings → Environment variables (for trailer lookup when playing). Get a free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
+
+4. Visit `/bookmarklet.html` on your deployed site, drag the button to your bookmarks bar, then sign in with Google. When on an IMDb title page, click the bookmarklet to add it to your watchlist.
 
 ## Features
 

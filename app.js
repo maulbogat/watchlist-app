@@ -284,11 +284,24 @@ function openModal(m) {
       fetch(`${apiBase}/.netlify/functions/add-from-imdb?imdbId=${encodeURIComponent(m.imdbId)}`)
         .then((r) => r.json())
         .then((data) => {
-          if (data.ok && data.embedUrl && currentModalMovie === m) {
+          if (data.ok && currentModalMovie === m) {
             placeholder.style.background = "#000";
-            placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
-              referrerpolicy="strict-origin-when-cross-origin"
-              src="${String(data.embedUrl).replace(/"/g, "&quot;")}"></iframe>`;
+            if (data.youtubeId) {
+              const rawOrigin = window.location.origin;
+              const originParam = rawOrigin && rawOrigin !== "null" ? `&origin=${encodeURIComponent(rawOrigin)}` : "";
+              placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
+                referrerpolicy="strict-origin-when-cross-origin"
+                src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(data.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1${originParam}"></iframe>`;
+            } else if (data.embedUrl) {
+              placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
+                referrerpolicy="strict-origin-when-cross-origin"
+                src="${String(data.embedUrl).replace(/"/g, "&quot;")}"></iframe>`;
+            } else {
+              placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
+                <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
+                <a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>
+              </div>`;
+            }
           } else if (currentModalMovie === m) {
             placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
               <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
