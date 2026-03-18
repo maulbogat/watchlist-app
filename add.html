@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Add to Watchlist</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <style>
+    .add-page { max-width: 420px; margin: 4rem auto; padding: 0 1.5rem; text-align: center; }
+    .add-page h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+    .add-page p { color: var(--muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem; }
+    .add-page .status { min-height: 2rem; }
+    .add-page a { color: var(--accent); text-decoration: none; }
+    .add-page a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="add-page">
+    <h1>Add to Watchlist</h1>
+    <div class="status" id="status">Checking…</div>
+    <p id="back-link" style="display:none"><a href="./">← Back to watchlist</a></p>
+  </div>
+  <script type="module" src="./add.js"></script>
+</body>
+</html>

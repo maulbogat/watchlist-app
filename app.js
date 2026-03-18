@@ -29,6 +29,23 @@ let currentModalMovie = null; // movie currently shown in modal
 let currentListMode = "personal"; // "personal" | { type: "shared", listId, name }
 let sharedLists = [];
 
+function saveLastList(user, mode) {
+  if (!user) return;
+  try {
+    const val = mode === "personal" ? "personal" : (mode?.listId || "personal");
+    localStorage.setItem(`watchlist_lastList_${user.uid}`, val);
+  } catch (e) {}
+}
+
+function getLastList(user) {
+  if (!user) return null;
+  try {
+    return localStorage.getItem(`watchlist_lastList_${user.uid}`) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 function getUniqueGenres() {
   const count = new Map();
   movies.forEach((m) => {
@@ -645,6 +662,7 @@ function init() {
         if (data.ok) {
           sharedLists = await getSharedListsForUser(user.uid);
           currentListMode = { type: "shared", listId: joinListId, name: data.name || "Shared list" };
+          saveLastList(user, currentListMode);
           renderListSelector();
           updateCopyInviteButton();
           window.history.replaceState({}, "", window.location.pathname);
@@ -652,6 +670,17 @@ function init() {
       } catch (e) {
         console.warn("Join failed:", e);
       }
+    } else {
+      const last = getLastList(user);
+      if (last === "personal") {
+        currentListMode = "personal";
+      } else if (last) {
+        const list = sharedLists.find((l) => l.id === last);
+        if (list) {
+          currentListMode = { type: "shared", listId: list.id, name: list.name };
+        }
+      }
+      renderListSelector();
     }
 
     movies = await loadList(user);
@@ -681,6 +710,7 @@ function init() {
     if (!user) return;
     if (val === "personal") {
       currentListMode = "personal";
+      saveLastList(user, currentListMode);
       movies = await loadList(user);
       setBookmarkletCookie(user);
       const filters = document.getElementById("content-filters");
@@ -703,6 +733,7 @@ function init() {
         const listId = await createSharedList(user.uid, name.trim());
         sharedLists = await getSharedListsForUser(user.uid);
         currentListMode = { type: "shared", listId, name: name.trim() };
+        saveLastList(user, currentListMode);
         renderListSelector();
         const shareUrl = window.location.origin + window.location.pathname + "?join=" + listId;
         showSharedModal("Shared list created", `
@@ -753,6 +784,7 @@ function init() {
         if (data.ok) {
           sharedLists = await getSharedListsForUser(user.uid);
           currentListMode = { type: "shared", listId, name: data.name || "Shared list" };
+          saveLastList(user, currentListMode);
           renderListSelector();
           movies = await loadList(user);
           setBookmarkletCookie(user);
@@ -772,6 +804,7 @@ function init() {
     } else {
       const list = sharedLists.find((l) => l.id === val);
       currentListMode = list ? { type: "shared", listId: list.id, name: list.name } : "personal";
+      saveLastList(user, currentListMode);
       movies = await loadList(user);
       setBookmarkletCookie(user);
       const filters = document.getElementById("content-filters");
