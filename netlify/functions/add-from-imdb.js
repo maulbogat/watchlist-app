@@ -178,7 +178,8 @@ exports.handler = async (event, context) => {
   } catch (e) {
     return jsonRes(400, { ok: false, error: "Invalid JSON body" }, event);
   }
-  const { imdbId, listId } = body;
+  const { imdbId, listId: bodyListId } = body;
+  const listId = bodyListId || cookies.bookmarklet_list_id || null;
   if (!imdbId) {
     return jsonRes(400, { ok: false, error: "imdbId required" }, event);
   }
