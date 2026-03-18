@@ -413,13 +413,16 @@ async function handleAddFromParams(user) {
     u.searchParams.delete("imdb");
     u.searchParams.delete("title");
     u.searchParams.delete("year");
+    u.searchParams.delete("type");
     window.history.replaceState({}, "", u.pathname + (u.search || ""));
   };
 
   if (!movie) {
     const title = params.get("title") || "Unknown";
     const year = params.get("year") || "";
-    showToast(`"${title}" not in catalog. Add via: node scripts/add-movie.js "${title}" ${year} movie`, 6000);
+    const type = params.get("type") || "movie";
+    const yearPart = year || "YEAR";
+    showToast(`"${title}" not in catalog. Add via: node scripts/add-movie.js "${title}" ${yearPart} ${type} SEARCH ${imdbId}`, 6000);
     clearUrl();
     return;
   }
