@@ -1,5 +1,5 @@
 const { initializeApp, cert } = require("firebase-admin/app");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getFirestore } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 const https = require("https");
 
@@ -208,66 +208,54 @@ exports.handler = async (event, context) => {
   const genre = omdb.Genre || "";
   const thumb = omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
 
-  const db = getFirestore(getApp());
-  const catalogRef = db.collection("catalog").doc("movies");
-  const catalogSnap = await catalogRef.get();
-  if (!catalogSnap.exists || !Array.isArray(catalogSnap.data().items)) {
-    return jsonRes(500, { ok: false, error: "Catalog not found" }, event);
-  }
-
-  const items = catalogSnap.data().items;
-  let movie = items.find((m) => m.imdbId && norm(m.imdbId) === nImdb);
-  if (!movie) {
-    movie = items.find((m) => m.title === title && (m.year ?? "") === String(year ?? ""));
-  }
-  let catalogChanged = false;
-  if (!movie) {
-    movie = {
-      title,
-      year: isNaN(year) ? null : year,
-      type: nType,
-      genre: genre || "",
-      youtubeId: "SEARCH",
-      imdbId: nImdb,
-      thumb,
-      services: [],
-    };
-    items.push(movie);
-    catalogChanged = true;
-  } else {
-    const idx = items.findIndex((m) => m === movie);
-    if (idx >= 0 && (movie.year == null && year != null || !movie.thumb && thumb || !movie.genre && genre)) {
-      if (movie.year == null && year != null) movie.year = year;
-      if (!movie.thumb && thumb) movie.thumb = thumb;
-      if (!movie.genre && genre) movie.genre = genre;
-      catalogChanged = true;
-    }
-  }
-  if (catalogChanged) {
-    await catalogRef.set({
-      items,
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
+  const movie = {
+    title,
+    year: isNaN(year) ? null : year,
+    type: nType,
+    genre: genre || "",
+    youtubeId: "SEARCH",
+    imdbId: nImdb,
+    thumb,
+    services: [],
+  };
   const key = movieKey(movie);
+
+  const db = getFirestore(getApp());
   const userRef = db.collection("users").doc(uid);
   const userSnap = await userRef.get();
   const data = userSnap.exists ? userSnap.data() : {};
+  const items = Array.isArray(data.items) ? [...data.items] : [];
   const watched = Array.isArray(data.watched) ? data.watched : [];
   const maybeLater = Array.isArray(data.maybeLater) ? data.maybeLater : [];
   const archive = Array.isArray(data.archive) ? data.archive : [];
+  const removed = Array.isArray(data.removed) ? data.removed : [];
 
-  if (watched.includes(key) || maybeLater.includes(key) || archive.includes(key)) {
-    return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in your list` }, event);
+  let existing = items.find((m) => m.imdbId && norm(m.imdbId) === nImdb);
+  if (!existing) {
+    existing = items.find((m) => m.title === title && String(m.year ?? "") === String(year ?? ""));
+  }
+
+  if (existing) {
+    if (watched.includes(key) || maybeLater.includes(key) || archive.includes(key)) {
+      return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in your list` }, event);
+    }
+    const idx = items.findIndex((m) => m === existing);
+    if (idx >= 0 && (existing.year == null && year != null || !existing.thumb && thumb || !existing.genre && genre)) {
+      if (existing.year == null && year != null) existing.year = year;
+      if (!existing.thumb && thumb) existing.thumb = thumb;
+      if (!existing.genre && genre) existing.genre = genre;
+    }
+  } else {
+    items.push(movie);
   }
 
   await userRef.set(
     {
+      items,
       watched: watched.filter((k) => k !== key),
       maybeLater: maybeLater.filter((k) => k !== key),
       archive: archive.filter((k) => k !== key),
-      removed: FieldValue.arrayRemove(key),
+      removed: removed.filter((k) => k !== key),
     },
     { merge: true }
   );

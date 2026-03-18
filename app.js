@@ -5,8 +5,7 @@ import {
   fbSignOut,
   onAuthStateChanged,
   movieKey,
-  getMoviesCatalog,
-  getStatusData,
+  getUserMovies,
   setStatus,
   removeTitle,
 } from "./firebase.js";
@@ -457,7 +456,9 @@ function updateAuthUI(user) {
 
 document.getElementById("sign-in-btn").addEventListener("click", async () => {
   try {
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    await signInWithPopup(auth, provider);
   } catch (err) {
     console.error("Sign-in error:", err);
     const msg = err.code === "auth/unauthorized-domain"
@@ -469,6 +470,20 @@ document.getElementById("sign-in-btn").addEventListener("click", async () => {
 
 document.getElementById("sign-out-btn").addEventListener("click", () => {
   fbSignOut(auth);
+});
+
+document.getElementById("switch-account-btn").addEventListener("click", async () => {
+  await fbSignOut(auth);
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    await signInWithPopup(auth, provider);
+  } catch (err) {
+    if (err.code !== "auth/cancelled-popup-request" && err.code !== "auth/popup-closed-by-user") {
+      console.error("Switch account error:", err);
+      alert(err.message || "Failed to switch account.");
+    }
+  }
 });
 
 async function setBookmarkletCookie(user) {
@@ -485,54 +500,44 @@ async function setBookmarkletCookie(user) {
   }
 }
 
-// Auth state + load status data, apply status attribute from Firebase
-function initAfterMoviesLoaded() {
+// Auth state + load user's movies (each account has its own list)
+function init() {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = '<div class="empty-state">Loading…</div>';
+
   onAuthStateChanged(auth, async (user) => {
     updateAuthUI(user);
     setBookmarkletCookie(user);
-    let data = { watched: [], maybeLater: [], archive: [] };
+
     if (user) {
       try {
-        data = await getStatusData(user.uid);
+        movies = await getUserMovies(user.uid);
       } catch (e) {
-        console.warn("Failed to load status data:", e);
+        console.error("Failed to load your list:", e);
+        movies = [];
+        grid.innerHTML =
+          '<div class="empty-state">Failed to load your list. Check console.</div>';
+        return;
       }
+    } else {
+      movies = [];
     }
-    const watchedSet = new Set(data.watched);
-    const maybeLaterSet = new Set(data.maybeLater);
-    const archiveSet = new Set(data.archive);
-    const removedSet = new Set(data.removed || []);
-    movies.forEach((m) => {
-      const key = movieKey(m);
-      m.removed = removedSet.has(key);
-      if (watchedSet.has(key)) m.status = "watched";
-      else if (maybeLaterSet.has(key)) m.status = "maybe-later";
-      else if (archiveSet.has(key)) m.status = "archive";
-      else m.status = "to-watch";
-    });
-    buildCards();
-  });
-}
 
-// Load movies from Firestore, then init auth + build
-async function init() {
-  const grid = document.getElementById("grid");
-  grid.innerHTML = '<div class="empty-state">Loading catalog…</div>';
-
-  try {
-    movies = await getMoviesCatalog();
     if (!movies.length) {
-      grid.innerHTML =
-        '<div class="empty-state">No catalog found. Add movies to Firestore <code>catalog/movies</code> in Firebase Console.</div>';
-      return;
+      const filters = document.getElementById("content-filters");
+      if (filters) filters.style.display = "none";
+      const meta = document.getElementById("header-meta");
+      if (meta) meta.textContent = user ? "0 titles" : "";
+      grid.innerHTML = user
+        ? '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>'
+        : '<div class="empty-state">Sign in to see your watchlist.</div>';
+    } else {
+      const filters = document.getElementById("content-filters");
+      if (filters) filters.style.display = "";
+      buildCards();
+      renderGenreFilter();
     }
-    initAfterMoviesLoaded();
-    renderGenreFilter();
-  } catch (err) {
-    console.error("Failed to load catalog:", err);
-    grid.innerHTML =
-      '<div class="empty-state">Failed to load catalog. Check console and Firestore setup.</div>';
-  }
+  });
 }
 
 function renderGenreFilter() {

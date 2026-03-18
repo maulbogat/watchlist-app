@@ -44,19 +44,72 @@ async function getMoviesCatalog() {
 
 /**
  * Returns status data from Firestore.
- * Data model: users/{uid} = { watched: string[], maybeLater: string[], archive: string[], removed: string[] }
- * Status: to-watch (default), watched, maybe-later, archive. Removed titles are hidden unless viewing Removed tab.
+ * Data model: users/{uid} = { items: [], watched: [], maybeLater: [], archive: [], removed: [] }
  */
 async function getStatusData(uid) {
   const ref = doc(db, "users", uid);
   const snap = await getDoc(ref);
   const data = snap.exists() ? snap.data() : {};
   return {
+    items: Array.isArray(data.items) ? data.items : [],
     watched: Array.isArray(data.watched) ? data.watched : [],
     maybeLater: Array.isArray(data.maybeLater) ? data.maybeLater : [],
     archive: Array.isArray(data.archive) ? data.archive : [],
     removed: Array.isArray(data.removed) ? data.removed : [],
   };
+}
+
+/**
+ * Returns the user's movie list with status applied. Each account has its own list.
+ * Migrates legacy users (catalog + status) to per-user items on first load.
+ */
+async function getUserMovies(uid) {
+  const data = await getStatusData(uid);
+  let items = data.items;
+
+  const hasLegacyData =
+    data.watched?.length > 0 ||
+    data.maybeLater?.length > 0 ||
+    data.archive?.length > 0 ||
+    data.removed?.length > 0;
+
+  if (items.length === 0 && hasLegacyData) {
+    const catalog = await getMoviesCatalog();
+    if (catalog.length > 0) {
+      const removedSet = new Set(data.removed);
+      const watchedSet = new Set(data.watched);
+      const maybeLaterSet = new Set(data.maybeLater);
+      const archiveSet = new Set(data.archive);
+      items = catalog
+        .filter((m) => !removedSet.has(movieKey(m)))
+        .map((m) => {
+          const key = movieKey(m);
+          let status = "to-watch";
+          if (watchedSet.has(key)) status = "watched";
+          else if (maybeLaterSet.has(key)) status = "maybe-later";
+          else if (archiveSet.has(key)) status = "archive";
+          return { ...m, status };
+        });
+      await setDoc(doc(db, "users", uid), { items }, { merge: true });
+    }
+  }
+
+  if (items.length > 0) {
+    const watchedSet = new Set(data.watched);
+    const maybeLaterSet = new Set(data.maybeLater);
+    const archiveSet = new Set(data.archive);
+    const removedSet = new Set(data.removed);
+    items = items.map((m) => {
+      const key = movieKey(m);
+      let status = "to-watch";
+      if (watchedSet.has(key)) status = "watched";
+      else if (maybeLaterSet.has(key)) status = "maybe-later";
+      else if (archiveSet.has(key)) status = "archive";
+      return { ...m, status, removed: removedSet.has(key) };
+    });
+  }
+
+  return items;
 }
 
 /** @deprecated Use getStatusData. Kept for backward compat. */
@@ -112,6 +165,7 @@ export {
   onAuthStateChanged,
   movieKey,
   getMoviesCatalog,
+  getUserMovies,
   getWatchedList,
   getStatusData,
   setStatus,

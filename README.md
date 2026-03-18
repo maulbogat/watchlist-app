@@ -1,6 +1,6 @@
 # movie-trailer-site
 
-A personal movie/show watchlist with YouTube trailers, filters, and Firestore-backed catalog + watched status.
+A personal movie/show watchlist with YouTube trailers, filters, and Firestore. Each account has its own list.
 
 ## Run locally
 
@@ -20,7 +20,7 @@ Then open `http://localhost:5173`. (YouTube embeds can fail when opened via `fil
    ```
    Or paste the rules in Firebase Console → Firestore → Rules
 
-4. **Movie catalog** is stored in Firestore. To add/update movies, edit the `catalog/movies` document in Firebase Console → Firestore.
+4. **Movie lists** are stored per user in `users/{uid}`. Users add titles via the bookmarklet; no shared catalog is needed for new users.
 
 ## Netlify deployment (bookmarklet)
 
@@ -40,7 +40,7 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 ## Multi-user support
 
-Multiple people can use the app with their own Google accounts. Each person gets their own watchlist (to-watch, watched, etc.) while sharing the same catalog.
+Multiple people can use the app with their own Google accounts. Each account has its own list of titles—items added via the bookmarklet go only to that account's list.
 
 **Verify in Firebase Console:**
 
@@ -52,7 +52,7 @@ The header shows the signed-in user's email so family members know whose account
 
 ## Features
 
-- Movie catalog stored in Firestore
+- Per-user lists (each account has its own titles)
 - To Watch / Watched tabs
 - Filter by Movies, Series, or Both
 - Mark titles as watched (persists across devices via Google sign-in)
