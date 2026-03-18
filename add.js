@@ -10,6 +10,10 @@ function setStatus(msg, isError = false) {
   statusEl.textContent = msg;
   statusEl.style.color = isError ? "var(--error, #e74c3c)" : "var(--text)";
   backLink.style.display = "block";
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("embed") === "1" && window.self === window.top) {
+    setTimeout(() => { window.location.href = "./"; }, 1500);
+  }
 }
 
 const norm = (id) => (String(id || "").startsWith("tt") ? id : `tt${id || ""}`);
@@ -21,7 +25,11 @@ if (!imdbId || !/^tt\d+$/.test(nImdb)) {
 
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
-      setStatus('Sign in on the watchlist first, then try again.', true);
+      const msg = "Sign in on the watchlist first, then try again.";
+      if (window.self !== window.top) {
+        window.parent.postMessage({ type: "add-result", ok: false, error: msg }, "*");
+      }
+      setStatus(msg, true);
       statusEl.innerHTML = 'Sign in on the <a href="./">watchlist</a> first, then try again.';
       return;
     }
@@ -43,13 +51,26 @@ if (!imdbId || !/^tt\d+$/.test(nImdb)) {
 
       const data = await res.json();
 
+      if (window.self !== window.top) {
+        window.parent.postMessage(
+          { type: "add-result", ok: data.ok, message: data.message, error: data.error },
+          "*"
+        );
+      }
       if (data.ok) {
         setStatus(data.message || "Added to watchlist!");
       } else {
         setStatus(data.error || "Failed to add.", true);
       }
     } catch (err) {
-      setStatus(err.message || "Could not reach the server.", true);
+      const errMsg = err.message || "Could not reach the server.";
+      if (window.self !== window.top) {
+        window.parent.postMessage(
+          { type: "add-result", ok: false, error: errMsg },
+          "*"
+        );
+      }
+      setStatus(errMsg, true);
     }
   });
 }

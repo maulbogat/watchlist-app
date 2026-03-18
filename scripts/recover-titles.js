@@ -43,7 +43,7 @@ function movieKey(m) {
 }
 
 function normalizeMovie(m) {
-  const { status, removed, ...rest } = m;
+  const { status, ...rest } = m;
   return rest;
 }
 
@@ -60,10 +60,7 @@ async function collectFromSharedLists() {
   snap.docs.forEach((d) => {
     const data = d.data();
     const items = Array.isArray(data?.items) ? data.items : [];
-    const removed = new Set(data?.removed || []);
-    items.forEach((m) => {
-      if (!removed.has(movieKey(m))) all.push(normalizeMovie(m));
-    });
+    items.forEach((m) => all.push(normalizeMovie(m)));
   });
   return all;
 }
@@ -74,10 +71,7 @@ async function collectFromUsers() {
   snap.docs.forEach((d) => {
     const data = d.data();
     const items = Array.isArray(data?.items) ? data.items : [];
-    const removed = new Set(data?.removed || []);
-    items.forEach((m) => {
-      if (!removed.has(movieKey(m))) all.push(normalizeMovie(m));
-    });
+    items.forEach((m) => all.push(normalizeMovie(m)));
   });
   return all;
 }
@@ -109,7 +103,6 @@ async function restoreToUser(uid, items) {
   const watched = new Set(data.watched || []);
   const maybeLater = new Set(data.maybeLater || []);
   const archive = new Set(data.archive || []);
-  const removed = new Set(data.removed || []);
 
   let added = 0;
   for (const m of items) {
@@ -117,7 +110,6 @@ async function restoreToUser(uid, items) {
     if (existingKeys.has(key)) continue;
     existing.push(m);
     existingKeys.add(key);
-    removed.delete(key);
     added++;
   }
 
@@ -127,7 +119,6 @@ async function restoreToUser(uid, items) {
       watched: [...watched],
       maybeLater: [...maybeLater],
       archive: [...archive],
-      removed: [...removed],
     },
     { merge: true }
   );

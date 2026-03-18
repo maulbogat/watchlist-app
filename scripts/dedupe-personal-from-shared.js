@@ -50,8 +50,7 @@ async function main() {
   const listId = match.id;
   const listData = match.data();
   const listItems = Array.isArray(listData.items) ? listData.items : [];
-  const listRemoved = new Set(listData.removed || []);
-  const sharedKeys = new Set(listItems.filter((m) => !listRemoved.has(movieKey(m))).map((m) => movieKey(m)));
+  const sharedKeys = new Set(listItems.map((m) => movieKey(m)));
 
   console.log(`Shared list: ${listData.name} (${listId}) - ${sharedKeys.size} items`);
 
@@ -66,23 +65,22 @@ async function main() {
     if (!userSnap.exists) continue;
     const userData = userSnap.data();
     const userItems = Array.isArray(userData.items) ? userData.items : [];
-    const userRemoved = new Set(userData.removed || []);
 
     const toRemove = [];
     for (const m of userItems) {
       const key = movieKey(m);
-      if (userRemoved.has(key)) continue;
       if (sharedKeys.has(key)) toRemove.push(key);
     }
 
     if (toRemove.length === 0) continue;
 
     const userRef = db.collection("users").doc(uid);
+    const newItems = userItems.filter((m) => !toRemove.includes(movieKey(m)));
     await userRef.update({
+      items: newItems,
       watched: FieldValue.arrayRemove(...toRemove),
       maybeLater: FieldValue.arrayRemove(...toRemove),
       archive: FieldValue.arrayRemove(...toRemove),
-      removed: FieldValue.arrayUnion(...toRemove),
     });
     console.log(`Removed ${toRemove.length} duplicates from user ${uid}`);
   }

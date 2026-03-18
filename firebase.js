@@ -49,7 +49,7 @@ async function getMoviesCatalog() {
 
 /**
  * Returns status data from Firestore.
- * Data model: users/{uid} = { items: [], watched: [], maybeLater: [], archive: [], removed: [] }
+ * Data model: users/{uid} = { items: [], watched: [], maybeLater: [], archive: [] }
  */
 async function getStatusData(uid) {
   const ref = doc(db, "users", uid);
@@ -60,7 +60,6 @@ async function getStatusData(uid) {
     watched: Array.isArray(data.watched) ? data.watched : [],
     maybeLater: Array.isArray(data.maybeLater) ? data.maybeLater : [],
     archive: Array.isArray(data.archive) ? data.archive : [],
-    removed: Array.isArray(data.removed) ? data.removed : [],
   };
 }
 
@@ -75,26 +74,22 @@ async function getUserMovies(uid) {
   const hasLegacyData =
     data.watched?.length > 0 ||
     data.maybeLater?.length > 0 ||
-    data.archive?.length > 0 ||
-    data.removed?.length > 0;
+    data.archive?.length > 0;
 
   if (items.length === 0 && hasLegacyData) {
     const catalog = await getMoviesCatalog();
     if (catalog.length > 0) {
-      const removedSet = new Set(data.removed);
       const watchedSet = new Set(data.watched);
       const maybeLaterSet = new Set(data.maybeLater);
       const archiveSet = new Set(data.archive);
-      items = catalog
-        .filter((m) => !removedSet.has(movieKey(m)))
-        .map((m) => {
-          const key = movieKey(m);
-          let status = "to-watch";
-          if (watchedSet.has(key)) status = "watched";
-          else if (maybeLaterSet.has(key)) status = "maybe-later";
-          else if (archiveSet.has(key)) status = "archive";
-          return { ...m, status };
-        });
+      items = catalog.map((m) => {
+        const key = movieKey(m);
+        let status = "to-watch";
+        if (watchedSet.has(key)) status = "watched";
+        else if (maybeLaterSet.has(key)) status = "maybe-later";
+        else if (archiveSet.has(key)) status = "archive";
+        return { ...m, status };
+      });
       await setDoc(doc(db, "users", uid), { items }, { merge: true });
     }
   }
@@ -103,14 +98,13 @@ async function getUserMovies(uid) {
     const watchedSet = new Set(data.watched);
     const maybeLaterSet = new Set(data.maybeLater);
     const archiveSet = new Set(data.archive);
-    const removedSet = new Set(data.removed);
     items = items.map((m) => {
       const key = movieKey(m);
       let status = "to-watch";
       if (watchedSet.has(key)) status = "watched";
       else if (maybeLaterSet.has(key)) status = "maybe-later";
       else if (archiveSet.has(key)) status = "archive";
-      return { ...m, status, removed: removedSet.has(key) };
+      return { ...m, status };
     });
   }
 
@@ -148,13 +142,16 @@ async function removeWatched(uid, key) {
 
 async function removeTitle(uid, key) {
   const ref = doc(db, "users", uid);
+  const snap = await getDoc(ref);
+  const data = snap.exists() ? snap.data() : {};
+  const items = Array.isArray(data.items) ? data.items.filter((m) => movieKey(m) !== key) : [];
   await setDoc(
     ref,
     {
+      items,
       watched: arrayRemove(key),
       maybeLater: arrayRemove(key),
       archive: arrayRemove(key),
-      removed: arrayUnion(key),
     },
     { merge: true }
   );
@@ -177,7 +174,6 @@ async function createSharedList(uid, name) {
     watched: [],
     maybeLater: [],
     archive: [],
-    removed: [],
     createdAt: new Date().toISOString(),
   });
   return listId;
@@ -206,14 +202,13 @@ async function getSharedListMovies(listId) {
   const watchedSet = new Set(data.watched || []);
   const maybeLaterSet = new Set(data.maybeLater || []);
   const archiveSet = new Set(data.archive || []);
-  const removedSet = new Set(data.removed || []);
   return items.map((m) => {
     const key = movieKey(m);
     let status = "to-watch";
     if (watchedSet.has(key)) status = "watched";
     else if (maybeLaterSet.has(key)) status = "maybe-later";
     else if (archiveSet.has(key)) status = "archive";
-    return { ...m, status, removed: removedSet.has(key) };
+    return { ...m, status };
   });
 }
 
@@ -234,13 +229,16 @@ async function setSharedListStatus(listId, key, status) {
 
 async function removeFromSharedList(listId, key) {
   const ref = doc(db, "sharedLists", listId);
+  const snap = await getDoc(ref);
+  const data = snap.exists() ? snap.data() : {};
+  const items = Array.isArray(data.items) ? data.items.filter((m) => movieKey(m) !== key) : [];
   await setDoc(
     ref,
     {
+      items,
       watched: arrayRemove(key),
       maybeLater: arrayRemove(key),
       archive: arrayRemove(key),
-      removed: arrayUnion(key),
     },
     { merge: true }
   );
@@ -256,7 +254,7 @@ async function addToSharedList(listId, movie) {
   const exists = items.some((m) => movieKey(m) === key);
   if (exists) return;
   items.push(movie);
-  await setDoc(ref, { items, removed: (data.removed || []).filter((k) => k !== key) }, { merge: true });
+  await setDoc(ref, { items }, { merge: true });
 }
 
 /**
@@ -271,13 +269,11 @@ async function moveAllToSharedList(uid, listId) {
 
   const userData = await getStatusData(uid);
   const userItems = Array.isArray(userData.items) ? userData.items : [];
-  const userRemoved = new Set(userData.removed || []);
   const userWatched = new Set(userData.watched || []);
   const userMaybeLater = new Set(userData.maybeLater || []);
   const userArchive = new Set(userData.archive || []);
 
-  const toCopy = userItems.filter((m) => !userRemoved.has(movieKey(m)));
-  if (toCopy.length === 0) throw new Error("Your list is empty");
+  if (userItems.length === 0) throw new Error("Your list is empty");
 
   const listRef = doc(db, "sharedLists", listId);
   const listSnap = await getDoc(listRef);
@@ -286,17 +282,15 @@ async function moveAllToSharedList(uid, listId) {
   const listWatched = new Set(listDoc.watched || []);
   const listMaybeLater = new Set(listDoc.maybeLater || []);
   const listArchive = new Set(listDoc.archive || []);
-  const listRemoved = new Set(listDoc.removed || []);
 
   const existingKeys = new Set(listItems.map((m) => movieKey(m)));
 
-  for (const m of toCopy) {
+  for (const m of userItems) {
     const key = movieKey(m);
     if (existingKeys.has(key)) continue;
-    const { status, removed, ...movie } = m;
+    const { status, ...movie } = m;
     listItems.push(movie);
     existingKeys.add(key);
-    listRemoved.delete(key);
     if (userWatched.has(key)) listWatched.add(key);
     else if (userMaybeLater.has(key)) listMaybeLater.add(key);
     else if (userArchive.has(key)) listArchive.add(key);
@@ -309,7 +303,6 @@ async function moveAllToSharedList(uid, listId) {
       watched: [...listWatched],
       maybeLater: [...listMaybeLater],
       archive: [...listArchive],
-      removed: [...listRemoved],
     },
     { merge: true }
   );
@@ -329,27 +322,23 @@ async function copySharedListToPersonal(uid, listId) {
   const listWatched = new Set(listData.watched || []);
   const listMaybeLater = new Set(listData.maybeLater || []);
   const listArchive = new Set(listData.archive || []);
-  const listRemoved = new Set(listData.removed || []);
 
-  const toCopy = listItems.filter((m) => !listRemoved.has(movieKey(m)));
-  if (toCopy.length === 0) throw new Error("Shared list is empty");
+  if (listItems.length === 0) throw new Error("Shared list is empty");
 
   const userData = await getStatusData(uid);
   const userItems = Array.isArray(userData.items) ? [...userData.items] : [];
   const userWatched = new Set(userData.watched || []);
   const userMaybeLater = new Set(userData.maybeLater || []);
   const userArchive = new Set(userData.archive || []);
-  const userRemoved = new Set(userData.removed || []);
 
   const existingKeys = new Set(userItems.map((m) => movieKey(m)));
 
-  for (const m of toCopy) {
+  for (const m of listItems) {
     const key = movieKey(m);
     if (existingKeys.has(key)) continue;
-    const { status, removed, ...movie } = m;
+    const { status, ...movie } = m;
     userItems.push(movie);
     existingKeys.add(key);
-    userRemoved.delete(key);
     if (listWatched.has(key)) userWatched.add(key);
     else if (listMaybeLater.has(key)) userMaybeLater.add(key);
     else if (listArchive.has(key)) userArchive.add(key);
@@ -363,7 +352,6 @@ async function copySharedListToPersonal(uid, listId) {
       watched: [...userWatched],
       maybeLater: [...userMaybeLater],
       archive: [...userArchive],
-      removed: [...userRemoved],
     },
     { merge: true }
   );
@@ -371,7 +359,7 @@ async function copySharedListToPersonal(uid, listId) {
 
 /**
  * Move a single item from a shared list to the user's personal list.
- * Adds to personal if not there, restores from removed if hidden, removes from shared list.
+ * Adds to personal if not there, removes from shared list.
  */
 async function moveItemFromSharedToPersonal(uid, listId, movie) {
   const listData = await getSharedList(listId);
@@ -382,21 +370,19 @@ async function moveItemFromSharedToPersonal(uid, listId, movie) {
   const key = movieKey(movie);
   const userData = await getStatusData(uid);
   const userItems = Array.isArray(userData.items) ? [...userData.items] : [];
-  const userRemoved = new Set(userData.removed || []);
   const userWatched = new Set(userData.watched || []);
   const userMaybeLater = new Set(userData.maybeLater || []);
   const userArchive = new Set(userData.archive || []);
 
   const existingKeys = new Set(userItems.map((m) => movieKey(m)));
   if (!existingKeys.has(key)) {
-    const { status, removed, ...movieClean } = movie;
+    const { status, ...movieClean } = movie;
     userItems.push(movieClean);
     const s = status || "to-watch";
     if (s === "watched") userWatched.add(key);
     else if (s === "maybe-later") userMaybeLater.add(key);
     else if (s === "archive") userArchive.add(key);
   }
-  userRemoved.delete(key);
 
   const userRef = doc(db, "users", uid);
   await setDoc(
@@ -406,7 +392,6 @@ async function moveItemFromSharedToPersonal(uid, listId, movie) {
       watched: [...userWatched],
       maybeLater: [...userMaybeLater],
       archive: [...userArchive],
-      removed: arrayRemove(key),
     },
     { merge: true }
   );
@@ -452,17 +437,14 @@ async function removeDuplicatesFromPersonal(uid, listId) {
   if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
 
   const listItems = Array.isArray(listData.items) ? listData.items : [];
-  const listRemoved = new Set(listData.removed || []);
-  const sharedKeys = new Set(listItems.filter((m) => !listRemoved.has(movieKey(m))).map((m) => movieKey(m)));
+  const sharedKeys = new Set(listItems.map((m) => movieKey(m)));
 
   const userData = await getStatusData(uid);
   const userItems = Array.isArray(userData.items) ? userData.items : [];
-  const userRemoved = new Set(userData.removed || []);
 
   const toRemove = [];
   for (const m of userItems) {
     const key = movieKey(m);
-    if (userRemoved.has(key)) continue;
     if (sharedKeys.has(key)) toRemove.push(key);
   }
 

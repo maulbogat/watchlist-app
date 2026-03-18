@@ -1,5 +1,5 @@
 /**
- * Ensure a title is in a user's personal list and visible (not in removed).
+ * Ensure a title is in a user's personal list.
  * Run: node scripts/ensure-in-personal.js "1941" <uid>
  */
 import { readFileSync } from "fs";
@@ -46,20 +46,12 @@ async function main() {
     process.exit(1);
   }
   const userData = userSnap.data();
-  let userItems = Array.isArray(userData.items) ? [...userData.items] : [];
-  let userRemoved = [...(userData.removed || [])];
+  const userItems = Array.isArray(userData.items) ? userData.items : [];
 
   const movie = userItems.find((m) => String(m.title || "").trim() === String(titleArg).trim());
-  const key = movie ? movieKey(movie) : null;
 
   if (movie) {
-    if (userRemoved.includes(key)) {
-      userRemoved = userRemoved.filter((k) => k !== key);
-      await db.collection("users").doc(uid).update({ removed: userRemoved });
-      console.log(`Restored "${movie.title}" to visible in personal list (was in removed).`);
-    } else {
-      console.log(`"${movie.title}" already visible in personal list.`);
-    }
+    console.log(`"${movie.title}" is in personal list.`);
   } else {
     console.error(`"${titleArg}" not found in user's items. Need to add from shared list or catalog.`);
     process.exit(1);

@@ -65,13 +65,11 @@ async function main() {
   }
   const userData = userSnap.data();
   const userItems = Array.isArray(userData.items) ? userData.items : [];
-  const userRemoved = new Set(userData.removed || []);
   const userWatched = new Set(userData.watched || []);
   const userMaybeLater = new Set(userData.maybeLater || []);
   const userArchive = new Set(userData.archive || []);
 
-  const toCopy = userItems.filter((m) => !userRemoved.has(movieKey(m)));
-  if (toCopy.length === 0) {
+  if (userItems.length === 0) {
     console.error("User list is empty");
     process.exit(1);
   }
@@ -92,17 +90,15 @@ async function main() {
   const listWatched = new Set(listData.watched || []);
   const listMaybeLater = new Set(listData.maybeLater || []);
   const listArchive = new Set(listData.archive || []);
-  const listRemoved = new Set(listData.removed || []);
   const existingKeys = new Set(listItems.map((m) => movieKey(m)));
 
   let added = 0;
-  for (const m of toCopy) {
+  for (const m of userItems) {
     const key = movieKey(m);
     if (existingKeys.has(key)) continue;
-    const { status, removed, ...movie } = m;
+    const { status, ...movie } = m;
     listItems.push(movie);
     existingKeys.add(key);
-    listRemoved.delete(key);
     if (userWatched.has(key)) listWatched.add(key);
     else if (userMaybeLater.has(key)) listMaybeLater.add(key);
     else if (userArchive.has(key)) listArchive.add(key);
@@ -115,7 +111,6 @@ async function main() {
       watched: [...listWatched],
       maybeLater: [...listMaybeLater],
       archive: [...listArchive],
-      removed: [...listRemoved],
     },
     { merge: true }
   );

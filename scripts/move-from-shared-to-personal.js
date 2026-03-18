@@ -63,7 +63,6 @@ async function main() {
   }
   const listData = listSnap.data();
   const listItems = Array.isArray(listData.items) ? [...listData.items] : [];
-  const listRemoved = new Set(listData.removed || []);
 
   const movie = listItems.find((m) => {
     const titleMatch = String(m.title || "").trim() === String(titleArg).trim();
@@ -94,33 +93,28 @@ async function main() {
   }
   const userData = userSnap.data();
   const userItems = Array.isArray(userData.items) ? [...userData.items] : [];
-  const userRemoved = new Set(userData.removed || []);
   const existingKeys = new Set(userItems.map((m) => movieKey(m)));
   const userUpdate = {};
 
   if (existingKeys.has(key)) {
     console.log(`"${movie.title}" already in personal list. Removing from shared list only.`);
   } else {
-    const { status, removed, ...movieClean } = movie;
+    const { status, ...movieClean } = movie;
     userItems.push(movieClean);
     userUpdate.items = userItems;
     console.log(`Added "${movie.title}" to personal list.`);
-  }
-
-  if (userRemoved.has(key)) {
-    userUpdate.removed = FieldValue.arrayRemove(key);
-    console.log(`Restored "${movie.title}" to visible (was in removed).`);
   }
 
   if (Object.keys(userUpdate).length) {
     await db.collection("users").doc(uid).update(userUpdate);
   }
 
+  const newListItems = listItems.filter((m) => movieKey(m) !== key);
   await db.collection("sharedLists").doc(listId).update({
+    items: newListItems,
     watched: FieldValue.arrayRemove(key),
     maybeLater: FieldValue.arrayRemove(key),
     archive: FieldValue.arrayRemove(key),
-    removed: FieldValue.arrayUnion(key),
   });
   console.log(`Removed "${movie.title}" from shared list.`);
   console.log("Done.");

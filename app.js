@@ -80,11 +80,10 @@ function getUniqueGenres() {
 
 function getFilteredTitles() {
   if (currentStatus === "recently-added") {
-    // Last 10 items added to catalog (by array order), excluding removed
+    // Last 10 items added to catalog (by array order)
     const recent = [];
     for (let i = movies.length - 1; i >= 0 && recent.length < 10; i--) {
       const m = movies[i];
-      if (m.removed) continue;
       if (currentFilter !== "both" && m.type !== currentFilter) continue;
       if (currentGenre) {
         const g = String(m.genre || "");
@@ -97,7 +96,6 @@ function getFilteredTitles() {
 
   let list = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
   list = list.filter((m) => {
-    if (m.removed) return false;
     const s = m.status || "to-watch";
     if (currentStatus === "to-watch") return s === "to-watch" || s === "maybe-later" || s === "archive";
     return s === currentStatus;
@@ -152,7 +150,7 @@ function buildCards() {
   grid.innerHTML = "";
 
   const visible = getFilteredTitles();
-  const totalCount = movies.filter((m) => !m.removed).length;
+  const totalCount = movies.length;
   updateHeaderMeta(totalCount);
 
   if (!visible.length) {
@@ -302,7 +300,7 @@ async function removeFromCard(m) {
     } else {
       await removeTitle(uid, key);
     }
-    m.removed = true;
+    movies = movies.filter((x) => movieKey(x) !== key);
     buildCards();
     closeModal();
   } catch (err) {
@@ -346,7 +344,7 @@ function attachMoveToMyListHandler(footer, m) {
     btn.textContent = "Moving…";
     try {
       await moveItemFromSharedToPersonal(user.uid, currentListMode.listId, m);
-      m.removed = true;
+      movies = movies.filter((x) => movieKey(x) !== movieKey(m));
       buildCards();
       closeModal();
     } catch (err) {

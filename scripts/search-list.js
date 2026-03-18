@@ -28,8 +28,7 @@ if (!match) {
   process.exit(1);
 }
 const items = match.data().items || [];
-const removed = new Set(match.data().removed || []);
 const s = search.toLowerCase();
-const found = items.filter((m) => !removed.has(`${m.title||""}|${m.year??""}`) && String(m.title||"").toLowerCase().includes(s));
+const found = items.filter((m) => String(m.title || "").toLowerCase().includes(s));
 console.log(`Found ${found.length} matches for "${search}":`);
 found.forEach((m) => console.log(`  - ${m.title} (${m.year ?? "—"})`));

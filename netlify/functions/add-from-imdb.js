@@ -289,8 +289,7 @@ exports.handler = async (event, context) => {
       return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in the list` }, event);
     }
     items.push(movie);
-    const removed = Array.isArray(listData.removed) ? listData.removed.filter((k) => k !== key) : [];
-    await listRef.update({ items, removed });
+    await listRef.update({ items });
     return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to shared list` }, event);
   }
 
@@ -301,7 +300,6 @@ exports.handler = async (event, context) => {
   const watched = Array.isArray(data.watched) ? data.watched : [];
   const maybeLater = Array.isArray(data.maybeLater) ? data.maybeLater : [];
   const archive = Array.isArray(data.archive) ? data.archive : [];
-  const removed = Array.isArray(data.removed) ? data.removed : [];
 
   let existing = items.find((m) => m.imdbId && norm(m.imdbId) === nImdb);
   if (!existing) {
@@ -328,7 +326,6 @@ exports.handler = async (event, context) => {
       watched: watched.filter((k) => k !== key),
       maybeLater: maybeLater.filter((k) => k !== key),
       archive: archive.filter((k) => k !== key),
-      removed: removed.filter((k) => k !== key),
     },
     { merge: true }
   );

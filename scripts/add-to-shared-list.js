@@ -100,7 +100,7 @@ function movieKey(m) {
 }
 
 function normalizeMovie(m) {
-  const { status, removed, ...rest } = m;
+  const { status, ...rest } = m;
   return rest;
 }
 
@@ -196,7 +196,6 @@ async function main() {
   }
   const listData = listSnap.data();
   const listItems = Array.isArray(listData.items) ? [...listData.items] : [];
-  const listRemoved = new Set(listData.removed || []);
   const listWatched = new Set(listData.watched || []);
   const listMaybeLater = new Set(listData.maybeLater || []);
   const listArchive = new Set(listData.archive || []);
@@ -204,30 +203,16 @@ async function main() {
   const key = movieKey(movie);
   const existingKeys = new Set(listItems.map((m) => movieKey(m)));
   if (existingKeys.has(key)) {
-    if (listRemoved.has(key)) {
-      listRemoved.delete(key);
-      await db.collection("sharedLists").doc(listId).set({
-        items: listItems,
-        watched: [...listWatched],
-        maybeLater: [...listMaybeLater],
-        archive: [...listArchive],
-        removed: [...listRemoved],
-      }, { merge: true });
-      console.log(`"${movie.title}" was in removed. Restored to visible.`);
-    } else {
-      console.log(`"${movie.title}" already in shared list.`);
-    }
+    console.log(`"${movie.title}" already in shared list.`);
     return;
   }
 
   listItems.push(movie);
-  listRemoved.delete(key);
   await db.collection("sharedLists").doc(listId).set({
     items: listItems,
     watched: [...listWatched],
     maybeLater: [...listMaybeLater],
     archive: [...listArchive],
-    removed: [...listRemoved],
   }, { merge: true });
 
   console.log(`Added "${movie.title}" to shared list.`);
