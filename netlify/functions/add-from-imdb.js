@@ -105,47 +105,95 @@ async function fetchTrailerFromTmdb(imdbId, apiKey) {
   return trailer?.key || null;
 }
 
+async function fetchTrailerFromYouTubeSearch(title, year) {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) return null;
+  const query = [title, year ? String(year) : ""].filter(Boolean).join(" ") + " official trailer";
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(query)}&key=${apiKey}`;
+  try {
+    const data = await fetchJson(url);
+    const item = (data.items || []).find((i) => i.id?.videoId);
+    return item?.id?.videoId || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 exports.handler = async (event, context) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(event) };
   }
 
-  // GET: fetch trailer (TMDB first, then IMDb scrape)
+  // GET: fetch trailer and thumb (TMDB, IMDb, YouTube; OMDb for poster)
   if (event.httpMethod === "GET") {
-    const imdbId = event.queryStringParameters?.imdbId || "";
+    const params = event.queryStringParameters || {};
+    const imdbId = params.imdbId || "";
+    const title = (params.title || "").trim();
+    const year = params.year ? String(params.year).replace(/\D/g, "").slice(0, 4) : null;
     const norm = (id) => (String(id).startsWith("tt") ? id : `tt${id}`);
     const nImdb = norm(imdbId).trim();
-    if (!nImdb || !/^tt\d+$/.test(nImdb)) {
-      return jsonRes(400, { ok: false, error: "imdbId required (e.g. tt7235466)" }, event);
+    const hasImdb = nImdb && /^tt\d+$/.test(nImdb);
+    const hasTitle = title.length > 0;
+
+    if (!hasImdb && !hasTitle) {
+      return jsonRes(400, { ok: false, error: "imdbId or title required" }, event);
     }
 
-    // 1. Try TMDB API (reliable, returns YouTube keys)
-    const tmdbKey = process.env.TMDB_API_KEY;
-    if (tmdbKey) {
+    let omdb = null;
+    let thumb = null;
+    let searchTitle = title;
+    let searchYear = year;
+
+    if (hasImdb) {
       try {
-        const youtubeId = await fetchTrailerFromTmdb(nImdb, tmdbKey);
-        if (youtubeId) {
-          return jsonRes(200, { ok: true, youtubeId }, event);
-        }
+        omdb = await fetchOMDb(nImdb);
+        searchTitle = omdb.Title || title;
+        searchYear = searchYear || (omdb.Year && String(omdb.Year).replace(/\D/g, "").slice(0, 4)) || null;
+        thumb = omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
       } catch (e) {
-        // fall through to IMDb
+        // continue without OMDb
       }
     }
 
-    // 2. Fallback: scrape IMDb videogallery (may fail from server IPs)
-    try {
-      const html = await fetchHtml(`https://www.imdb.com/title/${nImdb}/videogallery`);
-      const match = html.match(/\/video\/(vi\d+)/);
-      if (match) {
-        const videoId = match[1];
-        const embedUrl = `https://www.imdb.com/video/imdb/${videoId}/imdb/embed?autoplay=true`;
-        return jsonRes(200, { ok: true, embedUrl }, event);
+    let youtubeId = null;
+    let embedUrl = null;
+
+    // 1. Try TMDB API (when we have imdbId)
+    if (hasImdb) {
+      const tmdbKey = process.env.TMDB_API_KEY;
+      if (tmdbKey) {
+        try {
+          youtubeId = await fetchTrailerFromTmdb(nImdb, tmdbKey);
+        } catch (e) {}
       }
-    } catch (e) {
-      // ignore
     }
 
-    return jsonRes(404, { ok: false, error: "No trailer found for this title" }, event);
+    // 2. Try IMDb videogallery scrape (when we have imdbId)
+    if (!youtubeId && hasImdb) {
+      try {
+        const html = await fetchHtml(`https://www.imdb.com/title/${nImdb}/videogallery`);
+        const match = html.match(/\/video\/(vi\d+)/);
+        if (match) {
+          embedUrl = `https://www.imdb.com/video/imdb/${match[1]}/imdb/embed?autoplay=true`;
+        }
+      } catch (e) {}
+    }
+
+    // 3. Try YouTube search (by title + year)
+    if (!youtubeId && !embedUrl && searchTitle) {
+      try {
+        youtubeId = await fetchTrailerFromYouTubeSearch(searchTitle, searchYear);
+      } catch (e) {}
+    }
+
+    if (youtubeId) {
+      return jsonRes(200, { ok: true, youtubeId, thumb: thumb || undefined }, event);
+    }
+    if (embedUrl) {
+      return jsonRes(200, { ok: true, embedUrl, thumb: thumb || undefined }, event);
+    }
+
+    return jsonRes(404, { ok: false, error: "No trailer found for this title", thumb: thumb || undefined }, event);
   }
 
   if (event.httpMethod !== "POST") {

@@ -415,6 +415,33 @@ async function moveItemFromSharedToPersonal(uid, listId, movie) {
 }
 
 /**
+ * Update a movie's metadata (thumb, youtubeId) in the current list.
+ */
+async function updateMovieMetadata(uid, listMode, key, updates) {
+  if (listMode === "personal") {
+    const data = await getStatusData(uid);
+    const items = Array.isArray(data.items) ? [...data.items] : [];
+    const idx = items.findIndex((m) => movieKey(m) === key);
+    if (idx < 0) return;
+    if (updates.thumb) items[idx].thumb = updates.thumb;
+    if (updates.youtubeId) items[idx].youtubeId = updates.youtubeId;
+    await setDoc(doc(db, "users", uid), { items }, { merge: true });
+  } else if (typeof listMode === "object" && listMode?.type === "shared") {
+    const listId = listMode.listId;
+    const listData = await getSharedList(listId);
+    if (!listData) return;
+    const members = listData.members || [];
+    if (!members.includes(uid)) return;
+    const items = Array.isArray(listData.items) ? [...listData.items] : [];
+    const idx = items.findIndex((m) => movieKey(m) === key);
+    if (idx < 0) return;
+    if (updates.thumb) items[idx].thumb = updates.thumb;
+    if (updates.youtubeId) items[idx].youtubeId = updates.youtubeId;
+    await setDoc(doc(db, "sharedLists", listId), { items }, { merge: true });
+  }
+}
+
+/**
  * Remove from user's personal list any item that exists in the shared list.
  * Keeps items only in the shared list.
  */
@@ -472,5 +499,6 @@ export {
   moveAllToSharedList,
   copySharedListToPersonal,
   moveItemFromSharedToPersonal,
+  updateMovieMetadata,
   removeDuplicatesFromPersonal,
 };

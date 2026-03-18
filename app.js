@@ -18,6 +18,7 @@ import {
   moveAllToSharedList,
   copySharedListToPersonal,
   moveItemFromSharedToPersonal,
+  updateMovieMetadata,
   removeDuplicatesFromPersonal,
 } from "./firebase.js";
 
@@ -396,50 +397,68 @@ function openModal(m) {
       <div class="trailer-loading" style="font-size:0.9rem;color:var(--muted)">Loading trailer…</div>
     </div>`;
 
-    if (m.imdbId) {
-      const apiBase = window.location.origin;
-      fetch(`${apiBase}/.netlify/functions/add-from-imdb?imdbId=${encodeURIComponent(m.imdbId)}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.ok && currentModalMovie === m) {
-            placeholder.style.background = "#000";
-            if (data.youtubeId) {
-              const rawOrigin = window.location.origin;
-              const originParam = rawOrigin && rawOrigin !== "null" ? `&origin=${encodeURIComponent(rawOrigin)}` : "";
-              placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
-                referrerpolicy="strict-origin-when-cross-origin"
-                src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(data.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1${originParam}"></iframe>`;
-            } else if (data.embedUrl) {
-              placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
-                referrerpolicy="strict-origin-when-cross-origin"
-                src="${String(data.embedUrl).replace(/"/g, "&quot;")}"></iframe>`;
-            } else {
-              placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
-                <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
-                <a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>
-              </div>`;
-            }
-          } else if (currentModalMovie === m) {
-            placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
-              <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
-              <a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>
-            </div>`;
+    const apiBase = window.location.origin;
+    const fetchUrl = m.imdbId
+      ? `${apiBase}/.netlify/functions/add-from-imdb?imdbId=${encodeURIComponent(m.imdbId)}`
+      : `${apiBase}/.netlify/functions/add-from-imdb?title=${encodeURIComponent(m.title)}${m.year ? "&year=" + encodeURIComponent(m.year) : ""}`;
+
+    fetch(fetchUrl)
+      .then((r) => r.json())
+      .then((data) => {
+        if (currentModalMovie !== m) return;
+        const foundTrailer = data.ok && (data.youtubeId || data.embedUrl);
+        const foundThumb = data.thumb; // may come from 404 response (OMDb poster)
+        const updates = {};
+        if (foundThumb && !m.thumb) {
+          m.thumb = data.thumb;
+          updates.thumb = data.thumb;
+        }
+        if (foundTrailer && data.youtubeId) {
+          m.youtubeId = data.youtubeId;
+          if (!m.thumb) {
+            m.thumb = `https://img.youtube.com/vi/${data.youtubeId}/hqdefault.jpg`;
+            updates.thumb = m.thumb;
           }
-        })
-        .catch(() => {
-          if (currentModalMovie === m) {
-            placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
-              <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
-              <a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>
-            </div>`;
+          updates.youtubeId = data.youtubeId;
+        }
+        if (Object.keys(updates).length) {
+          buildCards();
+          const user = auth.currentUser;
+          if (user) {
+            updateMovieMetadata(user.uid, currentListMode, movieKey(m), updates).catch(() => {});
           }
-        });
-    } else {
-      placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
-        <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
-        <a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Find Trailer on YouTube &#x2197;</a>
-      </div>`;
-    }
+        }
+        if (foundTrailer) {
+          placeholder.style.background = "#000";
+          if (data.youtubeId) {
+            const rawOrigin = window.location.origin;
+            const originParam = rawOrigin && rawOrigin !== "null" ? `&origin=${encodeURIComponent(rawOrigin)}` : "";
+            placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
+              referrerpolicy="strict-origin-when-cross-origin"
+              src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(data.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1${originParam}"></iframe>`;
+          } else {
+            placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
+              referrerpolicy="strict-origin-when-cross-origin"
+              src="${String(data.embedUrl).replace(/"/g, "&quot;")}"></iframe>`;
+          }
+        } else {
+          placeholder.style.background = "#0d0d10";
+          placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
+            <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
+            ${imdbUrl ? `<a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>` : ""}
+            <a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Search on YouTube &#x2197;</a>
+          </div>`;
+        }
+      })
+      .catch(() => {
+        if (currentModalMovie === m) {
+          placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
+            <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
+            ${imdbUrl ? `<a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>` : ""}
+            <a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Search on YouTube &#x2197;</a>
+          </div>`;
+        }
+      });
   } else {
     const videoWrap = modal.querySelector(".video-wrap");
     videoWrap.style.background = "#000";
