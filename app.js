@@ -417,17 +417,26 @@ async function handleAddFromParams(user) {
     window.history.replaceState({}, "", u.pathname + (u.search || ""));
   };
 
+  const inIframe = window !== window.top;
+  const notify = (msg, isSuccess) => {
+    if (inIframe) {
+      window.parent.postMessage({ type: "watchlist-add", message: msg, success: isSuccess }, "*");
+    } else {
+      showToast(msg, isSuccess ? 4000 : 6000);
+    }
+  };
+
   if (!movie) {
     const title = params.get("title") || "Unknown";
     const year = params.get("year") || "";
     const type = params.get("type") || "movie";
     const yearPart = year || "YEAR";
-    showToast(`"${title}" not in catalog. Add via: node scripts/add-movie.js "${title}" ${yearPart} ${type} SEARCH ${imdbId}`, 6000);
+    notify(`"${title}" not in catalog. Add via: node scripts/add-movie.js "${title}" ${yearPart} ${type} SEARCH ${imdbId}`, false);
     clearUrl();
     return;
   }
   if (!user) {
-    showToast("Sign in with Google to add to your watchlist.", 5000);
+    notify("Sign in with Google to add to your watchlist.", false);
     clearUrl();
     return;
   }
@@ -441,10 +450,10 @@ async function handleAddFromParams(user) {
       b.setAttribute("aria-selected", isActive ? "true" : "false");
     });
     buildCards();
-    showToast(`Added "${movie.title}" to To Watch`, 4000);
+    notify(`Added "${movie.title}" to To Watch`, true);
   } catch (e) {
     console.error(e);
-    showToast("Failed to add. Try again.", 4000);
+    notify("Failed to add. Try again.", false);
   }
   clearUrl();
 }
