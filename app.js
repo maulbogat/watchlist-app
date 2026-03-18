@@ -15,29 +15,47 @@ import {
   setSharedListStatus,
   removeFromSharedList,
   addToSharedList,
+  moveAllToSharedList,
+  copySharedListToPersonal,
+  moveItemFromSharedToPersonal,
+  removeDuplicatesFromPersonal,
 } from "./firebase.js";
 
-const STATUS_ORDER = ["to-watch", "maybe-later", "watched", "archive"];
+const STATUS_ORDER = ["to-watch", "watched"];
 
 const GENRE_LIMIT = 10;
 
 let movies = [];
 let currentFilter = "both"; // 'both' | 'movie' | 'show'
 let currentGenre = ""; // '' = all, or genre name
-let currentStatus = "to-watch"; // 'to-watch' | 'maybe-later' | 'watched' | 'archive'
+let currentStatus = "to-watch"; // 'to-watch' | 'watched'
 let currentModalMovie = null; // movie currently shown in modal
 let currentListMode = "personal"; // "personal" | { type: "shared", listId, name }
 let sharedLists = [];
 
+function getListFromUrl() {
+  const list = new URLSearchParams(window.location.search).get("list");
+  return list || null;
+}
+
 function saveLastList(user, mode) {
-  if (!user) return;
+  const val = mode === "personal" ? "personal" : (mode?.listId || "personal");
   try {
-    const val = mode === "personal" ? "personal" : (mode?.listId || "personal");
-    localStorage.setItem(`watchlist_lastList_${user.uid}`, val);
+    if (user) localStorage.setItem(`watchlist_lastList_${user.uid}`, val);
   } catch (e) {}
+  const url = new URL(window.location.href);
+  url.searchParams.delete("join");
+  if (val === "personal") {
+    url.searchParams.delete("list");
+  } else {
+    url.searchParams.set("list", val);
+  }
+  window.history.replaceState({}, "", url.pathname + (url.search || ""));
 }
 
 function getLastList(user) {
+  const fromUrl = getListFromUrl();
+  if (fromUrl) return fromUrl;
   if (!user) return null;
   try {
     return localStorage.getItem(`watchlist_lastList_${user.uid}`) || null;
@@ -80,7 +98,12 @@ function getFilteredTitles() {
   }
 
   let list = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
-  list = list.filter((m) => !m.removed && (m.status || "to-watch") === currentStatus);
+  list = list.filter((m) => {
+    if (m.removed) return false;
+    const s = m.status || "to-watch";
+    if (currentStatus === "to-watch") return s === "to-watch" || s === "maybe-later" || s === "archive";
+    return s === currentStatus;
+  });
   if (currentGenre) {
     list = list.filter((m) => {
       const g = String(m.genre || "");
@@ -97,6 +120,19 @@ function updateHeaderMeta(visibleCount) {
   const el = document.getElementById("header-meta");
   if (!el) return;
   el.innerHTML = `${visibleCount} titles`;
+}
+
+function updateHeaderTitle() {
+  const el = document.getElementById("header-title");
+  if (!el) return;
+  if (currentListMode === "personal") {
+    el.textContent = "My";
+  } else if (typeof currentListMode === "object" && currentListMode?.type === "shared") {
+    const name = (currentListMode.name || "Our").trim();
+    el.textContent = name.replace(/\s+(list|watchlist)$/i, "") || "Our";
+  } else {
+    el.textContent = "My";
+  }
 }
 
 function renderServiceChips(services, { limit } = {}) {
@@ -118,7 +154,8 @@ function buildCards() {
   grid.innerHTML = "";
 
   const visible = getFilteredTitles();
-  updateHeaderMeta(visible.length);
+  const totalCount = movies.filter((m) => !m.removed).length;
+  updateHeaderMeta(totalCount);
 
   if (!visible.length) {
     const empty = document.createElement("div");
@@ -126,9 +163,7 @@ function buildCards() {
     const messages = {
       "recently-added": "No recently added titles.",
       "to-watch": "No titles to watch yet.",
-      "maybe-later": "No titles in Maybe later.",
       watched: "No watched titles yet.",
-      archive: "No archived titles.",
     };
     empty.textContent = messages[currentStatus] || "No titles match your filters.";
     grid.appendChild(empty);
@@ -153,19 +188,18 @@ function buildCards() {
     const serviceChips = renderServiceChips(m.services, { limit: 3 });
     const serviceRow = serviceChips ? `<div class="service-row">${serviceChips}</div>` : "";
     const s = m.status || "to-watch";
-    const statusLabels = { "to-watch": "To Watch", "maybe-later": "Maybe later", watched: "Watched", archive: "Archive" };
+    const displayStatus = s === "maybe-later" || s === "archive" ? "to-watch" : s;
+    const statusLabels = { "to-watch": "To Watch", watched: "Watched" };
     const statusIcons = {
       "to-watch": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>',
-      "maybe-later": '<path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>',
       watched: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>',
-      archive: '<path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5z"/>',
     };
     const statusBadge = `<div class="status-badge-wrap">
-      <button type="button" class="status-badge status-${s}" aria-label="Move to status" title="Move to…" data-status="${s}" aria-haspopup="true" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="${s === "watched" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2">${statusIcons[s]}</svg>
+      <button type="button" class="status-badge status-${displayStatus}" aria-label="Move to status" title="Move to…" data-status="${displayStatus}" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="${displayStatus === "watched" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2">${statusIcons[displayStatus]}</svg>
       </button>
       <div class="status-dropdown" role="menu" aria-label="Move to">
-        ${STATUS_ORDER.map((st) => `<button type="button" class="status-dropdown-item ${st === s ? "active" : ""}" role="menuitem" data-status="${st}">${statusLabels[st]}</button>`).join("")}
+        ${STATUS_ORDER.map((st) => `<button type="button" class="status-dropdown-item ${st === displayStatus ? "active" : ""}" role="menuitem" data-status="${st}">${statusLabels[st]}</button>`).join("")}
       </div>
     </div>`;
     const deleteBtn = `<button type="button" class="card-delete-btn" aria-label="Remove from list" title="Remove">&#215;</button>`;
@@ -219,7 +253,8 @@ function buildCards() {
         item.addEventListener("click", (e) => {
           e.stopPropagation();
           const status = item.dataset.status;
-          if (status && status !== (m.status || "to-watch")) setStatusFromCard(m, status);
+          const current = m.status === "maybe-later" || m.status === "archive" ? "to-watch" : (m.status || "to-watch");
+          if (status && status !== current) setStatusFromCard(m, status);
           dropdown.classList.remove("open");
           badgeBtn.setAttribute("aria-expanded", "false");
         });
@@ -279,8 +314,8 @@ async function removeFromCard(m) {
 }
 
 function renderModalStatusBtns(m) {
-  const s = m.status || "to-watch";
-  const labels = { "to-watch": "To Watch", "maybe-later": "Maybe later", watched: "Watched", archive: "Archive" };
+  const s = m.status === "maybe-later" || m.status === "archive" ? "to-watch" : (m.status || "to-watch");
+  const labels = { "to-watch": "To Watch", watched: "Watched" };
   return STATUS_ORDER.map(
     (status) =>
       `<button type="button" class="modal-status-btn ${status === s ? "active" : ""}" data-status="${status}" title="${labels[status]}">${labels[status]}</button>`
@@ -290,9 +325,39 @@ function renderModalStatusBtns(m) {
 function updateModalStatusBtn() {
   if (!currentModalMovie) return;
   const btns = document.querySelectorAll(".modal-status-btn");
+  const displayStatus = currentModalMovie.status === "maybe-later" || currentModalMovie.status === "archive" ? "to-watch" : (currentModalMovie.status || "to-watch");
   btns.forEach((btn) => {
-    const s = btn.dataset.status;
-    btn.classList.toggle("active", (currentModalMovie.status || "to-watch") === s);
+    btn.classList.toggle("active", btn.dataset.status === displayStatus);
+  });
+}
+
+function renderMoveToMyListBtn(m) {
+  const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
+  if (!isShared) return "";
+  return `<span style="opacity:0.4">·</span><button type="button" class="modal-move-to-my-list-btn" title="Move to My list">Move to My list</button>`;
+}
+
+function attachMoveToMyListHandler(footer, m) {
+  const btn = footer.querySelector(".modal-move-to-my-list-btn");
+  if (!btn) return;
+  btn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const user = auth.currentUser;
+    if (!user || typeof currentListMode !== "object" || currentListMode?.type !== "shared") return;
+    btn.disabled = true;
+    btn.textContent = "Moving…";
+    try {
+      await moveItemFromSharedToPersonal(user.uid, currentListMode.listId, m);
+      m.removed = true;
+      buildCards();
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to move.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Move to My list";
+    }
   });
 }
 
@@ -318,10 +383,12 @@ function openModal(m) {
       <span style="opacity:0.4">·</span>
       <span>No YouTube trailer &mdash;</span>
       ${trailerLink}
+      ${renderMoveToMyListBtn(m)}
     `;
     footer.querySelectorAll(".modal-status-btn").forEach((btn) => {
       btn.addEventListener("click", () => setStatusFromCard(m, btn.dataset.status));
     });
+    attachMoveToMyListHandler(footer, m);
     const placeholder = modal.querySelector(".video-wrap");
     placeholder.style.background = "#0d0d10";
     placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
@@ -403,10 +470,12 @@ function openModal(m) {
       <a href="${watchUrl}" target="_blank" style="color: var(--accent); text-decoration: none;">
         Watch on YouTube &#x2197;
       </a>
+      ${renderMoveToMyListBtn(m)}
     `;
     footer.querySelectorAll(".modal-status-btn").forEach((btn) => {
       btn.addEventListener("click", () => setStatusFromCard(m, btn.dataset.status));
     });
+    attachMoveToMyListHandler(footer, m);
   }
 
   modal.classList.add("open");
@@ -589,12 +658,37 @@ function renderListSelector() {
 }
 
 function updateCopyInviteButton() {
+  updateHeaderTitle();
   const btn = document.getElementById("copy-invite-btn");
   if (!btn) return;
   const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
   btn.style.display = isShared ? "inline" : "none";
   btn.textContent = "Copy invite link";
   btn.disabled = false;
+}
+
+function updateRestoreButton() {
+  const btn = document.getElementById("restore-btn");
+  if (!btn) return;
+  const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
+  const hasItems = movies.some((m) => !m.removed);
+  btn.style.display = isShared && hasItems ? "inline" : "none";
+}
+
+function updateDedupeButton() {
+  const btn = document.getElementById("dedupe-btn");
+  if (!btn) return;
+  const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
+  btn.style.display = isShared ? "inline" : "none";
+}
+
+function updateMoveAllButton() {
+  const btn = document.getElementById("move-all-btn");
+  if (!btn) return;
+  const isPersonal = currentListMode === "personal";
+  const hasItems = movies.some((m) => !m.removed);
+  const hasSharedLists = sharedLists.length > 0;
+  btn.style.display = isPersonal && hasItems && hasSharedLists ? "inline" : "none";
 }
 
 function showSharedModal(title, bodyHtml) {
@@ -646,8 +740,6 @@ function init() {
 
     const wrap = document.getElementById("list-selector-wrap");
     if (wrap) wrap.style.display = "flex";
-    renderListSelector();
-    updateCopyInviteButton();
 
     if (joinListId) {
       const apiBase = window.location.origin;
@@ -663,9 +755,6 @@ function init() {
           sharedLists = await getSharedListsForUser(user.uid);
           currentListMode = { type: "shared", listId: joinListId, name: data.name || "Shared list" };
           saveLastList(user, currentListMode);
-          renderListSelector();
-          updateCopyInviteButton();
-          window.history.replaceState({}, "", window.location.pathname);
         }
       } catch (e) {
         console.warn("Join failed:", e);
@@ -675,13 +764,27 @@ function init() {
       if (last === "personal") {
         currentListMode = "personal";
       } else if (last) {
-        const list = sharedLists.find((l) => l.id === last);
+        let list = sharedLists.find((l) => l.id === last);
+        if (!list) {
+          try {
+            const fetched = await getSharedList(last);
+            if (fetched && (fetched.ownerId === user.uid || (Array.isArray(fetched.members) && fetched.members.includes(user.uid)))) {
+              sharedLists.push(fetched);
+              list = fetched;
+            }
+          } catch (_) {}
+        }
         if (list) {
           currentListMode = { type: "shared", listId: list.id, name: list.name };
         }
       }
-      renderListSelector();
     }
+
+    renderListSelector();
+    updateCopyInviteButton();
+    updateRestoreButton();
+    updateDedupeButton();
+    updateMoveAllButton();
 
     movies = await loadList(user);
     setBookmarkletCookie(user);
@@ -694,13 +797,17 @@ function init() {
       const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
       grid.innerHTML = isShared
         ? '<div class="empty-state">This shared list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>'
-        : '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
+        : '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a> or <a href="./restore-titles.html">restore titles</a> from the project.</div>';
     } else {
       const filters = document.getElementById("content-filters");
       if (filters) filters.style.display = "";
       buildCards();
       renderGenreFilter();
     }
+    updateCopyInviteButton();
+    updateRestoreButton();
+    updateDedupeButton();
+    updateMoveAllButton();
   });
 
   document.getElementById("list-selector")?.addEventListener("change", async (e) => {
@@ -719,13 +826,16 @@ function init() {
         if (filters) filters.style.display = "none";
         const meta = document.getElementById("header-meta");
         if (meta) meta.textContent = "0 titles";
-        if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
+        if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a> or <a href="./restore-titles.html">restore titles</a>.</div>';
       } else {
         if (filters) filters.style.display = "";
         buildCards();
         renderGenreFilter();
       }
       updateCopyInviteButton();
+      updateRestoreButton();
+      updateDedupeButton();
+      updateMoveAllButton();
     } else if (val === "__create__") {
       const name = prompt("Enter a name for the shared list:", "Family watchlist");
       if (!name) return;
@@ -759,6 +869,9 @@ function init() {
         renderGenreFilter();
         sel.value = listId;
         updateCopyInviteButton();
+        updateRestoreButton();
+        updateDedupeButton();
+        updateMoveAllButton();
       } catch (err) {
         alert("Failed to create: " + (err.message || "Unknown error"));
         sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
@@ -793,6 +906,9 @@ function init() {
           buildCards();
           renderGenreFilter();
           updateCopyInviteButton();
+          updateRestoreButton();
+          updateDedupeButton();
+          updateMoveAllButton();
         } else {
           alert(data.error || "Failed to join");
           sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
@@ -818,6 +934,9 @@ function init() {
         grid.innerHTML = '<div class="empty-state">This shared list is empty.</div>';
       }
       updateCopyInviteButton();
+      updateRestoreButton();
+      updateDedupeButton();
+      updateMoveAllButton();
     }
   });
 
@@ -830,6 +949,84 @@ function init() {
       if (btn) { btn.textContent = "Copied!"; btn.disabled = true; setTimeout(() => { btn.textContent = "Copy invite link"; btn.disabled = false; }, 2000); }
     } catch (e) {
       alert("Could not copy. The link is: " + shareUrl);
+    }
+  });
+
+  document.getElementById("move-all-btn")?.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user || currentListMode !== "personal" || !sharedLists.length) return;
+    const count = movies.filter((m) => !m.removed).length;
+    if (count === 0) return;
+    const listOptions = sharedLists
+      .map((l) => `<button type="button" class="auth-btn move-all-list-btn" data-list-id="${l.id}" data-list-name="${(l.name || "Shared list").replace(/"/g, "&quot;")}">${l.name || "Shared list"}</button>`)
+      .join("");
+    showSharedModal(
+      "Copy all to shared list",
+      `<p>Copy ${count} item${count === 1 ? "" : "s"} from your list to (your list stays intact):</p>
+       <div class="move-all-list-btns">${listOptions}</div>`
+    );
+    document.querySelectorAll(".move-all-list-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const listId = btn.dataset.listId;
+        const listName = btn.dataset.listName;
+        if (!listId) return;
+        hideSharedModal();
+        try {
+          await moveAllToSharedList(user.uid, listId);
+          sharedLists = await getSharedListsForUser(user.uid);
+          currentListMode = { type: "shared", listId, name: listName };
+          saveLastList(user, currentListMode);
+          renderListSelector();
+          movies = await loadList(user);
+          setBookmarkletCookie(user);
+          buildCards();
+          renderGenreFilter();
+          updateCopyInviteButton();
+          updateRestoreButton();
+          updateDedupeButton();
+          updateMoveAllButton();
+        } catch (err) {
+          alert(err.message || "Failed to copy items.");
+        }
+      });
+    });
+  });
+
+  document.getElementById("dedupe-btn")?.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user || typeof currentListMode !== "object" || currentListMode?.type !== "shared") return;
+    const listId = currentListMode.listId;
+    if (!confirm("Remove from My list any items that are in this shared list?")) return;
+    try {
+      const removed = await removeDuplicatesFromPersonal(user.uid, listId);
+      alert(removed > 0 ? `Removed ${removed} duplicate${removed === 1 ? "" : "s"} from My list.` : "No duplicates found.");
+    } catch (err) {
+      alert(err.message || "Failed to remove duplicates.");
+    }
+  });
+
+  document.getElementById("restore-btn")?.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user || typeof currentListMode !== "object" || currentListMode?.type !== "shared") return;
+    const listId = currentListMode.listId;
+    const count = movies.filter((m) => !m.removed).length;
+    if (count === 0) return;
+    if (!confirm(`Copy ${count} item${count === 1 ? "" : "s"} from this shared list to your personal list?`)) return;
+    try {
+      await copySharedListToPersonal(user.uid, listId);
+      currentListMode = "personal";
+      saveLastList(user, currentListMode);
+      renderListSelector();
+      movies = await loadList(user);
+      setBookmarkletCookie(user);
+      buildCards();
+      renderGenreFilter();
+      updateCopyInviteButton();
+      updateRestoreButton();
+      updateDedupeButton();
+      updateMoveAllButton();
+    } catch (err) {
+      alert(err.message || "Failed to restore.");
     }
   });
 

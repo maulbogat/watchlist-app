@@ -1,7 +1,9 @@
 /**
  * Fetch title data from OMDb API by IMDb ID.
- * Run: OMDB_API_KEY=yourkey node scripts/fetch-omdb.js tt7235466
+ * Run: node scripts/fetch-omdb.js tt7235466
+ * Requires OMDB_API_KEY in .env
  */
+import "dotenv/config";
 const id = process.argv[2] || "tt7235466";
 const key = process.env.OMDB_API_KEY;
 if (!key) {

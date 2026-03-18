@@ -76,10 +76,16 @@ header {
   border-bottom: 1px solid var(--border);
   margin-bottom: 3rem;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 1rem;
+}
+
+.header-filters {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
+  gap: 0.55rem;
 }
 
 header h1 {
@@ -162,6 +168,17 @@ header h1 span {
   word-break: break-all;
   color: var(--accent);
   margin-top: 0.75rem;
+}
+
+.move-all-list-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.move-all-list-btn {
+  justify-content: flex-start;
 }
 
 .tab-group {
@@ -699,6 +716,19 @@ header h1 span {
 }
 .modal-status-btn:hover { color: var(--accent); background: rgba(255,255,255,0.06); }
 .modal-status-btn.active { color: var(--accent); }
+.modal-move-to-my-list-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.modal-move-to-my-list-btn:hover:not(:disabled) { background: rgba(255,255,255,0.06); }
+.modal-move-to-my-list-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .modal-footer { flex-wrap: wrap; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -779,10 +809,16 @@ header {
   border-bottom: 1px solid var(--border);
   margin-bottom: 3rem;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 1rem;
+}
+
+.header-filters {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
+  gap: 0.55rem;
 }
 
 header h1 {
@@ -1316,5 +1352,18 @@ header h1 span {
 }
 .modal-status-btn:hover { color: var(--accent); background: rgba(255,255,255,0.06); }
 .modal-status-btn.active { color: var(--accent); }
+.modal-move-to-my-list-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.modal-move-to-my-list-btn:hover:not(:disabled) { background: rgba(255,255,255,0.06); }
+.modal-move-to-my-list-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .modal-footer { flex-wrap: wrap; }
 

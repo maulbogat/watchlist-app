@@ -259,6 +259,192 @@ async function addToSharedList(listId, movie) {
   await setDoc(ref, { items, removed: (data.removed || []).filter((k) => k !== key) }, { merge: true });
 }
 
+/**
+ * Copy all items from user's personal list to a shared list. Preserves status (watched, maybe-later, archive).
+ * Does NOT remove items from the personal list — both lists keep the items.
+ */
+async function moveAllToSharedList(uid, listId) {
+  const listData = await getSharedList(listId);
+  if (!listData) throw new Error("Shared list not found");
+  const members = Array.isArray(listData.members) ? listData.members : [];
+  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
+
+  const userData = await getStatusData(uid);
+  const userItems = Array.isArray(userData.items) ? userData.items : [];
+  const userRemoved = new Set(userData.removed || []);
+  const userWatched = new Set(userData.watched || []);
+  const userMaybeLater = new Set(userData.maybeLater || []);
+  const userArchive = new Set(userData.archive || []);
+
+  const toCopy = userItems.filter((m) => !userRemoved.has(movieKey(m)));
+  if (toCopy.length === 0) throw new Error("Your list is empty");
+
+  const listRef = doc(db, "sharedLists", listId);
+  const listSnap = await getDoc(listRef);
+  const listDoc = listSnap.exists() ? listSnap.data() : {};
+  const listItems = Array.isArray(listDoc.items) ? [...listDoc.items] : [];
+  const listWatched = new Set(listDoc.watched || []);
+  const listMaybeLater = new Set(listDoc.maybeLater || []);
+  const listArchive = new Set(listDoc.archive || []);
+  const listRemoved = new Set(listDoc.removed || []);
+
+  const existingKeys = new Set(listItems.map((m) => movieKey(m)));
+
+  for (const m of toCopy) {
+    const key = movieKey(m);
+    if (existingKeys.has(key)) continue;
+    const { status, removed, ...movie } = m;
+    listItems.push(movie);
+    existingKeys.add(key);
+    listRemoved.delete(key);
+    if (userWatched.has(key)) listWatched.add(key);
+    else if (userMaybeLater.has(key)) listMaybeLater.add(key);
+    else if (userArchive.has(key)) listArchive.add(key);
+  }
+
+  await setDoc(
+    listRef,
+    {
+      items: listItems,
+      watched: [...listWatched],
+      maybeLater: [...listMaybeLater],
+      archive: [...listArchive],
+      removed: [...listRemoved],
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * Copy all items from a shared list back to the user's personal list. Use to recover after a move.
+ * Preserves status (watched, maybe-later, archive). Does not remove items from the shared list.
+ */
+async function copySharedListToPersonal(uid, listId) {
+  const listData = await getSharedList(listId);
+  if (!listData) throw new Error("Shared list not found");
+  const members = Array.isArray(listData.members) ? listData.members : [];
+  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
+
+  const listItems = Array.isArray(listData.items) ? listData.items : [];
+  const listWatched = new Set(listData.watched || []);
+  const listMaybeLater = new Set(listData.maybeLater || []);
+  const listArchive = new Set(listData.archive || []);
+  const listRemoved = new Set(listData.removed || []);
+
+  const toCopy = listItems.filter((m) => !listRemoved.has(movieKey(m)));
+  if (toCopy.length === 0) throw new Error("Shared list is empty");
+
+  const userData = await getStatusData(uid);
+  const userItems = Array.isArray(userData.items) ? [...userData.items] : [];
+  const userWatched = new Set(userData.watched || []);
+  const userMaybeLater = new Set(userData.maybeLater || []);
+  const userArchive = new Set(userData.archive || []);
+  const userRemoved = new Set(userData.removed || []);
+
+  const existingKeys = new Set(userItems.map((m) => movieKey(m)));
+
+  for (const m of toCopy) {
+    const key = movieKey(m);
+    if (existingKeys.has(key)) continue;
+    const { status, removed, ...movie } = m;
+    userItems.push(movie);
+    existingKeys.add(key);
+    userRemoved.delete(key);
+    if (listWatched.has(key)) userWatched.add(key);
+    else if (listMaybeLater.has(key)) userMaybeLater.add(key);
+    else if (listArchive.has(key)) userArchive.add(key);
+  }
+
+  const userRef = doc(db, "users", uid);
+  await setDoc(
+    userRef,
+    {
+      items: userItems,
+      watched: [...userWatched],
+      maybeLater: [...userMaybeLater],
+      archive: [...userArchive],
+      removed: [...userRemoved],
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * Move a single item from a shared list to the user's personal list.
+ * Adds to personal if not there, restores from removed if hidden, removes from shared list.
+ */
+async function moveItemFromSharedToPersonal(uid, listId, movie) {
+  const listData = await getSharedList(listId);
+  if (!listData) throw new Error("Shared list not found");
+  const members = Array.isArray(listData.members) ? listData.members : [];
+  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
+
+  const key = movieKey(movie);
+  const userData = await getStatusData(uid);
+  const userItems = Array.isArray(userData.items) ? [...userData.items] : [];
+  const userRemoved = new Set(userData.removed || []);
+  const userWatched = new Set(userData.watched || []);
+  const userMaybeLater = new Set(userData.maybeLater || []);
+  const userArchive = new Set(userData.archive || []);
+
+  const existingKeys = new Set(userItems.map((m) => movieKey(m)));
+  if (!existingKeys.has(key)) {
+    const { status, removed, ...movieClean } = movie;
+    userItems.push(movieClean);
+    const s = status || "to-watch";
+    if (s === "watched") userWatched.add(key);
+    else if (s === "maybe-later") userMaybeLater.add(key);
+    else if (s === "archive") userArchive.add(key);
+  }
+  userRemoved.delete(key);
+
+  const userRef = doc(db, "users", uid);
+  await setDoc(
+    userRef,
+    {
+      items: userItems,
+      watched: [...userWatched],
+      maybeLater: [...userMaybeLater],
+      archive: [...userArchive],
+      removed: arrayRemove(key),
+    },
+    { merge: true }
+  );
+
+  await removeFromSharedList(listId, key);
+}
+
+/**
+ * Remove from user's personal list any item that exists in the shared list.
+ * Keeps items only in the shared list.
+ */
+async function removeDuplicatesFromPersonal(uid, listId) {
+  const listData = await getSharedList(listId);
+  if (!listData) throw new Error("Shared list not found");
+  const members = Array.isArray(listData.members) ? listData.members : [];
+  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
+
+  const listItems = Array.isArray(listData.items) ? listData.items : [];
+  const listRemoved = new Set(listData.removed || []);
+  const sharedKeys = new Set(listItems.filter((m) => !listRemoved.has(movieKey(m))).map((m) => movieKey(m)));
+
+  const userData = await getStatusData(uid);
+  const userItems = Array.isArray(userData.items) ? userData.items : [];
+  const userRemoved = new Set(userData.removed || []);
+
+  const toRemove = [];
+  for (const m of userItems) {
+    const key = movieKey(m);
+    if (userRemoved.has(key)) continue;
+    if (sharedKeys.has(key)) toRemove.push(key);
+  }
+
+  for (const key of toRemove) {
+    await removeTitle(uid, key);
+  }
+  return toRemove.length;
+}
+
 export {
   auth,
   db,
@@ -283,4 +469,8 @@ export {
   setSharedListStatus,
   removeFromSharedList,
   addToSharedList,
+  moveAllToSharedList,
+  copySharedListToPersonal,
+  moveItemFromSharedToPersonal,
+  removeDuplicatesFromPersonal,
 };

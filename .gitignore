@@ -4,6 +4,9 @@
 .env.*.local
 serviceAccountKey.json
 
+# Backups
+watchlist-backup.json
+
 # Dependencies
 node_modules/
 

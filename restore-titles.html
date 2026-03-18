@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restore titles – Watchlist</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <style>
+    .restore-page { max-width: 480px; margin: 4rem auto; padding: 0 1.5rem; }
+    .restore-page h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    .restore-page p { color: var(--muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem; }
+    .restore-page ul { margin: 1rem 0; padding-left: 1.25rem; }
+    .restore-page li { margin-bottom: 0.5rem; }
+    .restore-page .btn { margin-top: 1rem; }
+    .restore-page a { color: var(--accent); text-decoration: none; }
+    .restore-page a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="restore-page">
+    <h1>Restore titles</h1>
+    <p>Titles found in the project (scripts, examples). Add them to your list:</p>
+    <ul id="title-list"></ul>
+    <p><a href="./">← Back to watchlist</a></p>
+  </div>
+  <script type="module" src="./restore-titles.js"></script>
+</body>
+</html>

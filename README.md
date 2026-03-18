@@ -61,6 +61,22 @@ Deploy Firestore rules: `firebase deploy --only firestore:rules`
 
 The header shows the signed-in user's email so family members know whose account they're using on shared devices.
 
+## Recover lost titles
+
+If you lost titles (e.g. after a failed move), run the recovery script to scan Firestore and restore:
+
+```bash
+# Scan catalog, shared lists, and users — report what's found
+node scripts/recover-titles.js
+
+# Restore all found titles to your personal list
+node scripts/recover-titles.js <your-uid> --restore
+```
+
+Get your UID: `node scripts/list-users.js` or Firebase Console → Authentication → Users.
+
+Requires `serviceAccountKey.json` in project root, or `FIREBASE_SERVICE_ACCOUNT` env var.
+
 ## Features
 
 - Per-user lists (each account has its own titles)
