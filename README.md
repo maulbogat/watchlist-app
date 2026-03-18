@@ -38,6 +38,18 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 4. Visit `/bookmarklet.html` on your deployed site, drag the button to your bookmarks bar, then sign in with Google. When on an IMDb title page, click the bookmarklet to add it to your watchlist.
 
+## Multi-user support
+
+Multiple people can use the app with their own Google accounts. Each person gets their own watchlist (to-watch, watched, etc.) while sharing the same catalog.
+
+**Verify in Firebase Console:**
+
+1. **Authentication → Sign-in method** → Google → Enabled
+2. **Authentication → Settings → Authorized domains** → Add your Netlify URL (e.g. `watchlist-trailers.netlify.app`) and `localhost` for local dev
+3. **Firestore rules** (in `firestore.rules`) — users can only read/write their own `users/{uid}` data
+
+The header shows the signed-in user's email so family members know whose account they're using on shared devices.
+
 ## Features
 
 - Movie catalog stored in Firestore

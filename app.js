@@ -439,13 +439,19 @@ document.querySelectorAll(".tab-group .tab").forEach((btn) => {
 function updateAuthUI(user) {
   const signInBtn = document.getElementById("sign-in-btn");
   const signedIn = document.getElementById("signed-in");
+  const userEmailEl = document.getElementById("user-email");
 
   if (user) {
     signInBtn.style.display = "none";
     signedIn.style.display = "flex";
+    if (userEmailEl) {
+      userEmailEl.textContent = user.email || user.displayName || "Signed in";
+      userEmailEl.title = "Signed in as " + (user.email || user.displayName || "you");
+    }
   } else {
     signInBtn.style.display = "inline-flex";
     signedIn.style.display = "none";
+    if (userEmailEl) userEmailEl.textContent = "";
   }
 }
 
