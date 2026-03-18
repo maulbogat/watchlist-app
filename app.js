@@ -38,6 +38,22 @@ function getUniqueGenres() {
 }
 
 function getFilteredTitles() {
+  if (currentStatus === "recently-added") {
+    // Last 10 items added to catalog (by array order), excluding removed
+    const recent = [];
+    for (let i = movies.length - 1; i >= 0 && recent.length < 10; i--) {
+      const m = movies[i];
+      if (m.removed) continue;
+      if (currentFilter !== "both" && m.type !== currentFilter) continue;
+      if (currentGenre) {
+        const g = String(m.genre || "");
+        if (!g.split(/\s*\/\s*/).some((s) => s.trim().toLowerCase() === currentGenre.toLowerCase())) continue;
+      }
+      recent.push(m);
+    }
+    return recent;
+  }
+
   let list = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
   list = list.filter((m) => !m.removed && (m.status || "to-watch") === currentStatus);
   if (currentGenre) {
@@ -83,6 +99,7 @@ function buildCards() {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     const messages = {
+      "recently-added": "No recently added titles.",
       "to-watch": "No titles to watch yet.",
       "maybe-later": "No titles in Maybe later.",
       watched: "No watched titles yet.",
