@@ -110,7 +110,16 @@ exports.handler = async (event, context) => {
   }
 
   const title = omdb.Title || "Unknown";
-  const year = omdb.Year ? parseInt(String(omdb.Year).replace(/\D/g, "").slice(0, 4), 10) : null;
+  let year = null;
+  const yearStr = String(omdb.Year || "").trim();
+  if (yearStr && yearStr !== "N/A") {
+    const digits = yearStr.replace(/\D/g, "").slice(0, 4);
+    if (digits.length >= 4) year = parseInt(digits, 10);
+  }
+  if (year == null && omdb.Released && omdb.Released !== "N/A") {
+    const releasedMatch = String(omdb.Released).match(/\b(19|20)\d{2}\b/);
+    if (releasedMatch) year = parseInt(releasedMatch[0], 10);
+  }
   const nType = (omdb.Type || "").toLowerCase() === "series" ? "show" : "movie";
   const genre = omdb.Genre || "";
   const thumb = omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
@@ -127,8 +136,9 @@ exports.handler = async (event, context) => {
   if (!movie) {
     movie = items.find((m) => m.title === title && (m.year ?? "") === String(year ?? ""));
   }
+  let catalogChanged = false;
   if (!movie) {
-    const newMovie = {
+    movie = {
       title,
       year: isNaN(year) ? null : year,
       type: nType,
@@ -138,12 +148,22 @@ exports.handler = async (event, context) => {
       thumb,
       services: [],
     };
-    items.push(newMovie);
+    items.push(movie);
+    catalogChanged = true;
+  } else {
+    const idx = items.findIndex((m) => m === movie);
+    if (idx >= 0 && (movie.year == null && year != null || !movie.thumb && thumb || !movie.genre && genre)) {
+      if (movie.year == null && year != null) movie.year = year;
+      if (!movie.thumb && thumb) movie.thumb = thumb;
+      if (!movie.genre && genre) movie.genre = genre;
+      catalogChanged = true;
+    }
+  }
+  if (catalogChanged) {
     await catalogRef.set({
       items,
       updatedAt: new Date().toISOString(),
     });
-    movie = newMovie;
   }
 
   const key = movieKey(movie);
