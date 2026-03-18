@@ -21,7 +21,7 @@
   var metaTitle = document.querySelector('meta[property="og:title"]');
   if (metaTitle && metaTitle.content) {
     var raw = metaTitle.content;
-    var y = raw.match(/\((\d{4}(?:–|-|\s*)?(?:\d{4})?\)/);
+    var y = raw.match(/\((\d{4})(?:–|-|\s*)?(?:\d{4})?\)/);
     if (y) { year = (y[1].match(/\d{4}/) || [""])[0]; }
     title = raw.split(" - ")[0].replace(/\s*\(\d{4}[^)]*\)\s*$/, "").trim();
   }
