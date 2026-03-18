@@ -59,7 +59,7 @@ exports.handler = async (event) => {
   } catch {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid JSON" }) };
   }
-  const { imdbId, title, year, type } = body;
+  const { imdbId, title, year, type, genre, thumb, youtubeId } = body;
   if (!imdbId || !title) {
     return {
       statusCode: 400,
@@ -103,11 +103,16 @@ exports.handler = async (event) => {
         title: String(title).trim(),
         year: year ? Number(year) : null,
         type: type === "show" ? "show" : "movie",
-        genre: "Comedy / Drama",
-        youtubeId: "SEARCH",
+        genre: (genre && String(genre).trim()) || "Comedy / Drama",
+        youtubeId: (youtubeId && String(youtubeId).trim()) || "SEARCH",
         services: [],
         imdbId: nImdb,
       };
+      if (movie.youtubeId !== "SEARCH") {
+        movie.thumb = `https://img.youtube.com/vi/${movie.youtubeId}/hqdefault.jpg`;
+      } else if (thumb && String(thumb).trim()) {
+        movie.thumb = String(thumb).trim();
+      }
       items.push(movie);
       await ref.set({
         items,
