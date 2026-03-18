@@ -16,6 +16,7 @@ import {
   removeFromSharedList,
   addToSharedList,
   moveItemFromSharedToPersonal,
+  moveItemFromPersonalToShared,
   updateMovieMetadata,
 } from "./firebase.js";
 
@@ -333,6 +334,17 @@ function renderMoveToMyListBtn(m) {
   return `<span style="opacity:0.4">·</span><button type="button" class="modal-move-to-my-list-btn" title="Move to My list">Move to My list</button>`;
 }
 
+function renderMoveToOurListBtn(m) {
+  const isPersonal = currentListMode === "personal";
+  if (!isPersonal || !sharedLists.length) return "";
+  return sharedLists
+    .map(
+      (l) =>
+        `<span style="opacity:0.4">·</span><button type="button" class="modal-move-to-our-list-btn" data-list-id="${l.id}" title="Move to ${(l.name || "Our list").replace(/"/g, "&quot;")}">Move to ${l.name || "Our list"}</button>`
+    )
+    .join("");
+}
+
 function attachMoveToMyListHandler(footer, m) {
   const btn = footer.querySelector(".modal-move-to-my-list-btn");
   if (!btn) return;
@@ -354,6 +366,32 @@ function attachMoveToMyListHandler(footer, m) {
       btn.disabled = false;
       btn.textContent = "Move to My list";
     }
+  });
+}
+
+function attachMoveToOurListHandler(footer, m) {
+  footer.querySelectorAll(".modal-move-to-our-list-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const user = auth.currentUser;
+      const listId = btn.dataset.listId;
+      if (!user || currentListMode !== "personal" || !listId) return;
+      btn.disabled = true;
+      const origText = btn.textContent;
+      btn.textContent = "Moving…";
+      try {
+        await moveItemFromPersonalToShared(user.uid, listId, m);
+        movies = movies.filter((x) => movieKey(x) !== movieKey(m));
+        buildCards();
+        closeModal();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || "Failed to move.");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = origText;
+      }
+    });
   });
 }
 
@@ -380,11 +418,13 @@ function openModal(m) {
       <span>No YouTube trailer &mdash;</span>
       ${trailerLink}
       ${renderMoveToMyListBtn(m)}
+      ${renderMoveToOurListBtn(m)}
     `;
     footer.querySelectorAll(".modal-status-btn").forEach((btn) => {
       btn.addEventListener("click", () => setStatusFromCard(m, btn.dataset.status));
     });
     attachMoveToMyListHandler(footer, m);
+    attachMoveToOurListHandler(footer, m);
     const placeholder = modal.querySelector(".video-wrap");
     placeholder.style.background = "#0d0d10";
     placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
@@ -485,11 +525,13 @@ function openModal(m) {
         Watch on YouTube &#x2197;
       </a>
       ${renderMoveToMyListBtn(m)}
+      ${renderMoveToOurListBtn(m)}
     `;
     footer.querySelectorAll(".modal-status-btn").forEach((btn) => {
       btn.addEventListener("click", () => setStatusFromCard(m, btn.dataset.status));
     });
     attachMoveToMyListHandler(footer, m);
+    attachMoveToOurListHandler(footer, m);
   }
 
   modal.classList.add("open");

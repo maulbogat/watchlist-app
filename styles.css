@@ -737,6 +737,19 @@ header h1 span {
 }
 .modal-move-to-my-list-btn:hover:not(:disabled) { background: rgba(255,255,255,0.06); }
 .modal-move-to-my-list-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.modal-move-to-our-list-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.modal-move-to-our-list-btn:hover:not(:disabled) { background: rgba(255,255,255,0.06); }
+.modal-move-to-our-list-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .modal-footer { flex-wrap: wrap; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1381,5 +1394,18 @@ header h1 span {
 }
 .modal-move-to-my-list-btn:hover:not(:disabled) { background: rgba(255,255,255,0.06); }
 .modal-move-to-my-list-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.modal-move-to-our-list-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.modal-move-to-our-list-btn:hover:not(:disabled) { background: rgba(255,255,255,0.06); }
+.modal-move-to-our-list-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .modal-footer { flex-wrap: wrap; }
 

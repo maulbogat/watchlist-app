@@ -400,6 +400,71 @@ async function moveItemFromSharedToPersonal(uid, listId, movie) {
 }
 
 /**
+ * Move a single item from the user's personal list to a shared list.
+ * Adds to shared list, removes from personal list.
+ */
+async function moveItemFromPersonalToShared(uid, listId, movie) {
+  const listData = await getSharedList(listId);
+  if (!listData) throw new Error("Shared list not found");
+  const members = Array.isArray(listData.members) ? listData.members : [];
+  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
+
+  const key = movieKey(movie);
+  const userData = await getStatusData(uid);
+  const userItems = Array.isArray(userData.items) ? userData.items : [];
+  const userWatched = new Set(userData.watched || []);
+  const userMaybeLater = new Set(userData.maybeLater || []);
+  const userArchive = new Set(userData.archive || []);
+
+  const existingKeys = new Set(userItems.map((m) => movieKey(m)));
+  if (!existingKeys.has(key)) throw new Error("Movie not in your personal list");
+
+  const listRef = doc(db, "sharedLists", listId);
+  const listSnap = await getDoc(listRef);
+  const listDoc = listSnap.exists() ? listSnap.data() : {};
+  const listItems = Array.isArray(listDoc.items) ? [...listDoc.items] : [];
+  const listWatched = new Set(listDoc.watched || []);
+  const listMaybeLater = new Set(listDoc.maybeLater || []);
+  const listArchive = new Set(listDoc.archive || []);
+  const listKeys = new Set(listItems.map((m) => movieKey(m)));
+
+  if (!listKeys.has(key)) {
+    const { status, ...movieClean } = movie;
+    listItems.push(movieClean);
+    const s = status || "to-watch";
+    if (s === "watched") listWatched.add(key);
+    else if (s === "maybe-later") listMaybeLater.add(key);
+    else if (s === "archive") listArchive.add(key);
+    await setDoc(
+      listRef,
+      {
+        items: listItems,
+        watched: [...listWatched],
+        maybeLater: [...listMaybeLater],
+        archive: [...listArchive],
+      },
+      { merge: true }
+    );
+  }
+
+  const newUserItems = userItems.filter((m) => movieKey(m) !== key);
+  userWatched.delete(key);
+  userMaybeLater.delete(key);
+  userArchive.delete(key);
+  const userRef = doc(db, "users", uid);
+  await setDoc(
+    userRef,
+    {
+      items: newUserItems,
+      watched: [...userWatched],
+      maybeLater: [...userMaybeLater],
+      archive: [...userArchive],
+    },
+    { merge: true }
+  );
+}
+
+/**
  * Update a movie's metadata (thumb, youtubeId) in the current list.
  */
 async function updateMovieMetadata(uid, listMode, key, updates) {
@@ -481,6 +546,7 @@ export {
   moveAllToSharedList,
   copySharedListToPersonal,
   moveItemFromSharedToPersonal,
+  moveItemFromPersonalToShared,
   updateMovieMetadata,
   removeDuplicatesFromPersonal,
 };
