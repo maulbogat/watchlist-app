@@ -5,7 +5,7 @@
  * Set FIREBASE_SERVICE_ACCOUNT in Netlify env (base64 of serviceAccountKey.json).
  */
 const { initializeApp, cert } = require("firebase-admin/app");
-const { getFirestore, arrayRemove } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 
 let app;
@@ -121,9 +121,9 @@ exports.handler = async (event) => {
       const key = movieKey(movie);
       await userRef.set(
         {
-          watched: arrayRemove(key),
-          maybeLater: arrayRemove(key),
-          archive: arrayRemove(key),
+          watched: FieldValue.arrayRemove(key),
+          maybeLater: FieldValue.arrayRemove(key),
+          archive: FieldValue.arrayRemove(key),
         },
         { merge: true }
       );
