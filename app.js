@@ -6,42 +6,20 @@ import {
   onAuthStateChanged,
   movieKey,
   getMoviesCatalog,
-  getWatchedList,
-  addWatched,
-  removeWatched,
+  getStatusData,
+  setStatus,
 } from "./firebase.js";
+
+const STATUS_ORDER = ["to-watch", "maybe-later", "watched", "archive"];
 
 let movies = [];
 let currentFilter = "both"; // 'both' | 'movie' | 'show'
-let currentGenre = ""; // '' = all, or genre name
-let currentStatus = "to-watch"; // 'to-watch' | 'watched'
+let currentStatus = "to-watch"; // 'to-watch' | 'maybe-later' | 'watched' | 'archive'
 let currentModalMovie = null; // movie currently shown in modal
-
-function getUniqueGenres() {
-  const set = new Set();
-  movies.forEach((m) => {
-    const g = String(m.genre || "").trim();
-    if (!g) return;
-    g.split(/\s*\/\s*/).forEach((s) => {
-      const t = s.trim();
-      if (t) set.add(t);
-    });
-  });
-  return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-}
 
 function getFilteredTitles() {
   let list = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
-  if (currentGenre) {
-    list = list.filter((m) => {
-      const g = String(m.genre || "");
-      return g.split(/\s*\/\s*/).some((s) => s.trim().toLowerCase() === currentGenre.toLowerCase());
-    });
-  }
-  const byStatus =
-    currentStatus === "watched"
-      ? list.filter((m) => m.watched === true)
-      : list.filter((m) => m.watched !== true);
+  const byStatus = list.filter((m) => (m.status || "to-watch") === currentStatus);
 
   return [...byStatus].sort((a, b) =>
     String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" })
@@ -78,10 +56,13 @@ function buildCards() {
   if (!visible.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent =
-      currentStatus === "watched"
-        ? "No watched titles yet."
-        : "No titles match your filters.";
+    const messages = {
+      "to-watch": "No titles to watch yet.",
+      "maybe-later": "No titles in Maybe later.",
+      watched: "No watched titles yet.",
+      archive: "No archived titles.",
+    };
+    empty.textContent = messages[currentStatus] || "No titles match your filters.";
     grid.appendChild(empty);
     return;
   }
@@ -103,14 +84,26 @@ function buildCards() {
     const badgeLabel = m.type === "show" ? "TV" : "Film";
     const serviceChips = renderServiceChips(m.services, { limit: 3 });
     const serviceRow = serviceChips ? `<div class="service-row">${serviceChips}</div>` : "";
-    const isWatched = m.watched === true;
-    const watchedBadge = `<button type="button" class="watched-badge ${isWatched ? "watched" : ""}" aria-label="${isWatched ? "Mark as unwatched" : "Mark as watched"}" title="${isWatched ? "Mark as unwatched" : "Mark as watched"}">
-      <svg viewBox="0 0 24 24" fill="${isWatched ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-    </button>`;
+    const s = m.status || "to-watch";
+    const statusLabels = { "to-watch": "To Watch", "maybe-later": "Maybe later", watched: "Watched", archive: "Archive" };
+    const statusIcons = {
+      "to-watch": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>',
+      "maybe-later": '<path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>',
+      watched: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>',
+      archive: '<path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5z"/>',
+    };
+    const statusBadge = `<div class="status-badge-wrap">
+      <button type="button" class="status-badge status-${s}" aria-label="Move to status" title="Move to…" data-status="${s}" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="${s === "watched" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2">${statusIcons[s]}</svg>
+      </button>
+      <div class="status-dropdown" role="menu" aria-label="Move to">
+        ${STATUS_ORDER.map((st) => `<button type="button" class="status-dropdown-item ${st === s ? "active" : ""}" role="menuitem" data-status="${st}">${statusLabels[st]}</button>`).join("")}
+      </div>
+    </div>`;
 
     card.innerHTML = `
       <div class="thumb-wrap">
-        ${watchedBadge}
+        ${statusBadge}
         ${thumbHTML}
         <div class="thumb-overlay"></div>
         <div class="play-btn">
@@ -128,52 +121,67 @@ function buildCards() {
     `;
 
     card.addEventListener("click", (e) => {
-      if (e.target.closest(".watched-badge")) return;
+      if (e.target.closest(".status-badge-wrap")) return;
       openModal(m);
     });
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") openModal(m);
     });
-    const badgeBtn = card.querySelector(".watched-badge");
-    if (badgeBtn) {
+    const wrap = card.querySelector(".status-badge-wrap");
+    const badgeBtn = card.querySelector(".status-badge");
+    const dropdown = card.querySelector(".status-dropdown");
+    if (badgeBtn && dropdown) {
       badgeBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
-        toggleWatched(m);
+        closeAllStatusDropdowns();
+        dropdown.classList.toggle("open", !dropdown.classList.contains("open"));
+        badgeBtn.setAttribute("aria-expanded", dropdown.classList.contains("open"));
+      });
+      dropdown.querySelectorAll(".status-dropdown-item").forEach((item) => {
+        item.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const status = item.dataset.status;
+          if (status !== (m.status || "to-watch")) setStatusFromCard(m, status);
+          dropdown.classList.remove("open");
+          badgeBtn.setAttribute("aria-expanded", "false");
+        });
       });
     }
     grid.appendChild(card);
   });
 }
 
-async function toggleWatched(m) {
+function closeAllStatusDropdowns() {
+  document.querySelectorAll(".status-dropdown.open").forEach((d) => d.classList.remove("open"));
+  document.querySelectorAll(".status-badge[aria-expanded='true']").forEach((b) => b.setAttribute("aria-expanded", "false"));
+}
+
+async function setStatusFromCard(m, status) {
   const uid = auth.currentUser?.uid;
   if (!uid) {
-    alert("Sign in with Google to save your watched list across devices.");
+    alert("Sign in with Google to save your status across devices.");
     return;
   }
   const key = movieKey(m);
-  const isWatched = m.watched === true;
   try {
-    if (isWatched) {
-      await removeWatched(uid, key);
-      m.watched = false;
-    } else {
-      await addWatched(uid, key);
-      m.watched = true;
-    }
+    await setStatus(uid, key, status);
+    m.status = status;
     buildCards();
-    if (currentModalMovie && movieKey(currentModalMovie) === key) {
-      const btn = document.querySelector(".modal-watched-btn");
-      if (btn) {
-        btn.textContent = m.watched ? "✓ Watched" : "Mark as watched";
-        btn.classList.toggle("watched", m.watched);
-      }
-    }
+    updateModalStatusBtn();
   } catch (err) {
-    console.error("Failed to update watched:", err);
+    console.error("Failed to update status:", err);
     alert("Failed to update. Please try again.");
   }
+}
+
+function updateModalStatusBtn() {
+  if (!currentModalMovie) return;
+  const btns = document.querySelectorAll(".modal-status-btn");
+  btns.forEach((btn) => {
+    const s = btn.dataset.status;
+    btn.classList.toggle("active", (currentModalMovie.status || "to-watch") === s);
+  });
 }
 
 function openModal(m) {
@@ -190,19 +198,18 @@ function openModal(m) {
     const imdbUrl = m.imdbId
       ? `https://www.imdb.com/title/${m.imdbId}/`
       : null;
-    const isWatched = m.watched === true;
     const trailerLink = imdbUrl
       ? `<a href="${imdbUrl}" target="_blank" style="color: var(--accent); text-decoration: none;">Watch on IMDb &#x2197;</a>`
       : `<a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="color: var(--accent); text-decoration: none;">Search on YouTube &#x2197;</a>`;
     footer.innerHTML = `
-      <button type="button" class="modal-watched-btn ${isWatched ? "watched" : ""}" title="${isWatched ? "Mark as unwatched" : "Mark as watched"}">
-        ${isWatched ? "✓ Watched" : "Mark as watched"}
-      </button>
+      <span class="modal-status-btns">${renderModalStatusBtns(m)}</span>
       <span style="opacity:0.4">·</span>
       <span>No YouTube trailer &mdash;</span>
       ${trailerLink}
     `;
-    footer.querySelector(".modal-watched-btn")?.addEventListener("click", () => toggleWatched(m));
+    footer.querySelectorAll(".modal-status-btn").forEach((btn) => {
+      btn.addEventListener("click", () => setStatusFromCard(m, btn.dataset.status));
+    });
     const placeholder = modal.querySelector(".video-wrap");
     placeholder.style.background = "#0d0d10";
     placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
@@ -230,22 +237,21 @@ function openModal(m) {
       referrerpolicy="strict-origin-when-cross-origin"
       src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(m.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1${originParam}"></iframe>`;
 
-    const isWatched = m.watched === true;
     footer.innerHTML = `
       <span>${m.title}</span>
       <span style="opacity:0.4">·</span>
       <span>${m.year || ""} ${m.genre}</span>
       ${serviceInline}
       <span style="opacity:0.4">·</span>
-      <button type="button" class="modal-watched-btn ${isWatched ? "watched" : ""}" data-movie-key="${movieKey(m)}" title="${isWatched ? "Mark as unwatched" : "Mark as watched"}">
-        ${isWatched ? "✓ Watched" : "Mark as watched"}
-      </button>
+      <span class="modal-status-btns">${renderModalStatusBtns(m)}</span>
       <span style="opacity:0.4">·</span>
       <a href="${watchUrl}" target="_blank" style="color: var(--accent); text-decoration: none;">
         Watch on YouTube &#x2197;
       </a>
     `;
-    footer.querySelector(".modal-watched-btn")?.addEventListener("click", () => toggleWatched(m));
+    footer.querySelectorAll(".modal-status-btn").forEach((btn) => {
+      btn.addEventListener("click", () => setStatusFromCard(m, btn.dataset.status));
+    });
   }
 
   modal.classList.add("open");
@@ -269,6 +275,9 @@ document.getElementById("modal").addEventListener("click", (e) => {
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeModal();
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".status-badge-wrap")) closeAllStatusDropdowns();
 });
 
 // Warn when opened from file:// since YouTube embeds often fail.
@@ -334,16 +343,27 @@ document.getElementById("sign-out-btn").addEventListener("click", () => {
   fbSignOut(auth);
 });
 
-// Auth state + load watched list, apply watched attribute from Firebase
+// Auth state + load status data, apply status attribute from Firebase
 function initAfterMoviesLoaded() {
   onAuthStateChanged(auth, async (user) => {
     updateAuthUI(user);
-    const watchedKeys = user
-      ? await getWatchedList(user.uid).catch(() => [])
-      : [];
-    const watchedSet = new Set(watchedKeys);
+    let data = { watched: [], maybeLater: [], archive: [] };
+    if (user) {
+      try {
+        data = await getStatusData(user.uid);
+      } catch (e) {
+        console.warn("Failed to load status data:", e);
+      }
+    }
+    const watchedSet = new Set(data.watched);
+    const maybeLaterSet = new Set(data.maybeLater);
+    const archiveSet = new Set(data.archive);
     movies.forEach((m) => {
-      m.watched = watchedSet.has(movieKey(m));
+      const key = movieKey(m);
+      if (watchedSet.has(key)) m.status = "watched";
+      else if (maybeLaterSet.has(key)) m.status = "maybe-later";
+      else if (archiveSet.has(key)) m.status = "archive";
+      else m.status = "to-watch";
     });
     buildCards();
   });
@@ -362,34 +382,11 @@ async function init() {
       return;
     }
     initAfterMoviesLoaded();
-    renderGenreFilter();
   } catch (err) {
     console.error("Failed to load catalog:", err);
     grid.innerHTML =
       '<div class="empty-state">Failed to load catalog. Check console and Firestore setup.</div>';
   }
-}
-
-function renderGenreFilter() {
-  const container = document.getElementById("genre-filter-wrap");
-  if (!container) return;
-  const genres = getUniqueGenres();
-  if (!genres.length) {
-    container.style.display = "none";
-    return;
-  }
-  container.style.display = "flex";
-  container.innerHTML = `
-    <label for="genre-filter" class="genre-filter-label">Genre</label>
-    <select id="genre-filter" class="genre-filter-select" aria-label="Filter by genre">
-      <option value="">All</option>
-      ${genres.map((g) => `<option value="${g}">${g}</option>`).join("")}
-    </select>
-  `;
-  container.querySelector("#genre-filter").addEventListener("change", (e) => {
-    currentGenre = e.target.value;
-    buildCards();
-  });
 }
 
 init();

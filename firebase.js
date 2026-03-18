@@ -43,24 +43,48 @@ async function getMoviesCatalog() {
 }
 
 /**
- * Returns the watched list from Firestore.
- * Data model: users/{uid}.watched = string[] (movie keys)
- * A movie is watched iff its key is in this array.
+ * Returns status data from Firestore.
+ * Data model: users/{uid} = { watched: string[], maybeLater: string[], archive: string[] }
+ * Status: to-watch (default), watched, maybe-later, archive
  */
-async function getWatchedList(uid) {
+async function getStatusData(uid) {
   const ref = doc(db, "users", uid);
   const snap = await getDoc(ref);
-  return snap.exists() && Array.isArray(snap.data().watched) ? snap.data().watched : [];
+  const data = snap.exists() ? snap.data() : {};
+  return {
+    watched: Array.isArray(data.watched) ? data.watched : [],
+    maybeLater: Array.isArray(data.maybeLater) ? data.maybeLater : [],
+    archive: Array.isArray(data.archive) ? data.archive : [],
+  };
+}
+
+/** @deprecated Use getStatusData. Kept for backward compat. */
+async function getWatchedList(uid) {
+  const { watched } = await getStatusData(uid);
+  return watched;
+}
+
+async function setStatus(uid, key, status) {
+  const ref = doc(db, "users", uid);
+  const removeFromAll = {
+    watched: arrayRemove(key),
+    maybeLater: arrayRemove(key),
+    archive: arrayRemove(key),
+  };
+  if (status === "to-watch") {
+    await setDoc(ref, removeFromAll, { merge: true });
+    return;
+  }
+  const addTo = status === "watched" ? "watched" : status === "maybe-later" ? "maybeLater" : "archive";
+  await setDoc(ref, { ...removeFromAll, [addTo]: arrayUnion(key) }, { merge: true });
 }
 
 async function addWatched(uid, key) {
-  const ref = doc(db, "users", uid);
-  await setDoc(ref, { watched: arrayUnion(key) }, { merge: true });
+  await setStatus(uid, key, "watched");
 }
 
 async function removeWatched(uid, key) {
-  const ref = doc(db, "users", uid);
-  await setDoc(ref, { watched: arrayRemove(key) }, { merge: true });
+  await setStatus(uid, key, "to-watch");
 }
 
 export {
@@ -74,6 +98,8 @@ export {
   movieKey,
   getMoviesCatalog,
   getWatchedList,
+  getStatusData,
+  setStatus,
   addWatched,
   removeWatched,
 };

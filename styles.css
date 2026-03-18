@@ -508,11 +508,7 @@ header h1 span {
 }
 
 /* Firebase + watched badge + auth */
-.watched-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
+.status-badge {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -525,17 +521,61 @@ header h1 span {
   cursor: pointer;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
-.watched-badge:hover {
+.status-badge:hover {
   background: rgba(0,0,0,0.7);
   color: var(--text);
   border-color: rgba(255,255,255,0.2);
 }
-.watched-badge.watched {
+.status-badge.status-watched {
   background: rgba(232,201,106,0.25);
   color: var(--accent);
   border-color: rgba(232,201,106,0.5);
 }
-.watched-badge svg { width: 18px; height: 18px; }
+.status-badge.status-maybe-later {
+  background: rgba(136,136,136,0.25);
+  color: var(--muted);
+}
+.status-badge.status-archive {
+  background: rgba(201,106,106,0.2);
+  color: var(--accent2);
+}
+.status-badge svg { width: 18px; height: 18px; }
+.status-badge-wrap {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+}
+.status-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 140px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  display: none;
+}
+.status-dropdown.open { display: block; }
+.status-dropdown-item {
+  display: block;
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 0.8rem;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.status-dropdown-item:hover { background: rgba(255,255,255,0.08); }
+.status-dropdown-item.active { color: var(--accent); }
 .auth-ui { display: flex; align-items: center; gap: 0.75rem; }
 .auth-btn {
   appearance: none;
@@ -567,18 +607,20 @@ header h1 span {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.modal-watched-btn {
+.modal-status-btns { display: inline-flex; gap: 0.25rem; flex-wrap: wrap; }
+.modal-status-btn {
   appearance: none;
   border: 0;
   background: none;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   cursor: pointer;
-  padding: 2px 0;
-  transition: color 0.2s;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
 }
-.modal-watched-btn:hover { color: var(--accent); }
-.modal-watched-btn.watched { color: var(--accent); }
+.modal-status-btn:hover { color: var(--accent); background: rgba(255,255,255,0.06); }
+.modal-status-btn.active { color: var(--accent); }
 .modal-footer { flex-wrap: wrap; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1048,11 +1090,7 @@ header h1 span {
 }
 
 /* Firebase + watched badge + auth */
-.watched-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
+.status-badge {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1065,17 +1103,61 @@ header h1 span {
   cursor: pointer;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
-.watched-badge:hover {
+.status-badge:hover {
   background: rgba(0,0,0,0.7);
   color: var(--text);
   border-color: rgba(255,255,255,0.2);
 }
-.watched-badge.watched {
+.status-badge.status-watched {
   background: rgba(232,201,106,0.25);
   color: var(--accent);
   border-color: rgba(232,201,106,0.5);
 }
-.watched-badge svg { width: 18px; height: 18px; }
+.status-badge.status-maybe-later {
+  background: rgba(136,136,136,0.25);
+  color: var(--muted);
+}
+.status-badge.status-archive {
+  background: rgba(201,106,106,0.2);
+  color: var(--accent2);
+}
+.status-badge svg { width: 18px; height: 18px; }
+.status-badge-wrap {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+}
+.status-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 140px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  display: none;
+}
+.status-dropdown.open { display: block; }
+.status-dropdown-item {
+  display: block;
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 0.8rem;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.status-dropdown-item:hover { background: rgba(255,255,255,0.08); }
+.status-dropdown-item.active { color: var(--accent); }
 .auth-ui { display: flex; align-items: center; gap: 0.75rem; }
 .auth-btn {
   appearance: none;
@@ -1107,17 +1189,19 @@ header h1 span {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.modal-watched-btn {
+.modal-status-btns { display: inline-flex; gap: 0.25rem; flex-wrap: wrap; }
+.modal-status-btn {
   appearance: none;
   border: 0;
   background: none;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   cursor: pointer;
-  padding: 2px 0;
-  transition: color 0.2s;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
 }
-.modal-watched-btn:hover { color: var(--accent); }
-.modal-watched-btn.watched { color: var(--accent); }
+.modal-status-btn:hover { color: var(--accent); background: rgba(255,255,255,0.06); }
+.modal-status-btn.active { color: var(--accent); }
 .modal-footer { flex-wrap: wrap; }
 

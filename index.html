@@ -37,8 +37,14 @@
       <button type="button" class="tab active" role="tab" aria-selected="true" aria-controls="grid" id="tab-to-watch" data-status="to-watch">
         To Watch
       </button>
+      <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="grid" id="tab-maybe-later" data-status="maybe-later">
+        Maybe later
+      </button>
       <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="grid" id="tab-watched" data-status="watched">
         Watched
+      </button>
+      <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="grid" id="tab-archive" data-status="archive">
+        Archive
       </button>
     </div>
     <div class="filter-group" role="radiogroup" aria-label="Filter titles">
@@ -49,7 +55,6 @@
       <input type="radio" name="typeFilter" id="filter-shows" value="show" />
       <label for="filter-shows">Series</label>
     </div>
-    <div id="genre-filter-wrap" class="genre-filter-wrap" style="display:none"></div>
   </div>
   <div class="grid" id="grid"></div>
 </main>
