@@ -129,9 +129,17 @@ header h1 span {
 .filters {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.55rem;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  width: 100%;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
 }
 
 .list-selector-wrap {
@@ -855,9 +863,17 @@ header h1 span {
 .filters {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.55rem;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  width: 100%;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
 }
 
 .filter-group {

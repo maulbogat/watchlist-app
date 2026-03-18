@@ -23,15 +23,16 @@
   <h1><span id="header-title">My</span> <span>Watchlist</span></h1>
   <div class="header-filters">
   <div class="filters">
-    <div class="list-selector-wrap" id="list-selector-wrap" style="display:none">
-      <select id="list-selector" class="list-selector" title="Switch list">
-        <option value="personal">My list</option>
-      </select>
-      <button type="button" id="copy-invite-btn" class="header-link header-link-btn" title="Copy invite link" style="display:none">Copy invite link</button>
-      <button type="button" id="move-all-btn" class="header-link header-link-btn" title="Copy all items to a shared list (keeps your list intact)" style="display:none">Copy all to shared list</button>
+    <div class="header-left">
+      <div class="list-selector-wrap" id="list-selector-wrap" style="display:none">
+        <select id="list-selector" class="list-selector" title="Switch list">
+          <option value="personal">My list</option>
+        </select>
+        <button type="button" id="copy-invite-btn" class="header-link header-link-btn" title="Copy invite link" style="display:none">Copy invite link</button>
+      </div>
+      <div class="header-meta" id="header-meta"></div>
+      <a href="./bookmarklet.html" class="header-link" title="Add titles from IMDb">+ from IMDb</a>
     </div>
-    <div class="header-meta" id="header-meta"></div>
-    <a href="./bookmarklet.html" class="header-link" title="Add titles from IMDb">+ from IMDb</a>
     <div id="auth-ui" class="auth-ui">
       <button type="button" id="sign-in-btn" class="auth-btn">Sign in with Google</button>
       <div id="signed-in" class="signed-in" style="display:none">

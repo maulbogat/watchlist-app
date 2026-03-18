@@ -15,7 +15,6 @@ import {
   setSharedListStatus,
   removeFromSharedList,
   addToSharedList,
-  moveAllToSharedList,
   moveItemFromSharedToPersonal,
   updateMovieMetadata,
 } from "./firebase.js";
@@ -684,15 +683,6 @@ function updateCopyInviteButton() {
   btn.disabled = false;
 }
 
-function updateMoveAllButton() {
-  const btn = document.getElementById("move-all-btn");
-  if (!btn) return;
-  const isPersonal = currentListMode === "personal";
-  const hasItems = movies.some((m) => !m.removed);
-  const hasSharedLists = sharedLists.length > 0;
-  btn.style.display = isPersonal && hasItems && hasSharedLists ? "inline" : "none";
-}
-
 function showSharedModal(title, bodyHtml) {
   const modal = document.getElementById("shared-modal");
   const titleEl = document.getElementById("shared-modal-title");
@@ -784,7 +774,6 @@ function init() {
 
     renderListSelector();
     updateCopyInviteButton();
-    updateMoveAllButton();
 
     movies = await loadList(user);
     setBookmarkletCookie(user);
@@ -805,7 +794,6 @@ function init() {
       renderGenreFilter();
     }
     updateCopyInviteButton();
-    updateMoveAllButton();
   });
 
   document.getElementById("list-selector")?.addEventListener("change", async (e) => {
@@ -831,7 +819,6 @@ function init() {
         renderGenreFilter();
       }
       updateCopyInviteButton();
-      updateMoveAllButton();
     } else if (val === "__create__") {
       const name = prompt("Enter a name for the shared list:", "Family watchlist");
       if (!name) return;
@@ -865,7 +852,6 @@ function init() {
         renderGenreFilter();
         sel.value = listId;
         updateCopyInviteButton();
-        updateMoveAllButton();
       } catch (err) {
         alert("Failed to create: " + (err.message || "Unknown error"));
         sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
@@ -900,7 +886,6 @@ function init() {
           buildCards();
           renderGenreFilter();
           updateCopyInviteButton();
-          updateMoveAllButton();
         } else {
           alert(data.error || "Failed to join");
           sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
@@ -926,7 +911,6 @@ function init() {
         grid.innerHTML = '<div class="empty-state">This shared list is empty.</div>';
       }
       updateCopyInviteButton();
-      updateMoveAllButton();
     }
   });
 
@@ -940,44 +924,6 @@ function init() {
     } catch (e) {
       alert("Could not copy. The link is: " + shareUrl);
     }
-  });
-
-  document.getElementById("move-all-btn")?.addEventListener("click", async () => {
-    const user = auth.currentUser;
-    if (!user || currentListMode !== "personal" || !sharedLists.length) return;
-    const count = movies.filter((m) => !m.removed).length;
-    if (count === 0) return;
-    const listOptions = sharedLists
-      .map((l) => `<button type="button" class="auth-btn move-all-list-btn" data-list-id="${l.id}" data-list-name="${(l.name || "Shared list").replace(/"/g, "&quot;")}">${l.name || "Shared list"}</button>`)
-      .join("");
-    showSharedModal(
-      "Copy all to shared list",
-      `<p>Copy ${count} item${count === 1 ? "" : "s"} from your list to (your list stays intact):</p>
-       <div class="move-all-list-btns">${listOptions}</div>`
-    );
-    document.querySelectorAll(".move-all-list-btn").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const listId = btn.dataset.listId;
-        const listName = btn.dataset.listName;
-        if (!listId) return;
-        hideSharedModal();
-        try {
-          await moveAllToSharedList(user.uid, listId);
-          sharedLists = await getSharedListsForUser(user.uid);
-          currentListMode = { type: "shared", listId, name: listName };
-          saveLastList(user, currentListMode);
-          renderListSelector();
-          movies = await loadList(user);
-          setBookmarkletCookie(user);
-          buildCards();
-          renderGenreFilter();
-          updateCopyInviteButton();
-          updateMoveAllButton();
-        } catch (err) {
-          alert(err.message || "Failed to copy items.");
-        }
-      });
-    });
   });
 
   document.getElementById("shared-modal-close")?.addEventListener("click", hideSharedModal);
