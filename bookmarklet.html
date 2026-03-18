@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Add to Watchlist – Bookmarklet</title>
-  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a0c'/%3E%3Cpath d='M12 8v16l12-8z' fill='%23e8c96a'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="./favicon.svg">
   <style>
     body { font-family: system-ui, sans-serif; max-width: 560px; margin: 2rem auto; padding: 0 1rem; }
     h1 { font-size: 1.25rem; }
@@ -33,6 +34,7 @@
   <ol class="steps">
     <li>Drag the link below to your bookmarks bar, <strong>or</strong> right‑click → "Add to bookmarks"</li>
     <li>Edit the bookmark and replace <code>YOUR-SITE-URL</code> with your watchlist URL (e.g. <code>https://watchlist-trailers.netlify.app</code>)</li>
+    <li><strong>Icon not updating?</strong> Delete the bookmark, refresh this page, then drag the link again.</li>
   </ol>
 
   <a class="bookmarklet" href="javascript:(function(){var m=location.href.match(/\/title\/(tt\d+)/);if(!m){alert('Not on an IMDb title page');return;}var imdb=m[1];var title='',year='',type='movie';var t=document.querySelector('[data-testid=hero-title-block__title]')||document.querySelector('h1');if(t){title=t.textContent.replace(/\s*-\s*IMDb$/i,'').replace(/\s*\(\d{4}[^)]*\)\s*$/,'').trim();}if(!title){var og=document.querySelector('meta[property=og:title]');if(og){var s=og.content.replace(/\s*-\s*IMDb$/i,'');var ym=s.match(/\((\d{4})/);if(ym){year=ym[1];}title=s.replace(/\s*\(\d{4}[^)]*\)\s*$/,'').trim();}}var y=document.querySelector('[data-testid=hero-title-block__metadata]');if(y){var yt=y.textContent;if(!year){var ym=yt.match(/(\d{4})/);if(ym)year=ym[1];}if(/TV\s*(Mini\s*)?Series|Documentary\s*Series/i.test(yt))type='show';}var base='https://watchlist-trailers.netlify.app';var u=base+'?add='+imdb+(title?'&title='+encodeURIComponent(title):'')+(year?'&year='+year:'')+'&type='+type;var origin=base.split('/').slice(0,3).join('/');var h=function(e){if(!e.data||e.data.type!=='watchlist-add'||e.origin!==origin)return;window.removeEventListener('message',h);var toast=document.createElement('div');toast.textContent=e.data.message;toast.style.cssText='position:fixed;top:1rem;left:50%;transform:translateX(-50%);background:#e8c96a;color:#0a0a0c;padding:0.75rem 1.25rem;border-radius:8px;font-size:0.9rem;z-index:2147483647;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-weight:500;';document.body.appendChild(toast);setTimeout(function(){toast.remove();},e.data.success?4000:6000);};window.addEventListener('message',h);var iframe=document.createElement('iframe');iframe.style.cssText='position:absolute;width:0;height:0;border:0;visibility:hidden';iframe.src=u;document.body.appendChild(iframe);setTimeout(function(){window.removeEventListener('message',h);},12000);})();">Add to Watchlist</a>
