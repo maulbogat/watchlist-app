@@ -101,6 +101,18 @@ header h1 span {
   text-transform: uppercase;
 }
 
+.header-link {
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.header-link:hover {
+  color: var(--accent);
+}
+
 .filters {
   display: flex;
   align-items: center;
@@ -722,6 +734,18 @@ header h1 span {
   color: var(--muted);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.header-link {
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.header-link:hover {
+  color: var(--accent);
 }
 
 .filters {

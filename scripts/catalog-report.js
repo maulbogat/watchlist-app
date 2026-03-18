@@ -51,6 +51,36 @@ async function run() {
   );
   const israeli = items.filter(isIsraeli);
 
+  const hasNetflix = (m) => {
+    const s = Array.isArray(m.services) ? m.services : [];
+    return s.some((x) => String(x).toLowerCase().includes("netflix"));
+  };
+  const withServices = items.filter((m) => Array.isArray(m.services) && m.services.length > 0);
+  const withNetflix = items.filter(hasNetflix);
+  const noServices = items.filter((m) => !Array.isArray(m.services) || m.services.length === 0);
+
+  console.log("\n=== Service chips ===\n");
+  console.log(`Titles with services: ${withServices.length}`);
+  console.log(`Titles with Netflix: ${withNetflix.length}`);
+  console.log(`Titles with no services: ${noServices.length}`);
+
+  console.log("\n--- Titles WITH Netflix ---\n");
+  if (!withNetflix.length) {
+    console.log("None.");
+  } else {
+    withNetflix.forEach((m) =>
+      console.log(`  ${m.title} (${m.year ?? "—"}) [${(m.services || []).join(", ")}]`)
+    );
+  }
+
+  console.log("\n--- Titles with NO services (missing chip) ---\n");
+  if (noServices.length <= 20) {
+    noServices.forEach((m) => console.log(`  ${m.title} (${m.year ?? "—"})`));
+  } else {
+    noServices.slice(0, 20).forEach((m) => console.log(`  ${m.title} (${m.year ?? "—"})`));
+    console.log(`  ... and ${noServices.length - 20} more`);
+  }
+
   console.log("\n=== Missing trailers (youtubeId empty or SEARCH) ===\n");
   if (!missingTrailer.length) {
     console.log("None.");
@@ -80,6 +110,9 @@ async function run() {
 
   console.log("\n--- Summary ---");
   console.log(`Total: ${items.length}`);
+  console.log(`With services: ${withServices.length}`);
+  console.log(`With Netflix: ${withNetflix.length}`);
+  console.log(`No services: ${noServices.length}`);
   console.log(`Missing trailer: ${missingTrailer.length}`);
   console.log(`Missing thumb: ${missingThumb.length}`);
   console.log(`Israeli: ${israeli.length}`);

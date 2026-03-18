@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add to Watchlist – Bookmarklet</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    p { color: #666; line-height: 1.6; }
+    .bookmarklet {
+      display: inline-block;
+      padding: 0.6rem 1rem;
+      background: #e8c96a;
+      color: #0a0a0c;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 500;
+      margin: 1rem 0;
+    }
+    .bookmarklet:hover { opacity: 0.9; }
+    code { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    .steps { margin: 1.5rem 0; }
+    .steps li { margin: 0.5rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Add to Watchlist – Bookmarklet</h1>
+  <p>When you're on an IMDb title page, click this bookmarklet to add the title to your watchlist.</p>
+
+  <p><strong>Setup:</strong></p>
+  <ol class="steps">
+    <li>Drag the link below to your bookmarks bar, <strong>or</strong> right‑click → "Add to bookmarks"</li>
+    <li>Edit the bookmark and replace <code>YOUR-SITE-URL</code> with your watchlist URL (e.g. <code>https://watchlist-trailers.netlify.app</code>)</li>
+  </ol>
+
+  <a class="bookmarklet" href="javascript:(function(){var m=location.href.match(/\/title\/(tt\d+)/);if(!m){alert('Not on an IMDb title page');return;}var imdb=m[1];var title='',year='';var t=document.querySelector('[data-testid=hero-title-block__title]')||document.querySelector('h1');if(t){title=t.textContent.replace(/\s*-\s*IMDb$/i,'').replace(/\s*\(\d{4}[^)]*\)\s*$/,'').trim();}if(!title){var og=document.querySelector('meta[property=og:title]');if(og){var s=og.content.replace(/\s*-\s*IMDb$/i,'');var ym=s.match(/\((\d{4})/);if(ym){year=ym[1];}title=s.replace(/\s*\(\d{4}[^)]*\)\s*$/,'').trim();}}var y=document.querySelector('[data-testid=hero-title-block__metadata]');if(!year&&y){var ym=y.textContent.match(/(\d{4})/);if(ym)year=ym[1];}var base='https://watchlist-trailers.netlify.app';var u=base+'?add='+imdb+(title?'&title='+encodeURIComponent(title):'')+(year?'&year='+year:'');location.href=u;})();">Add to Watchlist</a>
+
+  <p><strong>How it works:</strong></p>
+  <ul>
+    <li>Runs only on IMDb title pages (e.g. <code>imdb.com/title/tt1234567/</code>)</li>
+    <li>Extracts title, year, and IMDb ID from the page</li>
+    <li>Opens your watchlist with <code>?add=tt1234567</code></li>
+    <li>If the title is in your catalog and you're signed in, it's added to To Watch</li>
+    <li>If not in catalog, you'll see the <code>add-movie</code> command to run</li>
+  </ul>
+
+  <p><strong>Change the URL:</strong> Edit the bookmark and replace <code>watchlist-trailers.netlify.app</code> with your actual watchlist URL if different.</p>
+</body>
+</html>
