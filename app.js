@@ -497,7 +497,14 @@ function initAfterMoviesLoaded() {
       else m.status = "to-watch";
     });
     buildCards();
-    await handleAddFromParams(user);
+    const hasAddParams = new URLSearchParams(window.location.search).get("add") || new URLSearchParams(window.location.search).get("imdb");
+    if (hasAddParams && !user) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const retryUser = auth.currentUser;
+      await handleAddFromParams(retryUser);
+    } else {
+      await handleAddFromParams(user);
+    }
   });
 }
 

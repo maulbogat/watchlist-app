@@ -45,5 +45,7 @@
   </ul>
 
   <p><strong>Deploy:</strong> Set <code>FIREBASE_SERVICE_ACCOUNT</code> in Netlify env vars (base64 of <code>serviceAccountKey.json</code>): <code>base64 -i serviceAccountKey.json | tr -d '\n'</code></p>
+
+  <p><strong>Sign-in error?</strong> Ensure you're signed in on the watchlist site itself (open it in a tab, click Sign in with Google). Firebase Console → Authentication → Authorized domains must include <code>watchlist-trailers.netlify.app</code>.</p>
 </body>
 </html>
