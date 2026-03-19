@@ -12,6 +12,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  deleteDoc,
   collection,
   addDoc,
   query,
@@ -60,6 +61,7 @@ async function getStatusData(uid) {
     watched: Array.isArray(data.watched) ? data.watched : [],
     maybeLater: Array.isArray(data.maybeLater) ? data.maybeLater : [],
     archive: Array.isArray(data.archive) ? data.archive : [],
+    listName: data.listName || "My list",
   };
 }
 
@@ -253,8 +255,52 @@ async function addToSharedList(listId, movie) {
   const key = movieKey(movie);
   const exists = items.some((m) => movieKey(m) === key);
   if (exists) return;
-  items.push(movie);
-  await setDoc(ref, { items }, { merge: true });
+  const { status, ...movieClean } = movie;
+  items.push(movieClean);
+  const watched = new Set(data.watched || []);
+  const maybeLater = new Set(data.maybeLater || []);
+  const archive = new Set(data.archive || []);
+  const s = status || "to-watch";
+  if (s === "watched") watched.add(key);
+  else if (s === "maybe-later") maybeLater.add(key);
+  else if (s === "archive") archive.add(key);
+  await setDoc(ref, { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] }, { merge: true });
+}
+
+async function addToPersonalList(uid, listId, movie) {
+  const key = movieKey(movie);
+  const { status, ...movieClean } = movie;
+  const s = status || "to-watch";
+  if (listId === "personal") {
+    const ref = doc(db, "users", uid);
+    const snap = await getDoc(ref);
+    const data = snap.exists() ? snap.data() : {};
+    const items = Array.isArray(data.items) ? [...data.items] : [];
+    if (items.some((m) => movieKey(m) === key)) return;
+    items.push(movieClean);
+    const watched = new Set(data.watched || []);
+    const maybeLater = new Set(data.maybeLater || []);
+    const archive = new Set(data.archive || []);
+    if (s === "watched") watched.add(key);
+    else if (s === "maybe-later") maybeLater.add(key);
+    else if (s === "archive") archive.add(key);
+    await setDoc(ref, { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] }, { merge: true });
+  } else {
+    const ref = doc(db, "users", uid, "personalLists", listId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error("Personal list not found");
+    const data = snap.data();
+    const items = Array.isArray(data.items) ? [...data.items] : [];
+    if (items.some((m) => movieKey(m) === key)) return;
+    items.push(movieClean);
+    const watched = new Set(data.watched || []);
+    const maybeLater = new Set(data.maybeLater || []);
+    const archive = new Set(data.archive || []);
+    if (s === "watched") watched.add(key);
+    else if (s === "maybe-later") maybeLater.add(key);
+    else if (s === "archive") archive.add(key);
+    await setDoc(ref, { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] }, { merge: true });
+  }
 }
 
 /**
@@ -492,6 +538,161 @@ async function updateMovieMetadata(uid, listMode, key, updates) {
 }
 
 /**
+ * Create a new personal list. Never throws - returns null on failure.
+ */
+async function createPersonalList(uid, name) {
+  try {
+    const listId = randomId() + randomId();
+    const ref = doc(db, "users", uid, "personalLists", listId);
+    await setDoc(ref, {
+      name: (name || "Personal list").trim(),
+      items: [],
+      watched: [],
+      maybeLater: [],
+      archive: [],
+      createdAt: new Date().toISOString(),
+    });
+    return listId;
+  } catch (e) {
+    console.warn("createPersonalList failed:", e);
+    return null;
+  }
+}
+
+/**
+ * Get all personal lists. Never throws - returns at least default list on any error.
+ */
+async function getPersonalLists(uid) {
+  try {
+    const defaultData = await getStatusData(uid);
+    const defaultName = defaultData.listName || "My list";
+    const defaultCount = Array.isArray(defaultData.items) ? defaultData.items.length : 0;
+    const lists = [{ id: "personal", name: defaultName, count: defaultCount, isDefault: true }];
+    try {
+      const coll = collection(db, "users", uid, "personalLists");
+      const snap = await getDocs(coll);
+      for (const d of snap.docs) {
+        const data = d.data();
+        const items = Array.isArray(data.items) ? data.items : [];
+        lists.push({ id: d.id, name: data.name || "Personal list", count: items.length, isDefault: false });
+      }
+    } catch (subErr) {
+      console.warn("getPersonalLists subcollection read failed:", subErr);
+    }
+    return lists;
+  } catch (e) {
+    console.warn("getPersonalLists failed:", e);
+    return [{ id: "personal", name: "My list", count: 0, isDefault: true }];
+  }
+}
+
+/**
+ * Get movies for a personal list.
+ */
+async function getPersonalListMovies(uid, listId) {
+  if (listId === "personal") return getUserMovies(uid);
+  try {
+    const ref = doc(db, "users", uid, "personalLists", listId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return [];
+    const data = snap.data();
+    const items = Array.isArray(data.items) ? data.items : [];
+    const watchedSet = new Set(data.watched || []);
+    const maybeLaterSet = new Set(data.maybeLater || []);
+    const archiveSet = new Set(data.archive || []);
+    return items.map((m) => {
+      const key = movieKey(m);
+      let status = "to-watch";
+      if (watchedSet.has(key)) status = "watched";
+      else if (maybeLaterSet.has(key)) status = "maybe-later";
+      else if (archiveSet.has(key)) status = "archive";
+      return { ...m, status };
+    });
+  } catch (e) {
+    console.warn("getPersonalListMovies failed:", e);
+    return [];
+  }
+}
+
+async function setPersonalListStatus(uid, listId, key, status) {
+  const ref = doc(db, "users", uid, "personalLists", listId);
+  const removeFromAll = {
+    watched: arrayRemove(key),
+    maybeLater: arrayRemove(key),
+    archive: arrayRemove(key),
+  };
+  if (status === "to-watch") {
+    await setDoc(ref, removeFromAll, { merge: true });
+    return;
+  }
+  const addTo = status === "watched" ? "watched" : status === "maybe-later" ? "maybeLater" : "archive";
+  await setDoc(ref, { ...removeFromAll, [addTo]: arrayUnion(key) }, { merge: true });
+}
+
+async function removeFromPersonalList(uid, listId, key) {
+  const ref = doc(db, "users", uid, "personalLists", listId);
+  const snap = await getDoc(ref);
+  const data = snap.exists() ? snap.data() : {};
+  const items = Array.isArray(data.items) ? data.items.filter((m) => movieKey(m) !== key) : [];
+  await setDoc(
+    ref,
+    {
+      items,
+      watched: arrayRemove(key),
+      maybeLater: arrayRemove(key),
+      archive: arrayRemove(key),
+    },
+    { merge: true }
+  );
+}
+
+async function renamePersonalList(uid, listId, newName) {
+  const name = String(newName || "").trim();
+  if (!name) throw new Error("Name cannot be empty");
+  if (listId === "personal") {
+    await setDoc(doc(db, "users", uid), { listName: name }, { merge: true });
+  } else {
+    const ref = doc(db, "users", uid, "personalLists", listId);
+    await setDoc(ref, { name }, { merge: true });
+  }
+}
+
+async function deletePersonalList(uid, listId) {
+  if (listId === "personal") {
+    await setDoc(
+      doc(db, "users", uid),
+      { items: [], watched: [], maybeLater: [], archive: [] },
+      { merge: true }
+    );
+  } else {
+    const ref = doc(db, "users", uid, "personalLists", listId);
+    await deleteDoc(ref);
+  }
+}
+
+async function renameSharedList(listId, newName) {
+  const name = String(newName || "").trim();
+  if (!name) throw new Error("Name cannot be empty");
+  await setDoc(doc(db, "sharedLists", listId), { name }, { merge: true });
+}
+
+async function deleteSharedList(listId) {
+  await deleteDoc(doc(db, "sharedLists", listId));
+}
+
+/**
+ * Leave a shared list. Removes the user from the list's members.
+ */
+async function leaveSharedList(uid, listId) {
+  const listData = await getSharedList(listId);
+  if (!listData) throw new Error("Shared list not found");
+  const members = Array.isArray(listData.members) ? listData.members : [];
+  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
+  const ref = doc(db, "sharedLists", listId);
+  await setDoc(ref, { members: arrayRemove(uid) }, { merge: true });
+}
+
+/**
  * Remove from user's personal list any item that exists in the shared list.
  * Keeps items only in the shared list.
  */
@@ -543,6 +744,17 @@ export {
   setSharedListStatus,
   removeFromSharedList,
   addToSharedList,
+  addToPersonalList,
+  leaveSharedList,
+  createPersonalList,
+  getPersonalLists,
+  getPersonalListMovies,
+  setPersonalListStatus,
+  removeFromPersonalList,
+  renamePersonalList,
+  deletePersonalList,
+  renameSharedList,
+  deleteSharedList,
   moveAllToSharedList,
   copySharedListToPersonal,
   moveItemFromSharedToPersonal,

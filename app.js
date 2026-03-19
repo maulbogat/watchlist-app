@@ -15,6 +15,17 @@ import {
   setSharedListStatus,
   removeFromSharedList,
   addToSharedList,
+  addToPersonalList,
+  leaveSharedList,
+  createPersonalList,
+  getPersonalLists,
+  getPersonalListMovies,
+  setPersonalListStatus,
+  removeFromPersonalList,
+  renamePersonalList,
+  deletePersonalList,
+  renameSharedList,
+  deleteSharedList,
   moveItemFromSharedToPersonal,
   moveItemFromPersonalToShared,
   updateMovieMetadata,
@@ -33,8 +44,9 @@ let currentFilter = "both"; // 'both' | 'movie' | 'show'
 let currentGenre = ""; // '' = all, or genre name
 let currentStatus = "to-watch"; // 'to-watch' | 'watched'
 let currentModalMovie = null; // movie currently shown in modal
-let currentListMode = "personal"; // "personal" | { type: "shared", listId, name }
+let currentListMode = "personal"; // "personal" | { type: "personal", listId, name } | { type: "shared", listId, name }
 let sharedLists = [];
+let personalLists = [];
 
 function getListFromUrl() {
   const list = new URLSearchParams(window.location.search).get("list");
@@ -42,7 +54,8 @@ function getListFromUrl() {
 }
 
 function saveLastList(user, mode) {
-  const val = mode === "personal" ? "personal" : (mode?.listId || "personal");
+  const val = mode === "personal" ? "personal"
+    : (typeof mode === "object" && mode?.listId) ? mode.listId : "personal";
   try {
     if (user) localStorage.setItem(`watchlist_lastList_${user.uid}`, val);
   } catch (e) {}
@@ -117,23 +130,16 @@ function getFilteredTitles() {
   );
 }
 
-function updateHeaderMeta(visibleCount) {
-  const el = document.getElementById("header-meta");
+function updateFilterCount(visibleCount) {
+  const el = document.getElementById("filter-count");
   if (!el) return;
-  el.innerHTML = `${visibleCount} titles`;
+  el.textContent = typeof visibleCount === "number" ? `${visibleCount} title${visibleCount === 1 ? "" : "s"}` : "";
 }
 
 function updateHeaderTitle() {
   const el = document.getElementById("header-title");
   if (!el) return;
-  if (currentListMode === "personal") {
-    el.textContent = "My";
-  } else if (typeof currentListMode === "object" && currentListMode?.type === "shared") {
-    const name = (currentListMode.name || "Our").trim();
-    el.textContent = name.replace(/\s+(list|watchlist)$/i, "") || "Our";
-  } else {
-    el.textContent = "My";
-  }
+  el.textContent = "My";
 }
 
 function renderServiceChips(services, { limit } = {}) {
@@ -155,8 +161,7 @@ function buildCards() {
   grid.innerHTML = "";
 
   const visible = getFilteredTitles();
-  const totalCount = movies.length;
-  updateHeaderMeta(totalCount);
+  updateFilterCount(visible.length);
 
   if (!visible.length) {
     const empty = document.createElement("div");
@@ -192,11 +197,11 @@ function buildCards() {
     const displayStatus = s === "maybe-later" || s === "archive" ? "to-watch" : s;
     const statusLabels = { "to-watch": "To Watch", watched: "Watched" };
     const statusIcons = {
-      "to-watch": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>',
+      "to-watch": '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" fill="none"/><circle cx="12" cy="12" r="3" fill="none"/>',
       watched: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>',
     };
     const statusBadge = `<div class="status-badge-wrap">
-      <button type="button" class="status-badge status-${displayStatus}" aria-label="Move to status" title="Move to…" data-status="${displayStatus}" aria-haspopup="true" aria-expanded="false">
+      <button type="button" class="status-badge status-${displayStatus}" aria-label="Change status" title="Change status" data-status="${displayStatus}" aria-haspopup="true" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="${displayStatus === "watched" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2">${statusIcons[displayStatus]}</svg>
       </button>
       <div class="status-dropdown" role="menu" aria-label="Move to">
@@ -239,7 +244,12 @@ function buildCards() {
       deleteBtnEl.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
-        removeFromCard(m);
+        const uid = auth.currentUser?.uid;
+        if (!uid) {
+          alert("Sign in with Google to save your status across devices.");
+          return;
+        }
+        showRemoveToast(m, () => {}, () => removeFromCard(m));
       });
     }
     if (badgeBtn && dropdown) {
@@ -280,6 +290,8 @@ async function setStatusFromCard(m, status) {
   try {
     if (typeof currentListMode === "object" && currentListMode?.type === "shared") {
       await setSharedListStatus(currentListMode.listId, key, status);
+    } else if (typeof currentListMode === "object" && currentListMode?.type === "personal") {
+      await setPersonalListStatus(uid, currentListMode.listId, key, status);
     } else {
       await setStatus(uid, key, status);
     }
@@ -292,6 +304,34 @@ async function setStatusFromCard(m, status) {
   }
 }
 
+function showRemoveToast(m, onUndo, onRemove) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  const title = escapeHtml(String(m.title || "").trim() || "Title");
+  toast.innerHTML = `<span>Removed ${title}</span><button type="button" class="toast-undo-btn">Undo</button>`;
+  container.appendChild(toast);
+  let removed = false;
+  const doRemove = () => {
+    if (removed) return;
+    removed = true;
+    if (toast.parentNode) toast.remove();
+    onRemove();
+  };
+  const undo = () => {
+    if (removed) return;
+    removed = true;
+    if (toast.parentNode) toast.remove();
+    onUndo();
+  };
+  const timer = setTimeout(doRemove, 4000);
+  toast.querySelector(".toast-undo-btn").addEventListener("click", () => {
+    clearTimeout(timer);
+    undo();
+  });
+}
+
 async function removeFromCard(m) {
   const uid = auth.currentUser?.uid;
   if (!uid) {
@@ -302,6 +342,8 @@ async function removeFromCard(m) {
   try {
     if (typeof currentListMode === "object" && currentListMode?.type === "shared") {
       await removeFromSharedList(currentListMode.listId, key);
+    } else if (typeof currentListMode === "object" && currentListMode?.type === "personal") {
+      await removeFromPersonalList(uid, currentListMode.listId, key);
     } else {
       await removeTitle(uid, key);
     }
@@ -314,88 +356,169 @@ async function removeFromCard(m) {
   }
 }
 
-function renderModalStatusBtns(m) {
+const STATUS_LABELS = { "to-watch": "To Watch", watched: "Watched" };
+const CHECK_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+
+function renderModalFooter(m, youtubeLinkHtml) {
   const s = m.status === "maybe-later" || m.status === "archive" ? "to-watch" : (m.status || "to-watch");
-  const labels = { "to-watch": "To Watch", watched: "Watched" };
-  return STATUS_ORDER.map(
-    (status) =>
-      `<button type="button" class="modal-status-btn ${status === s ? "active" : ""}" data-status="${status}" title="${labels[status]}">${labels[status]}</button>`
-  ).join("");
+  const currentListLabel = getCurrentListLabel();
+  const serviceChips = renderServiceChips(m.services);
+  const servicePart = serviceChips ? ` <span style="opacity:0.4">·</span> ${serviceChips}` : "";
+  const metaParts = [m.year || "", m.genre || ""].filter(Boolean).join(" ");
+  return `
+    <div class="modal-footer-meta">${metaParts}${servicePart}</div>
+    <div class="modal-footer-actions">
+      <div class="modal-action-dropdown" data-dropdown="status">
+        <button type="button" class="modal-action-btn modal-status-trigger" aria-haspopup="true" aria-expanded="false">
+          <span class="modal-action-label">${STATUS_LABELS[s]}</span>
+        </button>
+        <div class="modal-action-dropdown-panel" role="menu">
+          ${STATUS_ORDER.map((st) => `<button type="button" class="modal-action-dropdown-item" role="menuitem" data-status="${st}">${STATUS_LABELS[st]}${st === s ? " " + CHECK_SVG : ""}</button>`).join("")}
+        </div>
+      </div>
+      <div class="modal-action-dropdown" data-dropdown="add-to-list">
+        <button type="button" class="modal-action-btn modal-add-to-list-trigger" aria-haspopup="true" aria-expanded="false">
+          <span class="modal-action-label modal-list-label">${escapeHtml(currentListLabel)}</span>
+        </button>
+        <div class="modal-action-dropdown-panel modal-add-to-list-panel" role="menu"></div>
+      </div>
+      ${youtubeLinkHtml}
+    </div>
+  `;
 }
 
 function updateModalStatusBtn() {
   if (!currentModalMovie) return;
-  const btns = document.querySelectorAll(".modal-status-btn");
+  const trigger = document.querySelector(".modal-status-trigger");
   const displayStatus = currentModalMovie.status === "maybe-later" || currentModalMovie.status === "archive" ? "to-watch" : (currentModalMovie.status || "to-watch");
-  btns.forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.status === displayStatus);
+  if (trigger) trigger.querySelector(".modal-action-label").textContent = STATUS_LABELS[displayStatus];
+  document.querySelectorAll(".modal-action-dropdown-item[data-status]").forEach((btn) => {
+    const isActive = btn.dataset.status === displayStatus;
+    btn.innerHTML = STATUS_LABELS[btn.dataset.status] + (isActive ? " " + CHECK_SVG : "");
   });
 }
 
-function renderMoveToMyListBtn(m) {
-  const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
-  if (!isShared) return "";
-  return `<span style="opacity:0.4">·</span><button type="button" class="modal-move-to-my-list-btn" title="Move to My list">Move to My list</button>`;
+function updateModalListBtn() {
+  const labelEl = document.querySelector(".modal-add-to-list-trigger .modal-list-label");
+  if (labelEl) labelEl.textContent = getCurrentListLabel();
 }
 
-function renderMoveToOurListBtn(m) {
-  const isPersonal = currentListMode === "personal";
-  if (!isPersonal || !sharedLists.length) return "";
-  return sharedLists
-    .map(
-      (l) =>
-        `<span style="opacity:0.4">·</span><button type="button" class="modal-move-to-our-list-btn" data-list-id="${l.id}" title="Move to ${(l.name || "Our list").replace(/"/g, "&quot;")}">Move to ${l.name || "Our list"}</button>`
-    )
-    .join("");
-}
-
-function attachMoveToMyListHandler(footer, m) {
-  const btn = footer.querySelector(".modal-move-to-my-list-btn");
-  if (!btn) return;
-  btn.addEventListener("click", async (e) => {
-    e.preventDefault();
-    const user = auth.currentUser;
-    if (!user || typeof currentListMode !== "object" || currentListMode?.type !== "shared") return;
-    btn.disabled = true;
-    btn.textContent = "Moving…";
+async function getListsContainingMovie(m) {
+  const user = auth.currentUser;
+  if (!user) return new Set();
+  const key = movieKey(m);
+  const containing = new Set();
+  for (const l of personalLists) {
+    const listId = l.id;
     try {
-      await moveItemFromSharedToPersonal(user.uid, currentListMode.listId, m);
-      movies = movies.filter((x) => movieKey(x) !== movieKey(m));
-      buildCards();
-      closeModal();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || "Failed to move.");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Move to My list";
-    }
-  });
+      const listMovies = await getPersonalListMovies(user.uid, listId);
+      if (listMovies.some((x) => movieKey(x) === key)) containing.add(listId);
+    } catch (_) {}
+  }
+  for (const l of sharedLists) {
+    const items = Array.isArray(l.items) ? l.items : [];
+    if (items.some((x) => movieKey(x) === key)) containing.add(l.id);
+  }
+  return containing;
 }
 
-function attachMoveToOurListHandler(footer, m) {
-  footer.querySelectorAll(".modal-move-to-our-list-btn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      e.preventDefault();
-      const user = auth.currentUser;
-      const listId = btn.dataset.listId;
-      if (!user || currentListMode !== "personal" || !listId) return;
-      btn.disabled = true;
-      const origText = btn.textContent;
-      btn.textContent = "Moving…";
-      try {
-        await moveItemFromPersonalToShared(user.uid, listId, m);
-        movies = movies.filter((x) => movieKey(x) !== movieKey(m));
-        buildCards();
-        closeModal();
-      } catch (err) {
-        console.error(err);
-        alert(err.message || "Failed to move.");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = origText;
+function attachModalFooterHandlers(footer, m) {
+  const statusDropdown = footer.querySelector("[data-dropdown='status']");
+  const statusTrigger = footer.querySelector(".modal-status-trigger");
+  const statusPanel = statusDropdown?.querySelector(".modal-action-dropdown-panel");
+  if (statusTrigger && statusPanel) {
+    statusTrigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = statusPanel.classList.contains("open");
+      footer.querySelectorAll(".modal-action-dropdown-panel.open").forEach((p) => p.classList.remove("open"));
+      footer.querySelectorAll(".modal-action-btn[aria-expanded='true']").forEach((b) => b.setAttribute("aria-expanded", "false"));
+      if (!open) {
+        statusPanel.classList.add("open");
+        statusTrigger.setAttribute("aria-expanded", "true");
       }
     });
+    statusPanel.querySelectorAll("[data-status]").forEach((item) => {
+      item.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const status = item.dataset.status;
+        const current = m.status === "maybe-later" || m.status === "archive" ? "to-watch" : (m.status || "to-watch");
+        if (status && status !== current) await setStatusFromCard(m, status);
+        statusPanel.classList.remove("open");
+        statusTrigger.setAttribute("aria-expanded", "false");
+      });
+    });
+  }
+
+  const addDropdown = footer.querySelector("[data-dropdown='add-to-list']");
+  const addTrigger = footer.querySelector(".modal-add-to-list-trigger");
+  const addPanel = footer.querySelector(".modal-add-to-list-panel");
+  if (addTrigger && addPanel) {
+    addTrigger.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const open = addPanel.classList.contains("open");
+      footer.querySelectorAll(".modal-action-dropdown-panel.open").forEach((p) => p.classList.remove("open"));
+      footer.querySelectorAll(".modal-action-btn[aria-expanded='true']").forEach((b) => b.setAttribute("aria-expanded", "false"));
+      if (!open) {
+        addPanel.innerHTML = '<span class="modal-add-to-list-loading">Loading…</span>';
+        addPanel.classList.add("open");
+        addTrigger.setAttribute("aria-expanded", "true");
+        const containing = await getListsContainingMovie(m);
+        const user = auth.currentUser;
+        if (!user) {
+          addPanel.innerHTML = '<span class="modal-add-to-list-empty">Sign in to manage lists</span>';
+          return;
+        }
+        const items = [];
+        for (const l of personalLists) {
+          const inList = containing.has(l.id);
+          const name = escapeHtml(l.name || "My list");
+          items.push(`<button type="button" class="modal-action-dropdown-item" role="menuitem" data-type="personal" data-list-id="${l.id}" data-list-name="${name}" data-in-list="${inList}">${name}${inList ? " " + CHECK_SVG : ""}</button>`);
+        }
+        for (const l of sharedLists) {
+          const inList = containing.has(l.id);
+          const name = escapeHtml(l.name || "Shared list");
+          items.push(`<button type="button" class="modal-action-dropdown-item" role="menuitem" data-type="shared" data-list-id="${l.id}" data-list-name="${name}" data-in-list="${inList}">${name}${inList ? " " + CHECK_SVG : ""}</button>`);
+        }
+        addPanel.innerHTML = items.length ? items.join("") : '<span class="modal-add-to-list-empty">No lists</span>';
+        addPanel.querySelectorAll(".modal-action-dropdown-item[data-list-id]").forEach((item) => {
+          item.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const type = item.dataset.type;
+            const listId = item.dataset.listId;
+            const listName = item.dataset.listName || "";
+            const inList = item.dataset.inList === "true";
+            try {
+              if (inList) {
+                if (type === "personal") await removeFromPersonalList(user.uid, listId, movieKey(m));
+                else await removeFromSharedList(listId, movieKey(m));
+                item.dataset.inList = "false";
+                item.innerHTML = listName;
+              } else {
+                if (type === "personal") await addToPersonalList(user.uid, listId, m);
+                else await addToSharedList(listId, m);
+                item.dataset.inList = "true";
+                item.innerHTML = listName + " " + CHECK_SVG;
+              }
+              if (typeof currentListMode === "object" && currentListMode?.listId === listId) {
+                movies = type === "personal" ? await getPersonalListMovies(user.uid, listId) : await getSharedListMovies(listId);
+                buildCards();
+              }
+            } catch (err) {
+              console.error(err);
+              alert(err.message || "Failed to update list.");
+            }
+          });
+        });
+      }
+    });
+  }
+
+  document.addEventListener("click", function closeModalDropdowns(ev) {
+    if (!footer.contains(ev.target)) {
+      footer.querySelectorAll(".modal-action-dropdown-panel.open").forEach((p) => p.classList.remove("open"));
+      footer.querySelectorAll(".modal-action-btn[aria-expanded='true']").forEach((b) => b.setAttribute("aria-expanded", "false"));
+      document.removeEventListener("click", closeModalDropdowns);
+    }
   });
 }
 
@@ -410,25 +533,12 @@ function openModal(m) {
 
   if (m.youtubeId === "SEARCH") {
     const query = encodeURIComponent(m.title + " official trailer");
-    const imdbUrl = m.imdbId
-      ? `https://www.imdb.com/title/${m.imdbId}/`
-      : null;
+    const imdbUrl = m.imdbId ? `https://www.imdb.com/title/${m.imdbId}/` : null;
     const trailerLink = imdbUrl
-      ? `<a href="${imdbUrl}" target="_blank" style="color: var(--accent); text-decoration: none;">Watch on IMDb &#x2197;</a>`
-      : `<a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="color: var(--accent); text-decoration: none;">Search on YouTube &#x2197;</a>`;
-    footer.innerHTML = `
-      <span class="modal-status-btns">${renderModalStatusBtns(m)}</span>
-      <span style="opacity:0.4">·</span>
-      <span>No YouTube trailer &mdash;</span>
-      ${trailerLink}
-      ${renderMoveToMyListBtn(m)}
-      ${renderMoveToOurListBtn(m)}
-    `;
-    footer.querySelectorAll(".modal-status-btn").forEach((btn) => {
-      btn.addEventListener("click", () => setStatusFromCard(m, btn.dataset.status));
-    });
-    attachMoveToMyListHandler(footer, m);
-    attachMoveToOurListHandler(footer, m);
+      ? `<a href="${imdbUrl}" target="_blank" class="modal-action-btn modal-youtube-link">Watch on IMDb &#x2197;</a>`
+      : `<a href="https://www.youtube.com/results?search_query=${query}" target="_blank" class="modal-action-btn modal-youtube-link">Search on YouTube &#x2197;</a>`;
+    footer.innerHTML = renderModalFooter(m, trailerLink);
+    attachModalFooterHandlers(footer, m);
     const placeholder = modal.querySelector(".video-wrap");
     placeholder.style.background = "#0d0d10";
     placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
@@ -508,34 +618,13 @@ function openModal(m) {
         ? `&origin=${encodeURIComponent(rawOrigin)}`
         : "";
 
-    const serviceChips = renderServiceChips(m.services);
-    const serviceInline = serviceChips
-      ? ` <span style="opacity:0.4">·</span> ${serviceChips}`
-      : "";
-
     videoWrap.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
       referrerpolicy="strict-origin-when-cross-origin"
       src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(m.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1${originParam}"></iframe>`;
 
-    footer.innerHTML = `
-      <span>${m.title}</span>
-      <span style="opacity:0.4">·</span>
-      <span>${m.year || ""} ${m.genre}</span>
-      ${serviceInline}
-      <span style="opacity:0.4">·</span>
-      <span class="modal-status-btns">${renderModalStatusBtns(m)}</span>
-      <span style="opacity:0.4">·</span>
-      <a href="${watchUrl}" target="_blank" style="color: var(--accent); text-decoration: none;">
-        Watch on YouTube &#x2197;
-      </a>
-      ${renderMoveToMyListBtn(m)}
-      ${renderMoveToOurListBtn(m)}
-    `;
-    footer.querySelectorAll(".modal-status-btn").forEach((btn) => {
-      btn.addEventListener("click", () => setStatusFromCard(m, btn.dataset.status));
-    });
-    attachMoveToMyListHandler(footer, m);
-    attachMoveToOurListHandler(footer, m);
+    const youtubeLink = `<a href="${watchUrl}" target="_blank" class="modal-action-btn modal-youtube-link">Watch on YouTube &#x2197;</a>`;
+    footer.innerHTML = renderModalFooter(m, youtubeLink);
+    attachModalFooterHandlers(footer, m);
   }
 
   modal.classList.add("open");
@@ -601,15 +690,33 @@ document.querySelectorAll(".tab-group .tab").forEach((btn) => {
 function updateAuthUI(user) {
   const signInBtn = document.getElementById("sign-in-btn");
   const signedIn = document.getElementById("signed-in");
-  const userEmailEl = document.getElementById("user-email");
+  const avatarImg = document.getElementById("auth-avatar-img");
+  const avatarInitial = document.getElementById("auth-avatar-initial");
+  const avatarBtn = document.getElementById("auth-avatar-btn");
   const versionFooter = document.getElementById("version-footer");
 
   if (user) {
     signInBtn.style.display = "none";
     signedIn.style.display = "flex";
-    if (userEmailEl) {
-      userEmailEl.textContent = user.email || user.displayName || "Signed in";
-      userEmailEl.title = "Signed in as " + (user.email || user.displayName || "you");
+    if (avatarBtn) avatarBtn.title = "Signed in as " + (user.email || user.displayName || "you");
+    const initial = (user.displayName || user.email || "?").charAt(0).toUpperCase();
+    if (avatarInitial) avatarInitial.textContent = initial;
+    if (user.photoURL && avatarImg && avatarInitial) {
+      avatarImg.alt = user.displayName || user.email || "Avatar";
+      avatarImg.onerror = () => {
+        avatarImg.style.display = "none";
+        avatarImg.src = "";
+        avatarImg.onerror = null;
+        avatarInitial.style.display = "";
+      };
+      avatarImg.src = user.photoURL;
+      avatarImg.style.display = "";
+      avatarInitial.style.display = "none";
+    } else if (avatarInitial && avatarImg) {
+      avatarInitial.style.display = "";
+      avatarImg.style.display = "none";
+      avatarImg.src = "";
+      avatarImg.onerror = null;
     }
     if (versionFooter && user.email === DEBUG_EMAIL) {
       versionFooter.textContent = "v" + APP_VERSION;
@@ -622,7 +729,7 @@ function updateAuthUI(user) {
   } else {
     signInBtn.style.display = "inline-flex";
     signedIn.style.display = "none";
-    if (userEmailEl) userEmailEl.textContent = "";
+    if (avatarInitial) avatarInitial.textContent = "";
     if (versionFooter) {
       versionFooter.style.display = "none";
       versionFooter.setAttribute("aria-hidden", "true");
@@ -644,11 +751,32 @@ document.getElementById("sign-in-btn").addEventListener("click", async () => {
   }
 });
 
-document.getElementById("sign-out-btn").addEventListener("click", () => {
+// Auth avatar dropdown
+const authAvatarWrap = document.getElementById("signed-in");
+const authAvatarBtn = document.getElementById("auth-avatar-btn");
+const authDropdown = document.getElementById("auth-dropdown");
+if (authAvatarBtn && authDropdown) {
+  authAvatarBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = authDropdown.getAttribute("aria-hidden") === "false";
+    authAvatarBtn.setAttribute("aria-expanded", !open);
+    authDropdown.setAttribute("aria-hidden", open);
+  });
+  document.addEventListener("click", (e) => {
+    if (authAvatarWrap && !authAvatarWrap.contains(e.target)) {
+      authAvatarBtn?.setAttribute("aria-expanded", "false");
+      authDropdown?.setAttribute("aria-hidden", "true");
+    }
+  });
+}
+document.getElementById("auth-signout-btn")?.addEventListener("click", () => {
+  authDropdown?.setAttribute("aria-hidden", "true");
+  authAvatarBtn?.setAttribute("aria-expanded", "false");
   fbSignOut(auth);
 });
-
-document.getElementById("switch-account-btn").addEventListener("click", async () => {
+document.getElementById("auth-switch-btn")?.addEventListener("click", async () => {
+  authDropdown?.setAttribute("aria-hidden", "true");
+  authAvatarBtn?.setAttribute("aria-expanded", "false");
   await fbSignOut(auth);
   try {
     const provider = new GoogleAuthProvider();
@@ -684,50 +812,75 @@ async function setBookmarkletCookie(user) {
 
 async function loadList(user) {
   const grid = document.getElementById("grid");
-  if (currentListMode === "personal" || (typeof currentListMode === "object" && currentListMode?.type !== "shared")) {
+  if (currentListMode === "personal" || (typeof currentListMode === "object" && currentListMode?.type === "personal")) {
+    const listId = currentListMode === "personal" ? "personal" : currentListMode.listId;
     try {
-      movies = await getUserMovies(user.uid);
+      movies = await getPersonalListMovies(user.uid, listId);
     } catch (e) {
       console.error("Failed to load your list:", e);
       movies = [];
     }
-  } else {
+  } else if (typeof currentListMode === "object" && currentListMode?.type === "shared") {
     try {
       movies = await getSharedListMovies(currentListMode.listId);
     } catch (e) {
       console.error("Failed to load shared list:", e);
       movies = [];
     }
+  } else {
+    movies = [];
   }
   return movies;
 }
 
+function getCurrentListValue() {
+  if (currentListMode === "personal") return "personal";
+  if (typeof currentListMode === "object" && currentListMode?.type === "personal") return currentListMode.listId;
+  if (typeof currentListMode === "object" && currentListMode?.type === "shared") return currentListMode.listId;
+  return "personal";
+}
+
+function getCurrentListLabel() {
+  if (currentListMode === "personal") {
+    const p = personalLists.find((l) => l.id === "personal");
+    return p?.name || "My list";
+  }
+  if (typeof currentListMode === "object" && currentListMode?.type === "personal") {
+    const p = personalLists.find((l) => l.id === currentListMode.listId);
+    return p?.name || currentListMode.name || "Personal list";
+  }
+  if (typeof currentListMode === "object" && currentListMode?.type === "shared") return currentListMode.name || "Shared list";
+  return "My list";
+}
+
 function renderListSelector() {
-  const sel = document.getElementById("list-selector");
-  if (!sel) return;
-  const currentVal = currentListMode === "personal" ? "personal"
-    : (typeof currentListMode === "object" && currentListMode?.type === "shared") ? currentListMode.listId : "personal";
-  sel.innerHTML = "";
-  const optPersonal = document.createElement("option");
-  optPersonal.value = "personal";
-  optPersonal.textContent = "My list";
-  if (currentVal === "personal") optPersonal.selected = true;
-  sel.appendChild(optPersonal);
-  sharedLists.forEach((l) => {
-    const opt = document.createElement("option");
-    opt.value = l.id;
-    opt.textContent = l.name || "Shared list";
-    if (currentVal === l.id) opt.selected = true;
-    sel.appendChild(opt);
+  const dropdown = document.getElementById("list-selector");
+  const trigger = document.getElementById("list-selector-trigger");
+  const valueEl = trigger?.querySelector(".custom-dropdown-value");
+  const panel = document.getElementById("list-selector-panel");
+  if (!dropdown || !trigger || !valueEl || !panel) return;
+
+  const currentVal = getCurrentListValue();
+  valueEl.textContent = getCurrentListLabel();
+  updateModalListBtn();
+
+  const iconPerson = '<svg class="custom-dropdown-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+  const iconGroup = '<svg class="custom-dropdown-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>';
+
+  panel.innerHTML = "";
+  const items = [
+    ...personalLists.map((l) => ({ value: l.id, label: l.name || "Personal list", icon: iconPerson })),
+    ...sharedLists.map((l) => ({ value: l.id, label: l.name || "Shared list", icon: iconGroup })),
+  ];
+  items.forEach(({ value, label, icon }) => {
+    const div = document.createElement("div");
+    div.className = "custom-dropdown-item";
+    div.setAttribute("role", "option");
+    div.dataset.value = value;
+    div.innerHTML = (icon ? icon : "") + "<span class=\"custom-dropdown-item-text\">" + label + "</span>";
+    div.setAttribute("aria-selected", value === currentVal ? "true" : "false");
+    panel.appendChild(div);
   });
-  const optCreate = document.createElement("option");
-  optCreate.value = "__create__";
-  optCreate.textContent = "+ Create shared list";
-  sel.appendChild(optCreate);
-  const optJoin = document.createElement("option");
-  optJoin.value = "__join__";
-  optJoin.textContent = "Join with link";
-  sel.appendChild(optJoin);
 }
 
 function updateCopyInviteButton() {
@@ -735,8 +888,9 @@ function updateCopyInviteButton() {
   const btn = document.getElementById("copy-invite-btn");
   if (!btn) return;
   const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
-  btn.style.display = isShared ? "inline" : "none";
-  btn.textContent = "Copy invite link";
+  btn.style.display = isShared ? "inline-flex" : "none";
+  const textEl = btn.querySelector(".copy-invite-text");
+  if (textEl) textEl.textContent = "Copy invite link";
   btn.disabled = false;
 }
 
@@ -760,6 +914,167 @@ function hideSharedModal() {
   }
 }
 
+function showListsModal() {
+  const modal = document.getElementById("lists-modal");
+  if (modal) {
+    renderListsModalContent();
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function hideListsModal() {
+  const modal = document.getElementById("lists-modal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+}
+
+let deleteConfirmResolve = null;
+
+function showDeleteConfirmModal(listName, count, onConfirm, { isLeave = false, isSharedDelete = false } = {}) {
+  const modal = document.getElementById("delete-confirm-modal");
+  const msg = document.getElementById("delete-confirm-message");
+  const titleEl = document.getElementById("delete-confirm-title");
+  const actionBtn = document.getElementById("delete-confirm-delete");
+  if (!modal || !msg || !actionBtn) return;
+  if (isLeave) {
+    msg.textContent = `Leave ${listName}? You will lose access but other members are unaffected.`;
+    if (titleEl) titleEl.textContent = "Leave list?";
+    actionBtn.textContent = "Leave";
+  } else {
+    msg.textContent = isSharedDelete
+      ? `Delete ${listName}? This will permanently delete the list for all members.`
+      : `Delete ${listName}? This will permanently remove all ${count} titles and cannot be undone.`;
+    if (titleEl) titleEl.textContent = "Delete list?";
+    actionBtn.textContent = "Delete";
+  }
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+  deleteConfirmResolve = onConfirm;
+}
+
+function hideDeleteConfirmModal() {
+  const modal = document.getElementById("delete-confirm-modal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  deleteConfirmResolve = null;
+}
+
+function escapeHtml(s) {
+  const div = document.createElement("div");
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function renderListsModalContent() {
+  const listEl = document.getElementById("lists-modal-list");
+  if (!listEl) return;
+
+  const iconPerson = '<svg class="custom-dropdown-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+  const iconGroup = '<svg class="custom-dropdown-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>';
+  const user = auth.currentUser;
+
+  listEl.innerHTML = "";
+
+  personalLists.forEach((l) => {
+    const li = document.createElement("li");
+    li.className = "lists-modal-list-item";
+    li.dataset.value = l.id;
+    li.dataset.type = "personal";
+    li.dataset.count = String(l.count || 0);
+    li.innerHTML = `
+      <span class="lists-modal-list-item-name">${iconPerson}<span class="lists-modal-list-item-name-text">${escapeHtml(l.name || "My list")}</span></span>
+      <div class="lists-modal-list-item-actions">
+        <button type="button" class="lists-modal-list-item-action lists-modal-rename-btn" data-list-id="${l.id}" data-type="personal">Rename</button>
+        <button type="button" class="lists-modal-list-item-action lists-modal-list-item-action--delete lists-modal-delete-btn" data-list-id="${l.id}" data-type="personal">Delete</button>
+      </div>
+    `;
+    listEl.appendChild(li);
+  });
+
+  sharedLists.forEach((l) => {
+    // Only show Delete if current user created the list (uid matches Firestore ownerId)
+    const isOwner = !!(user && l.ownerId && String(l.ownerId) === String(user.uid));
+    const li = document.createElement("li");
+    li.className = "lists-modal-list-item";
+    li.dataset.value = l.id;
+    li.dataset.type = "shared";
+    li.dataset.count = String((l.items || []).length);
+    li.innerHTML = `
+      <span class="lists-modal-list-item-name">${iconGroup}<span class="lists-modal-list-item-name-text">${escapeHtml(l.name || "Shared list")}</span></span>
+      <div class="lists-modal-list-item-actions">
+        <button type="button" class="lists-modal-list-item-action lists-modal-rename-btn" data-list-id="${l.id}" data-type="shared">Rename</button>
+        ${isOwner
+          ? `<button type="button" class="lists-modal-list-item-action lists-modal-list-item-action--delete lists-modal-delete-btn" data-list-id="${l.id}" data-type="shared">Delete</button>`
+          : `<button type="button" class="lists-modal-list-item-leave lists-modal-leave-btn" data-list-id="${l.id}">Leave</button>`
+        }
+      </div>
+    `;
+    listEl.appendChild(li);
+  });
+}
+
+async function handleListSelect(val) {
+  const user = auth.currentUser;
+  if (!user) return;
+  const grid = document.getElementById("grid");
+  const filters = document.getElementById("content-filters");
+
+  const personalList = personalLists.find((l) => l.id === val);
+  const sharedList = sharedLists.find((l) => l.id === val);
+
+  if (personalList) {
+    currentListMode = val === "personal" ? "personal" : { type: "personal", listId: val, name: personalList.name };
+    saveLastList(user, currentListMode);
+    movies = await loadList(user);
+    setBookmarkletCookie(user);
+    if (!movies.length) {
+      if (filters) filters.style.display = "none";
+      updateFilterCount(0);
+      if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
+    } else {
+      if (filters) filters.style.display = "";
+      buildCards();
+      renderGenreFilter();
+    }
+    updateCopyInviteButton();
+  } else if (sharedList) {
+    currentListMode = { type: "shared", listId: sharedList.id, name: sharedList.name };
+    saveLastList(user, currentListMode);
+    movies = await loadList(user);
+    setBookmarkletCookie(user);
+    const filters = document.getElementById("content-filters");
+    if (filters) filters.style.display = movies.length ? "" : "none";
+    if (movies.length) {
+      buildCards();
+      renderGenreFilter();
+    } else {
+      updateFilterCount(0);
+      if (grid) grid.innerHTML = '<div class="empty-state">This shared list is empty.</div>';
+    }
+    updateCopyInviteButton();
+  } else {
+    currentListMode = "personal";
+    saveLastList(user, currentListMode);
+    movies = await loadList(user);
+    setBookmarkletCookie(user);
+    if (filters) filters.style.display = movies.length ? "" : "none";
+    if (movies.length) {
+      buildCards();
+      renderGenreFilter();
+    } else {
+      updateFilterCount(0);
+      if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
+    }
+    updateCopyInviteButton();
+  }
+  renderListSelector();
+}
+
 // Auth state + load user's movies (each account has its own list)
 function init() {
   const grid = document.getElementById("grid");
@@ -775,8 +1090,7 @@ function init() {
       movies = [];
       const wrap = document.getElementById("list-selector-wrap");
       if (wrap) wrap.style.display = "none";
-      const meta = document.getElementById("header-meta");
-      if (meta) meta.textContent = "";
+      updateFilterCount("");
       grid.innerHTML = '<div class="empty-state">Sign in to see your watchlist.</div>';
       return;
     }
@@ -785,6 +1099,12 @@ function init() {
       sharedLists = await getSharedListsForUser(user.uid);
     } catch (e) {
       sharedLists = [];
+    }
+    try {
+      personalLists = await getPersonalLists(user.uid);
+    } catch (e) {
+      console.warn("getPersonalLists failed, using default:", e);
+      personalLists = [{ id: "personal", name: "My list", count: 0, isDefault: true }];
     }
 
     const wrap = document.getElementById("list-selector-wrap");
@@ -813,18 +1133,23 @@ function init() {
       if (last === "personal") {
         currentListMode = "personal";
       } else if (last) {
-        let list = sharedLists.find((l) => l.id === last);
-        if (!list) {
-          try {
-            const fetched = await getSharedList(last);
-            if (fetched && (fetched.ownerId === user.uid || (Array.isArray(fetched.members) && fetched.members.includes(user.uid)))) {
-              sharedLists.push(fetched);
-              list = fetched;
-            }
-          } catch (_) {}
-        }
-        if (list) {
-          currentListMode = { type: "shared", listId: list.id, name: list.name };
+        const personalList = personalLists.find((l) => l.id === last);
+        if (personalList) {
+          currentListMode = last === "personal" ? "personal" : { type: "personal", listId: last, name: personalList.name };
+        } else {
+          let list = sharedLists.find((l) => l.id === last);
+          if (!list) {
+            try {
+              const fetched = await getSharedList(last);
+              if (fetched && (fetched.ownerId === user.uid || (Array.isArray(fetched.members) && fetched.members.includes(user.uid)))) {
+                sharedLists.push(fetched);
+                list = fetched;
+              }
+            } catch (_) {}
+          }
+          if (list) {
+            currentListMode = { type: "shared", listId: list.id, name: list.name };
+          }
         }
       }
     }
@@ -838,8 +1163,7 @@ function init() {
     if (!movies.length) {
       const filters = document.getElementById("content-filters");
       if (filters) filters.style.display = "none";
-      const meta = document.getElementById("header-meta");
-      if (meta) meta.textContent = "0 titles";
+      updateFilterCount(0);
       const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
       grid.innerHTML = isShared
         ? '<div class="empty-state">This shared list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>'
@@ -853,121 +1177,62 @@ function init() {
     updateCopyInviteButton();
   });
 
-  document.getElementById("list-selector")?.addEventListener("change", async (e) => {
-    const sel = e.target;
-    const val = sel.value;
-    const user = auth.currentUser;
-    if (!user) return;
-    if (val === "personal") {
-      currentListMode = "personal";
-      saveLastList(user, currentListMode);
-      movies = await loadList(user);
-      setBookmarkletCookie(user);
-      const filters = document.getElementById("content-filters");
-      const grid = document.getElementById("grid");
-      if (!movies.length) {
-        if (filters) filters.style.display = "none";
-        const meta = document.getElementById("header-meta");
-        if (meta) meta.textContent = "0 titles";
-        if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
-      } else {
-        if (filters) filters.style.display = "";
-        buildCards();
-        renderGenreFilter();
+  // Custom dropdown: toggle, select, close on outside click
+  const dropdown = document.getElementById("list-selector");
+  const trigger = document.getElementById("list-selector-trigger");
+  const panel = document.getElementById("list-selector-panel");
+  if (dropdown && trigger && panel) {
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = dropdown.getAttribute("data-open") === "true";
+      dropdown.setAttribute("data-open", !open);
+      trigger.setAttribute("aria-expanded", !open);
+      panel.setAttribute("aria-hidden", open);
+    });
+    panel.addEventListener("click", async (e) => {
+      const item = e.target.closest(".custom-dropdown-item");
+      if (!item) return;
+      const val = item.dataset.value;
+      dropdown.setAttribute("data-open", "false");
+      trigger.setAttribute("aria-expanded", "false");
+      panel.setAttribute("aria-hidden", "true");
+      await handleListSelect(val);
+    });
+    document.addEventListener("click", (e) => {
+      if (dropdown.contains(e.target)) return;
+      if (dropdown.getAttribute("data-open") === "true") {
+        dropdown.setAttribute("data-open", "false");
+        trigger.setAttribute("aria-expanded", "false");
+        panel.setAttribute("aria-hidden", "true");
       }
-      updateCopyInviteButton();
-    } else if (val === "__create__") {
-      const name = prompt("Enter a name for the shared list:", "Family watchlist");
-      if (!name) return;
-      try {
-        const listId = await createSharedList(user.uid, name.trim());
-        sharedLists = await getSharedListsForUser(user.uid);
-        currentListMode = { type: "shared", listId, name: name.trim() };
-        saveLastList(user, currentListMode);
-        renderListSelector();
-        const shareUrl = window.location.origin + window.location.pathname + "?join=" + listId;
-        showSharedModal("Shared list created", `
-          <p>Share this link for others to join:</p>
-          <p class="share-link" id="share-link-text">${shareUrl}</p>
-          <button type="button" class="auth-btn" id="copy-share-link-btn" style="margin-top:0.75rem">Copy link</button>
-          <p style="margin-top:0.75rem;font-size:0.85rem;color:var(--muted)">Anyone with the link can join. They must be signed in.</p>
-        `);
-        document.getElementById("copy-share-link-btn")?.addEventListener("click", async () => {
-          try {
-            await navigator.clipboard.writeText(shareUrl);
-            const btn = document.getElementById("copy-share-link-btn");
-            if (btn) { btn.textContent = "Copied!"; btn.disabled = true; }
-          } catch (e) {
-            alert("Could not copy. Select and copy the link above.");
-          }
-        });
-        movies = await loadList(user);
-        setBookmarkletCookie(user);
-        const filters = document.getElementById("content-filters");
-        if (filters) filters.style.display = "";
-        buildCards();
-        renderGenreFilter();
-        sel.value = listId;
-        updateCopyInviteButton();
-      } catch (err) {
-        alert("Failed to create: " + (err.message || "Unknown error"));
-        sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
-      }
-    } else if (val === "__join__") {
-      const url = prompt("Paste the share link:");
-      if (!url) return;
-      const m = url.match(/[?&]join=([a-z0-9]+)/i);
-      const listId = m ? m[1] : null;
-      if (!listId) {
-        alert("Invalid link. Paste the full URL from the person who shared the list.");
+    });
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const deleteModal = document.getElementById("delete-confirm-modal");
+      if (deleteModal?.classList.contains("open")) {
+        hideDeleteConfirmModal();
         return;
       }
-      try {
-        const apiBase = window.location.origin;
-        const res = await fetch(apiBase + "/.netlify/functions/join-shared-list", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ listId }),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          sharedLists = await getSharedListsForUser(user.uid);
-          currentListMode = { type: "shared", listId, name: data.name || "Shared list" };
-          saveLastList(user, currentListMode);
-          renderListSelector();
-          movies = await loadList(user);
-          setBookmarkletCookie(user);
-          const filters = document.getElementById("content-filters");
-          if (filters) filters.style.display = "";
-          buildCards();
-          renderGenreFilter();
-          updateCopyInviteButton();
-        } else {
-          alert(data.error || "Failed to join");
-          sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
-        }
-      } catch (err) {
-        alert("Failed to join: " + (err.message || "Unknown error"));
-        sel.value = currentListMode === "personal" ? "personal" : (currentListMode?.listId || "personal");
+      const listsModal = document.getElementById("lists-modal");
+      if (listsModal?.classList.contains("open")) {
+        hideListsModal();
+        return;
       }
-    } else {
-      const list = sharedLists.find((l) => l.id === val);
-      currentListMode = list ? { type: "shared", listId: list.id, name: list.name } : "personal";
-      saveLastList(user, currentListMode);
-      movies = await loadList(user);
-      setBookmarkletCookie(user);
-      const filters = document.getElementById("content-filters");
-      if (filters) filters.style.display = movies.length ? "" : "none";
-      if (movies.length) {
-        buildCards();
-        renderGenreFilter();
-      } else {
-        const meta = document.getElementById("header-meta");
-        if (meta) meta.textContent = "0 titles";
-        grid.innerHTML = '<div class="empty-state">This shared list is empty.</div>';
+      const d = document.getElementById("list-selector");
+      const p = document.getElementById("list-selector-panel");
+      const t = document.getElementById("list-selector-trigger");
+      if (d?.getAttribute("data-open") === "true") {
+        d.setAttribute("data-open", "false");
+        t?.setAttribute("aria-expanded", "false");
+        p?.setAttribute("aria-hidden", "true");
       }
-      updateCopyInviteButton();
+      const authDd = document.getElementById("auth-dropdown");
+      if (authDd?.getAttribute("aria-hidden") === "false") {
+        authDd.setAttribute("aria-hidden", "true");
+        document.getElementById("auth-avatar-btn")?.setAttribute("aria-expanded", "false");
+      }
     }
   });
 
@@ -977,7 +1242,15 @@ function init() {
     try {
       await navigator.clipboard.writeText(shareUrl);
       const btn = document.getElementById("copy-invite-btn");
-      if (btn) { btn.textContent = "Copied!"; btn.disabled = true; setTimeout(() => { btn.textContent = "Copy invite link"; btn.disabled = false; }, 2000); }
+      if (btn) {
+        const textEl = btn.querySelector(".copy-invite-text");
+        if (textEl) textEl.textContent = "Copied!";
+        btn.disabled = true;
+        setTimeout(() => {
+          if (textEl) textEl.textContent = "Copy invite link";
+          btn.disabled = false;
+        }, 2000);
+      }
     } catch (e) {
       alert("Could not copy. The link is: " + shareUrl);
     }
@@ -986,6 +1259,274 @@ function init() {
   document.getElementById("shared-modal-close")?.addEventListener("click", hideSharedModal);
   document.getElementById("shared-modal")?.addEventListener("click", (e) => {
     if (e.target === e.currentTarget) hideSharedModal();
+  });
+
+  // Lists management modal
+  document.getElementById("list-settings-btn")?.addEventListener("click", showListsModal);
+  document.getElementById("lists-modal-close")?.addEventListener("click", hideListsModal);
+  document.getElementById("lists-modal")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) hideListsModal();
+  });
+
+  const bookmarkletBtn = document.getElementById("lists-bookmarklet-btn");
+  if (bookmarkletBtn) {
+    const scriptUrl = window.location.origin + "/bookmarklet.js?v=9";
+    bookmarkletBtn.href = "javascript:(function(){var s=document.createElement('script');s.src='" + scriptUrl + "';document.body.appendChild(s);})();";
+    bookmarkletBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+    });
+  }
+
+  document.getElementById("lists-new-personal-btn")?.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const name = prompt("Enter a name for the new personal list:", "Personal list");
+    if (!name) return;
+    try {
+      const listId = await createPersonalList(user.uid, name.trim());
+      if (!listId) {
+        alert("Failed to create list. Please try again.");
+        return;
+      }
+      personalLists = await getPersonalLists(user.uid);
+      currentListMode = { type: "personal", listId, name: name.trim() };
+      saveLastList(user, currentListMode);
+      renderListSelector();
+      renderListsModalContent();
+      movies = await loadList(user);
+      setBookmarkletCookie(user);
+      const filters = document.getElementById("content-filters");
+      if (filters) filters.style.display = movies.length ? "" : "none";
+      if (movies.length) {
+        buildCards();
+        renderGenreFilter();
+      } else {
+        updateFilterCount(0);
+        const grid = document.getElementById("grid");
+        if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
+      }
+      updateCopyInviteButton();
+    } catch (err) {
+      alert("Failed to create: " + (err.message || "Unknown error"));
+    }
+  });
+
+  document.getElementById("lists-create-btn")?.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const name = prompt("Enter a name for the shared list:", "Family watchlist");
+    if (!name) return;
+    try {
+      const listId = await createSharedList(user.uid, name.trim());
+      sharedLists = await getSharedListsForUser(user.uid);
+      currentListMode = { type: "shared", listId, name: name.trim() };
+      saveLastList(user, currentListMode);
+      renderListSelector();
+      renderListsModalContent();
+      const shareUrl = window.location.origin + window.location.pathname + "?join=" + listId;
+      showSharedModal("Shared list created", `
+        <p>Share this link for others to join:</p>
+        <p class="share-link" id="share-link-text">${shareUrl}</p>
+        <button type="button" class="auth-btn" id="copy-share-link-btn" style="margin-top:0.75rem">Copy link</button>
+        <p style="margin-top:0.75rem;font-size:0.85rem;color:var(--muted)">Anyone with the link can join. They must be signed in.</p>
+      `);
+      document.getElementById("copy-share-link-btn")?.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          const btn = document.getElementById("copy-share-link-btn");
+          if (btn) { btn.textContent = "Copied!"; btn.disabled = true; }
+        } catch (err) {
+          alert("Could not copy. Select and copy the link above.");
+        }
+      });
+      movies = await loadList(user);
+      setBookmarkletCookie(user);
+      const filters = document.getElementById("content-filters");
+      if (filters) filters.style.display = "";
+      buildCards();
+      renderGenreFilter();
+      updateCopyInviteButton();
+    } catch (err) {
+      alert("Failed to create: " + (err.message || "Unknown error"));
+    }
+  });
+  document.getElementById("lists-join-btn")?.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const input = document.getElementById("lists-join-input");
+    const url = input?.value?.trim() || "";
+    if (!url) {
+      alert("Paste the invite link in the field above.");
+      return;
+    }
+    const m = url.match(/[?&]join=([a-z0-9]+)/i);
+    const listId = m ? m[1] : null;
+    if (!listId) {
+      alert("Invalid link. Paste the full URL from the person who shared the list.");
+      return;
+    }
+    try {
+      const apiBase = window.location.origin;
+      const res = await fetch(apiBase + "/.netlify/functions/join-shared-list", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        sharedLists = await getSharedListsForUser(user.uid);
+        currentListMode = { type: "shared", listId, name: data.name || "Shared list" };
+        saveLastList(user, currentListMode);
+        renderListSelector();
+        renderListsModalContent();
+        movies = await loadList(user);
+        setBookmarkletCookie(user);
+        const filters = document.getElementById("content-filters");
+        if (filters) filters.style.display = "";
+        buildCards();
+        renderGenreFilter();
+        updateCopyInviteButton();
+        if (input) input.value = "";
+      } else {
+        alert(data.error || "Failed to join");
+      }
+    } catch (err) {
+      alert("Failed to join: " + (err.message || "Unknown error"));
+    }
+  });
+  document.getElementById("lists-modal-list")?.addEventListener("click", async (e) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const renameBtn = e.target.closest(".lists-modal-rename-btn");
+    if (renameBtn) {
+      const listId = renameBtn.dataset.listId;
+      const type = renameBtn.dataset.type;
+      const li = renameBtn.closest(".lists-modal-list-item");
+      const nameSpan = li?.querySelector(".lists-modal-list-item-name-text");
+      if (!nameSpan || !listId) return;
+      const currentName = nameSpan.textContent;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "lists-modal-list-item-edit";
+      input.value = currentName;
+      input.style.width = `${Math.max(120, nameSpan.offsetWidth)}px`;
+      nameSpan.replaceWith(input);
+      input.focus();
+      input.select();
+      const saveRename = async () => {
+        if (!document.contains(input)) return;
+        const newName = input.value.trim();
+        if (!newName) {
+          const span = document.createElement("span");
+          span.className = "lists-modal-list-item-name-text";
+          span.textContent = currentName;
+          input.replaceWith(span);
+          return;
+        }
+        try {
+          if (type === "personal") {
+            await renamePersonalList(user.uid, listId, newName);
+          } else {
+            await renameSharedList(listId, newName);
+          }
+          personalLists = await getPersonalLists(user.uid);
+          sharedLists = await getSharedListsForUser(user.uid);
+          if (typeof currentListMode === "object" && currentListMode?.listId === listId) {
+            currentListMode = { ...currentListMode, name: newName };
+          }
+          renderListSelector();
+          renderListsModalContent();
+        } catch (err) {
+          alert("Failed to rename: " + (err.message || "Unknown error"));
+          const span = document.createElement("span");
+          span.className = "lists-modal-list-item-name-text";
+          span.textContent = currentName;
+          input.replaceWith(span);
+        }
+      };
+      input.addEventListener("blur", saveRename);
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          input.blur();
+        }
+        if (ev.key === "Escape") {
+          const span = document.createElement("span");
+          span.className = "lists-modal-list-item-name-text";
+          span.textContent = currentName;
+          input.replaceWith(span);
+        }
+      });
+      return;
+    }
+
+    const deleteBtn = e.target.closest(".lists-modal-delete-btn");
+    const leaveBtn = e.target.closest(".lists-modal-leave-btn");
+    if (deleteBtn || leaveBtn) {
+      const listId = (deleteBtn || leaveBtn).dataset.listId;
+      const li = (deleteBtn || leaveBtn).closest(".lists-modal-list-item");
+      const listName = li?.querySelector(".lists-modal-list-item-name-text")?.textContent || "list";
+      const count = parseInt(li?.dataset.count || "0", 10);
+      const isLeave = !!leaveBtn;
+      const type = li?.dataset.type;
+
+      if (!isLeave && type === "personal" && personalLists.length <= 1) {
+        alert("You must have at least one personal list.");
+        return;
+      }
+
+      showDeleteConfirmModal(listName, count, async () => {
+        hideDeleteConfirmModal();
+        try {
+          if (isLeave) {
+            await leaveSharedList(user.uid, listId);
+          } else {
+            const type = li?.dataset.type;
+            if (type === "personal") {
+              await deletePersonalList(user.uid, listId);
+            } else {
+              await deleteSharedList(listId);
+            }
+          }
+          personalLists = await getPersonalLists(user.uid);
+          sharedLists = await getSharedListsForUser(user.uid);
+          if (typeof currentListMode === "object" && currentListMode?.listId === listId) {
+            currentListMode = "personal";
+            saveLastList(user, currentListMode);
+            movies = await loadList(user);
+            setBookmarkletCookie(user);
+            const grid = document.getElementById("grid");
+            const filters = document.getElementById("content-filters");
+            if (!movies.length) {
+              if (filters) filters.style.display = "none";
+              updateFilterCount(0);
+              if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
+            } else {
+              if (filters) filters.style.display = "";
+              buildCards();
+              renderGenreFilter();
+            }
+          }
+          renderListSelector();
+          renderListsModalContent();
+          updateCopyInviteButton();
+        } catch (err) {
+          alert("Failed: " + (err.message || "Unknown error"));
+        }
+      }, { isLeave, isSharedDelete: !isLeave && type === "shared" });
+      return;
+    }
+  });
+
+  document.getElementById("delete-confirm-close")?.addEventListener("click", hideDeleteConfirmModal);
+  document.getElementById("delete-confirm-cancel")?.addEventListener("click", hideDeleteConfirmModal);
+  document.getElementById("delete-confirm-delete")?.addEventListener("click", () => {
+    if (deleteConfirmResolve) deleteConfirmResolve();
+  });
+  document.getElementById("delete-confirm-modal")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) hideDeleteConfirmModal();
   });
 }
 
