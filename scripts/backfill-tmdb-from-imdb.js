@@ -1,0 +1,338 @@
+/**
+ * Backfill all list/catalog items that have imdbId: refresh from TMDB (title, year,
+ * type, genre, poster thumb, watch providers, tmdbId, YouTube trailer id).
+ * IMDb id is the source of truth key; TMDB supplies everything else.
+ *
+ * Run: node scripts/backfill-tmdb-from-imdb.js [path/to/backup.json]
+ * Default backup: backups/firestore-backup-migrated.json (or firestore-backup.json if missing)
+ *
+ * Requires: TMDB_API_KEY in .env
+ * Optional: YOUTUBE_API_KEY (if TMDB has no YouTube trailer), WATCH_REGION (default IL)
+ *
+ * Use --dry-run to only print counts without writing.
+ * After review: restore with node scripts/restore-from-backup.js <file>
+ * Or deploy data your usual way.
+ */
+import "dotenv/config";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import https from "https";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const rootDir = join(__dirname, "..");
+
+const DELAY_MS = 280;
+const TMDB_IMG = "https://image.tmdb.org/t/p/w500";
+
+function movieKey(m) {
+  return `${m.title}|${m.year ?? ""}`;
+}
+
+function normImdb(id) {
+  const s = String(id || "").trim();
+  if (!s) return "";
+  return s.startsWith("tt") ? s : `tt${s}`;
+}
+
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    https
+      .get(url, (res) => {
+        let data = "";
+        res.on("data", (c) => (data += c));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      })
+      .on("error", reject);
+  });
+}
+
+function pickYoutubeTrailerKey(results) {
+  const r = results || [];
+  const preferred = (t) => r.find((v) => v.site === "YouTube" && v.key && v.type === t);
+  return (
+    preferred("Trailer") ||
+    preferred("Teaser") ||
+    r.find((v) => v.site === "YouTube" && v.key && (v.type === "Clip" || v.type === "Featurette")) ||
+    r.find((v) => v.site === "YouTube" && v.key)
+  )?.key || null;
+}
+
+async function enrichFromTmdb(imdbId, apiKey, watchRegion) {
+  const findUrl = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?external_source=imdb_id&api_key=${apiKey}`;
+  const find = await fetchJson(findUrl);
+  const movie = find.movie_results?.[0];
+  const tv = find.tv_results?.[0];
+  if (!movie && !tv) return null;
+  const id = movie?.id ?? tv?.id;
+  const mediaType = movie ? "movie" : "tv";
+
+  const detailUrl = `https://api.themoviedb.org/3/${mediaType}/${id}?append_to_response=videos&api_key=${apiKey}`;
+  const detail = await fetchJson(detailUrl);
+
+  const posterPath = detail.poster_path;
+  const thumb = posterPath ? `${TMDB_IMG}${posterPath}` : null;
+
+  const title =
+    mediaType === "movie"
+      ? detail.title || detail.original_title || ""
+      : detail.name || detail.original_name || "";
+
+  let year = null;
+  if (mediaType === "movie") {
+    const d = detail.release_date;
+    if (d && String(d).length >= 4) year = parseInt(String(d).slice(0, 4), 10);
+  } else {
+    const d = detail.first_air_date;
+    if (d && String(d).length >= 4) year = parseInt(String(d).slice(0, 4), 10);
+  }
+  if (Number.isNaN(year)) year = null;
+
+  const genres = (detail.genres || []).map((g) => g.name).filter(Boolean);
+  const genre = genres.join(" / ");
+
+  let youtubeId = pickYoutubeTrailerKey(detail.videos?.results);
+
+  let services = [];
+  if (watchRegion && String(watchRegion).length >= 2) {
+    const providersUrl = `https://api.themoviedb.org/3/${mediaType}/${id}/watch/providers?api_key=${apiKey}`;
+    const pdata = await fetchJson(providersUrl);
+    const region = pdata.results?.[String(watchRegion).toUpperCase().slice(0, 2)];
+    if (region) {
+      const names = new Set();
+      for (const arr of [region.flatrate, region.rent, region.buy].filter(Boolean)) {
+        for (const p of arr) {
+          if (p.provider_name) names.add(p.provider_name);
+        }
+      }
+      services = [...names];
+    }
+  }
+
+  return {
+    tmdbId: id,
+    type: mediaType === "movie" ? "movie" : "show",
+    title: title || "Unknown",
+    year,
+    thumb,
+    genre,
+    youtubeId,
+    services,
+  };
+}
+
+async function fetchTrailerFromYouTubeSearch(title, year) {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) return null;
+  const query = [title, year ? String(year) : ""].filter(Boolean).join(" ") + " official trailer";
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(query)}&key=${apiKey}`;
+  try {
+    const data = await fetchJson(url);
+    const item = (data.items || []).find((i) => i.id?.videoId);
+    return item?.id?.videoId || null;
+  } catch {
+    return null;
+  }
+}
+
+function replaceKeyEverywhere(backup, oldKey, newKey) {
+  if (!oldKey || oldKey === newKey) return;
+  const userFields = ["watched", "maybeLater", "archive"];
+  const sharedFields = ["removed", "watched", "maybeLater", "archive"];
+
+  for (const doc of Object.values(backup.users || {})) {
+    for (const f of userFields) {
+      if (!Array.isArray(doc[f])) continue;
+      doc[f] = doc[f].map((k) => (k === oldKey ? newKey : k));
+    }
+  }
+  for (const doc of Object.values(backup.sharedLists || {})) {
+    for (const f of sharedFields) {
+      if (!Array.isArray(doc[f])) continue;
+      doc[f] = doc[f].map((k) => (k === oldKey ? newKey : k));
+    }
+  }
+}
+
+function collectItemsWithImdb(backup) {
+  const out = [];
+  const cat = backup.catalog?.movies?.items;
+  if (Array.isArray(cat)) {
+    for (let i = 0; i < cat.length; i++) {
+      const m = cat[i];
+      if (m?.imdbId) out.push({ place: "catalog", ref: cat, index: i, m });
+    }
+  }
+  for (const doc of Object.values(backup.users || {})) {
+    if (!Array.isArray(doc?.items)) continue;
+    for (let i = 0; i < doc.items.length; i++) {
+      const m = doc.items[i];
+      if (m?.imdbId) out.push({ place: "user", ref: doc.items, index: i, m });
+    }
+  }
+  for (const doc of Object.values(backup.sharedLists || {})) {
+    if (!Array.isArray(doc?.items)) continue;
+    for (let i = 0; i < doc.items.length; i++) {
+      const m = doc.items[i];
+      if (m?.imdbId) out.push({ place: "shared", ref: doc.items, index: i, m });
+    }
+  }
+  return out;
+}
+
+async function main() {
+  const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+  const dryRun = process.argv.includes("--dry-run");
+
+  const defaultMigrated = join(rootDir, "backups", "firestore-backup-migrated.json");
+  const defaultPlain = join(rootDir, "backups", "firestore-backup.json");
+  let backupPath = args[0];
+  if (!backupPath) {
+    backupPath = existsSync(defaultMigrated) ? defaultMigrated : defaultPlain;
+  }
+
+  const tmdbKey = process.env.TMDB_API_KEY;
+  if (!tmdbKey) {
+    console.error("Set TMDB_API_KEY in .env");
+    process.exit(1);
+  }
+
+  const watchRegion = String(process.env.WATCH_REGION || "IL")
+    .trim()
+    .toUpperCase()
+    .slice(0, 2);
+
+  let backup;
+  try {
+    backup = JSON.parse(readFileSync(backupPath, "utf-8"));
+  } catch (e) {
+    console.error("Cannot read", backupPath, e.message);
+    process.exit(1);
+  }
+
+  const rows = collectItemsWithImdb(backup);
+  const uniqueIds = [...new Set(rows.map((r) => normImdb(r.m.imdbId)).filter((id) => /^tt\d+$/.test(id)))];
+
+  console.log(`Backup: ${backupPath}`);
+  console.log(`Rows with imdbId: ${rows.length}, unique IMDb ids: ${uniqueIds.length}`);
+  console.log(`Watch region (providers): ${watchRegion}`);
+  if (dryRun) console.log("DRY RUN — no file write\n");
+
+  const cache = new Map();
+  const report = {
+    tmdbOk: 0,
+    tmdbMiss: 0,
+    withTrailer: 0,
+    searchOnly: 0,
+    errors: [],
+  };
+
+  for (const imdbId of uniqueIds) {
+    try {
+      const e = await enrichFromTmdb(imdbId, tmdbKey, watchRegion);
+      if (!e) {
+        cache.set(imdbId, null);
+        report.tmdbMiss++;
+      } else {
+        let yt = e.youtubeId;
+        if (!yt && e.title) {
+          yt = await fetchTrailerFromYouTubeSearch(e.title, e.year);
+        }
+        cache.set(imdbId, { ...e, youtubeId: yt || null });
+        report.tmdbOk++;
+        if (yt) report.withTrailer++;
+        else report.searchOnly++;
+      }
+    } catch (err) {
+      report.errors.push({ imdbId, err: String(err.message || err) });
+      cache.set(imdbId, null);
+    }
+    await new Promise((r) => setTimeout(r, DELAY_MS));
+  }
+
+  let keyRenames = 0;
+  for (const { ref, index, m } of rows) {
+    const id = normImdb(m.imdbId);
+    if (!/^tt\d+$/.test(id)) continue;
+    const e = cache.get(id);
+    if (!e) continue;
+
+    const oldKey = movieKey(m);
+    const next = { ...m };
+    next.title = e.title;
+    next.year = e.year;
+    next.type = e.type;
+    next.genre = e.genre || "";
+    if (e.thumb) next.thumb = e.thumb;
+    next.youtubeId = e.youtubeId || "SEARCH";
+    next.services = Array.isArray(e.services) ? e.services : [];
+    next.tmdbId = e.tmdbId;
+    next.imdbId = id;
+
+    const newKey = movieKey(next);
+    if (oldKey !== newKey) {
+      replaceKeyEverywhere(backup, oldKey, newKey);
+      keyRenames++;
+    }
+    ref[index] = next;
+  }
+
+  let itemRowsWithTrailer = 0;
+  let itemRowsWithSearch = 0;
+  for (const { ref, index } of rows) {
+    const y = ref[index]?.youtubeId;
+    if (y && y !== "SEARCH") itemRowsWithTrailer++;
+    else itemRowsWithSearch++;
+  }
+
+  backup.exportedAt = new Date().toISOString();
+
+  const reportPath = join(rootDir, "backups", "tmdb-backfill-report.txt");
+  const lines = [
+    `TMDB backfill from IMDb`,
+    `Generated: ${backup.exportedAt}`,
+    `Source file: ${backupPath}`,
+    ``,
+    `Unique IMDb ids processed: ${uniqueIds.length}`,
+    `TMDB matched: ${report.tmdbOk}, no TMDB match: ${report.tmdbMiss}`,
+    `Unique ids got YouTube key from TMDB/search: ${report.withTrailer}`,
+    `Unique ids with no trailer key (stored as SEARCH): ${report.searchOnly}`,
+    `List rows with real youtubeId after backfill: ${itemRowsWithTrailer}`,
+    `List rows still SEARCH: ${itemRowsWithSearch}`,
+    `movieKey renames (title/year updates): ${keyRenames}`,
+    ``,
+  ];
+  if (report.errors.length) {
+    lines.push(`Errors (first 30):`);
+    report.errors.slice(0, 30).forEach((x) => lines.push(`  ${x.imdbId}: ${x.err}`));
+  }
+
+  if (!dryRun) {
+    writeFileSync(backupPath, JSON.stringify(backup, null, 2), "utf-8");
+    writeFileSync(reportPath, lines.join("\n"), "utf-8");
+    console.log(`\nWrote ${backupPath}`);
+    console.log(`Report: ${reportPath}`);
+  } else {
+    console.log("\n[dry-run] Would write backup and report.");
+  }
+
+  console.log("\n" + lines.join("\n"));
+
+  console.log(
+    "\nExample titles that should play inline after backfill (TMDB has YouTube trailers):"
+  );
+  console.log("  • The Shawshank Redemption — imdb tt0111161");
+  console.log("  • Inception — imdb tt1375666");
+  console.log("After restore, open the card and Play — youtubeId should be stored, not SEARCH.");
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

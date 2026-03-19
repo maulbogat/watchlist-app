@@ -91,47 +91,85 @@ function fetchHtml(url) {
   });
 }
 
-async function fetchTrailerFromTmdb(imdbId, apiKey) {
-  const findUrl = `https://api.themoviedb.org/3/find/${imdbId}?external_source=imdb_id&api_key=${apiKey}`;
-  const find = await fetchJson(findUrl);
-  const movie = find.movie_results?.[0];
-  const tv = find.tv_results?.[0];
-  const id = movie?.id ?? tv?.id;
-  const type = movie ? "movie" : "tv";
-  if (!id) return null;
-  const videosUrl = `https://api.themoviedb.org/3/${type}/${id}/videos?api_key=${apiKey}`;
-  const videos = await fetchJson(videosUrl);
-  const r = videos.results || [];
+const TMDB_IMG = "https://image.tmdb.org/t/p/w500";
+
+function pickYoutubeTrailerKey(results) {
+  const r = results || [];
   const preferred = (t) =>
     r.find((v) => v.site === "YouTube" && v.key && v.type === t);
-  const trailer =
+  const key =
     preferred("Trailer") ||
     preferred("Teaser") ||
     r.find((v) => v.site === "YouTube" && v.key && (v.type === "Clip" || v.type === "Featurette")) ||
     r.find((v) => v.site === "YouTube" && v.key);
-  return trailer?.key || null;
+  return key?.key || null;
 }
 
-async function fetchWatchProvidersFromTmdb(imdbId, apiKey, watchRegion) {
-  if (!watchRegion || watchRegion.length !== 2) return [];
-  const findUrl = `https://api.themoviedb.org/3/find/${imdbId}?external_source=imdb_id&api_key=${apiKey}`;
+/**
+ * Full TMDB enrichment from IMDb id: type, title, year, poster, genres, trailer key, watch providers.
+ * Returns null if TMDB has no match for this IMDb id.
+ */
+async function enrichFromTmdb(imdbId, apiKey, watchRegion) {
+  const findUrl = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?external_source=imdb_id&api_key=${apiKey}`;
   const find = await fetchJson(findUrl);
   const movie = find.movie_results?.[0];
   const tv = find.tv_results?.[0];
+  if (!movie && !tv) return null;
   const id = movie?.id ?? tv?.id;
-  const type = movie ? "movie" : "tv";
-  if (!id) return [];
-  const providersUrl = `https://api.themoviedb.org/3/${type}/${id}/watch/providers?api_key=${apiKey}`;
-  const data = await fetchJson(providersUrl);
-  const region = data.results?.[watchRegion.toUpperCase()];
-  if (!region) return [];
-  const names = new Set();
-  for (const arr of [region.flatrate, region.rent, region.buy].filter(Boolean)) {
-    for (const p of arr) {
-      if (p.provider_name) names.add(p.provider_name);
+  const mediaType = movie ? "movie" : "tv";
+
+  const detailUrl = `https://api.themoviedb.org/3/${mediaType}/${id}?append_to_response=videos&api_key=${apiKey}`;
+  const detail = await fetchJson(detailUrl);
+
+  const posterPath = detail.poster_path;
+  const thumb = posterPath ? `${TMDB_IMG}${posterPath}` : null;
+
+  const title =
+    mediaType === "movie"
+      ? detail.title || detail.original_title || ""
+      : detail.name || detail.original_name || "";
+
+  let year = null;
+  if (mediaType === "movie") {
+    const d = detail.release_date;
+    if (d && String(d).length >= 4) year = parseInt(String(d).slice(0, 4), 10);
+  } else {
+    const d = detail.first_air_date;
+    if (d && String(d).length >= 4) year = parseInt(String(d).slice(0, 4), 10);
+  }
+  if (Number.isNaN(year)) year = null;
+
+  const genres = (detail.genres || []).map((g) => g.name).filter(Boolean);
+  const genre = genres.join(" / ");
+
+  const youtubeId = pickYoutubeTrailerKey(detail.videos?.results);
+
+  let services = [];
+  if (watchRegion && String(watchRegion).length >= 2) {
+    const providersUrl = `https://api.themoviedb.org/3/${mediaType}/${id}/watch/providers?api_key=${apiKey}`;
+    const pdata = await fetchJson(providersUrl);
+    const region = pdata.results?.[String(watchRegion).toUpperCase().slice(0, 2)];
+    if (region) {
+      const names = new Set();
+      for (const arr of [region.flatrate, region.rent, region.buy].filter(Boolean)) {
+        for (const p of arr) {
+          if (p.provider_name) names.add(p.provider_name);
+        }
+      }
+      services = [...names];
     }
   }
-  return [...names];
+
+  return {
+    tmdbId: id,
+    type: mediaType === "movie" ? "movie" : "show",
+    title: title || "Unknown",
+    year,
+    thumb,
+    genre,
+    youtubeId,
+    services,
+  };
 }
 
 async function fetchTrailerFromYouTubeSearch(title, year) {
@@ -189,18 +227,20 @@ exports.handler = async (event, context) => {
     let embedUrl = null;
     let services = [];
 
-    // 1. Try TMDB API (when we have imdbId)
+    // 1. TMDB: poster, title/year for search, trailer key, watch providers (single enrichment pass)
     if (hasImdb) {
       const tmdbKey = process.env.TMDB_API_KEY;
       if (tmdbKey) {
         try {
-          youtubeId = await fetchTrailerFromTmdb(nImdb, tmdbKey);
-        } catch (e) {}
-        if (watchRegion) {
-          try {
-            services = await fetchWatchProvidersFromTmdb(nImdb, tmdbKey, watchRegion);
-          } catch (e) {}
-        }
+          const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion);
+          if (e) {
+            if (e.thumb) thumb = e.thumb;
+            searchTitle = e.title || searchTitle;
+            if (e.year != null) searchYear = String(e.year);
+            youtubeId = e.youtubeId;
+            services = e.services || [];
+          }
+        } catch (err) {}
       }
     }
 
@@ -263,7 +303,7 @@ exports.handler = async (event, context) => {
   } catch (e) {
     return jsonRes(400, { ok: false, error: "Invalid JSON body" }, event);
   }
-  const { imdbId, listId: bodyListId } = body;
+  const { imdbId, listId: bodyListId, watch_region: bodyWatch } = body;
   const listId = bodyListId || cookies.bookmarklet_list_id || null;
   if (!imdbId) {
     return jsonRes(400, { ok: false, error: "imdbId required" }, event);
@@ -271,39 +311,78 @@ exports.handler = async (event, context) => {
 
   const norm = (id) => (String(id).startsWith("tt") ? id : `tt${id}`);
   const nImdb = norm(imdbId);
+  const watchRegion = String(bodyWatch || body.watchRegion || "").trim().toUpperCase().slice(0, 2);
 
-  let omdb;
-  try {
-    omdb = await fetchOMDb(nImdb);
-  } catch (e) {
-    return jsonRes(502, { ok: false, error: e.message || "Failed to fetch title from OMDb" }, event);
+  const tmdbKey = process.env.TMDB_API_KEY;
+  let movie = null;
+
+  // 1) TMDB from IMDb id: type, poster, genres, year, providers, trailer key
+  if (tmdbKey) {
+    try {
+      const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion);
+      if (e) {
+        let yt = e.youtubeId;
+        if (!yt && e.title) {
+          try {
+            yt = await fetchTrailerFromYouTubeSearch(e.title, e.year);
+          } catch (err) {}
+        }
+        movie = {
+          title: e.title,
+          year: e.year,
+          type: e.type,
+          genre: e.genre || "",
+          thumb: e.thumb,
+          youtubeId: yt || "SEARCH",
+          imdbId: nImdb,
+          services: Array.isArray(e.services) ? e.services : [],
+          tmdbId: e.tmdbId,
+        };
+      }
+    } catch (err) {}
   }
 
-  const title = omdb.Title || "Unknown";
-  let year = null;
-  const yearStr = String(omdb.Year || "").trim();
-  if (yearStr && yearStr !== "N/A") {
-    const digits = yearStr.replace(/\D/g, "").slice(0, 4);
-    if (digits.length >= 4) year = parseInt(digits, 10);
-  }
-  if (year == null && omdb.Released && omdb.Released !== "N/A") {
-    const releasedMatch = String(omdb.Released).match(/\b(19|20)\d{2}\b/);
-    if (releasedMatch) year = parseInt(releasedMatch[0], 10);
-  }
-  const nType = (omdb.Type || "").toLowerCase() === "series" ? "show" : "movie";
-  const genre = omdb.Genre || "";
-  const thumb = omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
+  // 2) OMDb fallback when TMDB has no match
+  if (!movie) {
+    let omdb;
+    try {
+      omdb = await fetchOMDb(nImdb);
+    } catch (e) {
+      return jsonRes(502, { ok: false, error: e.message || "Title not found in TMDB or OMDb" }, event);
+    }
 
-  const movie = {
-    title,
-    year: isNaN(year) ? null : year,
-    type: nType,
-    genre: genre || "",
-    youtubeId: "SEARCH",
-    imdbId: nImdb,
-    thumb,
-    services: [],
-  };
+    const title = omdb.Title || "Unknown";
+    let year = null;
+    const yearStr = String(omdb.Year || "").trim();
+    if (yearStr && yearStr !== "N/A") {
+      const digits = yearStr.replace(/\D/g, "").slice(0, 4);
+      if (digits.length >= 4) year = parseInt(digits, 10);
+    }
+    if (year == null && omdb.Released && omdb.Released !== "N/A") {
+      const releasedMatch = String(omdb.Released).match(/\b(19|20)\d{2}\b/);
+      if (releasedMatch) year = parseInt(releasedMatch[0], 10);
+    }
+    const nType = (omdb.Type || "").toLowerCase() === "series" ? "show" : "movie";
+    const genre = omdb.Genre || "";
+    const thumb = omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
+
+    let yt = null;
+    try {
+      yt = await fetchTrailerFromYouTubeSearch(title, year);
+    } catch (err) {}
+
+    movie = {
+      title,
+      year: isNaN(year) ? null : year,
+      type: nType,
+      genre: genre || "",
+      thumb,
+      youtubeId: yt || "SEARCH",
+      imdbId: nImdb,
+      services: [],
+    };
+  }
+
   const key = movieKey(movie);
 
   const db = getFirestore(getApp());
@@ -321,7 +400,9 @@ exports.handler = async (event, context) => {
     }
     const items = Array.isArray(listData.items) ? [...listData.items] : [];
     const existing = items.find((m) => m.imdbId && norm(m.imdbId) === nImdb)
-      || items.find((m) => m.title === title && String(m.year ?? "") === String(year ?? ""));
+      || items.find(
+          (m) => m.title === movie.title && String(m.year ?? "") === String(movie.year ?? "")
+        );
     if (existing) {
       return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in the list` }, event);
     }
@@ -340,7 +421,9 @@ exports.handler = async (event, context) => {
 
   let existing = items.find((m) => m.imdbId && norm(m.imdbId) === nImdb);
   if (!existing) {
-    existing = items.find((m) => m.title === title && String(m.year ?? "") === String(year ?? ""));
+    existing = items.find(
+      (m) => m.title === movie.title && String(m.year ?? "") === String(movie.year ?? "")
+    );
   }
 
   if (existing) {
@@ -348,10 +431,30 @@ exports.handler = async (event, context) => {
       return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in your list` }, event);
     }
     const idx = items.findIndex((m) => m === existing);
-    if (idx >= 0 && (existing.year == null && year != null || !existing.thumb && thumb || !existing.genre && genre)) {
-      if (existing.year == null && year != null) existing.year = year;
-      if (!existing.thumb && thumb) existing.thumb = thumb;
-      if (!existing.genre && genre) existing.genre = genre;
+    if (idx >= 0) {
+      const needMerge =
+        (existing.year == null && movie.year != null) ||
+        (!existing.thumb && movie.thumb) ||
+        (!existing.genre && movie.genre) ||
+        ((!existing.youtubeId || existing.youtubeId === "SEARCH") &&
+          movie.youtubeId &&
+          movie.youtubeId !== "SEARCH") ||
+        ((!existing.services || existing.services.length === 0) &&
+          movie.services &&
+          movie.services.length > 0);
+      if (needMerge) {
+        if (existing.year == null && movie.year != null) existing.year = movie.year;
+        if (!existing.thumb && movie.thumb) existing.thumb = movie.thumb;
+        if (!existing.genre && movie.genre) existing.genre = movie.genre;
+        if ((!existing.youtubeId || existing.youtubeId === "SEARCH") && movie.youtubeId && movie.youtubeId !== "SEARCH") {
+          existing.youtubeId = movie.youtubeId;
+        }
+        if ((!existing.services || existing.services.length === 0) && movie.services?.length) {
+          existing.services = movie.services;
+        }
+        if (!existing.imdbId && movie.imdbId) existing.imdbId = movie.imdbId;
+        if (movie.tmdbId && !existing.tmdbId) existing.tmdbId = movie.tmdbId;
+      }
     }
   } else {
     items.push(movie);

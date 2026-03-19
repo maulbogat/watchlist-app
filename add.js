@@ -1,4 +1,4 @@
-import { auth, onAuthStateChanged } from "./firebase.js";
+import { auth, onAuthStateChanged, getUserProfile } from "./firebase.js";
 
 const params = new URLSearchParams(window.location.search);
 const imdbId = params.get("imdbId") || params.get("i");
@@ -40,7 +40,12 @@ if (!imdbId || !/^tt\d+$/.test(nImdb)) {
 
     try {
       const token = await user.getIdToken();
-      const body = { imdbId: nImdb };
+      const profile = await getUserProfile(user.uid);
+      const watchRegion = String(profile.country || "IL")
+        .trim()
+        .toUpperCase()
+        .slice(0, 2);
+      const body = { imdbId: nImdb, watch_region: watchRegion };
       const listMatch = document.cookie.match(/bookmarklet_list_id=([^;]+)/);
       if (listMatch) body.listId = decodeURIComponent(listMatch[1].trim());
 

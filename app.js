@@ -559,7 +559,16 @@ function openModal(m) {
       : `${apiBase}/.netlify/functions/add-from-imdb?title=${encodeURIComponent(m.title)}${m.year ? "&year=" + encodeURIComponent(m.year) : ""}${watchRegion}`;
 
     fetch(fetchUrl)
-      .then((r) => r.json())
+      .then(async (r) => {
+        let data = {};
+        try {
+          data = await r.json();
+        } catch {
+          data = {};
+        }
+        if (!r.ok) data = { ...data, ok: false };
+        return data;
+      })
       .then((data) => {
         if (currentModalMovie !== m) return;
         const foundTrailer = data.ok && (data.youtubeId || data.embedUrl);
