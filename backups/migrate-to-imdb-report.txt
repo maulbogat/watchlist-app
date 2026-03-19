@@ -1,0 +1,147 @@
+IMDb-first migration report
+Generated: 2026-03-19T18:24:01.758Z
+Input: backups/firestore-backup.json
+
+=== Summary ===
+Total items: 248
+Already IMDb-ready: 10
+Needed migration: 238
+Migrated (imdbId added): 163
+Failed (no OMDb match): 13
+Skipped (had imdbId): 62
+
+=== Still uses YouTube ===
+Trailer from YouTube: 233
+  - Resident Evil (2002)
+  - The Devil's Advocate (1997)
+  - My Cousin Vinny (1992)
+  - Shaun of the Dead (2004)
+  - Delivery Man (2013)
+  - Now You See Me (2013)
+  - Runt (2021)
+  - Final Destination (2000)
+  - Looper (2012)
+  - Big Stan (2007)
+  - Big Trouble (2002)
+  - The Girlfriend (2025)
+  - Kennedy (2023)
+  - The Skin (2019)
+  - Keanu (2016)
+  - Would You Rather (2012)
+  - Hoosiers (1986)
+  - Speak No Evil (2022)
+  - Companion (2025)
+  - Click (2006)
+  - Absolutely Anything (2015)
+  - The Square (2017)
+  - Pretend It’s a City (2021)
+  - Ferris Bueller’s Day Off (1986)
+  - M3GAN 2.0 (2025)
+  - Braveheart (1995)
+  - Love & Mercy (2014)
+  - Once Upon a Time in Hollywood (2019)
+  - Elvis (2022)
+  - You Don't Mess with the Zohan (2008)
+  ... and 203 more
+
+Thumb from YouTube: 232
+  - Resident Evil (2002)
+  - The Devil's Advocate (1997)
+  - My Cousin Vinny (1992)
+  - Shaun of the Dead (2004)
+  - Delivery Man (2013)
+  - Now You See Me (2013)
+  - Runt (2021)
+  - Final Destination (2000)
+  - Looper (2012)
+  - Big Stan (2007)
+  - Big Trouble (2002)
+  - The Girlfriend (2025)
+  - Kennedy (2023)
+  - The Skin (2019)
+  - Keanu (2016)
+  - Would You Rather (2012)
+  - Hoosiers (1986)
+  - Speak No Evil (2022)
+  - Companion (2025)
+  - Click (2006)
+  - Absolutely Anything (2015)
+  - The Square (2017)
+  - Pretend It’s a City (2021)
+  - Ferris Bueller’s Day Off (1986)
+  - M3GAN 2.0 (2025)
+  - Braveheart (1995)
+  - Love & Mercy (2014)
+  - Once Upon a Time in Hollywood (2019)
+  - Elvis (2022)
+  - You Don't Mess with the Zohan (2008)
+  ... and 202 more
+
+=== Still missing ===
+Missing imdbId: 14
+Missing trailer (youtubeId empty/SEARCH): 15
+Missing thumb: 12
+
+Items still without imdbId:
+  - Runt (2021)
+  - Big Stan (2007)
+  - You’ve Got Mail (1998)
+  - Open Water (2003)
+  - Adios Buenos Aires (2014)
+  - The Three Amigos (1986)
+  - כלבים לא נובחים בירוק (1996)
+  - המזח (2025)
+  - זה לא הגיל (2019)
+  - מטומטמת (2016)
+  - אנחנו המהפכה (2020)
+  - מי שחלם (2005)
+  - האחת (2023)
+  - Heweliusz (2024)
+
+Items missing trailer:
+  - BoJack Horseman (2014)
+  - אנחנו המהפכה (2020)
+  - מי שחלם (2005)
+  - האחת (2023)
+  - How to Get to Heaven from Belfast (2026)
+  - Envious (2024)
+  - Missing You (2025)
+  - Heweliusz (2024)
+  - Homicide: Los Angeles (2024)
+  - The Breakthrough (2025)
+  - Starve (2014)
+  - 9-1-1 (2018)
+  - Hunters (—)
+  - The Bear (2022)
+  - Deadloch (2023)
+
+Items missing thumb:
+  - Happyish (2015)
+  - BoJack Horseman (2014)
+  - אנחנו המהפכה (2020)
+  - מי שחלם (2005)
+  - האחת (2023)
+  - How to Get to Heaven from Belfast (2026)
+  - Envious (2024)
+  - Missing You (2025)
+  - Heweliusz (2024)
+  - Homicide: Los Angeles (2024)
+  - The Breakthrough (2025)
+  - Starve (2014)
+
+OMDb search failed (no match):
+  - Runt (2021)
+  - Big Stan (2007)
+  - You’ve Got Mail (1998)
+  - Adios Buenos Aires (2014)
+  - The Three Amigos (1986)
+  - כלבים לא נובחים בירוק (1996)
+  - המזח (2025)
+  - זה לא הגיל (2019)
+  - מטומטמת (2016)
+  - אנחנו המהפכה (2020)
+  - מי שחלם (2005)
+  - האחת (2023)
+  - Heweliusz (2024)
+
+Backup of YouTube-source items: backups/youtube-source-backup.json
