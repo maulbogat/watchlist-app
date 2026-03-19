@@ -11,7 +11,7 @@
   --accent2: #c96a6a;
   --font-title: 'Bebas Neue', sans-serif;
   --font-body: 'DM Sans', sans-serif;
-  --card-scale: 0.7;
+  --card-scale: 0.84; /* was 0.7; +20% */
 }
 
 body {
@@ -1309,7 +1309,7 @@ header h1 span {
   --accent2: #c96a6a;
   --font-title: 'Bebas Neue', sans-serif;
   --font-body: 'DM Sans', sans-serif;
-  --card-scale: 0.7;
+  --card-scale: 0.84; /* was 0.7; +20% */
 }
 
 body {
