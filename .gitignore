@@ -6,6 +6,8 @@ serviceAccountKey.json
 
 # Backups
 watchlist-backup.json
+backups/firestore-backup*.json
+backups/youtube-source-backup.json
 
 # Dependencies
 node_modules/
