@@ -53,6 +53,7 @@
           <span class="auth-avatar-initial" id="auth-avatar-initial"></span>
         </button>
         <div class="auth-dropdown" id="auth-dropdown" role="menu" aria-hidden="true">
+          <button type="button" class="auth-dropdown-item" id="auth-country-btn" role="menuitem">Country: 🇮🇱 Israel</button>
           <button type="button" class="auth-dropdown-item" id="auth-switch-btn" role="menuitem">Switch account</button>
           <button type="button" class="auth-dropdown-item" id="auth-signout-btn" role="menuitem">Sign out</button>
         </div>
@@ -158,6 +159,23 @@
       <iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media"></iframe>
     </div>
     <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<div class="modal-bg country-modal-bg" id="country-modal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal country-modal">
+    <div class="modal-header">
+      <span class="modal-title">Where are you watching from?</span>
+    </div>
+    <div class="country-modal-body">
+      <div class="country-picker-wrap">
+        <input type="text" id="country-search" class="country-search" placeholder="Search countries..." autocomplete="off" aria-haspopup="listbox" aria-expanded="false" aria-controls="country-dropdown-list" />
+        <div class="country-dropdown" id="country-dropdown" role="listbox" aria-hidden="true">
+          <div class="country-dropdown-list" id="country-dropdown-list"></div>
+        </div>
+      </div>
+      <button type="button" class="country-save-btn" id="country-save-btn">Save</button>
+    </div>
   </div>
 </div>
 

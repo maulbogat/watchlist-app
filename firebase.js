@@ -62,7 +62,24 @@ async function getStatusData(uid) {
     maybeLater: Array.isArray(data.maybeLater) ? data.maybeLater : [],
     archive: Array.isArray(data.archive) ? data.archive : [],
     listName: data.listName || "My list",
+    country: data.country || null,
+    countryName: data.countryName || null,
   };
+}
+
+async function getUserProfile(uid) {
+  const ref = doc(db, "users", uid);
+  const snap = await getDoc(ref);
+  const data = snap.exists() ? snap.data() : {};
+  return {
+    country: data.country || null,
+    countryName: data.countryName || null,
+  };
+}
+
+async function setUserCountry(uid, countryCode, countryName) {
+  const ref = doc(db, "users", uid);
+  await setDoc(ref, { country: countryCode, countryName: countryName || countryCode }, { merge: true });
 }
 
 /**
@@ -521,6 +538,7 @@ async function updateMovieMetadata(uid, listMode, key, updates) {
     if (idx < 0) return;
     if (updates.thumb) items[idx].thumb = updates.thumb;
     if (updates.youtubeId) items[idx].youtubeId = updates.youtubeId;
+    if (Array.isArray(updates.services)) items[idx].services = updates.services;
     await setDoc(doc(db, "users", uid), { items }, { merge: true });
   } else if (typeof listMode === "object" && listMode?.type === "shared") {
     const listId = listMode.listId;
@@ -533,6 +551,7 @@ async function updateMovieMetadata(uid, listMode, key, updates) {
     if (idx < 0) return;
     if (updates.thumb) items[idx].thumb = updates.thumb;
     if (updates.youtubeId) items[idx].youtubeId = updates.youtubeId;
+    if (Array.isArray(updates.services)) items[idx].services = updates.services;
     await setDoc(doc(db, "sharedLists", listId), { items }, { merge: true });
   }
 }
@@ -733,6 +752,8 @@ export {
   getUserMovies,
   getWatchedList,
   getStatusData,
+  getUserProfile,
+  setUserCountry,
   setStatus,
   addWatched,
   removeWatched,

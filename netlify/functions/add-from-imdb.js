@@ -105,6 +105,28 @@ async function fetchTrailerFromTmdb(imdbId, apiKey) {
   return trailer?.key || null;
 }
 
+async function fetchWatchProvidersFromTmdb(imdbId, apiKey, watchRegion) {
+  if (!watchRegion || watchRegion.length !== 2) return [];
+  const findUrl = `https://api.themoviedb.org/3/find/${imdbId}?external_source=imdb_id&api_key=${apiKey}`;
+  const find = await fetchJson(findUrl);
+  const movie = find.movie_results?.[0];
+  const tv = find.tv_results?.[0];
+  const id = movie?.id ?? tv?.id;
+  const type = movie ? "movie" : "tv";
+  if (!id) return [];
+  const providersUrl = `https://api.themoviedb.org/3/${type}/${id}/watch/providers?api_key=${apiKey}`;
+  const data = await fetchJson(providersUrl);
+  const region = data.results?.[watchRegion.toUpperCase()];
+  if (!region) return [];
+  const names = new Set();
+  for (const arr of [region.flatrate, region.rent, region.buy].filter(Boolean)) {
+    for (const p of arr) {
+      if (p.provider_name) names.add(p.provider_name);
+    }
+  }
+  return [...names];
+}
+
 async function fetchTrailerFromYouTubeSearch(title, year) {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) return null;
@@ -124,12 +146,13 @@ exports.handler = async (event, context) => {
     return { statusCode: 204, headers: corsHeaders(event) };
   }
 
-  // GET: fetch trailer and thumb (TMDB, IMDb, YouTube; OMDb for poster)
+  // GET: fetch trailer, thumb, and watch providers (TMDB, IMDb, YouTube; OMDb for poster)
   if (event.httpMethod === "GET") {
     const params = event.queryStringParameters || {};
     const imdbId = params.imdbId || "";
     const title = (params.title || "").trim();
     const year = params.year ? String(params.year).replace(/\D/g, "").slice(0, 4) : null;
+    const watchRegion = (params.watch_region || "").trim().toUpperCase().slice(0, 2);
     const norm = (id) => (String(id).startsWith("tt") ? id : `tt${id}`);
     const nImdb = norm(imdbId).trim();
     const hasImdb = nImdb && /^tt\d+$/.test(nImdb);
@@ -157,6 +180,7 @@ exports.handler = async (event, context) => {
 
     let youtubeId = null;
     let embedUrl = null;
+    let services = [];
 
     // 1. Try TMDB API (when we have imdbId)
     if (hasImdb) {
@@ -165,6 +189,11 @@ exports.handler = async (event, context) => {
         try {
           youtubeId = await fetchTrailerFromTmdb(nImdb, tmdbKey);
         } catch (e) {}
+        if (watchRegion) {
+          try {
+            services = await fetchWatchProvidersFromTmdb(nImdb, tmdbKey, watchRegion);
+          } catch (e) {}
+        }
       }
     }
 
@@ -186,14 +215,15 @@ exports.handler = async (event, context) => {
       } catch (e) {}
     }
 
+    const basePayload = { thumb: thumb || undefined, services: services.length ? services : undefined };
     if (youtubeId) {
-      return jsonRes(200, { ok: true, youtubeId, thumb: thumb || undefined }, event);
+      return jsonRes(200, { ok: true, youtubeId, ...basePayload }, event);
     }
     if (embedUrl) {
-      return jsonRes(200, { ok: true, embedUrl, thumb: thumb || undefined }, event);
+      return jsonRes(200, { ok: true, embedUrl, ...basePayload }, event);
     }
 
-    return jsonRes(404, { ok: false, error: "No trailer found for this title", thumb: thumb || undefined }, event);
+    return jsonRes(404, { ok: false, error: "No trailer found for this title", ...basePayload }, event);
   }
 
   if (event.httpMethod !== "POST") {

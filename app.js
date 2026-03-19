@@ -29,7 +29,10 @@ import {
   moveItemFromSharedToPersonal,
   moveItemFromPersonalToShared,
   updateMovieMetadata,
+  getUserProfile,
+  setUserCountry,
 } from "./firebase.js";
+import { COUNTRIES, countryCodeToFlag } from "./countries.js";
 
 const STATUS_ORDER = ["to-watch", "watched"];
 
@@ -47,6 +50,9 @@ let currentModalMovie = null; // movie currently shown in modal
 let currentListMode = "personal"; // "personal" | { type: "personal", listId, name } | { type: "shared", listId, name }
 let sharedLists = [];
 let personalLists = [];
+
+/** User's selected country code (e.g. 'IL') for TMDB watch provider API. Set from Firestore profile. */
+let userCountryCode = "IL";
 
 function getListFromUrl() {
   const list = new URLSearchParams(window.location.search).get("list");
@@ -547,9 +553,10 @@ function openModal(m) {
     </div>`;
 
     const apiBase = window.location.origin;
+    const watchRegion = userCountryCode ? `&watch_region=${encodeURIComponent(userCountryCode)}` : "";
     const fetchUrl = m.imdbId
-      ? `${apiBase}/.netlify/functions/add-from-imdb?imdbId=${encodeURIComponent(m.imdbId)}`
-      : `${apiBase}/.netlify/functions/add-from-imdb?title=${encodeURIComponent(m.title)}${m.year ? "&year=" + encodeURIComponent(m.year) : ""}`;
+      ? `${apiBase}/.netlify/functions/add-from-imdb?imdbId=${encodeURIComponent(m.imdbId)}${watchRegion}`
+      : `${apiBase}/.netlify/functions/add-from-imdb?title=${encodeURIComponent(m.title)}${m.year ? "&year=" + encodeURIComponent(m.year) : ""}${watchRegion}`;
 
     fetch(fetchUrl)
       .then((r) => r.json())
@@ -569,6 +576,10 @@ function openModal(m) {
             updates.thumb = m.thumb;
           }
           updates.youtubeId = data.youtubeId;
+        }
+        if (Array.isArray(data.services) && data.services.length > 0 && (!m.services || m.services.length === 0)) {
+          m.services = data.services;
+          updates.services = data.services;
         }
         if (Object.keys(updates).length) {
           buildCards();
@@ -774,6 +785,20 @@ document.getElementById("auth-signout-btn")?.addEventListener("click", () => {
   authAvatarBtn?.setAttribute("aria-expanded", "false");
   fbSignOut(auth);
 });
+document.getElementById("auth-country-btn")?.addEventListener("click", async () => {
+  authDropdown?.setAttribute("aria-hidden", "true");
+  authAvatarBtn?.setAttribute("aria-expanded", "false");
+  const user = auth.currentUser;
+  if (!user) return;
+  await showCountryModal({
+    initialCode: userCountryCode,
+    onSave: async (code, name) => {
+      await setUserCountry(user.uid, code, name);
+      userCountryCode = code;
+      updateCountryDropdownRow();
+    },
+  });
+});
 document.getElementById("auth-switch-btn")?.addEventListener("click", async () => {
   authDropdown?.setAttribute("aria-hidden", "true");
   authAvatarBtn?.setAttribute("aria-expanded", "false");
@@ -929,6 +954,110 @@ function hideListsModal() {
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
   }
+}
+
+let countryModalAbortController = null;
+
+function showCountryModal({ initialCode = "IL", onSave } = {}) {
+  const modal = document.getElementById("country-modal");
+  const searchInput = document.getElementById("country-search");
+  const dropdown = document.getElementById("country-dropdown");
+  const listEl = document.getElementById("country-dropdown-list");
+  const saveBtn = document.getElementById("country-save-btn");
+  if (!modal || !searchInput || !dropdown || !listEl || !saveBtn) return Promise.reject(new Error("Country modal elements missing"));
+
+  countryModalAbortController?.abort();
+  countryModalAbortController = new AbortController();
+  const ac = countryModalAbortController;
+
+  let selected = COUNTRIES.find((c) => c.code === initialCode) || COUNTRIES[0];
+
+  function renderList(filter = "") {
+    const q = filter.trim().toLowerCase();
+    const filtered = q
+      ? COUNTRIES.filter((c) => c.searchKey.includes(q))
+      : COUNTRIES;
+    listEl.innerHTML = filtered
+      .map(
+        (c) =>
+          `<button type="button" class="country-dropdown-item" role="option" data-code="${c.code}" aria-selected="${c.code === selected.code}">${c.flag} ${escapeHtml(c.name)}</button>`
+      )
+      .join("");
+    listEl.querySelectorAll(".country-dropdown-item").forEach((btn) => {
+      btn.addEventListener(
+        "click",
+        () => {
+          selected = COUNTRIES.find((x) => x.code === btn.dataset.code) || selected;
+          searchInput.value = selected.name;
+          renderList(searchInput.value);
+          dropdown.classList.add("open");
+        },
+        { signal: ac.signal }
+      );
+    });
+  }
+
+  searchInput.value = selected.name;
+  renderList();
+
+  searchInput.addEventListener(
+    "input",
+    () => {
+      const q = searchInput.value;
+      renderList(q);
+      dropdown.classList.add("open");
+      searchInput.setAttribute("aria-expanded", "true");
+    },
+    { signal: ac.signal }
+  );
+  searchInput.addEventListener(
+    "focus",
+    () => {
+      dropdown.classList.add("open");
+      searchInput.setAttribute("aria-expanded", "true");
+    },
+    { signal: ac.signal }
+  );
+
+  const closeDropdown = (e) => {
+    if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.remove("open");
+      searchInput.setAttribute("aria-expanded", "false");
+      document.removeEventListener("click", closeDropdown);
+    }
+  };
+  document.addEventListener("click", closeDropdown);
+
+  return new Promise((resolve) => {
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    searchInput.focus();
+
+    saveBtn.onclick = async () => {
+      document.removeEventListener("click", closeDropdown);
+      ac.abort();
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+      if (onSave) await onSave(selected.code, selected.name);
+      resolve({ code: selected.code, name: selected.name });
+    };
+  });
+}
+
+function hideCountryModal() {
+  const modal = document.getElementById("country-modal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  countryModalResolve = null;
+}
+
+function updateCountryDropdownRow() {
+  const btn = document.getElementById("auth-country-btn");
+  if (!btn) return;
+  const c = COUNTRIES.find((x) => x.code === userCountryCode);
+  btn.textContent = `Country: ${c ? c.flag + " " + c.name : userCountryCode}`;
 }
 
 let deleteConfirmResolve = null;
@@ -1088,11 +1217,36 @@ function init() {
       currentListMode = "personal";
       sharedLists = [];
       movies = [];
+      userCountryCode = "IL";
       const wrap = document.getElementById("list-selector-wrap");
       if (wrap) wrap.style.display = "none";
       updateFilterCount("");
       grid.innerHTML = '<div class="empty-state">Sign in to see your watchlist.</div>';
       return;
+    }
+
+    let profile = { country: null, countryName: null };
+    try {
+      profile = await getUserProfile(user.uid);
+    } catch (e) {
+      console.warn("getUserProfile failed:", e);
+    }
+
+    if (!profile.country) {
+      grid.innerHTML = '<div class="empty-state">Loading…</div>';
+      const result = await showCountryModal({
+        initialCode: "IL",
+        onSave: async (code, name) => {
+          await setUserCountry(user.uid, code, name);
+          userCountryCode = code;
+          updateCountryDropdownRow();
+        },
+      });
+      userCountryCode = result?.code || "IL";
+      updateCountryDropdownRow();
+    } else {
+      userCountryCode = profile.country;
+      updateCountryDropdownRow();
     }
 
     try {
