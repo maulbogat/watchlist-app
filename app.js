@@ -24,6 +24,10 @@ const STATUS_ORDER = ["to-watch", "watched"];
 
 const GENRE_LIMIT = 10;
 
+// Version footer: visible only when signed in as this email (bump version on deploy)
+const DEBUG_EMAIL = "maulbogat@gmail.com";
+const APP_VERSION = "92dea52";
+
 let movies = [];
 let currentFilter = "both"; // 'both' | 'movie' | 'show'
 let currentGenre = ""; // '' = all, or genre name
@@ -598,6 +602,7 @@ function updateAuthUI(user) {
   const signInBtn = document.getElementById("sign-in-btn");
   const signedIn = document.getElementById("signed-in");
   const userEmailEl = document.getElementById("user-email");
+  const versionFooter = document.getElementById("version-footer");
 
   if (user) {
     signInBtn.style.display = "none";
@@ -606,10 +611,22 @@ function updateAuthUI(user) {
       userEmailEl.textContent = user.email || user.displayName || "Signed in";
       userEmailEl.title = "Signed in as " + (user.email || user.displayName || "you");
     }
+    if (versionFooter && user.email === DEBUG_EMAIL) {
+      versionFooter.textContent = "v" + APP_VERSION;
+      versionFooter.style.display = "block";
+      versionFooter.setAttribute("aria-hidden", "false");
+    } else if (versionFooter) {
+      versionFooter.style.display = "none";
+      versionFooter.setAttribute("aria-hidden", "true");
+    }
   } else {
     signInBtn.style.display = "inline-flex";
     signedIn.style.display = "none";
     if (userEmailEl) userEmailEl.textContent = "";
+    if (versionFooter) {
+      versionFooter.style.display = "none";
+      versionFooter.setAttribute("aria-hidden", "true");
+    }
   }
 }
 
@@ -826,7 +843,7 @@ function init() {
       const isShared = typeof currentListMode === "object" && currentListMode?.type === "shared";
       grid.innerHTML = isShared
         ? '<div class="empty-state">This shared list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>'
-        : '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a> or <a href="./restore-titles.html">restore titles</a> from the project.</div>';
+        : '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
     } else {
       const filters = document.getElementById("content-filters");
       if (filters) filters.style.display = "";
@@ -852,7 +869,7 @@ function init() {
         if (filters) filters.style.display = "none";
         const meta = document.getElementById("header-meta");
         if (meta) meta.textContent = "0 titles";
-        if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a> or <a href="./restore-titles.html">restore titles</a>.</div>';
+        if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
       } else {
         if (filters) filters.style.display = "";
         buildCards();
