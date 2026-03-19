@@ -587,9 +587,22 @@ async function moveItemFromPersonalToShared(uid, listId, movie) {
 }
 
 /**
- * Update a movie's metadata (thumb, youtubeId) in the current list.
+ * Update a movie's metadata (thumb, youtubeId, services) in the current list.
+ * @param {string} [countryCode] ISO 3166-1 alpha-2 — when saving services, also merges into servicesByRegion[country].
  */
-async function updateMovieMetadata(uid, listMode, key, updates) {
+async function updateMovieMetadata(uid, listMode, key, updates, countryCode) {
+  const mergeServices = (item) => {
+    if (!Array.isArray(updates.services)) return;
+    item.services = updates.services;
+    const c = countryCode && String(countryCode).trim().length >= 2 ? String(countryCode).toUpperCase().slice(0, 2) : null;
+    if (c) {
+      const prev =
+        item.servicesByRegion && typeof item.servicesByRegion === "object" ? { ...item.servicesByRegion } : {};
+      prev[c] = updates.services;
+      item.servicesByRegion = prev;
+    }
+  };
+
   if (listMode === "personal") {
     const data = await getStatusData(uid);
     const items = Array.isArray(data.items) ? [...data.items] : [];
@@ -597,7 +610,7 @@ async function updateMovieMetadata(uid, listMode, key, updates) {
     if (idx < 0) return;
     if (updates.thumb) items[idx].thumb = updates.thumb;
     if (updates.youtubeId) items[idx].youtubeId = updates.youtubeId;
-    if (Array.isArray(updates.services)) items[idx].services = updates.services;
+    mergeServices(items[idx]);
     await setDoc(doc(db, "users", uid), { items }, { merge: true });
   } else if (typeof listMode === "object" && listMode?.type === "shared") {
     const listId = listMode.listId;
@@ -610,7 +623,7 @@ async function updateMovieMetadata(uid, listMode, key, updates) {
     if (idx < 0) return;
     if (updates.thumb) items[idx].thumb = updates.thumb;
     if (updates.youtubeId) items[idx].youtubeId = updates.youtubeId;
-    if (Array.isArray(updates.services)) items[idx].services = updates.services;
+    mergeServices(items[idx]);
     await setDoc(doc(db, "sharedLists", listId), { items }, { merge: true });
   }
 }

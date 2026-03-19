@@ -14,6 +14,8 @@ backups/sync-imdb-from-catalog-report.txt
 backups/tmdb-backfill-report.txt
 backups/tmdb-backfill-mismatches.txt
 backups/sync-metadata-from-tmdb-report.txt
+backups/sync-services-from-tmdb-report.txt
+backups/verify-tmdb-metadata-report.txt
 
 # Dependencies
 node_modules/

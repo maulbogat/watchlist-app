@@ -148,6 +148,16 @@ function updateHeaderTitle() {
   el.textContent = "My";
 }
 
+/** Watch-provider names for TMDB region: prefers servicesByRegion[country], then legacy services. */
+function servicesForMovie(m, countryCode) {
+  const code = (countryCode || "IL").toString().toUpperCase().slice(0, 2);
+  const map = m.servicesByRegion;
+  if (map && typeof map === "object" && Array.isArray(map[code])) {
+    return map[code];
+  }
+  return Array.isArray(m.services) ? m.services : [];
+}
+
 function renderServiceChips(services, { limit } = {}) {
   const list = Array.isArray(services) ? services : [];
   const sliced = typeof limit === "number" ? list.slice(0, limit) : list;
@@ -197,7 +207,7 @@ function buildCards() {
     const yearStr = m.year ? m.year : "—";
     const badgeClass = m.type === "show" ? "badge-show" : "badge-movie";
     const badgeLabel = m.type === "show" ? "TV" : "Film";
-    const serviceChips = renderServiceChips(m.services, { limit: 3 });
+    const serviceChips = renderServiceChips(servicesForMovie(m, userCountryCode), { limit: 3 });
     const serviceRow = serviceChips ? `<div class="service-row">${serviceChips}</div>` : "";
     const s = m.status || "to-watch";
     const displayStatus = s === "maybe-later" || s === "archive" ? "to-watch" : s;
@@ -368,7 +378,7 @@ const CHECK_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="
 function renderModalFooter(m, youtubeLinkHtml) {
   const s = m.status === "maybe-later" || m.status === "archive" ? "to-watch" : (m.status || "to-watch");
   const currentListLabel = getCurrentListLabel();
-  const serviceChips = renderServiceChips(m.services);
+  const serviceChips = renderServiceChips(servicesForMovie(m, userCountryCode));
   const servicePart = serviceChips ? ` <span style="opacity:0.4">·</span> ${serviceChips}` : "";
   const metaParts = [m.year || "", m.genre || ""].filter(Boolean).join(" ");
   return `
@@ -586,7 +596,9 @@ function openModal(m) {
           }
           updates.youtubeId = data.youtubeId;
         }
-        if (Array.isArray(data.services) && data.services.length > 0 && (!m.services || m.services.length === 0)) {
+        if (Array.isArray(data.services) && data.services.length > 0) {
+          if (!m.servicesByRegion) m.servicesByRegion = {};
+          m.servicesByRegion[userCountryCode] = data.services;
           m.services = data.services;
           updates.services = data.services;
         }
@@ -594,7 +606,7 @@ function openModal(m) {
           buildCards();
           const user = auth.currentUser;
           if (user) {
-            updateMovieMetadata(user.uid, currentListMode, movieKey(m), updates).catch(() => {});
+            updateMovieMetadata(user.uid, currentListMode, movieKey(m), updates, userCountryCode).catch(() => {});
           }
         }
         if (foundTrailer) {

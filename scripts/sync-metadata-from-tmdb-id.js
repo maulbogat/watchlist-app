@@ -1,9 +1,15 @@
 /**
- * For every item with tmdbId, refresh title, year, type (movie/show), genre from TMDB
- * /movie/{id} or /tv/{id}. Uses tmdbMedia when set; otherwise tries movie then TV.
+ * For every item with tmdbId, refresh title, year, type (movie/show), genre, thumb
+ * (poster w500), and youtubeId (YouTube trailer key from TMDB videos) from
+ * /movie/{id} or /tv/{id} with append_to_response=videos. Uses tmdbMedia when set;
+ * otherwise tries movie then TV.
  *
- * Run: node scripts/sync-metadata-from-tmdb-id.js [backup.json] [--dry-run]
+ * Run: node scripts/sync-metadata-from-tmdb-id.js [backup.json] [--dry-run] [--thumb-only] [--youtube-only]
  * Default: backups/firestore-backup-migrated.json
+ *
+ * --thumb-only: only set thumb from TMDB poster_path (does not change title/year/type/genre).
+ * --youtube-only: only set youtubeId from TMDB videos (YouTube trailer key), or "SEARCH" if none.
+ *   You can pass --thumb-only and --youtube-only together to update both without other fields.
  *
  * Requires: TMDB_API_KEY in .env
  * Report: backups/sync-metadata-from-tmdb-report.txt
@@ -19,6 +25,27 @@ import https from "https";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
 const DELAY_MS = 260;
+const TMDB_IMG = "https://image.tmdb.org/t/p/w500";
+
+function thumbFromPosterPath(posterPath) {
+  return posterPath ? `${TMDB_IMG}${posterPath}` : null;
+}
+
+/** Prefer Trailer, then Teaser, then Clip/Featurette, then any YouTube (matches backfill-tmdb-from-imdb). */
+function pickYoutubeTrailerKey(results) {
+  const r = results || [];
+  const preferred = (t) => r.find((v) => v.site === "YouTube" && v.key && v.type === t);
+  return (
+    preferred("Trailer") ||
+    preferred("Teaser") ||
+    r.find((v) => v.site === "YouTube" && v.key && (v.type === "Clip" || v.type === "Featurette")) ||
+    r.find((v) => v.site === "YouTube" && v.key)
+  )?.key || null;
+}
+
+function youtubeIdFromDetail(d) {
+  return pickYoutubeTrailerKey(d.videos?.results);
+}
 
 function movieKey(m) {
   return `${m.title}|${m.year ?? ""}`;
@@ -72,6 +99,8 @@ function formatMovie(d) {
     type: "movie",
     genre: genres.join(" / "),
     tmdbMedia: "movie",
+    thumb: thumbFromPosterPath(d.poster_path),
+    youtubeId: youtubeIdFromDetail(d),
   };
 }
 
@@ -89,13 +118,16 @@ function formatTv(d) {
     type: "show",
     genre: genres.join(" / "),
     tmdbMedia: "tv",
+    thumb: thumbFromPosterPath(d.poster_path),
+    youtubeId: youtubeIdFromDetail(d),
   };
 }
 
 async function fetchDetailsByTmdbId(id, apiKey, hint) {
   const base = `https://api.themoviedb.org/3`;
-  const movieUrl = `${base}/movie/${id}?api_key=${encodeURIComponent(apiKey)}`;
-  const tvUrl = `${base}/tv/${id}?api_key=${encodeURIComponent(apiKey)}`;
+  const v = "append_to_response=videos";
+  const movieUrl = `${base}/movie/${id}?${v}&api_key=${encodeURIComponent(apiKey)}`;
+  const tvUrl = `${base}/tv/${id}?${v}&api_key=${encodeURIComponent(apiKey)}`;
 
   if (hint === "tv") {
     try {
@@ -163,8 +195,12 @@ function walkAllItems(backup, fn) {
 }
 
 async function main() {
-  const args = process.argv.slice(2).filter((a) => a !== "--dry-run");
+  const args = process.argv.slice(2).filter(
+    (a) => a !== "--dry-run" && a !== "--thumb-only" && a !== "--youtube-only"
+  );
   const dryRun = process.argv.includes("--dry-run");
+  const thumbOnly = process.argv.includes("--thumb-only");
+  const youtubeOnly = process.argv.includes("--youtube-only");
 
   const defaultPath = join(rootDir, "backups", "firestore-backup-migrated.json");
   const altPath = join(rootDir, "backups", "firestore-backup.json");
@@ -198,6 +234,13 @@ async function main() {
   const uniqueIds = [...hintById.keys()].sort((a, b) => a - b);
   console.log(`Backup: ${backupPath}`);
   console.log(`Unique tmdbIds to refresh: ${uniqueIds.length}`);
+  if (thumbOnly && youtubeOnly) {
+    console.log("Mode: --thumb-only + --youtube-only (thumb + youtubeId only)");
+  } else if (thumbOnly) {
+    console.log("Mode: --thumb-only (poster/thumb only; title/year/type/genre/youtubeId unchanged)");
+  } else if (youtubeOnly) {
+    console.log("Mode: --youtube-only (trailer id only; other fields unchanged)");
+  }
   if (dryRun) {
     console.log("[--dry-run] Exiting before TMDB API calls and file writes.");
     process.exit(0);
@@ -226,6 +269,15 @@ async function main() {
     const meta = cache.get(id);
     if (!meta) return;
 
+    if (thumbOnly || youtubeOnly) {
+      const patch = { ...m };
+      if (thumbOnly) patch.thumb = meta.thumb;
+      if (youtubeOnly) patch.youtubeId = meta.youtubeId || "SEARCH";
+      arr[i] = patch;
+      rowsUpdated++;
+      return;
+    }
+
     const oldKey = movieKey(m);
     const next = {
       ...m,
@@ -234,6 +286,8 @@ async function main() {
       type: meta.type,
       genre: meta.genre || "",
       tmdbMedia: meta.tmdbMedia,
+      thumb: meta.thumb,
+      youtubeId: meta.youtubeId || "SEARCH",
     };
     const newKey = movieKey(next);
     if (oldKey !== newKey) {
@@ -250,6 +304,15 @@ async function main() {
     `sync-metadata-from-tmdb-id`,
     `Generated: ${backup.exportedAt}`,
     `Backup: ${backupPath}`,
+    `Mode: ${
+      thumbOnly && youtubeOnly
+        ? "thumb + youtube only"
+        : thumbOnly
+          ? "thumb-only"
+          : youtubeOnly
+            ? "youtube-only"
+            : "metadata + thumb + youtube"
+    }`,
     ``,
     `Unique tmdbIds: ${uniqueIds.length}`,
     `TMDB detail fetches OK: ${cache.size}`,
