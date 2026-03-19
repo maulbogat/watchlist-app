@@ -205,26 +205,12 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint) {
   };
 }
 
-async function fetchTrailerFromYouTubeSearch(title, year) {
-  const apiKey = process.env.YOUTUBE_API_KEY;
-  if (!apiKey) return null;
-  const query = [title, year ? String(year) : ""].filter(Boolean).join(" ") + " official trailer";
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(query)}&key=${apiKey}`;
-  try {
-    const data = await fetchJson(url);
-    const item = (data.items || []).find((i) => i.id?.videoId);
-    return item?.id?.videoId || null;
-  } catch (e) {
-    return null;
-  }
-}
-
 exports.handler = async (event, context) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(event) };
   }
 
-  // GET: fetch trailer, thumb, and watch providers (TMDB, IMDb, YouTube; OMDb for poster)
+  // GET: fetch trailer key from TMDB only; thumb from TMDB or OMDb; IMDb embed URL as last resort
   if (event.httpMethod === "GET") {
     const params = event.queryStringParameters || {};
     const imdbId = params.imdbId || "";
@@ -277,14 +263,7 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // 2. YouTube search (plays in our modal) — before IMDb embed, which is often blocked in iframes off-site
-    if (!youtubeId && searchTitle) {
-      try {
-        youtubeId = await fetchTrailerFromYouTubeSearch(searchTitle, searchYear);
-      } catch (e) {}
-    }
-
-    // 3. IMDb videogallery scrape — last resort; frontend opens in new tab (see app.js), not iframe
+    // 2. IMDb videogallery scrape — last resort; frontend opens in new tab (see app.js), not iframe
     if (!youtubeId && hasImdb) {
       try {
         const html = await fetchHtml(`https://www.imdb.com/title/${nImdb}/videogallery`);
@@ -366,12 +345,7 @@ exports.handler = async (event, context) => {
     try {
       const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion, omdbForTmdb);
       if (e) {
-        let yt = e.youtubeId;
-        if (!yt && e.title) {
-          try {
-            yt = await fetchTrailerFromYouTubeSearch(e.title, e.year);
-          } catch (err) {}
-        }
+        const yt = e.youtubeId;
         movie = {
           title: e.title,
           year: e.year,
@@ -411,18 +385,13 @@ exports.handler = async (event, context) => {
     const genre = omdb.Genre || "";
     const thumb = omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
 
-    let yt = null;
-    try {
-      yt = await fetchTrailerFromYouTubeSearch(title, year);
-    } catch (err) {}
-
     movie = {
       title,
       year: isNaN(year) ? null : year,
       type: nType,
       genre: genre || "",
       thumb,
-      youtubeId: normalizeStoredYoutubeTrailerId(yt),
+      youtubeId: null,
       imdbId: nImdb,
       services: [],
     };

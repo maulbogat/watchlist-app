@@ -19,6 +19,7 @@ backups/sync-services-from-tmdb-report.txt
 backups/verify-tmdb-metadata-report.txt
 backups/remove-no-tmdb-report.txt
 backups/backfill-youtube-from-tmdb-report.txt
+backups/items-without-youtube-trailer.txt
 
 # Dependencies
 node_modules/

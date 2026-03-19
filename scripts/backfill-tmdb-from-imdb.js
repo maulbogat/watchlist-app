@@ -7,7 +7,7 @@
  * Default backup: backups/firestore-backup-migrated.json (or firestore-backup.json if missing)
  *
  * Requires: TMDB_API_KEY in .env
- * Optional: YOUTUBE_API_KEY (if TMDB has no YouTube trailer), WATCH_REGION (default IL)
+ * Optional: WATCH_REGION (default IL)
  *
  * Use --dry-run to only print counts without writing.
  * After review: restore with node scripts/restore-from-backup.js <file>
@@ -135,20 +135,6 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, itemTypeHint) {
     youtubeId,
     services,
   };
-}
-
-async function fetchTrailerFromYouTubeSearch(title, year) {
-  const apiKey = process.env.YOUTUBE_API_KEY;
-  if (!apiKey) return null;
-  const query = [title, year ? String(year) : ""].filter(Boolean).join(" ") + " official trailer";
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(query)}&key=${apiKey}`;
-  try {
-    const data = await fetchJson(url);
-    const item = (data.items || []).find((i) => i.id?.videoId);
-    return item?.id?.videoId || null;
-  } catch {
-    return null;
-  }
 }
 
 function replaceKeyEverywhere(backup, oldKey, newKey) {
@@ -289,7 +275,7 @@ async function main() {
     tmdbOk: 0,
     tmdbMiss: 0,
     withTrailer: 0,
-    searchOnly: 0,
+    noTmdbTrailer: 0,
     errors: [],
   };
 
@@ -301,14 +287,11 @@ async function main() {
         cache.set(imdbId, null);
         report.tmdbMiss++;
       } else {
-        let yt = e.youtubeId;
-        if (!yt && e.title) {
-          yt = await fetchTrailerFromYouTubeSearch(e.title, e.year);
-        }
-        cache.set(imdbId, { ...e, youtubeId: yt || null });
+        const yt = e.youtubeId || null;
+        cache.set(imdbId, { ...e, youtubeId: yt });
         report.tmdbOk++;
         if (yt) report.withTrailer++;
-        else report.searchOnly++;
+        else report.noTmdbTrailer++;
       }
     } catch (err) {
       report.errors.push({ imdbId, err: String(err.message || err) });
@@ -371,8 +354,8 @@ async function main() {
     ``,
     `Unique IMDb ids processed: ${uniqueIds.length}`,
     `TMDB matched: ${report.tmdbOk}, no TMDB match: ${report.tmdbMiss}`,
-    `Unique ids got YouTube key from TMDB/search: ${report.withTrailer}`,
-    `Unique ids with no trailer key (stored as null): ${report.searchOnly}`,
+    `Unique ids with YouTube trailer key from TMDB: ${report.withTrailer}`,
+    `Unique ids with no TMDB trailer key (stored as null): ${report.noTmdbTrailer}`,
     `List rows with real youtubeId after backfill: ${itemRowsWithTrailer}`,
     `List rows with null youtubeId: ${itemRowsWithNone}`,
     `movieKey renames (title/year updates): ${keyRenames}`,
