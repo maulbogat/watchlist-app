@@ -42,15 +42,18 @@ function fetchJson(url) {
   });
 }
 
-/** Returns { tmdbId: number, media: 'movie'|'tv' } or null */
-async function findTmdbByImdb(imdbId, apiKey) {
+/** When both movie + TV exist for one IMDb id, prefer row type; else prefer TV (see add-from-imdb). */
+async function findTmdbByImdb(imdbId, apiKey, itemTypeHint) {
   const url = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?external_source=imdb_id&api_key=${apiKey}`;
   const find = await fetchJson(url);
   const movie = find.movie_results?.[0];
   const tv = find.tv_results?.[0];
-  if (movie?.id != null) return { tmdbId: movie.id, media: "movie" };
-  if (tv?.id != null) return { tmdbId: tv.id, media: "tv" };
-  return null;
+  if (!movie && !tv) return null;
+  if (!movie) return { tmdbId: tv.id, media: "tv" };
+  if (!tv) return { tmdbId: movie.id, media: "movie" };
+  if (itemTypeHint === "movie") return { tmdbId: movie.id, media: "movie" };
+  if (itemTypeHint === "show") return { tmdbId: tv.id, media: "tv" };
+  return { tmdbId: tv.id, media: "tv" };
 }
 
 function walkAllItems(backup, fn) {
@@ -91,10 +94,17 @@ async function main() {
   }
 
   const unique = new Set();
+  const idToTypeHint = new Map();
   walkAllItems(backup, (arr, i) => {
     const m = arr[i];
     const id = normImdb(m?.imdbId);
-    if (/^tt\d+$/.test(id)) unique.add(id);
+    if (/^tt\d+$/.test(id)) {
+      unique.add(id);
+      if (!idToTypeHint.has(id)) {
+        const t = m?.type;
+        if (t === "show" || t === "movie") idToTypeHint.set(id, t);
+      }
+    }
   });
 
   const cache = new Map();
@@ -126,7 +136,7 @@ async function main() {
   const errors = [];
   for (const imdbId of toFetch) {
     try {
-      const res = await findTmdbByImdb(imdbId, apiKey);
+      const res = await findTmdbByImdb(imdbId, apiKey, idToTypeHint.get(imdbId));
       if (res) cache.set(imdbId, { ...res, from: "api" });
       else errors.push({ imdbId, err: "no movie/tv in TMDB find" });
     } catch (e) {

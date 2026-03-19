@@ -106,17 +106,35 @@ function pickYoutubeTrailerKey(results) {
 }
 
 /**
+ * When TMDB returns both a movie and TV hit for one IMDb id, we must pick one.
+ * Bugfix: `movie?.id ?? tv?.id` always preferred movie — wrong for TV miniseries (e.g. Cecil Hotel
+ * could get another title's trailer/thumb/genres). Use OMDb Type when available; else prefer TV
+ * when both exist (miniseries/docuseries are usually TV on TMDB).
+ * @param {object|null} omdbHint - OMDb row { Type, Title } if already fetched
+ */
+function pickTmdbFindEntry(find, omdbHint) {
+  const movie = find.movie_results?.[0];
+  const tv = find.tv_results?.[0];
+  if (!movie && !tv) return { mediaType: null, id: null };
+  if (!movie) return { mediaType: "tv", id: tv.id };
+  if (!tv) return { mediaType: "movie", id: movie.id };
+
+  const t = omdbHint && String(omdbHint.Type || "").toLowerCase();
+  if (t === "movie") return { mediaType: "movie", id: movie.id };
+  if (t === "series" || t === "episode") return { mediaType: "tv", id: tv.id };
+  // No OMDb or ambiguous: prefer TV so we don't attach a random film's trailer to a series id
+  return { mediaType: "tv", id: tv.id };
+}
+
+/**
  * Full TMDB enrichment from IMDb id: type, title, year, poster, genres, trailer key, watch providers.
  * Returns null if TMDB has no match for this IMDb id.
  */
-async function enrichFromTmdb(imdbId, apiKey, watchRegion) {
+async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint) {
   const findUrl = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?external_source=imdb_id&api_key=${apiKey}`;
   const find = await fetchJson(findUrl);
-  const movie = find.movie_results?.[0];
-  const tv = find.tv_results?.[0];
-  if (!movie && !tv) return null;
-  const id = movie?.id ?? tv?.id;
-  const mediaType = movie ? "movie" : "tv";
+  const { mediaType, id } = pickTmdbFindEntry(find, omdbHint);
+  if (id == null || !mediaType) return null;
 
   const detailUrl = `https://api.themoviedb.org/3/${mediaType}/${id}?append_to_response=videos&api_key=${apiKey}`;
   const detail = await fetchJson(detailUrl);
@@ -232,7 +250,7 @@ exports.handler = async (event, context) => {
       const tmdbKey = process.env.TMDB_API_KEY;
       if (tmdbKey) {
         try {
-          const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion);
+          const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion, omdb);
           if (e) {
             if (e.thumb) thumb = e.thumb;
             searchTitle = e.title || searchTitle;
@@ -262,7 +280,12 @@ exports.handler = async (event, context) => {
       } catch (e) {}
     }
 
-    const basePayload = { thumb: thumb || undefined, services: services.length ? services : undefined };
+    const basePayload = {
+      thumb: thumb || undefined,
+      services: services.length ? services : undefined,
+      resolvedTitle: searchTitle || undefined,
+      resolvedYear: searchYear || undefined,
+    };
     if (youtubeId) {
       return jsonRes(200, { ok: true, youtubeId, ...basePayload }, event);
     }
@@ -313,13 +336,20 @@ exports.handler = async (event, context) => {
   const nImdb = norm(imdbId);
   const watchRegion = String(bodyWatch || body.watchRegion || "").trim().toUpperCase().slice(0, 2);
 
+  let omdbForTmdb = null;
+  try {
+    omdbForTmdb = await fetchOMDb(nImdb);
+  } catch (e) {
+    omdbForTmdb = null;
+  }
+
   const tmdbKey = process.env.TMDB_API_KEY;
   let movie = null;
 
   // 1) TMDB from IMDb id: type, poster, genres, year, providers, trailer key
   if (tmdbKey) {
     try {
-      const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion);
+      const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion, omdbForTmdb);
       if (e) {
         let yt = e.youtubeId;
         if (!yt && e.title) {
@@ -346,7 +376,7 @@ exports.handler = async (event, context) => {
   if (!movie) {
     let omdb;
     try {
-      omdb = await fetchOMDb(nImdb);
+      omdb = omdbForTmdb || (await fetchOMDb(nImdb));
     } catch (e) {
       return jsonRes(502, { ok: false, error: e.message || "Title not found in TMDB or OMDb" }, event);
     }

@@ -158,6 +158,25 @@ function servicesForMovie(m, countryCode) {
   return Array.isArray(m.services) ? m.services : [];
 }
 
+/** Guard against wrong TMDB enrichment (e.g. movie vs TV mix-up) before saving trailer/thumb to Firestore */
+function normalizeTitleForMatch(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+function titlesLikelyMatch(a, b) {
+  const na = normalizeTitleForMatch(a);
+  const nb = normalizeTitleForMatch(b);
+  if (!na || !nb) return true;
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const shorter = na.length <= nb.length ? na : nb;
+  const longer = na.length > nb.length ? na : nb;
+  if (shorter.length >= 10 && longer.includes(shorter.slice(0, 12))) return true;
+  return false;
+}
+
 function renderServiceChips(services, { limit } = {}) {
   const list = Array.isArray(services) ? services : [];
   const sliced = typeof limit === "number" ? list.slice(0, limit) : list;
@@ -583,24 +602,30 @@ function openModal(m) {
         if (currentModalMovie !== m) return;
         const foundTrailer = data.ok && (data.youtubeId || data.embedUrl);
         const foundThumb = data.thumb; // may come from 404 response (OMDb poster)
+        const enrichmentTrusted =
+          !data.resolvedTitle ||
+          !m.title ||
+          titlesLikelyMatch(data.resolvedTitle, m.title);
         const updates = {};
-        if (foundThumb && !m.thumb) {
-          m.thumb = data.thumb;
-          updates.thumb = data.thumb;
-        }
-        if (foundTrailer && data.youtubeId) {
-          m.youtubeId = data.youtubeId;
-          if (!m.thumb) {
-            m.thumb = `https://img.youtube.com/vi/${data.youtubeId}/hqdefault.jpg`;
-            updates.thumb = m.thumb;
+        if (enrichmentTrusted) {
+          if (foundThumb && !m.thumb) {
+            m.thumb = data.thumb;
+            updates.thumb = data.thumb;
           }
-          updates.youtubeId = data.youtubeId;
-        }
-        if (Array.isArray(data.services) && data.services.length > 0) {
-          if (!m.servicesByRegion) m.servicesByRegion = {};
-          m.servicesByRegion[userCountryCode] = data.services;
-          m.services = data.services;
-          updates.services = data.services;
+          if (foundTrailer && data.youtubeId) {
+            m.youtubeId = data.youtubeId;
+            if (!m.thumb) {
+              m.thumb = `https://img.youtube.com/vi/${data.youtubeId}/hqdefault.jpg`;
+              updates.thumb = m.thumb;
+            }
+            updates.youtubeId = data.youtubeId;
+          }
+          if (Array.isArray(data.services) && data.services.length > 0) {
+            if (!m.servicesByRegion) m.servicesByRegion = {};
+            m.servicesByRegion[userCountryCode] = data.services;
+            m.services = data.services;
+            updates.services = data.services;
+          }
         }
         if (Object.keys(updates).length) {
           buildCards();
@@ -609,7 +634,7 @@ function openModal(m) {
             updateMovieMetadata(user.uid, currentListMode, movieKey(m), updates, userCountryCode).catch(() => {});
           }
         }
-        if (foundTrailer) {
+        if (foundTrailer && enrichmentTrusted) {
           placeholder.style.background = "#000";
           if (data.youtubeId) {
             const rawOrigin = window.location.origin;

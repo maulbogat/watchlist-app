@@ -64,14 +64,23 @@ function pickYoutubeTrailerKey(results) {
   )?.key || null;
 }
 
-async function enrichFromTmdb(imdbId, apiKey, watchRegion) {
-  const findUrl = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?external_source=imdb_id&api_key=${apiKey}`;
-  const find = await fetchJson(findUrl);
+/** When TMDB returns both movie + TV for one IMDb id, never blindly prefer movie (see add-from-imdb). */
+function pickTmdbFindEntry(find, itemTypeHint) {
   const movie = find.movie_results?.[0];
   const tv = find.tv_results?.[0];
-  if (!movie && !tv) return null;
-  const id = movie?.id ?? tv?.id;
-  const mediaType = movie ? "movie" : "tv";
+  if (!movie && !tv) return { mediaType: null, id: null };
+  if (!movie) return { mediaType: "tv", id: tv.id };
+  if (!tv) return { mediaType: "movie", id: movie.id };
+  if (itemTypeHint === "movie") return { mediaType: "movie", id: movie.id };
+  if (itemTypeHint === "show") return { mediaType: "tv", id: tv.id };
+  return { mediaType: "tv", id: tv.id };
+}
+
+async function enrichFromTmdb(imdbId, apiKey, watchRegion, itemTypeHint) {
+  const findUrl = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?external_source=imdb_id&api_key=${apiKey}`;
+  const find = await fetchJson(findUrl);
+  const { mediaType, id } = pickTmdbFindEntry(find, itemTypeHint);
+  if (id == null || !mediaType) return null;
 
   const detailUrl = `https://api.themoviedb.org/3/${mediaType}/${id}?append_to_response=videos&api_key=${apiKey}`;
   const detail = await fetchJson(detailUrl);
@@ -259,6 +268,14 @@ async function main() {
   const rows = collectItemsWithImdb(backup);
   const noImdbItems = collectItemsWithoutValidImdb(backup);
   const uniqueIds = [...new Set(rows.map((r) => normImdb(r.m.imdbId)).filter((id) => /^tt\d+$/.test(id)))];
+  /** First-seen list row type (movie/show) per IMDb id — disambiguates TMDB find when movie + TV both exist */
+  const idToTypeHint = new Map();
+  for (const r of rows) {
+    const id = normImdb(r.m.imdbId);
+    if (!/^tt\d+$/.test(id) || idToTypeHint.has(id)) continue;
+    const t = r.m?.type;
+    if (t === "show" || t === "movie") idToTypeHint.set(id, t);
+  }
 
   console.log(`Backup: ${backupPath}`);
   console.log(`Rows with imdbId: ${rows.length}, unique IMDb ids: ${uniqueIds.length}`);
@@ -277,7 +294,8 @@ async function main() {
 
   for (const imdbId of uniqueIds) {
     try {
-      const e = await enrichFromTmdb(imdbId, tmdbKey, watchRegion);
+      const typeHint = idToTypeHint.get(imdbId);
+      const e = await enrichFromTmdb(imdbId, tmdbKey, watchRegion, typeHint);
       if (!e) {
         cache.set(imdbId, null);
         report.tmdbMiss++;
