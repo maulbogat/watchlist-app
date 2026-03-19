@@ -596,10 +596,14 @@ function openModal(m) {
             placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
               referrerpolicy="strict-origin-when-cross-origin"
               src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(data.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1${originParam}"></iframe>`;
-          } else {
-            placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
-              referrerpolicy="strict-origin-when-cross-origin"
-              src="${String(data.embedUrl).replace(/"/g, "&quot;")}"></iframe>`;
+          } else if (data.embedUrl) {
+            // IMDb blocks embedding this player on third-party sites (X-Frame-Options / CSP).
+            const safeEmbed = String(data.embedUrl).replace(/"/g, "&quot;");
+            placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.25rem;padding:1.5rem;text-align:center;background:#0d0d10;">
+              <div style="font-family:var(--font-title);font-size:1.35rem;letter-spacing:0.06em;color:var(--text);max-width:22rem">${escapeHtml(m.title)}</div>
+              <p style="font-size:0.85rem;color:var(--muted);margin:0;max-width:24rem;line-height:1.45">IMDb doesn’t allow playing this trailer inside other sites. Open it on IMDb in a new tab.</p>
+              <a href="${safeEmbed}" target="_blank" rel="noopener noreferrer" class="modal-action-btn modal-youtube-link" style="display:inline-flex">Play trailer on IMDb &#x2197;</a>
+            </div>`;
           }
         } else {
           placeholder.style.background = "#0d0d10";

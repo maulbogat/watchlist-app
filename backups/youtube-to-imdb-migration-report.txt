@@ -1,0 +1,15 @@
+YouTube → IMDb-first trailer migration (final summary)
+Generated: 2026-03-19
+
+Pass 1 (catalog + sync from catalog):
+  - Catalog: set youtubeId to SEARCH for 233 titles (had real YouTube id + imdbId).
+  - OMDb poster used for thumb: 228
+  - No OMDb poster (thumb cleared if was YouTube): 5
+  - User/shared list item rows synced: 693
+
+Pass 2 (list-only titles not present in catalog):
+  - Migrated: 3 shared-list rows (Squid Game, Homicide: Los Angeles, Lessons in Chemistry)
+  - OMDb poster used for thumb: 3
+  - User/shared list item rows synced: 5
+
+Verification: zero stored YouTube video ids remain; all use youtubeId "SEARCH" and resolve trailers via IMDb/TMDB when imdbId is set.

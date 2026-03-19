@@ -101,7 +101,14 @@ async function fetchTrailerFromTmdb(imdbId, apiKey) {
   if (!id) return null;
   const videosUrl = `https://api.themoviedb.org/3/${type}/${id}/videos?api_key=${apiKey}`;
   const videos = await fetchJson(videosUrl);
-  const trailer = (videos.results || []).find((v) => v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser"));
+  const r = videos.results || [];
+  const preferred = (t) =>
+    r.find((v) => v.site === "YouTube" && v.key && v.type === t);
+  const trailer =
+    preferred("Trailer") ||
+    preferred("Teaser") ||
+    r.find((v) => v.site === "YouTube" && v.key && (v.type === "Clip" || v.type === "Featurette")) ||
+    r.find((v) => v.site === "YouTube" && v.key);
   return trailer?.key || null;
 }
 
@@ -197,7 +204,14 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // 2. Try IMDb videogallery scrape (when we have imdbId)
+    // 2. YouTube search (plays in our modal) — before IMDb embed, which is often blocked in iframes off-site
+    if (!youtubeId && searchTitle) {
+      try {
+        youtubeId = await fetchTrailerFromYouTubeSearch(searchTitle, searchYear);
+      } catch (e) {}
+    }
+
+    // 3. IMDb videogallery scrape — last resort; frontend opens in new tab (see app.js), not iframe
     if (!youtubeId && hasImdb) {
       try {
         const html = await fetchHtml(`https://www.imdb.com/title/${nImdb}/videogallery`);
@@ -205,13 +219,6 @@ exports.handler = async (event, context) => {
         if (match) {
           embedUrl = `https://www.imdb.com/video/imdb/${match[1]}/imdb/embed?autoplay=true`;
         }
-      } catch (e) {}
-    }
-
-    // 3. Try YouTube search (by title + year)
-    if (!youtubeId && !embedUrl && searchTitle) {
-      try {
-        youtubeId = await fetchTrailerFromYouTubeSearch(searchTitle, searchYear);
       } catch (e) {}
     }
 
