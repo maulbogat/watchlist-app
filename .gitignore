@@ -13,6 +13,7 @@ backups/add-tmdb-ids-report.txt
 backups/sync-imdb-from-catalog-report.txt
 backups/tmdb-backfill-report.txt
 backups/tmdb-backfill-mismatches.txt
+backups/sync-metadata-from-tmdb-report.txt
 
 # Dependencies
 node_modules/
