@@ -1,6 +1,6 @@
 /**
  * Remove every list/catalog row that has no numeric tmdbId (null, "", or invalid).
- * Strips matching movieKey() from watched / maybeLater / archive (and removed on shared lists).
+ * Strips matching movieKey() from watched / maybeLater / archive (users and shared lists).
  *
  * Run: node scripts/remove-items-without-tmdb-id.js [backup.json] [--dry-run]
  * Default: backups/firestore-backup-migrated.json
@@ -28,7 +28,7 @@ function hasTmdbId(m) {
 }
 
 const USER_STATUS = ["watched", "maybeLater", "archive"];
-const SHARED_STATUS = ["removed", "watched", "maybeLater", "archive"];
+const SHARED_STATUS = ["watched", "maybeLater", "archive"];
 
 function stripKeys(doc, fields, keySet) {
   for (const f of fields) {

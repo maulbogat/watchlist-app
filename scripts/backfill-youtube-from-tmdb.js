@@ -102,18 +102,21 @@ async function fetchYoutubeOnlyByTmdbId(id, apiKey, hint) {
       return null;
     }
   }
+  // No hint: same id can be movie or TV. Do not stop at movie when it has no trailer,
+  // or we never try /tv/{id} (formatMovie is always truthy when the request succeeds).
+  let movieD = null;
   try {
-    const d = await fetchJson(movieUrl);
-    const m = formatMovie(d);
-    if (m) return m;
+    movieD = await fetchJson(movieUrl);
+    const m = formatMovie(movieD);
+    if (m?.youtubeId) return m;
   } catch {
-    /* try tv */
+    movieD = null;
   }
   try {
-    const d = await fetchJson(tvUrl);
-    return formatTv(d);
+    const tvD = await fetchJson(tvUrl);
+    return formatTv(tvD);
   } catch {
-    return null;
+    return movieD ? formatMovie(movieD) : null;
   }
 }
 

@@ -140,7 +140,7 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, itemTypeHint) {
 function replaceKeyEverywhere(backup, oldKey, newKey) {
   if (!oldKey || oldKey === newKey) return;
   const userFields = ["watched", "maybeLater", "archive"];
-  const sharedFields = ["removed", "watched", "maybeLater", "archive"];
+  const sharedFields = ["watched", "maybeLater", "archive"];
 
   for (const doc of Object.values(backup.users || {})) {
     for (const f of userFields) {

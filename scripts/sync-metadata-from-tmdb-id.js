@@ -2,7 +2,8 @@
  * For every item with tmdbId, refresh title, year, type (movie/show), genre, thumb
  * (poster w500), and youtubeId (YouTube trailer key from TMDB videos) from
  * /movie/{id} or /tv/{id} with append_to_response=videos. Uses tmdbMedia when set;
- * otherwise tries movie then TV.
+ * otherwise tries movie then TV when needed (same numeric id can be both; if movie has
+ * no YouTube trailer but TV does, TV metadata is used — set tmdbMedia to disambiguate).
  *
  * Run: node scripts/sync-metadata-from-tmdb-id.js [backup.json] [--dry-run] [--thumb-only] [--youtube-only]
  * Default: backups/firestore-backup-migrated.json
@@ -14,7 +15,7 @@
  * Requires: TMDB_API_KEY in .env
  * Report: backups/sync-metadata-from-tmdb-report.txt
  *
- * Renames movieKey in watched/maybeLater/archive/removed when title/year change.
+ * Renames movieKey in watched/maybeLater/archive when title/year change.
  */
 import "dotenv/config";
 import { readFileSync, writeFileSync, existsSync } from "fs";
@@ -146,25 +147,33 @@ async function fetchDetailsByTmdbId(id, apiKey, hint) {
       return null;
     }
   }
+  // No tmdbMedia hint: same numeric id can be /movie/{id} or /tv/{id}. Prefer the
+  // response that has a YouTube trailer; if neither does, prefer movie (legacy order).
+  let movieD = null;
   try {
-    const d = await fetchJson(movieUrl);
-    const m = formatMovie(d);
-    if (m) return m;
+    movieD = await fetchJson(movieUrl);
   } catch {
-    /* try tv */
+    movieD = null;
+  }
+  if (movieD) {
+    const m = formatMovie(movieD);
+    if (youtubeIdFromDetail(movieD)) return m;
   }
   try {
-    const d = await fetchJson(tvUrl);
-    return formatTv(d);
+    const tvD = await fetchJson(tvUrl);
+    const t = formatTv(tvD);
+    if (youtubeIdFromDetail(tvD)) return t;
+    if (movieD) return formatMovie(movieD);
+    return t;
   } catch {
-    return null;
+    return movieD ? formatMovie(movieD) : null;
   }
 }
 
 function replaceKeyEverywhere(backup, oldKey, newKey) {
   if (!oldKey || oldKey === newKey) return;
   const userFields = ["watched", "maybeLater", "archive"];
-  const sharedFields = ["removed", "watched", "maybeLater", "archive"];
+  const sharedFields = ["watched", "maybeLater", "archive"];
 
   for (const doc of Object.values(backup.users || {})) {
     for (const f of userFields) {

@@ -8,7 +8,8 @@
  * Requires: TMDB_API_KEY in .env
  * Report: backups/verify-tmdb-metadata-report.txt
  *
- * Uses tmdbMedia when "movie" or "tv"; otherwise tries movie then TV (same as sync-metadata).
+ * Uses tmdbMedia when "movie" or "tv"; otherwise disambiguates like sync-metadata
+ * (append_to_response=videos; prefer endpoint with a YouTube trailer when hint is missing).
  * Genre comparison normalizes order (split/sort/join) so "Action / Drama" matches "Drama / Action".
  */
 import "dotenv/config";
@@ -91,8 +92,9 @@ function formatTv(d) {
 
 async function fetchDetailsByTmdbId(id, apiKey, hint) {
   const base = `https://api.themoviedb.org/3`;
-  const movieUrl = `${base}/movie/${id}?api_key=${encodeURIComponent(apiKey)}`;
-  const tvUrl = `${base}/tv/${id}?api_key=${encodeURIComponent(apiKey)}`;
+  const v = "append_to_response=videos";
+  const movieUrl = `${base}/movie/${id}?${v}&api_key=${encodeURIComponent(apiKey)}`;
+  const tvUrl = `${base}/tv/${id}?${v}&api_key=${encodeURIComponent(apiKey)}`;
 
   if (hint === "tv") {
     try {
@@ -110,18 +112,24 @@ async function fetchDetailsByTmdbId(id, apiKey, hint) {
       return null;
     }
   }
+  let movieD = null;
   try {
-    const d = await fetchJson(movieUrl);
-    const m = formatMovie(d);
-    if (m) return m;
+    movieD = await fetchJson(movieUrl);
   } catch {
-    /* try tv */
+    movieD = null;
+  }
+  if (movieD) {
+    const m = formatMovie(movieD);
+    if (youtubeIdFromDetail(movieD)) return m;
   }
   try {
-    const d = await fetchJson(tvUrl);
-    return formatTv(d);
+    const tvD = await fetchJson(tvUrl);
+    const t = formatTv(tvD);
+    if (youtubeIdFromDetail(tvD)) return t;
+    if (movieD) return formatMovie(movieD);
+    return t;
   } catch {
-    return null;
+    return movieD ? formatMovie(movieD) : null;
   }
 }
 

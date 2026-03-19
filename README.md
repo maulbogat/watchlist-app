@@ -77,6 +77,17 @@ Get your UID: `node scripts/list-users.js` or Firebase Console → Authenticatio
 
 Requires `serviceAccountKey.json` in project root, or `FIREBASE_SERVICE_ACCOUNT` env var.
 
+## Catalog sync (backup JSON)
+
+Titles added only to a **shared list** (via the bookmarklet) are not written to `catalog/movies` automatically. To copy every user/shared list row into the catalog (for backups and scripts that treat the catalog as source of truth), run:
+
+```bash
+node scripts/sync-missing-items-to-catalog.js [backups/firestore-backup-migrated.json]
+# Optional: --dry-run
+```
+
+Then restore to Firestore if needed: `node scripts/restore-from-backup.js <backup>`.
+
 ## Features
 
 - Per-user lists (each account has its own titles)

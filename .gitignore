@@ -20,6 +20,8 @@ backups/verify-tmdb-metadata-report.txt
 backups/remove-no-tmdb-report.txt
 backups/backfill-youtube-from-tmdb-report.txt
 backups/items-without-youtube-trailer.txt
+backups/items-not-in-all-three-report.txt
+backups/sync-missing-to-catalog-report.txt
 
 # Dependencies
 node_modules/

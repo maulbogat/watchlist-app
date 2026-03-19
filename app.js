@@ -83,6 +83,75 @@ function getLastList(user) {
   }
 }
 
+const FILTER_STORAGE_PREFIX = "watchlist_filters_";
+
+function getFilterStorageKey(uid) {
+  return `${FILTER_STORAGE_PREFIX}${uid}`;
+}
+
+/** Restore type / status / genre filters from localStorage (per signed-in user). */
+function loadFilterPreferences(user) {
+  if (!user) return;
+  try {
+    const raw = localStorage.getItem(getFilterStorageKey(user.uid));
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (p.currentFilter === "both" || p.currentFilter === "movie" || p.currentFilter === "show") {
+      currentFilter = p.currentFilter;
+    }
+    if (
+      p.currentStatus === "to-watch" ||
+      p.currentStatus === "watched" ||
+      p.currentStatus === "recently-added"
+    ) {
+      currentStatus = p.currentStatus;
+    }
+    if (typeof p.currentGenre === "string") {
+      currentGenre = p.currentGenre;
+    }
+  } catch (e) {}
+}
+
+function saveFilterPreferences(user) {
+  if (!user) return;
+  try {
+    localStorage.setItem(
+      getFilterStorageKey(user.uid),
+      JSON.stringify({ currentFilter, currentGenre, currentStatus })
+    );
+  } catch (e) {}
+}
+
+function isGenrePresentInMovies(genre) {
+  if (!genre) return true;
+  const g = genre.toLowerCase();
+  return movies.some((m) => {
+    const gs = String(m.genre || "");
+    return gs.split(/\s*\/\s*/).some((s) => s.trim().toLowerCase() === g);
+  });
+}
+
+function sanitizeGenreAfterLoad() {
+  if (currentGenre && !isGenrePresentInMovies(currentGenre)) currentGenre = "";
+}
+
+/** Sync type radios + status tabs to currentFilter / currentStatus (e.g. after refresh restore). */
+function applyFilterUI() {
+  document.querySelectorAll('input[name="typeFilter"]').forEach((input) => {
+    input.checked = input.value === currentFilter;
+  });
+  document.querySelectorAll(".tab-group .tab").forEach((btn) => {
+    const isActive = btn.dataset.status === currentStatus;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+}
+
+function syncFiltersAfterListLoad(user) {
+  sanitizeGenreAfterLoad();
+  applyFilterUI();
+}
+
 function getUniqueGenres() {
   const count = new Map();
   movies.forEach((m) => {
@@ -628,11 +697,12 @@ document.addEventListener("click", (e) => {
 document.querySelectorAll('input[name="typeFilter"]').forEach((input) => {
   input.addEventListener("change", (e) => {
     currentFilter = e.target.value;
+    saveFilterPreferences(auth.currentUser);
     buildCards();
   });
 });
 
-// Tabs (To Watch / Watched)
+// Tabs (To Watch / Watched / Recently Added)
 document.querySelectorAll(".tab-group .tab").forEach((btn) => {
   btn.addEventListener("click", () => {
     currentStatus = btn.dataset.status;
@@ -641,6 +711,7 @@ document.querySelectorAll(".tab-group .tab").forEach((btn) => {
       b.classList.toggle("active", isActive);
       b.setAttribute("aria-selected", isActive ? "true" : "false");
     });
+    saveFilterPreferences(auth.currentUser);
     buildCards();
   });
 });
@@ -1095,6 +1166,7 @@ async function handleListSelect(val) {
     currentListMode = val === "personal" ? "personal" : { type: "personal", listId: val, name: personalList.name };
     saveLastList(user, currentListMode);
     movies = await loadList(user);
+    syncFiltersAfterListLoad(user);
     setBookmarkletCookie(user);
     if (!movies.length) {
       if (filters) filters.style.display = "none";
@@ -1110,6 +1182,7 @@ async function handleListSelect(val) {
     currentListMode = { type: "shared", listId: sharedList.id, name: sharedList.name };
     saveLastList(user, currentListMode);
     movies = await loadList(user);
+    syncFiltersAfterListLoad(user);
     setBookmarkletCookie(user);
     const filters = document.getElementById("content-filters");
     if (filters) filters.style.display = movies.length ? "" : "none";
@@ -1125,6 +1198,7 @@ async function handleListSelect(val) {
     currentListMode = "personal";
     saveLastList(user, currentListMode);
     movies = await loadList(user);
+    syncFiltersAfterListLoad(user);
     setBookmarkletCookie(user);
     if (filters) filters.style.display = movies.length ? "" : "none";
     if (movies.length) {
@@ -1153,6 +1227,9 @@ function init() {
       sharedLists = [];
       movies = [];
       userCountryCode = "IL";
+      currentFilter = "both";
+      currentGenre = "";
+      currentStatus = "to-watch";
       const wrap = document.getElementById("list-selector-wrap");
       if (wrap) wrap.style.display = "none";
       updateFilterCount("");
@@ -1246,7 +1323,9 @@ function init() {
     renderListSelector();
     updateCopyInviteButton();
 
+    loadFilterPreferences(user);
     movies = await loadList(user);
+    syncFiltersAfterListLoad(user);
     setBookmarkletCookie(user);
 
     if (!movies.length) {
@@ -1383,6 +1462,7 @@ function init() {
       renderListSelector();
       renderListsModalContent();
       movies = await loadList(user);
+      syncFiltersAfterListLoad(user);
       setBookmarkletCookie(user);
       const filters = document.getElementById("content-filters");
       if (filters) filters.style.display = movies.length ? "" : "none";
@@ -1429,6 +1509,7 @@ function init() {
         }
       });
       movies = await loadList(user);
+      syncFiltersAfterListLoad(user);
       setBookmarkletCookie(user);
       const filters = document.getElementById("content-filters");
       if (filters) filters.style.display = "";
@@ -1470,6 +1551,7 @@ function init() {
         renderListSelector();
         renderListsModalContent();
         movies = await loadList(user);
+        syncFiltersAfterListLoad(user);
         setBookmarkletCookie(user);
         const filters = document.getElementById("content-filters");
         if (filters) filters.style.display = "";
@@ -1585,6 +1667,7 @@ function init() {
             currentListMode = "personal";
             saveLastList(user, currentListMode);
             movies = await loadList(user);
+            syncFiltersAfterListLoad(user);
             setBookmarkletCookie(user);
             const grid = document.getElementById("grid");
             const filters = document.getElementById("content-filters");
@@ -1635,6 +1718,7 @@ function renderGenreFilter() {
   container.querySelectorAll(".genre-chip").forEach((btn) => {
     btn.addEventListener("click", () => {
       currentGenre = btn.dataset.genre || "";
+      saveFilterPreferences(auth.currentUser);
       container.querySelectorAll(".genre-chip").forEach((b) => {
         const isActive = (b.dataset.genre || "") === currentGenre;
         b.classList.toggle("active", isActive);
