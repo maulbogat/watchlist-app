@@ -169,18 +169,58 @@ function collectItemsWithImdb(backup) {
       if (m?.imdbId) out.push({ place: "catalog", ref: cat, index: i, m });
     }
   }
-  for (const doc of Object.values(backup.users || {})) {
+  for (const [uid, doc] of Object.entries(backup.users || {})) {
     if (!Array.isArray(doc?.items)) continue;
     for (let i = 0; i < doc.items.length; i++) {
       const m = doc.items[i];
-      if (m?.imdbId) out.push({ place: "user", ref: doc.items, index: i, m });
+      if (m?.imdbId) out.push({ place: "user", userId: uid, ref: doc.items, index: i, m });
     }
   }
-  for (const doc of Object.values(backup.sharedLists || {})) {
+  for (const [listId, doc] of Object.entries(backup.sharedLists || {})) {
     if (!Array.isArray(doc?.items)) continue;
     for (let i = 0; i < doc.items.length; i++) {
       const m = doc.items[i];
-      if (m?.imdbId) out.push({ place: "shared", ref: doc.items, index: i, m });
+      if (m?.imdbId) out.push({ place: "shared", listId, ref: doc.items, index: i, m });
+    }
+  }
+  return out;
+}
+
+/** Items that cannot be matched to TMDB (missing or invalid imdbId). */
+function collectItemsWithoutValidImdb(backup) {
+  const out = [];
+  const push = (place, idLabel, index, m) => {
+    out.push({
+      place,
+      idLabel,
+      index,
+      title: m?.title,
+      year: m?.year,
+      rawImdbId: m?.imdbId,
+    });
+  };
+  const cat = backup.catalog?.movies?.items;
+  if (Array.isArray(cat)) {
+    for (let i = 0; i < cat.length; i++) {
+      const m = cat[i];
+      const id = normImdb(m?.imdbId);
+      if (!/^tt\d+$/.test(id)) push("catalog", "catalog", i, m);
+    }
+  }
+  for (const [uid, doc] of Object.entries(backup.users || {})) {
+    if (!Array.isArray(doc?.items)) continue;
+    for (let i = 0; i < doc.items.length; i++) {
+      const m = doc.items[i];
+      const id = normImdb(m?.imdbId);
+      if (!/^tt\d+$/.test(id)) push("user", uid, i, m);
+    }
+  }
+  for (const [listId, doc] of Object.entries(backup.sharedLists || {})) {
+    if (!Array.isArray(doc?.items)) continue;
+    for (let i = 0; i < doc.items.length; i++) {
+      const m = doc.items[i];
+      const id = normImdb(m?.imdbId);
+      if (!/^tt\d+$/.test(id)) push("shared", listId, i, m);
     }
   }
   return out;
@@ -217,10 +257,12 @@ async function main() {
   }
 
   const rows = collectItemsWithImdb(backup);
+  const noImdbItems = collectItemsWithoutValidImdb(backup);
   const uniqueIds = [...new Set(rows.map((r) => normImdb(r.m.imdbId)).filter((id) => /^tt\d+$/.test(id)))];
 
   console.log(`Backup: ${backupPath}`);
   console.log(`Rows with imdbId: ${rows.length}, unique IMDb ids: ${uniqueIds.length}`);
+  console.log(`Rows without valid imdbId (skipped): ${noImdbItems.length}`);
   console.log(`Watch region (providers): ${watchRegion}`);
   if (dryRun) console.log("DRY RUN — no file write\n");
 
@@ -291,9 +333,18 @@ async function main() {
     else itemRowsWithSearch++;
   }
 
+  const tmdbNoMatchRows = [];
+  for (const row of rows) {
+    const id = normImdb(row.m.imdbId);
+    if (!/^tt\d+$/.test(id)) continue;
+    if (cache.get(id) != null) continue;
+    tmdbNoMatchRows.push(row);
+  }
+
   backup.exportedAt = new Date().toISOString();
 
   const reportPath = join(rootDir, "backups", "tmdb-backfill-report.txt");
+  const mismatchPath = join(rootDir, "backups", "tmdb-backfill-mismatches.txt");
   const lines = [
     `TMDB backfill from IMDb`,
     `Generated: ${backup.exportedAt}`,
@@ -313,13 +364,69 @@ async function main() {
     report.errors.slice(0, 30).forEach((x) => lines.push(`  ${x.imdbId}: ${x.err}`));
   }
 
+  const mismatchLines = [
+    `TMDB alignment — items that do not match / could not be loaded from TMDB`,
+    `Generated: ${backup.exportedAt}`,
+    `Backup: ${backupPath}`,
+    ``,
+    `These are NOT TMDB-backed rows, or TMDB had no entry for the given IMDb id.`,
+    ``,
+    `=== A. Missing or invalid imdbId (${noImdbItems.length} rows) ===`,
+    `Cannot call TMDB /find without a valid tt… id. Data was left unchanged.`,
+    ``,
+  ];
+  for (const x of noImdbItems) {
+    mismatchLines.push(
+      `  [${x.place}:${x.idLabel}#${x.index}] "${x.title ?? ""}" (${x.year ?? ""}) rawImdb=${JSON.stringify(x.rawImdbId)}`
+    );
+  }
+  mismatchLines.push(
+    ``,
+    `=== B. Valid imdbId but TMDB returned no movie/TV (${tmdbNoMatchRows.length} rows) ===`,
+    `TMDB /find had no result for this IMDb external id — row left unchanged (still non-TMDB data).`,
+    ``
+  );
+  const seenNoMatch = new Set();
+  for (const row of tmdbNoMatchRows) {
+    const id = normImdb(row.m.imdbId);
+    const loc =
+      row.place === "user"
+        ? `user:${row.userId}`
+        : row.place === "shared"
+          ? `shared:${row.listId}`
+          : "catalog";
+    mismatchLines.push(
+      `  [${loc}#${row.index}] imdbId=${id} "${row.m.title ?? ""}" (${row.m.year ?? ""})`
+    );
+    seenNoMatch.add(id);
+  }
+  mismatchLines.push(``, `Unique IMDb ids with no TMDB match: ${seenNoMatch.size}`, ``);
+
+  mismatchLines.push(`=== C. TMDB API errors (${report.errors.length} ids) ===`, ``);
+  if (report.errors.length === 0) {
+    mismatchLines.push(`  (none)`);
+  } else {
+    for (const x of report.errors) {
+      mismatchLines.push(`  ${x.imdbId}: ${x.err}`);
+    }
+  }
+  mismatchLines.push(
+    ``,
+    `Note: Rows in A and B were not overwritten with TMDB data. Fix imdbId or remove bad titles;`,
+    `for B, verify the id exists on both IMDb and TMDB (rare for valid tt ids).`
+  );
+
   if (!dryRun) {
     writeFileSync(backupPath, JSON.stringify(backup, null, 2), "utf-8");
     writeFileSync(reportPath, lines.join("\n"), "utf-8");
+    writeFileSync(mismatchPath, mismatchLines.join("\n"), "utf-8");
     console.log(`\nWrote ${backupPath}`);
     console.log(`Report: ${reportPath}`);
+    console.log(`Mismatches / non-TMDB rows: ${mismatchPath}`);
   } else {
-    console.log("\n[dry-run] Would write backup and report.");
+    writeFileSync(mismatchPath, mismatchLines.join("\n"), "utf-8");
+    console.log("\n[dry-run] Wrote mismatch report only; backup unchanged.");
+    console.log(`Mismatches: ${mismatchPath}`);
   }
 
   console.log("\n" + lines.join("\n"));
