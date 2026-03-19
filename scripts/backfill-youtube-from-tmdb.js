@@ -1,8 +1,8 @@
 /**
  * 1) Removes any existing youtubeId on every catalog/user/shared list item.
  * 2) For each item with tmdbId, fetches TMDB /movie|tv/{id}?append_to_response=videos
- *    and sets youtubeId to the YouTube trailer key, or "NONE" if TMDB has none.
- * 3) Items without tmdbId get youtubeId: "NONE".
+ *    and sets youtubeId to the YouTube trailer key, or null if TMDB has none.
+ * 3) Items without tmdbId get youtubeId: null.
  *
  * Run: node scripts/backfill-youtube-from-tmdb.js [backup.json] [--dry-run]
  * Default: backups/firestore-backup-migrated.json
@@ -20,7 +20,6 @@ import https from "https";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
 const DELAY_MS = 260;
-const NONE = "NONE";
 
 function pickYoutubeTrailerKey(results) {
   const r = results || [];
@@ -188,7 +187,7 @@ async function main() {
   }
 
   let rowsWithTrailerKey = 0;
-  let rowsWithNone = 0;
+  let rowsWithNull = 0;
   walkAllItems(backup, (arr, i) => {
     const m = arr[i];
     const next = { ...m };
@@ -196,8 +195,8 @@ async function main() {
 
     const id = numTmdbId(m);
     if (id == null) {
-      next.youtubeId = NONE;
-      rowsWithNone++;
+      next.youtubeId = null;
+      rowsWithNull++;
     } else {
       const meta = cache.get(id);
       const key = meta?.youtubeId;
@@ -205,8 +204,8 @@ async function main() {
         next.youtubeId = String(key).trim();
         rowsWithTrailerKey++;
       } else {
-        next.youtubeId = NONE;
-        rowsWithNone++;
+        next.youtubeId = null;
+        rowsWithNull++;
       }
     }
     arr[i] = next;
@@ -222,7 +221,7 @@ async function main() {
     `Unique tmdbIds fetched: ${uniqueIds.length}`,
     `TMDB OK: ${cache.size}, errors: ${errors.length}`,
     `Rows: youtubeId = real YouTube key: ${rowsWithTrailerKey}`,
-    `Rows: youtubeId = NONE: ${rowsWithNone}`,
+    `Rows: youtubeId = null (no trailer): ${rowsWithNull}`,
     ``,
   ];
   if (errors.length) {

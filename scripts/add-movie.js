@@ -3,7 +3,7 @@
  * Run: node scripts/add-movie.js "Title" [year] [type] [youtubeId] [imdbId]
  * Example: node scripts/add-movie.js "Action" 1999 show "" tt0206467
  *
- * If youtubeId omitted, uses "NONE". Use imdbId (e.g. tt0206467) when adding metadata.
+ * If youtubeId omitted, stores null. Use imdbId (e.g. tt0206467) when adding metadata.
  * Requires: serviceAccountKey.json in project root.
  */
 import { readFileSync } from "fs";
@@ -40,7 +40,10 @@ async function addMovie(title, year, type, youtubeId, imdbId) {
     console.error(`"${title}" (${year}) already in catalog.`);
     process.exit(1);
   }
-  const yt = youtubeId || "NONE";
+  const yt =
+    youtubeId && String(youtubeId).trim() !== "" && youtubeId !== "null"
+      ? String(youtubeId).trim()
+      : null;
   const movie = {
     title,
     year: year ? Number(year) : null,
@@ -49,7 +52,7 @@ async function addMovie(title, year, type, youtubeId, imdbId) {
     youtubeId: yt,
     services: [],
   };
-  if (yt !== "NONE" && yt !== "SEARCH") {
+  if (yt) {
     movie.thumb = `https://img.youtube.com/vi/${yt}/hqdefault.jpg`;
   }
   if (imdbId) {

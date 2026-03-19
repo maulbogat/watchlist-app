@@ -17,6 +17,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
+import { isPlayableYoutubeTrailerId } from "../lib/youtube-trailer-id.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
@@ -65,8 +66,7 @@ function movieKey(m) {
 }
 
 function usesYoutubeForTrailer(m) {
-  const id = m.youtubeId;
-  return id && id !== "SEARCH" && id !== "NONE" && id.length > 0;
+  return isPlayableYoutubeTrailerId(m.youtubeId);
 }
 
 function usesYoutubeForThumb(m) {
@@ -188,10 +188,8 @@ async function main() {
   const stillYoutubeTrailer = migratedItems.filter(usesYoutubeForTrailer);
   const stillYoutubeThumb = migratedItems.filter(usesYoutubeForThumb);
   const stillMissingImdb = migratedItems.filter(lacksImdbId);
-  const stillMissingTrailer = migratedItems.filter((m) => !m.youtubeId || m.youtubeId === "SEARCH");
-  const stillMissingThumb = migratedItems.filter(
-    (m) => !m.thumb || ((m.youtubeId === "SEARCH" || m.youtubeId === "NONE") && !m.thumb)
-  );
+  const stillMissingTrailer = migratedItems.filter((m) => !isPlayableYoutubeTrailerId(m.youtubeId));
+  const stillMissingThumb = migratedItems.filter((m) => !m.thumb);
 
   reportLines.push(`Trailer from YouTube: ${stillYoutubeTrailer.length}`);
   if (stillYoutubeTrailer.length <= 30) {
@@ -213,7 +211,7 @@ async function main() {
     ``,
     `=== Still missing ===`,
     `Missing imdbId: ${stillMissingImdb.length}`,
-    `Missing trailer (youtubeId empty/NONE/SEARCH): ${stillMissingTrailer.length}`,
+    `Missing trailer (youtubeId null/empty or legacy placeholder): ${stillMissingTrailer.length}`,
     `Missing thumb: ${stillMissingThumb.length}`
   );
 

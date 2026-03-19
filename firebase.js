@@ -609,7 +609,7 @@ async function updateMovieMetadata(uid, listMode, key, updates, countryCode) {
     const idx = items.findIndex((m) => movieKey(m) === key);
     if (idx < 0) return;
     if (updates.thumb) items[idx].thumb = updates.thumb;
-    if (updates.youtubeId) items[idx].youtubeId = updates.youtubeId;
+    if ("youtubeId" in updates) items[idx].youtubeId = updates.youtubeId;
     mergeServices(items[idx]);
     await setDoc(doc(db, "users", uid), { items }, { merge: true });
   } else if (typeof listMode === "object" && listMode?.type === "shared") {
@@ -622,7 +622,7 @@ async function updateMovieMetadata(uid, listMode, key, updates, countryCode) {
     const idx = items.findIndex((m) => movieKey(m) === key);
     if (idx < 0) return;
     if (updates.thumb) items[idx].thumb = updates.thumb;
-    if (updates.youtubeId) items[idx].youtubeId = updates.youtubeId;
+    if ("youtubeId" in updates) items[idx].youtubeId = updates.youtubeId;
     mergeServices(items[idx]);
     await setDoc(doc(db, "sharedLists", listId), { items }, { merge: true });
   }

@@ -18,6 +18,7 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
+import { isPlayableYoutubeTrailerId } from "../lib/youtube-trailer-id.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
@@ -330,7 +331,7 @@ async function main() {
     next.type = e.type;
     next.genre = e.genre || "";
     if (e.thumb) next.thumb = e.thumb;
-    next.youtubeId = e.youtubeId || "NONE";
+    next.youtubeId = e.youtubeId ?? null;
     next.services = Array.isArray(e.services) ? e.services : [];
     next.tmdbId = e.tmdbId;
     next.imdbId = id;
@@ -344,11 +345,11 @@ async function main() {
   }
 
   let itemRowsWithTrailer = 0;
-  let itemRowsWithSearch = 0;
+  let itemRowsWithNone = 0;
   for (const { ref, index } of rows) {
     const y = ref[index]?.youtubeId;
-    if (y && y !== "NONE" && y !== "SEARCH") itemRowsWithTrailer++;
-    else itemRowsWithSearch++;
+    if (isPlayableYoutubeTrailerId(y)) itemRowsWithTrailer++;
+    else itemRowsWithNone++;
   }
 
   const tmdbNoMatchRows = [];
@@ -371,9 +372,9 @@ async function main() {
     `Unique IMDb ids processed: ${uniqueIds.length}`,
     `TMDB matched: ${report.tmdbOk}, no TMDB match: ${report.tmdbMiss}`,
     `Unique ids got YouTube key from TMDB/search: ${report.withTrailer}`,
-    `Unique ids with no trailer key (stored as NONE): ${report.searchOnly}`,
+    `Unique ids with no trailer key (stored as null): ${report.searchOnly}`,
     `List rows with real youtubeId after backfill: ${itemRowsWithTrailer}`,
-    `List rows still NONE/SEARCH: ${itemRowsWithSearch}`,
+    `List rows with null youtubeId: ${itemRowsWithNone}`,
     `movieKey renames (title/year updates): ${keyRenames}`,
     ``,
   ];
@@ -454,7 +455,7 @@ async function main() {
   );
   console.log("  • The Shawshank Redemption — imdb tt0111161");
   console.log("  • Inception — imdb tt1375666");
-  console.log("After restore, open the card and Play — youtubeId should be a real key or NONE.");
+  console.log("After restore, open the card and Play — youtubeId should be a real key or null.");
 }
 
 main().catch((e) => {

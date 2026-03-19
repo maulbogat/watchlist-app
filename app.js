@@ -33,6 +33,7 @@ import {
   setUserCountry,
 } from "./firebase.js";
 import { COUNTRIES, countryCodeToFlag } from "./countries.js";
+import { isPlayableYoutubeTrailerId } from "./lib/youtube-trailer-id.js";
 
 const STATUS_ORDER = ["to-watch", "watched"];
 
@@ -158,12 +159,9 @@ function servicesForMovie(m, countryCode) {
   return Array.isArray(m.services) ? m.services : [];
 }
 
-/** Stored TMDB YouTube trailer key — playable unless missing, NONE, or legacy SEARCH */
+/** Stored TMDB YouTube trailer key — playable only if valid 11-char YouTube id */
 function hasPlayableTrailerYoutubeId(m) {
-  const y = m?.youtubeId;
-  if (y == null || y === "") return false;
-  if (y === "NONE" || y === "SEARCH") return false;
-  return true;
+  return isPlayableYoutubeTrailerId(m?.youtubeId);
 }
 
 function renderServiceChips(services, { limit } = {}) {

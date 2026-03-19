@@ -1,6 +1,7 @@
 /**
  * Update a movie in Firestore catalog.
  * Run: node scripts/update-movie.js "Man on the Inside" xhsVj_4ONoA
+ * Clear trailer thumb: pass null (literal) as second arg.
  *
  * Requires: serviceAccountKey.json in project root.
  */
@@ -40,26 +41,30 @@ async function updateMovie(title, youtubeId) {
     console.error(`Movie "${title}" not found.`);
     process.exit(1);
   }
-  items[idx].youtubeId = youtubeId;
-  if (youtubeId === "NONE" || youtubeId === "SEARCH") {
+  const yt =
+    youtubeId === "null" || youtubeId === ""
+      ? null
+      : youtubeId;
+  items[idx].youtubeId = yt;
+  if (!yt) {
     delete items[idx].thumb;
   } else {
-    items[idx].thumb = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+    items[idx].thumb = `https://img.youtube.com/vi/${yt}/hqdefault.jpg`;
   }
   await ref.set({
     items,
     updatedAt: new Date().toISOString(),
   });
-  console.log(`Updated "${items[idx].title}" youtubeId to ${youtubeId}`);
+  console.log(`Updated "${items[idx].title}" youtubeId to ${yt === null ? "null" : yt}`);
 }
 
-const [, , title, youtubeId] = process.argv;
-if (!title || !youtubeId) {
-  console.error('Usage: node scripts/update-movie.js "Movie Title" youtubeId');
+const [, , title, rawYoutube] = process.argv;
+if (!title || rawYoutube === undefined) {
+  console.error('Usage: node scripts/update-movie.js "Movie Title" <youtubeId|null>');
   process.exit(1);
 }
 
-updateMovie(title, youtubeId).catch((err) => {
+updateMovie(title, rawYoutube).catch((err) => {
   console.error(err);
   process.exit(1);
 });

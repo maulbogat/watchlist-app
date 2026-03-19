@@ -68,7 +68,7 @@ function omdbToMovie(omdb, imdbId) {
     year: isNaN(year) ? null : year,
     type: nType,
     genre: genre || "",
-    youtubeId: "NONE",
+    youtubeId: null,
     imdbId: nImdb ? (String(nImdb).startsWith("tt") ? nImdb : `tt${nImdb}`) : null,
     thumb,
     services: [],

@@ -1,6 +1,6 @@
 /**
  * Migrate catalog (and mirrored user/shared items) from stored YouTube trailer
- * to IMDb-first: youtubeId → SEARCH, thumb from OMDb poster when available.
+ * to IMDb-first: youtubeId → null (placeholder), thumb from OMDb poster when available.
  *
  * Run: node scripts/migrate-youtube-to-imdb-trailer.js
  * Requires: OMDB_API_KEY in .env
@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
+import { isPlayableYoutubeTrailerId } from "../lib/youtube-trailer-id.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
@@ -57,7 +58,7 @@ function isYoutubeThumb(t) {
 }
 
 function applyTrailerMigration(m, posterUrl) {
-  m.youtubeId = "SEARCH";
+  m.youtubeId = null;
   if (posterUrl) {
     m.thumb = posterUrl;
   } else if (isYoutubeThumb(m.thumb)) {
@@ -83,7 +84,7 @@ function syncItemFromCanonical(m, byKey) {
 
 /**
  * List rows that were never in catalog still hold old youtubeId. Migrate those
- * (OMDb poster + SEARCH), add to byKey, then sync every list row from byKey.
+ * (OMDb poster + null youtubeId), add to byKey, then sync every list row from byKey.
  */
 async function migrateAndSyncUserSharedItems(backup, byKey, report) {
   const listRows = [];
@@ -102,7 +103,7 @@ async function migrateAndSyncUserSharedItems(backup, byKey, report) {
 
   let orphans = 0;
   for (const m of listRows) {
-    if (!m.imdbId || !m.youtubeId || m.youtubeId === "SEARCH") continue;
+    if (!m.imdbId || !isPlayableYoutubeTrailerId(m.youtubeId)) continue;
     const k = movieKey(m);
     if (byKey.has(k)) continue;
     try {
@@ -147,7 +148,7 @@ async function main() {
     process.exit(1);
   }
 
-  const toMigrate = items.filter((m) => m.imdbId && m.youtubeId && m.youtubeId !== "SEARCH");
+  const toMigrate = items.filter((m) => m.imdbId && isPlayableYoutubeTrailerId(m.youtubeId));
   console.log(`Catalog items with YouTube trailer + imdbId: ${toMigrate.length}`);
 
   const report = { migrated: 0, posterOk: 0, posterFail: 0, errors: [] };
@@ -184,7 +185,7 @@ async function main() {
     `YouTube → IMDb-first trailer migration`,
     `Generated: ${new Date().toISOString()}`,
     ``,
-    `Catalog: set youtubeId to SEARCH for ${report.migrated} titles (had real YouTube id + imdbId).`,
+    `Catalog: set youtubeId to null for ${report.migrated} titles (had real YouTube id + imdbId).`,
     `List-only titles migrated (not in catalog): ${orphans}`,
     `OMDb poster used for thumb: ${report.posterOk}`,
     `No OMDb poster (thumb cleared if was YouTube): ${report.posterFail}`,

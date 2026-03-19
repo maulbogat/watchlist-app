@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { isPlayableYoutubeTrailerId } from "../lib/youtube-trailer-id.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
@@ -43,12 +44,8 @@ async function run() {
   }
   const items = snap.data().items;
 
-  const missingTrailer = items.filter(
-    (m) => !m.youtubeId || m.youtubeId === "NONE" || m.youtubeId === "SEARCH"
-  );
-  const missingThumb = items.filter(
-    (m) => !m.thumb || ((m.youtubeId === "NONE" || m.youtubeId === "SEARCH") && !m.thumb)
-  );
+  const missingTrailer = items.filter((m) => !isPlayableYoutubeTrailerId(m.youtubeId));
+  const missingThumb = items.filter((m) => !m.thumb);
   const israeli = items.filter(isIsraeli);
 
   const hasNetflix = (m) => {
@@ -81,7 +78,7 @@ async function run() {
     console.log(`  ... and ${noServices.length - 20} more`);
   }
 
-  console.log("\n=== Missing trailers (youtubeId empty, NONE, or SEARCH) ===\n");
+  console.log("\n=== Missing trailers (youtubeId null or no playable key) ===\n");
   if (!missingTrailer.length) {
     console.log("None.");
   } else {

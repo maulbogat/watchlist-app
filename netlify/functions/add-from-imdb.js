@@ -3,6 +3,21 @@ const { getFirestore } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 const https = require("https");
 
+/** Same rule as lib/youtube-trailer-id.js (YouTube video id from TMDB). */
+const YOUTUBE_VIDEO_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
+
+function normalizeStoredYoutubeTrailerId(v) {
+  if (v == null || v === "") return null;
+  const s = String(v).trim();
+  if (!YOUTUBE_VIDEO_ID_RE.test(s)) return null;
+  return s;
+}
+
+function isPlayableYoutubeTrailerId(v) {
+  if (v == null || typeof v !== "string") return false;
+  return YOUTUBE_VIDEO_ID_RE.test(v.trim());
+}
+
 function getApp() {
   if (global.__fbAdmin) return global.__fbAdmin;
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -363,7 +378,7 @@ exports.handler = async (event, context) => {
           type: e.type,
           genre: e.genre || "",
           thumb: e.thumb,
-          youtubeId: yt || "NONE",
+          youtubeId: normalizeStoredYoutubeTrailerId(yt),
           imdbId: nImdb,
           services: Array.isArray(e.services) ? e.services : [],
           tmdbId: e.tmdbId,
@@ -407,7 +422,7 @@ exports.handler = async (event, context) => {
       type: nType,
       genre: genre || "",
       thumb,
-      youtubeId: yt || "NONE",
+      youtubeId: normalizeStoredYoutubeTrailerId(yt),
       imdbId: nImdb,
       services: [],
     };
@@ -466,12 +481,8 @@ exports.handler = async (event, context) => {
         (existing.year == null && movie.year != null) ||
         (!existing.thumb && movie.thumb) ||
         (!existing.genre && movie.genre) ||
-        ((!existing.youtubeId ||
-          existing.youtubeId === "SEARCH" ||
-          existing.youtubeId === "NONE") &&
-          movie.youtubeId &&
-          movie.youtubeId !== "SEARCH" &&
-          movie.youtubeId !== "NONE") ||
+        (!isPlayableYoutubeTrailerId(existing.youtubeId) &&
+          isPlayableYoutubeTrailerId(movie.youtubeId)) ||
         ((!existing.services || existing.services.length === 0) &&
           movie.services &&
           movie.services.length > 0);
@@ -480,10 +491,8 @@ exports.handler = async (event, context) => {
         if (!existing.thumb && movie.thumb) existing.thumb = movie.thumb;
         if (!existing.genre && movie.genre) existing.genre = movie.genre;
         if (
-          (!existing.youtubeId || existing.youtubeId === "SEARCH" || existing.youtubeId === "NONE") &&
-          movie.youtubeId &&
-          movie.youtubeId !== "SEARCH" &&
-          movie.youtubeId !== "NONE"
+          !isPlayableYoutubeTrailerId(existing.youtubeId) &&
+          isPlayableYoutubeTrailerId(movie.youtubeId)
         ) {
           existing.youtubeId = movie.youtubeId;
         }

@@ -8,7 +8,7 @@
  * Default: backups/firestore-backup-migrated.json
  *
  * --thumb-only: only set thumb from TMDB poster_path (does not change title/year/type/genre).
- * --youtube-only: only set youtubeId from TMDB videos (YouTube trailer key), or "NONE" if none.
+ * --youtube-only: only set youtubeId from TMDB videos (YouTube trailer key), or null if none.
  *   You can pass --thumb-only and --youtube-only together to update both without other fields.
  *
  * Requires: TMDB_API_KEY in .env
@@ -21,6 +21,7 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
+import { normalizeStoredYoutubeTrailerId } from "../lib/youtube-trailer-id.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
@@ -272,7 +273,7 @@ async function main() {
     if (thumbOnly || youtubeOnly) {
       const patch = { ...m };
       if (thumbOnly) patch.thumb = meta.thumb;
-      if (youtubeOnly) patch.youtubeId = meta.youtubeId || "SEARCH";
+      if (youtubeOnly) patch.youtubeId = normalizeStoredYoutubeTrailerId(meta.youtubeId);
       arr[i] = patch;
       rowsUpdated++;
       return;
@@ -287,7 +288,7 @@ async function main() {
       genre: meta.genre || "",
       tmdbMedia: meta.tmdbMedia,
       thumb: meta.thumb,
-      youtubeId: meta.youtubeId || "NONE",
+      youtubeId: normalizeStoredYoutubeTrailerId(meta.youtubeId),
     };
     const newKey = movieKey(next);
     if (oldKey !== newKey) {
