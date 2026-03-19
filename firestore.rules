@@ -8,6 +8,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+    // Extra personal lists (not the default doc on users/{uid})
+    match /users/{userId}/personalLists/{listId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
     match /sharedLists/{listId} {
       allow read: if request.auth != null && request.auth.uid in resource.data.members;
       allow create: if request.auth != null && request.auth.uid in request.resource.data.members;

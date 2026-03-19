@@ -710,6 +710,10 @@ async function getPersonalListMovies(uid, listId) {
 }
 
 async function setPersonalListStatus(uid, listId, key, status) {
+  if (listId === "personal") {
+    await setStatus(uid, key, status);
+    return;
+  }
   const ref = doc(db, "users", uid, "personalLists", listId);
   const removeFromAll = {
     watched: arrayRemove(key),
@@ -725,6 +729,10 @@ async function setPersonalListStatus(uid, listId, key, status) {
 }
 
 async function removeFromPersonalList(uid, listId, key) {
+  if (listId === "personal") {
+    await removeTitle(uid, key);
+    return;
+  }
   const ref = doc(db, "users", uid, "personalLists", listId);
   const snap = await getDoc(ref);
   const data = snap.exists() ? snap.data() : {};
