@@ -39,10 +39,6 @@ const STATUS_ORDER = ["to-watch", "watched"];
 
 const GENRE_LIMIT = 10;
 
-// Version footer: visible only when signed in as this email (bump version on deploy)
-const DEBUG_EMAIL = "maulbogat@gmail.com";
-const APP_VERSION = "92dea52";
-
 let movies = [];
 let currentFilter = "both"; // 'both' | 'movie' | 'show'
 let currentGenre = ""; // '' = all, or genre name
@@ -656,7 +652,6 @@ function updateAuthUI(user) {
   const avatarImg = document.getElementById("auth-avatar-img");
   const avatarInitial = document.getElementById("auth-avatar-initial");
   const avatarBtn = document.getElementById("auth-avatar-btn");
-  const versionFooter = document.getElementById("version-footer");
 
   if (user) {
     signInBtn.style.display = "none";
@@ -681,22 +676,10 @@ function updateAuthUI(user) {
       avatarImg.src = "";
       avatarImg.onerror = null;
     }
-    if (versionFooter && user.email === DEBUG_EMAIL) {
-      versionFooter.textContent = "v" + APP_VERSION;
-      versionFooter.style.display = "block";
-      versionFooter.setAttribute("aria-hidden", "false");
-    } else if (versionFooter) {
-      versionFooter.style.display = "none";
-      versionFooter.setAttribute("aria-hidden", "true");
-    }
   } else {
     signInBtn.style.display = "inline-flex";
     signedIn.style.display = "none";
     if (avatarInitial) avatarInitial.textContent = "";
-    if (versionFooter) {
-      versionFooter.style.display = "none";
-      versionFooter.setAttribute("aria-hidden", "true");
-    }
   }
 }
 

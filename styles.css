@@ -1290,15 +1290,6 @@ header h1 span {
 .modal-move-to-our-list-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .modal-footer { flex-wrap: wrap; }
 
-.version-footer {
-  display: none;
-  padding: 0.5rem 1rem;
-  font-size: 0.7rem;
-  color: var(--muted);
-  text-align: center;
-  opacity: 0.6;
-}
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
