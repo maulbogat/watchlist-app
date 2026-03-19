@@ -82,6 +82,28 @@ async function mergeImdbIdsFromCatalog(items) {
 }
 
 /**
+ * Fill missing tmdbId on list rows from catalog, keyed by imdbId.
+ */
+async function mergeTmdbIdsFromCatalog(items) {
+  if (!Array.isArray(items) || items.length === 0) return items;
+  if (!items.some((m) => m && m.imdbId && (m.tmdbId == null || m.tmdbId === ""))) return items;
+  const catalog = await getMoviesCatalog();
+  const byImdb = new Map();
+  for (const c of catalog) {
+    if (!c?.imdbId || c.tmdbId == null || c.tmdbId === "") continue;
+    const iid = String(c.imdbId).startsWith("tt") ? c.imdbId : `tt${c.imdbId}`;
+    const tid = Number(c.tmdbId);
+    if (!Number.isNaN(tid)) byImdb.set(iid, tid);
+  }
+  return items.map((m) => {
+    if (!m?.imdbId || (m.tmdbId != null && m.tmdbId !== "")) return m;
+    const iid = String(m.imdbId).startsWith("tt") ? m.imdbId : `tt${m.imdbId}`;
+    const tid = byImdb.get(iid);
+    return tid != null ? { ...m, tmdbId: tid } : m;
+  });
+}
+
+/**
  * Returns status data from Firestore.
  * Data model: users/{uid} = { items: [], watched: [], maybeLater: [], archive: [] }
  */
@@ -160,7 +182,7 @@ async function getUserMovies(uid) {
     });
   }
 
-  return mergeImdbIdsFromCatalog(items);
+  return mergeTmdbIdsFromCatalog(await mergeImdbIdsFromCatalog(items));
 }
 
 /** @deprecated Use getStatusData. Kept for backward compat. */
@@ -254,15 +276,17 @@ async function getSharedListMovies(listId) {
   const watchedSet = new Set(data.watched || []);
   const maybeLaterSet = new Set(data.maybeLater || []);
   const archiveSet = new Set(data.archive || []);
-  return mergeImdbIdsFromCatalog(
-    items.map((m) => {
-      const key = movieKey(m);
-      let status = "to-watch";
-      if (watchedSet.has(key)) status = "watched";
-      else if (maybeLaterSet.has(key)) status = "maybe-later";
-      else if (archiveSet.has(key)) status = "archive";
-      return { ...m, status };
-    })
+  return mergeTmdbIdsFromCatalog(
+    await mergeImdbIdsFromCatalog(
+      items.map((m) => {
+        const key = movieKey(m);
+        let status = "to-watch";
+        if (watchedSet.has(key)) status = "watched";
+        else if (maybeLaterSet.has(key)) status = "maybe-later";
+        else if (archiveSet.has(key)) status = "archive";
+        return { ...m, status };
+      })
+    )
   );
 }
 
@@ -654,15 +678,17 @@ async function getPersonalListMovies(uid, listId) {
     const watchedSet = new Set(data.watched || []);
     const maybeLaterSet = new Set(data.maybeLater || []);
     const archiveSet = new Set(data.archive || []);
-    return mergeImdbIdsFromCatalog(
-      items.map((m) => {
-        const key = movieKey(m);
-        let status = "to-watch";
-        if (watchedSet.has(key)) status = "watched";
-        else if (maybeLaterSet.has(key)) status = "maybe-later";
-        else if (archiveSet.has(key)) status = "archive";
-        return { ...m, status };
-      })
+    return mergeTmdbIdsFromCatalog(
+      await mergeImdbIdsFromCatalog(
+        items.map((m) => {
+          const key = movieKey(m);
+          let status = "to-watch";
+          if (watchedSet.has(key)) status = "watched";
+          else if (maybeLaterSet.has(key)) status = "maybe-later";
+          else if (archiveSet.has(key)) status = "archive";
+          return { ...m, status };
+        })
+      )
     );
   } catch (e) {
     console.warn("getPersonalListMovies failed:", e);
