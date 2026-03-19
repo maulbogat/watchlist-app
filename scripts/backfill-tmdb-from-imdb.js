@@ -330,7 +330,7 @@ async function main() {
     next.type = e.type;
     next.genre = e.genre || "";
     if (e.thumb) next.thumb = e.thumb;
-    next.youtubeId = e.youtubeId || "SEARCH";
+    next.youtubeId = e.youtubeId || "NONE";
     next.services = Array.isArray(e.services) ? e.services : [];
     next.tmdbId = e.tmdbId;
     next.imdbId = id;
@@ -347,7 +347,7 @@ async function main() {
   let itemRowsWithSearch = 0;
   for (const { ref, index } of rows) {
     const y = ref[index]?.youtubeId;
-    if (y && y !== "SEARCH") itemRowsWithTrailer++;
+    if (y && y !== "NONE" && y !== "SEARCH") itemRowsWithTrailer++;
     else itemRowsWithSearch++;
   }
 
@@ -371,9 +371,9 @@ async function main() {
     `Unique IMDb ids processed: ${uniqueIds.length}`,
     `TMDB matched: ${report.tmdbOk}, no TMDB match: ${report.tmdbMiss}`,
     `Unique ids got YouTube key from TMDB/search: ${report.withTrailer}`,
-    `Unique ids with no trailer key (stored as SEARCH): ${report.searchOnly}`,
+    `Unique ids with no trailer key (stored as NONE): ${report.searchOnly}`,
     `List rows with real youtubeId after backfill: ${itemRowsWithTrailer}`,
-    `List rows still SEARCH: ${itemRowsWithSearch}`,
+    `List rows still NONE/SEARCH: ${itemRowsWithSearch}`,
     `movieKey renames (title/year updates): ${keyRenames}`,
     ``,
   ];
@@ -454,7 +454,7 @@ async function main() {
   );
   console.log("  • The Shawshank Redemption — imdb tt0111161");
   console.log("  • Inception — imdb tt1375666");
-  console.log("After restore, open the card and Play — youtubeId should be stored, not SEARCH.");
+  console.log("After restore, open the card and Play — youtubeId should be a real key or NONE.");
 }
 
 main().catch((e) => {

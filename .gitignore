@@ -17,6 +17,8 @@ backups/tmdb-backfill-mismatches.txt
 backups/sync-metadata-from-tmdb-report.txt
 backups/sync-services-from-tmdb-report.txt
 backups/verify-tmdb-metadata-report.txt
+backups/remove-no-tmdb-report.txt
+backups/backfill-youtube-from-tmdb-report.txt
 
 # Dependencies
 node_modules/

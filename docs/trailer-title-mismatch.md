@@ -14,7 +14,7 @@ TV miniseries and docuseries (e.g. *Crime Scene: The Vanishing at the Cecil Hote
    - GET responses include **`resolvedTitle` / `resolvedYear`** for the client.
 
 2. **`app.js`**  
-   - Before saving thumb / `youtubeId` / services from the enricher, checks that **`resolvedTitle` matches the list title** (fuzzy match). If not, it does not persist a mismatched trailer.
+   - Trailers play only from **stored** `youtubeId` (TMDB key) or show **no trailer**; see `docs/youtube-trailer-field.md`.
 
 3. **`scripts/backfill-tmdb-from-imdb.js`** & **`scripts/add-tmdb-ids-from-imdb.js`**  
    - Same disambiguation using the row’s **`type`** (`movie` vs `show`) when both TMDB results exist.

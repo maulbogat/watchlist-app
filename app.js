@@ -158,23 +158,12 @@ function servicesForMovie(m, countryCode) {
   return Array.isArray(m.services) ? m.services : [];
 }
 
-/** Guard against wrong TMDB enrichment (e.g. movie vs TV mix-up) before saving trailer/thumb to Firestore */
-function normalizeTitleForMatch(s) {
-  return String(s || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-function titlesLikelyMatch(a, b) {
-  const na = normalizeTitleForMatch(a);
-  const nb = normalizeTitleForMatch(b);
-  if (!na || !nb) return true;
-  if (na === nb) return true;
-  if (na.includes(nb) || nb.includes(na)) return true;
-  const shorter = na.length <= nb.length ? na : nb;
-  const longer = na.length > nb.length ? na : nb;
-  if (shorter.length >= 10 && longer.includes(shorter.slice(0, 12))) return true;
-  return false;
+/** Stored TMDB YouTube trailer key — playable unless missing, NONE, or legacy SEARCH */
+function hasPlayableTrailerYoutubeId(m) {
+  const y = m?.youtubeId;
+  if (y == null || y === "") return false;
+  if (y === "NONE" || y === "SEARCH") return false;
+  return true;
 }
 
 function renderServiceChips(services, { limit } = {}) {
@@ -566,111 +555,10 @@ function openModal(m) {
   titleEl.textContent = m.title;
   titleEl.dir = /[\u0590-\u05FF]/.test(m.title) ? "rtl" : "ltr";
 
-  if (m.youtubeId === "SEARCH") {
-    const query = encodeURIComponent(m.title + " official trailer");
-    const imdbUrl = m.imdbId ? `https://www.imdb.com/title/${m.imdbId}/` : null;
-    const trailerLink = imdbUrl
-      ? `<a href="${imdbUrl}" target="_blank" class="modal-action-btn modal-youtube-link">Watch on IMDb &#x2197;</a>`
-      : `<a href="https://www.youtube.com/results?search_query=${query}" target="_blank" class="modal-action-btn modal-youtube-link">Search on YouTube &#x2197;</a>`;
-    footer.innerHTML = renderModalFooter(m, trailerLink);
-    attachModalFooterHandlers(footer, m);
-    const placeholder = modal.querySelector(".video-wrap");
-    placeholder.style.background = "#0d0d10";
-    placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
-      <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
-      <div class="trailer-loading" style="font-size:0.9rem;color:var(--muted)">Loading trailer…</div>
-    </div>`;
+  const videoWrap = modal.querySelector(".video-wrap");
+  const imdbUrl = m.imdbId ? `https://www.imdb.com/title/${m.imdbId}/` : null;
 
-    const apiBase = window.location.origin;
-    const watchRegion = userCountryCode ? `&watch_region=${encodeURIComponent(userCountryCode)}` : "";
-    const fetchUrl = m.imdbId
-      ? `${apiBase}/.netlify/functions/add-from-imdb?imdbId=${encodeURIComponent(m.imdbId)}${watchRegion}`
-      : `${apiBase}/.netlify/functions/add-from-imdb?title=${encodeURIComponent(m.title)}${m.year ? "&year=" + encodeURIComponent(m.year) : ""}${watchRegion}`;
-
-    fetch(fetchUrl)
-      .then(async (r) => {
-        let data = {};
-        try {
-          data = await r.json();
-        } catch {
-          data = {};
-        }
-        if (!r.ok) data = { ...data, ok: false };
-        return data;
-      })
-      .then((data) => {
-        if (currentModalMovie !== m) return;
-        const foundTrailer = data.ok && (data.youtubeId || data.embedUrl);
-        const foundThumb = data.thumb; // may come from 404 response (OMDb poster)
-        const enrichmentTrusted =
-          !data.resolvedTitle ||
-          !m.title ||
-          titlesLikelyMatch(data.resolvedTitle, m.title);
-        const updates = {};
-        if (enrichmentTrusted) {
-          if (foundThumb && !m.thumb) {
-            m.thumb = data.thumb;
-            updates.thumb = data.thumb;
-          }
-          if (foundTrailer && data.youtubeId) {
-            m.youtubeId = data.youtubeId;
-            if (!m.thumb) {
-              m.thumb = `https://img.youtube.com/vi/${data.youtubeId}/hqdefault.jpg`;
-              updates.thumb = m.thumb;
-            }
-            updates.youtubeId = data.youtubeId;
-          }
-          if (Array.isArray(data.services) && data.services.length > 0) {
-            if (!m.servicesByRegion) m.servicesByRegion = {};
-            m.servicesByRegion[userCountryCode] = data.services;
-            m.services = data.services;
-            updates.services = data.services;
-          }
-        }
-        if (Object.keys(updates).length) {
-          buildCards();
-          const user = auth.currentUser;
-          if (user) {
-            updateMovieMetadata(user.uid, currentListMode, movieKey(m), updates, userCountryCode).catch(() => {});
-          }
-        }
-        if (foundTrailer && enrichmentTrusted) {
-          placeholder.style.background = "#000";
-          if (data.youtubeId) {
-            const rawOrigin = window.location.origin;
-            const originParam = rawOrigin && rawOrigin !== "null" ? `&origin=${encodeURIComponent(rawOrigin)}` : "";
-            placeholder.innerHTML = `<iframe id="modal-iframe" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"
-              referrerpolicy="strict-origin-when-cross-origin"
-              src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(data.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1${originParam}"></iframe>`;
-          } else if (data.embedUrl) {
-            // IMDb blocks embedding this player on third-party sites (X-Frame-Options / CSP).
-            const safeEmbed = String(data.embedUrl).replace(/"/g, "&quot;");
-            placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.25rem;padding:1.5rem;text-align:center;background:#0d0d10;">
-              <div style="font-family:var(--font-title);font-size:1.35rem;letter-spacing:0.06em;color:var(--text);max-width:22rem">${escapeHtml(m.title)}</div>
-              <p style="font-size:0.85rem;color:var(--muted);margin:0;max-width:24rem;line-height:1.45">IMDb doesn’t allow playing this trailer inside other sites. Open it on IMDb in a new tab.</p>
-              <a href="${safeEmbed}" target="_blank" rel="noopener noreferrer" class="modal-action-btn modal-youtube-link" style="display:inline-flex">Play trailer on IMDb &#x2197;</a>
-            </div>`;
-          }
-        } else {
-          placeholder.style.background = "#0d0d10";
-          placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
-            <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
-            ${imdbUrl ? `<a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>` : ""}
-            <a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Search on YouTube &#x2197;</a>
-          </div>`;
-        }
-      })
-      .catch(() => {
-        if (currentModalMovie === m) {
-          placeholder.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
-            <div style="font-family:var(--font-title);font-size:2rem;letter-spacing:0.06em;color:var(--muted)">${m.title}</div>
-            ${imdbUrl ? `<a href="${imdbUrl}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Watch on IMDb &#x2197;</a>` : ""}
-            <a href="https://www.youtube.com/results?search_query=${query}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;letter-spacing:0.08em;text-transform:uppercase">Search on YouTube &#x2197;</a>
-          </div>`;
-        }
-      });
-  } else {
-    const videoWrap = modal.querySelector(".video-wrap");
+  if (hasPlayableTrailerYoutubeId(m)) {
     videoWrap.style.background = "#000";
     const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(m.youtubeId)}`;
     const rawOrigin = window.location.origin;
@@ -685,6 +573,22 @@ function openModal(m) {
 
     const youtubeLink = `<a href="${watchUrl}" target="_blank" class="modal-action-btn modal-youtube-link">Watch on YouTube &#x2197;</a>`;
     footer.innerHTML = renderModalFooter(m, youtubeLink);
+    attachModalFooterHandlers(footer, m);
+  } else {
+    videoWrap.style.background = "#0d0d10";
+    videoWrap.innerHTML = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.25rem;padding:1.5rem;text-align:center;">
+      <p style="font-family:var(--font-title);font-size:1.25rem;letter-spacing:0.06em;color:var(--text);margin:0">No trailer available</p>
+      <p style="font-size:0.88rem;color:var(--muted);margin:0;max-width:22rem;line-height:1.45">There is no YouTube trailer on TMDB for this title, or it has not been loaded yet.</p>
+      ${
+        imdbUrl
+          ? `<a href="${imdbUrl}" target="_blank" rel="noopener noreferrer" class="modal-action-btn modal-youtube-link" style="display:inline-flex;margin-top:0.25rem">View on IMDb &#x2197;</a>`
+          : ""
+      }
+    </div>`;
+    const extra = imdbUrl
+      ? `<a href="${imdbUrl}" target="_blank" class="modal-action-btn modal-youtube-link">IMDb &#x2197;</a>`
+      : "";
+    footer.innerHTML = renderModalFooter(m, extra);
     attachModalFooterHandlers(footer, m);
   }
 

@@ -41,7 +41,7 @@ async function updateMovie(title, youtubeId) {
     process.exit(1);
   }
   items[idx].youtubeId = youtubeId;
-  if (youtubeId === "SEARCH") {
+  if (youtubeId === "NONE" || youtubeId === "SEARCH") {
     delete items[idx].thumb;
   } else {
     items[idx].thumb = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;

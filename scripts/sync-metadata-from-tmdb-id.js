@@ -8,7 +8,7 @@
  * Default: backups/firestore-backup-migrated.json
  *
  * --thumb-only: only set thumb from TMDB poster_path (does not change title/year/type/genre).
- * --youtube-only: only set youtubeId from TMDB videos (YouTube trailer key), or "SEARCH" if none.
+ * --youtube-only: only set youtubeId from TMDB videos (YouTube trailer key), or "NONE" if none.
  *   You can pass --thumb-only and --youtube-only together to update both without other fields.
  *
  * Requires: TMDB_API_KEY in .env
@@ -287,7 +287,7 @@ async function main() {
       genre: meta.genre || "",
       tmdbMedia: meta.tmdbMedia,
       thumb: meta.thumb,
-      youtubeId: meta.youtubeId || "SEARCH",
+      youtubeId: meta.youtubeId || "NONE",
     };
     const newKey = movieKey(next);
     if (oldKey !== newKey) {

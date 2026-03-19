@@ -66,7 +66,7 @@ function movieKey(m) {
 
 function usesYoutubeForTrailer(m) {
   const id = m.youtubeId;
-  return id && id !== "SEARCH" && id.length > 0;
+  return id && id !== "SEARCH" && id !== "NONE" && id.length > 0;
 }
 
 function usesYoutubeForThumb(m) {
@@ -190,7 +190,7 @@ async function main() {
   const stillMissingImdb = migratedItems.filter(lacksImdbId);
   const stillMissingTrailer = migratedItems.filter((m) => !m.youtubeId || m.youtubeId === "SEARCH");
   const stillMissingThumb = migratedItems.filter(
-    (m) => !m.thumb || (m.youtubeId === "SEARCH" && !m.thumb)
+    (m) => !m.thumb || ((m.youtubeId === "SEARCH" || m.youtubeId === "NONE") && !m.thumb)
   );
 
   reportLines.push(`Trailer from YouTube: ${stillYoutubeTrailer.length}`);
@@ -213,7 +213,7 @@ async function main() {
     ``,
     `=== Still missing ===`,
     `Missing imdbId: ${stillMissingImdb.length}`,
-    `Missing trailer (youtubeId empty/SEARCH): ${stillMissingTrailer.length}`,
+    `Missing trailer (youtubeId empty/NONE/SEARCH): ${stillMissingTrailer.length}`,
     `Missing thumb: ${stillMissingThumb.length}`
   );
 

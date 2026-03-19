@@ -363,7 +363,7 @@ exports.handler = async (event, context) => {
           type: e.type,
           genre: e.genre || "",
           thumb: e.thumb,
-          youtubeId: yt || "SEARCH",
+          youtubeId: yt || "NONE",
           imdbId: nImdb,
           services: Array.isArray(e.services) ? e.services : [],
           tmdbId: e.tmdbId,
@@ -407,7 +407,7 @@ exports.handler = async (event, context) => {
       type: nType,
       genre: genre || "",
       thumb,
-      youtubeId: yt || "SEARCH",
+      youtubeId: yt || "NONE",
       imdbId: nImdb,
       services: [],
     };
@@ -466,9 +466,12 @@ exports.handler = async (event, context) => {
         (existing.year == null && movie.year != null) ||
         (!existing.thumb && movie.thumb) ||
         (!existing.genre && movie.genre) ||
-        ((!existing.youtubeId || existing.youtubeId === "SEARCH") &&
+        ((!existing.youtubeId ||
+          existing.youtubeId === "SEARCH" ||
+          existing.youtubeId === "NONE") &&
           movie.youtubeId &&
-          movie.youtubeId !== "SEARCH") ||
+          movie.youtubeId !== "SEARCH" &&
+          movie.youtubeId !== "NONE") ||
         ((!existing.services || existing.services.length === 0) &&
           movie.services &&
           movie.services.length > 0);
@@ -476,7 +479,12 @@ exports.handler = async (event, context) => {
         if (existing.year == null && movie.year != null) existing.year = movie.year;
         if (!existing.thumb && movie.thumb) existing.thumb = movie.thumb;
         if (!existing.genre && movie.genre) existing.genre = movie.genre;
-        if ((!existing.youtubeId || existing.youtubeId === "SEARCH") && movie.youtubeId && movie.youtubeId !== "SEARCH") {
+        if (
+          (!existing.youtubeId || existing.youtubeId === "SEARCH" || existing.youtubeId === "NONE") &&
+          movie.youtubeId &&
+          movie.youtubeId !== "SEARCH" &&
+          movie.youtubeId !== "NONE"
+        ) {
           existing.youtubeId = movie.youtubeId;
         }
         if ((!existing.services || existing.services.length === 0) && movie.services?.length) {

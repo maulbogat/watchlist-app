@@ -44,10 +44,10 @@ async function run() {
   const items = snap.data().items;
 
   const missingTrailer = items.filter(
-    (m) => !m.youtubeId || m.youtubeId === "SEARCH"
+    (m) => !m.youtubeId || m.youtubeId === "NONE" || m.youtubeId === "SEARCH"
   );
   const missingThumb = items.filter(
-    (m) => !m.thumb || (m.youtubeId === "SEARCH" && !m.thumb)
+    (m) => !m.thumb || ((m.youtubeId === "NONE" || m.youtubeId === "SEARCH") && !m.thumb)
   );
   const israeli = items.filter(isIsraeli);
 
@@ -81,7 +81,7 @@ async function run() {
     console.log(`  ... and ${noServices.length - 20} more`);
   }
 
-  console.log("\n=== Missing trailers (youtubeId empty or SEARCH) ===\n");
+  console.log("\n=== Missing trailers (youtubeId empty, NONE, or SEARCH) ===\n");
   if (!missingTrailer.length) {
     console.log("None.");
   } else {
