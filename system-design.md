@@ -382,7 +382,7 @@ erDiagram
     string docId "movies"
     array items
   }
-  CATALOG_MOVIES ..> USER_DOC : "merge imdb/tmdb by match"
+  CATALOG_MOVIES }o--o{ USER_DOC : "optional client merge"
 ```
 
 ### TMDB enrichment decision logic (flowchart)
