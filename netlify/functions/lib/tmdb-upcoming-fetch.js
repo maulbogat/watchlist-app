@@ -79,8 +79,6 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-const RETURNING_LIKE = new Set(["Returning Series", "In Production", "Planned"]);
-
 /**
  * Build alert payloads for one catalog row (TMDB only).
  * @param {string} apiKey
@@ -97,7 +95,6 @@ async function buildAlertsForCatalogRow(apiKey, row) {
 
     const data = tv.data;
     const name = data.name || hintTitle || "TV show";
-    const status = data.status || "";
     const next = data.next_episode_to_air;
 
     if (next && next.air_date && String(next.air_date).trim()) {
@@ -129,27 +126,7 @@ async function buildAlertsForCatalogRow(apiKey, row) {
       return alerts;
     }
 
-    if (RETURNING_LIKE.has(status)) {
-      const seasons = Number(data.number_of_seasons) || 0;
-      const nextSeason = Math.max(1, seasons + 1);
-      const fingerprint = `${tmdbId}_${nextSeason}_0`;
-      const expiresAt = addDaysIso(new Date(), 60);
-      alerts.push({
-        docId: `tv_${fingerprint}`,
-        fingerprint,
-        catalogTmdbId: tmdbId,
-        media: "tv",
-        tmdbId,
-        type: "tv",
-        alertType: "new_season",
-        title: name,
-        detail: "Returning — next episode date TBA",
-        airDate: null,
-        confirmed: false,
-        expiresAt,
-        sequelTmdbId: null,
-      });
-    }
+    // No dated next episode: skip "Returning / TBA" placeholders — only surface alerts with a real air date.
     return alerts;
   }
 

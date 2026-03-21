@@ -137,10 +137,10 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `fingerprint` | `string` | Dismissal / identity key (e.g. `136311_3_9`, `12345_sequel_999`, `12345_upcoming`). |
 | `tmdbId` | `number` | Same as `catalogTmdbId` in current implementation (show in list). |
 | `type` | `"tv"` \| `"movie"` | Same as `media`. |
-| `alertType` | `string` | `new_episode`, `new_season`, `upcoming_movie`, `sequel`. |
+| `alertType` | `string` | `new_episode`, `upcoming_movie`, `sequel`. (Legacy `new_season` / TBA “returning” rows are no longer written.) |
 | `title`, `detail` | `string` | UI copy. |
-| `airDate` | `string` or null | `YYYY-MM-DD` when known; null for TBA-style. |
-| `confirmed` | `bool` | `false` for returning series without `next_episode_to_air`. |
+| `airDate` | `string` or null | `YYYY-MM-DD` when known; may be null on very old docs. |
+| `confirmed` | `bool` | `true` for newly synced rows (TBA returning alerts are not created). |
 | `expiresAt` | `string` | `YYYY-MM-DD`; expired docs deleted by the scheduled job. |
 | `sequelTmdbId` | `number` or null | For `sequel` alerts. |
 | `detectedAt` | `timestamp` | Server time on upsert. |
