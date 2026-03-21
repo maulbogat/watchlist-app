@@ -91,21 +91,6 @@ function fetchJson(url) {
   });
 }
 
-function fetchHtml(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    }, (res) => {
-      let data = "";
-      res.on("data", (chunk) => { data += chunk; });
-      res.on("end", () => resolve(data));
-    }).on("error", reject);
-  });
-}
-
 const TMDB_IMG = "https://image.tmdb.org/t/p/w500";
 
 function pickYoutubeTrailerKey(results) {
@@ -208,86 +193,6 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint) {
 exports.handler = async (event, context) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(event) };
-  }
-
-  // GET: fetch trailer key from TMDB only; thumb from TMDB or OMDb; IMDb embed URL as last resort
-  if (event.httpMethod === "GET") {
-    const params = event.queryStringParameters || {};
-    const imdbId = params.imdbId || "";
-    const title = (params.title || "").trim();
-    const year = params.year ? String(params.year).replace(/\D/g, "").slice(0, 4) : null;
-    const watchRegion = (params.watch_region || "").trim().toUpperCase().slice(0, 2);
-    const norm = (id) => (String(id).startsWith("tt") ? id : `tt${id}`);
-    const nImdb = norm(imdbId).trim();
-    const hasImdb = nImdb && /^tt\d+$/.test(nImdb);
-    const hasTitle = title.length > 0;
-
-    if (!hasImdb && !hasTitle) {
-      return jsonRes(400, { ok: false, error: "imdbId or title required" }, event);
-    }
-
-    let omdb = null;
-    let thumb = null;
-    let searchTitle = title;
-    let searchYear = year;
-
-    if (hasImdb) {
-      try {
-        omdb = await fetchOMDb(nImdb);
-        searchTitle = omdb.Title || title;
-        searchYear = searchYear || (omdb.Year && String(omdb.Year).replace(/\D/g, "").slice(0, 4)) || null;
-        thumb = omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
-      } catch (e) {
-        // continue without OMDb
-      }
-    }
-
-    let youtubeId = null;
-    let embedUrl = null;
-    let services = [];
-
-    // 1. TMDB: poster, title/year for search, trailer key, watch providers (single enrichment pass)
-    if (hasImdb) {
-      const tmdbKey = process.env.TMDB_API_KEY;
-      if (tmdbKey) {
-        try {
-          const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion, omdb);
-          if (e) {
-            if (e.thumb) thumb = e.thumb;
-            searchTitle = e.title || searchTitle;
-            if (e.year != null) searchYear = String(e.year);
-            youtubeId = e.youtubeId;
-            services = e.services || [];
-          }
-        } catch (err) {}
-      }
-    }
-
-    // 2. IMDb videogallery scrape — last resort; frontend opens in new tab (see app.js), not iframe
-    if (!youtubeId && hasImdb) {
-      try {
-        const html = await fetchHtml(`https://www.imdb.com/title/${nImdb}/videogallery`);
-        const match = html.match(/\/video\/(vi\d+)/);
-        if (match) {
-          embedUrl = `https://www.imdb.com/video/imdb/${match[1]}/imdb/embed?autoplay=true`;
-        }
-      } catch (e) {}
-    }
-
-    const basePayload = {
-      thumb: thumb || undefined,
-      services: services.length ? services : undefined,
-      resolvedTitle: searchTitle || undefined,
-      resolvedYear: searchYear || undefined,
-    };
-    if (youtubeId) {
-      return jsonRes(200, { ok: true, youtubeId, ...basePayload }, event);
-    }
-    if (embedUrl) {
-      return jsonRes(200, { ok: true, embedUrl, ...basePayload }, event);
-    }
-
-    return jsonRes(404, { ok: false, error: "No trailer found for this title", ...basePayload }, event);
   }
 
   if (event.httpMethod !== "POST") {

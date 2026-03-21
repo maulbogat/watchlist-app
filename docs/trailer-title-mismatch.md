@@ -10,8 +10,7 @@ TV miniseries and docuseries (e.g. *Crime Scene: The Vanishing at the Cecil Hote
 
 1. **`netlify/functions/add-from-imdb.js`**  
    - Chooses movie vs TV using **OMDb `Type`** when both exist (`movie` vs `series`/`episode`).  
-   - If OMDb isn’t available, **prefers TV** when both exist (safer for miniseries).  
-   - GET responses include **`resolvedTitle` / `resolvedYear`** for the client.
+   - If OMDb isn’t available, **prefers TV** when both exist (safer for miniseries).
 
 2. **`app.js`**  
    - Trailers play only from **stored** `youtubeId` (TMDB key) or show **no trailer**; see `docs/youtube-trailer-field.md`.

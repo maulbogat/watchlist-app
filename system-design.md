@@ -13,7 +13,6 @@ This document describes **only what exists in this repository** as of the last f
 | **Firebase Analytics** | Analytics instance created on app init. | **Client:** `getAnalytics(app)` in `firebase.js`. | Inherits Firebase web app setup. | Defined in `config/firebase.js`. |
 | **The Movie Database (TMDB)** | Resolve IMDb id → TMDB id; poster; genres/year; **YouTube trailer key** from appended `videos`; **watch providers** by region. | **REST:** `https://api.themoviedb.org/3/...` via Node `https.get` in `netlify/functions/add-from-imdb.js`. Same pattern in maintenance scripts (e.g. `scripts/sync-services-from-tmdb.js`, `check-upcoming.mjs` uses `fetch`). **Not** called from the browser in `app.js`. | API key query parameter `api_key`. | `TMDB_API_KEY` in Netlify env; `.env` for local scripts / `check-upcoming.mjs`. |
 | **OMDb** | Title metadata by IMDb id; disambiguate movie vs TV when TMDB returns both; fallback row when TMDB has no match. | **REST:** `https://www.omdbapi.com/?i=...&apikey=...` in `add-from-imdb.js` and various scripts. | API key query parameter. | `OMDB_API_KEY` (Netlify + local scripts per README / `.env.example`). |
-| **IMDb (public pages)** | Optional HTML scrape for video gallery path when TMDB does not yield a YouTube id (GET path on `add-from-imdb` only). | **REST:** `https.get` to `/title/{imdbId}/videogallery` with browser-like `User-Agent`. | None. | None. |
 | **YouTube** | Trailer playback in modal via iframe embed. | **Browser:** `https://www.youtube-nocookie.com/embed/{youtubeId}?...` and link to `youtube.com/watch`. | None for embed (public video ids). | None. |
 | **Google Fonts** | UI typography (Bebas Neue, DM Sans). | `<link href="https://fonts.googleapis.com/...">` in HTML. | None. | None. |
 | **Netlify** | Host static HTML/CSS/JS; run serverless functions under `/.netlify/functions/*`. | **Browser:** `fetch` to same-origin function paths. **Functions:** Node.js handlers in `netlify/functions/*.js`. | Functions verify Firebase ID token (cookie or `Authorization: Bearer`). | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY` documented in README. |
@@ -35,7 +34,7 @@ This document describes **only what exists in this repository** as of the last f
 **Netlify**  
 - **Static hosting** for HTML, CSS, JS, SVG assets.  
 - **Serverless functions** (see `netlify.toml` → `functions = "netlify/functions"`):  
-  - `add-from-imdb.js` — verifies token, calls OMDb/TMDB (and optionally scrapes IMDb on GET), writes Firestore via Admin SDK.  
+  - `add-from-imdb.js` — verifies token, calls OMDb/TMDB, writes Firestore via Admin SDK.  
   - `join-shared-list.js` — verifies token, adds caller’s uid to `sharedLists/{listId}.members`.  
 - Functions use **Firebase Admin** with `FIREBASE_SERVICE_ACCOUNT`; they bypass Firestore security rules by design.
 
@@ -44,7 +43,7 @@ This document describes **only what exists in this repository** as of the last f
 - **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: catalog read-only to clients; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`).
 
 **External APIs — where invoked**  
-- **TMDB / OMDb / IMDb scrape:** only from **`netlify/functions/add-from-imdb.js`** (and from **local Node scripts**, not from the deployed SPA).  
+- **TMDB / OMDb:** from **`netlify/functions/add-from-imdb.js`** (POST) and from **local Node scripts**, not from the deployed SPA.  
 - **YouTube:** browser loads embed URLs; no YouTube Data API key in repo.  
 - **No** TMDB calls from `app.js` for watch providers or enrichment at runtime; chips use data already on each item (`services`, `servicesByRegion`).
 
@@ -127,7 +126,7 @@ Typical fields as produced by `add-from-imdb` and consumed by `app.js` / `fireba
 | `imdbId` | `string` | Normalized with `tt` prefix in add flow. |
 | `tmdbId` | `number` | When TMDB enrichment succeeds. |
 | `services` | `array` of string | Provider display names for a region (legacy / default). |
-| `servicesByRegion` | `object` | Optional map `{ "IL": [...], ... }`; merged in `updateMovieMetadata` when saving region-specific services. |
+| `servicesByRegion` | `object` | Optional map `{ "IL": [...], ... }`; may be populated by maintenance scripts or future client code (not written by current SPA). |
 | `tmdbMedia` | `string` | Used in scripts / dedupe (`"tv"`); client dedupe in diagnostics uses `tmdbMedia === "tv"` or `type === "show"`. |
 
 **Runtime-only:** `status` (`to-watch` \| `watched` \| `maybe-later` \| `archive`) is **computed in memory** when loading lists, from `watched` / `maybeLater` / `archive` key arrays, not stored inside each item in Firestore.
@@ -173,8 +172,6 @@ Typical fields as produced by `add-from-imdb` and consumed by `app.js` / `fireba
 8. If TMDB fails: build minimal row from OMDb only (`youtubeId: null`).  
 9. Dedupe/merge into target list document; normalize `youtubeId` through 11-char validation before persist.
 
-(GET handler on same function implements a similar resolution path for trailer/embed URL **without** writing Firestore — used for diagnostics/API-style reads; **no caller** in current `add.js` / `app.js`.)
-
 ### 4. Shared list invite flow
 
 **Create:**  
@@ -199,7 +196,7 @@ Typical fields as produced by `add-from-imdb` and consumed by `app.js` / `fireba
 1. **At add time:** User’s `country` on `users/{uid}` is read in `add.js` as `watch_region` and sent to `add-from-imdb`.  
 2. **Server:** `enrichFromTmdb` fetches TMDB watch providers for that region and stores provider **names** on the new/merged item as `services` (array of strings).  
 3. **At display time:** `app.js` `servicesForMovie(m, userCountryCode)` prefers `m.servicesByRegion[countryCode]`, else falls back to `m.services`.  
-4. **Persisting region-specific cache:** `firebase.js` `updateMovieMetadata` can merge `updates.services` into `item.services` and `item.servicesByRegion[country]` — **exported** but **not called** from current `app.js` (no client-side TMDB refresh for providers in SPA).
+4. **Persisting region-specific cache:** There is no client helper in the SPA; `services` / `servicesByRegion` are set at add time (Netlify) or by scripts, not by `app.js`.
 
 ---
 
@@ -217,7 +214,7 @@ Typical fields as produced by `add-from-imdb` and consumed by `app.js` / `fireba
 | `add.js` | Bookmarklet target: auth gate, call add function. | `getUserProfile` | — | `fetch` → `add-from-imdb` |
 | `bookmarklet.html` | Instructions + draggable bookmark. | — | — | — |
 | `bookmarklet.js` | On IMDb: open popup, `postMessage` handshake. | — | — | Opens hosted `add.html` (hardcoded Netlify host) |
-| `netlify/functions/add-from-imdb.js` | Auth verify, OMDb/TMDB/IMDb scrape, merge/write list docs. | Firestore via Admin | `users`, `sharedLists` | OMDb, TMDB, IMDb HTML |
+| `netlify/functions/add-from-imdb.js` | Auth verify, OMDb/TMDB enrichment, merge/write list docs. | Firestore via Admin | `users`, `sharedLists` | OMDb, TMDB |
 | `netlify/functions/join-shared-list.js` | Add member to shared list. | Firestore via Admin | `sharedLists` | — |
 | `styles.css` | Visual styling. | — | — | — |
 | `check-upcoming.mjs` | Local diagnostic: read Firestore + TMDB, print report. | Admin + `dotenv` | — | TMDB |
@@ -251,7 +248,6 @@ flowchart LR
   subgraph External["External APIs"]
     TMDB["TMDB API"]
     OMDb["OMDb API"]
-    IMDb["IMDb HTML"]
     YT["YouTube embeds"]
     GFonts["Google Fonts"]
     Gstatic["Google gstatic (Firebase SDK)"]
@@ -271,7 +267,6 @@ flowchart LR
   NF1 --> FA
   NF1 --> TMDB
   NF1 --> OMDb
-  NF1 --> IMDb
   NF2 --> FS
   NF2 --> FA
 
@@ -424,25 +419,21 @@ flowchart TD
 
 2. **Secrets in repository:** Full Firebase web config (including `apiKey`) is committed. This is normal for Firebase client apps but means the document is not “secret-free”; `FIREBASE_SERVICE_ACCOUNT` correctly stays out of git.
 
-3. **`updateMovieMetadata` unused in UI:** Exported and documented for `thumb` / `youtubeId` / `services` / `servicesByRegion`, but **`app.js` never calls it** — no in-app “refresh metadata” or client-driven provider backfill.
+3. **Bookmarklet portability:** `bookmarklet.js` and `bookmarklet.html` hardcode **`https://watchlist-trailers.netlify.app`** for the script URL and popup base. Forks or alternate deployments must edit these files.
 
-4. **GET `add-from-imdb`:** Implements TMDB/OMDb/IMDb trailer resolution **without** persisting, but **no frontend in this repo calls it** after the bookmarklet/add flow moved to POST-only in `add.js`.
+4. **Secondary personal lists + bookmarklet:** Cookie `bookmarklet_list_id` is set when viewing a **shared** list, not when viewing an extra **personal** subcollection list. The Netlify function only targets `users/{uid}.items` or `sharedLists/{listId}` — **bookmarklet cannot add directly** to `users/.../personalLists/{otherListId}`.
 
-5. **Bookmarklet portability:** `bookmarklet.js` and `bookmarklet.html` hardcode **`https://watchlist-trailers.netlify.app`** for the script URL and popup base. Forks or alternate deployments must edit these files.
+5. **Firestore rules vs Admin:** Client rules deny catalog writes; all list mutations from functions use **Admin SDK** (bypass rules). Compromise of `FIREBASE_SERVICE_ACCOUNT` on Netlify is full database access.
 
-6. **Secondary personal lists + bookmarklet:** Cookie `bookmarklet_list_id` is set when viewing a **shared** list, not when viewing an extra **personal** subcollection list. The Netlify function only targets `users/{uid}.items` or `sharedLists/{listId}` — **bookmarklet cannot add directly** to `users/.../personalLists/{otherListId}`.
+6. **Shared list join token:** Join uses the same `bookmarklet_token` cookie / Bearer token as add; there is **no separate invite secret** — anyone with a valid account and a `listId` could join if they guess/obtain the id (predictability of random ids should be considered).
 
-7. **Firestore rules vs Admin:** Client rules deny catalog writes; all list mutations from functions use **Admin SDK** (bypass rules). Compromise of `FIREBASE_SERVICE_ACCOUNT` on Netlify is full database access.
+7. **`join-shared-list` CORS headers:** Response includes `Access-Control-Allow-Origin` reflecting request origin; **POST from browser** with credentials is how `app.js` uses it; behavior depends on Netlify origin alignment.
 
-8. **Shared list join token:** Join uses the same `bookmarklet_token` cookie / Bearer token as add; there is **no separate invite secret** — anyone with a valid account and a `listId` could join if they guess/obtain the id (predictability of random ids should be considered).
+8. **Composite indexes:** `array-contains` query on `sharedLists` has **no committed `firestore.indexes.json`**; if Firebase ever requires a composite index for an expanded query, it would be created in console only.
 
-9. **`join-shared-list` CORS headers:** Response includes `Access-Control-Allow-Origin` reflecting request origin; **POST from browser** with credentials is how `app.js` uses it; behavior depends on Netlify origin alignment.
+9. **`hideCountryModal` / `countryModalResolve`:** `app.js` contains `hideCountryModal` assigning `countryModalResolve = null` — small dead/legacy fragment next to `showCountryModal` Promise flow (Country save uses `saveBtn.onclick` path).
 
-10. **Composite indexes:** `array-contains` query on `sharedLists` has **no committed `firestore.indexes.json`**; if Firebase ever requires a composite index for an expanded query, it would be created in console only.
-
-11. **`hideCountryModal` / `countryModalResolve`:** `app.js` contains `hideCountryModal` assigning `countryModalResolve = null` — small dead/legacy fragment next to `showCountryModal` Promise flow (Country save uses `saveBtn.onclick` path).
-
-12. **“Recently Added” tab:** Driven by **order of items in the loaded array** (last N in array), not a server-side `addedAt` field — reordering or merge logic can change meaning without a timestamp.
+10. **“Recently Added” tab:** Driven by **order of items in the loaded array** (last N in array), not a server-side `addedAt` field — reordering or merge logic can change meaning without a timestamp.
 
 ---
 

@@ -579,48 +579,6 @@ async function moveItemFromPersonalToShared(uid, listId, movie) {
 }
 
 /**
- * Update a movie's metadata (thumb, youtubeId, services) in the current list.
- * @param {string} [countryCode] ISO 3166-1 alpha-2 — when saving services, also merges into servicesByRegion[country].
- */
-async function updateMovieMetadata(uid, listMode, key, updates, countryCode) {
-  const mergeServices = (item) => {
-    if (!Array.isArray(updates.services)) return;
-    item.services = updates.services;
-    const c = countryCode && String(countryCode).trim().length >= 2 ? String(countryCode).toUpperCase().slice(0, 2) : null;
-    if (c) {
-      const prev =
-        item.servicesByRegion && typeof item.servicesByRegion === "object" ? { ...item.servicesByRegion } : {};
-      prev[c] = updates.services;
-      item.servicesByRegion = prev;
-    }
-  };
-
-  if (listMode === "personal") {
-    const data = await getStatusData(uid);
-    const items = Array.isArray(data.items) ? [...data.items] : [];
-    const idx = items.findIndex((m) => movieKey(m) === key);
-    if (idx < 0) return;
-    if (updates.thumb) items[idx].thumb = updates.thumb;
-    if ("youtubeId" in updates) items[idx].youtubeId = updates.youtubeId;
-    mergeServices(items[idx]);
-    await setDoc(doc(db, "users", uid), { items }, { merge: true });
-  } else if (typeof listMode === "object" && listMode?.type === "shared") {
-    const listId = listMode.listId;
-    const listData = await getSharedList(listId);
-    if (!listData) return;
-    const members = listData.members || [];
-    if (!members.includes(uid)) return;
-    const items = Array.isArray(listData.items) ? [...listData.items] : [];
-    const idx = items.findIndex((m) => movieKey(m) === key);
-    if (idx < 0) return;
-    if (updates.thumb) items[idx].thumb = updates.thumb;
-    if ("youtubeId" in updates) items[idx].youtubeId = updates.youtubeId;
-    mergeServices(items[idx]);
-    await setDoc(doc(db, "sharedLists", listId), { items }, { merge: true });
-  }
-}
-
-/**
  * Create a new personal list. Never throws - returns null on failure.
  */
 async function createPersonalList(uid, name) {
@@ -856,6 +814,5 @@ export {
   copySharedListToPersonal,
   moveItemFromSharedToPersonal,
   moveItemFromPersonalToShared,
-  updateMovieMetadata,
   removeDuplicatesFromPersonal,
 };

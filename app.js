@@ -28,7 +28,6 @@ import {
   deleteSharedList,
   moveItemFromSharedToPersonal,
   moveItemFromPersonalToShared,
-  updateMovieMetadata,
   getUserProfile,
   setUserCountry,
 } from "./firebase.js";
