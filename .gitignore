@@ -6,8 +6,9 @@ serviceAccountKey.json
 
 # Backups
 watchlist-backup.json
-backups/firestore-backup.json
-backups/firestore-backup*.json
+# Canonical daily backup is committed by .github/workflows/backup.yml — do not ignore it.
+# Ignore only named/timestamped variants (e.g. firestore-backup-migrated.json).
+backups/firestore-backup-*.json
 backups/youtube-source-backup.json
 # Generated one-off migration reports (local runs)
 backups/add-tmdb-ids-report.txt

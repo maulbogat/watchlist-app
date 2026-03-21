@@ -8,9 +8,9 @@ This document describes **only what exists in this repository** as of the last f
 
 | Service name | Purpose | How it's accessed | Authentication | Environment variables |
 |--------------|---------|-------------------|----------------|----------------------|
-| **Firebase (Firestore)** | Persist watchlists, shared lists, optional catalog document, user profile (country, list name). | **Client:** Firebase JS SDK v10.7 from `gstatic` CDN in `firebase.js` (`getFirestore`, `doc`, `getDoc`, `setDoc`, etc.). **Server:** `firebase-admin` in Netlify functions and Node scripts. | **Client:** Firebase Auth user JWT (SDK attaches to requests per Firestore rules). **Server:** Service account JSON (base64) for Admin SDK. | **Client:** None — `firebaseConfig` is **hardcoded** in `firebase.js` (see Section 7). **Server/scripts:** `FIREBASE_SERVICE_ACCOUNT` (base64 JSON). Scripts may also use `serviceAccountKey.json` in project root (per README / `check-upcoming.mjs`). |
-| **Firebase Auth** | Google Sign-In for end users. | **Client:** `firebase-auth.js` from CDN — `signInWithPopup`, `GoogleAuthProvider`, `onAuthStateChanged`. | OAuth via Google; Firebase-issued ID tokens. | Same as Firebase — hardcoded web app config in `firebase.js`. `.env.example` lists `VITE_FIREBASE_*` but those are **not** wired into `firebase.js`. |
-| **Firebase Analytics** | Analytics instance created on app init. | **Client:** `getAnalytics(app)` in `firebase.js`. | Inherits Firebase web app setup. | Hardcoded in `firebase.js`. |
+| **Firebase (Firestore)** | Persist watchlists, shared lists, optional catalog document, user profile (country, list name). | **Client:** Firebase JS SDK v10.7 from `gstatic` CDN in `firebase.js` (`getFirestore`, `doc`, `getDoc`, `setDoc`, etc.). **Server:** `firebase-admin` in Netlify functions and Node scripts. | **Client:** Firebase Auth user JWT (SDK attaches to requests per Firestore rules). **Server:** Service account JSON (base64) for Admin SDK. | **Client:** None — public web config lives in `config/firebase.js` (imported by `firebase.js`; see Section 7). **Server/scripts:** `FIREBASE_SERVICE_ACCOUNT` (base64 JSON). Scripts may also use `serviceAccountKey.json` in project root (per README / `check-upcoming.mjs`). |
+| **Firebase Auth** | Google Sign-In for end users. | **Client:** `firebase-auth.js` from CDN — `signInWithPopup`, `GoogleAuthProvider`, `onAuthStateChanged`. | OAuth via Google; Firebase-issued ID tokens. | Same as Firebase — `config/firebase.js`. |
+| **Firebase Analytics** | Analytics instance created on app init. | **Client:** `getAnalytics(app)` in `firebase.js`. | Inherits Firebase web app setup. | Defined in `config/firebase.js`. |
 | **The Movie Database (TMDB)** | Resolve IMDb id → TMDB id; poster; genres/year; **YouTube trailer key** from appended `videos`; **watch providers** by region. | **REST:** `https://api.themoviedb.org/3/...` via Node `https.get` in `netlify/functions/add-from-imdb.js`. Same pattern in maintenance scripts (e.g. `scripts/sync-services-from-tmdb.js`, `check-upcoming.mjs` uses `fetch`). **Not** called from the browser in `app.js`. | API key query parameter `api_key`. | `TMDB_API_KEY` in Netlify env; `.env` for local scripts / `check-upcoming.mjs`. |
 | **OMDb** | Title metadata by IMDb id; disambiguate movie vs TV when TMDB returns both; fallback row when TMDB has no match. | **REST:** `https://www.omdbapi.com/?i=...&apikey=...` in `add-from-imdb.js` and various scripts. | API key query parameter. | `OMDB_API_KEY` (Netlify + local scripts per README / `.env.example`). |
 | **IMDb (public pages)** | Optional HTML scrape for video gallery path when TMDB does not yield a YouTube id (GET path on `add-from-imdb` only). | **REST:** `https.get` to `/title/{imdbId}/videogallery` with browser-like `User-Agent`. | None. | None. |
@@ -209,7 +209,8 @@ Typical fields as produced by `add-from-imdb` and consumed by `app.js` / `fireba
 |-------------|----------------|-----------------|------------------|---------------|
 | `index.html` | Shell markup, modals, header, grid container. | — | — | Google Fonts |
 | `app.js` | Watchlist UI, auth chrome, list switching, modal, filters, invite copy/join, bookmarklet link builder. | Via `firebase.js` helpers (`getPersonalListMovies`, `getSharedListMovies`, `setStatus`, etc.) | Same | `fetch` → `join-shared-list`; YouTube embed URLs; clipboard API |
-| `firebase.js` | Firebase init, catalog read, user/shared/personal list CRUD, status keys, merge helpers from catalog. | `catalog/movies`, `users/*`, `sharedLists/*`, `personalLists/*` | Same | Firebase SDK only (Gstatic CDN) |
+| `config/firebase.js` | Public Firebase Web SDK config object (`firebaseConfig`). | — | — | — |
+| `firebase.js` | Imports config, initializes App/Auth/Firestore/Analytics; catalog read, user/shared/personal list CRUD, status keys, merge helpers from catalog. | `catalog/movies`, `users/*`, `sharedLists/*`, `personalLists/*` | Same | Firebase SDK only (Gstatic CDN) |
 | `countries.js` | Static ISO country list + flags for country modal. | — | — | — |
 | `lib/youtube-trailer-id.js` | Validate/normalize TMDB YouTube key strings. | — | — | — |
 | `add.html` | Minimal page for add result. | — | — | — |
@@ -419,7 +420,7 @@ flowchart TD
 
 ## Section 7: Open Questions & Gaps
 
-1. **`firebase.js` vs `.env.example`:** Web app config (apiKey, projectId, etc.) is **hardcoded** in `firebase.js`. `.env.example` lists `VITE_FIREBASE_*` variables that **no code in the repo consumes** for the SPA — likely documentation drift or an unimplemented Vite migration.
+1. **Web app config:** Public Firebase web SDK settings live in **`config/firebase.js`** and are imported by `firebase.js`. They are not loaded from `.env` (static site, no build step).
 
 2. **Secrets in repository:** Full Firebase web config (including `apiKey`) is committed. This is normal for Firebase client apps but means the document is not “secret-free”; `FIREBASE_SERVICE_ACCOUNT` correctly stays out of git.
 

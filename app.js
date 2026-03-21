@@ -35,7 +35,7 @@ import {
 import { COUNTRIES, countryCodeToFlag } from "./countries.js";
 import { isPlayableYoutubeTrailerId } from "./lib/youtube-trailer-id.js";
 
-const STATUS_ORDER = ["to-watch", "watched"];
+const STATUS_ORDER = ["to-watch", "watched", "archive"];
 
 const GENRE_LIMIT = 10;
 
@@ -102,6 +102,7 @@ function loadFilterPreferences(user) {
     if (
       p.currentStatus === "to-watch" ||
       p.currentStatus === "watched" ||
+      p.currentStatus === "archive" ||
       p.currentStatus === "recently-added"
     ) {
       currentStatus = p.currentStatus;
@@ -187,7 +188,8 @@ function getFilteredTitles() {
   let list = currentFilter === "both" ? movies : movies.filter((m) => m.type === currentFilter);
   list = list.filter((m) => {
     const s = m.status || "to-watch";
-    if (currentStatus === "to-watch") return s === "to-watch" || s === "maybe-later" || s === "archive";
+    if (currentStatus === "to-watch") return s === "to-watch" || s === "maybe-later";
+    if (currentStatus === "archive") return s === "archive";
     return s === currentStatus;
   });
   if (currentGenre) {
@@ -257,6 +259,7 @@ function buildCards() {
       "recently-added": "No recently added titles.",
       "to-watch": "No titles to watch yet.",
       watched: "No watched titles yet.",
+      archive: "No archived titles yet.",
     };
     empty.textContent = messages[currentStatus] || "No titles match your filters.";
     grid.appendChild(empty);
@@ -281,18 +284,29 @@ function buildCards() {
     const serviceChips = renderServiceChips(servicesForMovie(m, userCountryCode), { limit: 3 });
     const serviceRow = serviceChips ? `<div class="service-row">${serviceChips}</div>` : "";
     const s = m.status || "to-watch";
-    const displayStatus = s === "maybe-later" || s === "archive" ? "to-watch" : s;
-    const statusLabels = { "to-watch": "To Watch", watched: "Watched" };
+    const displayStatus = s;
+    const statusTabKey =
+      s === "watched" ? "watched" : s === "archive" ? "archive" : "to-watch";
+    const statusLabels = { ...STATUS_LABELS };
     const statusIcons = {
       "to-watch": '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" fill="none"/><circle cx="12" cy="12" r="3" fill="none"/>',
       watched: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>',
+      archive:
+        '<path d="M4 7h16M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2M4 7v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7M9 12h6" fill="none"/>',
+      "maybe-later":
+        '<circle cx="12" cy="12" r="9" fill="none"/><path d="M12 7v5l3 2" fill="none"/>',
     };
+    const iconKey = displayStatus in statusIcons ? displayStatus : "to-watch";
+    const useFill = displayStatus === "watched";
     const statusBadge = `<div class="status-badge-wrap">
       <button type="button" class="status-badge status-${displayStatus}" aria-label="Change status" title="Change status" data-status="${displayStatus}" aria-haspopup="true" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="${displayStatus === "watched" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2">${statusIcons[displayStatus]}</svg>
+        <svg viewBox="0 0 24 24" fill="${useFill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2">${statusIcons[iconKey]}</svg>
       </button>
       <div class="status-dropdown" role="menu" aria-label="Move to">
-        ${STATUS_ORDER.map((st) => `<button type="button" class="status-dropdown-item ${st === displayStatus ? "active" : ""}" role="menuitem" data-status="${st}">${statusLabels[st]}</button>`).join("")}
+        ${STATUS_ORDER.map(
+          (st) =>
+            `<button type="button" class="status-dropdown-item ${st === statusTabKey ? "active" : ""}" role="menuitem" data-status="${st}">${statusLabels[st]}</button>`
+        ).join("")}
       </div>
     </div>`;
     const deleteBtn = `<button type="button" class="card-delete-btn" aria-label="Remove from list" title="Remove">&#215;</button>`;
@@ -351,7 +365,9 @@ function buildCards() {
         item.addEventListener("click", (e) => {
           e.stopPropagation();
           const status = item.dataset.status;
-          const current = m.status === "maybe-later" || m.status === "archive" ? "to-watch" : (m.status || "to-watch");
+          const raw = m.status || "to-watch";
+          const current =
+            raw === "watched" ? "watched" : raw === "archive" ? "archive" : "to-watch";
           if (status && status !== current) setStatusFromCard(m, status);
           dropdown.classList.remove("open");
           badgeBtn.setAttribute("aria-expanded", "false");
@@ -443,11 +459,16 @@ async function removeFromCard(m) {
   }
 }
 
-const STATUS_LABELS = { "to-watch": "To Watch", watched: "Watched" };
+const STATUS_LABELS = {
+  "to-watch": "To Watch",
+  watched: "Watched",
+  archive: "Archive",
+};
 const CHECK_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
 
 function renderModalFooter(m, youtubeLinkHtml) {
-  const s = m.status === "maybe-later" || m.status === "archive" ? "to-watch" : (m.status || "to-watch");
+  const raw = m.status || "to-watch";
+  const s = raw === "watched" ? "watched" : raw === "archive" ? "archive" : "to-watch";
   const currentListLabel = getCurrentListLabel();
   const serviceChips = renderServiceChips(servicesForMovie(m, userCountryCode));
   const servicePart = serviceChips ? ` <span style="opacity:0.4">·</span> ${serviceChips}` : "";
@@ -477,10 +498,11 @@ function renderModalFooter(m, youtubeLinkHtml) {
 function updateModalStatusBtn() {
   if (!currentModalMovie) return;
   const trigger = document.querySelector(".modal-status-trigger");
-  const displayStatus = currentModalMovie.status === "maybe-later" || currentModalMovie.status === "archive" ? "to-watch" : (currentModalMovie.status || "to-watch");
-  if (trigger) trigger.querySelector(".modal-action-label").textContent = STATUS_LABELS[displayStatus];
+  const raw = currentModalMovie.status || "to-watch";
+  const tabKey = raw === "watched" ? "watched" : raw === "archive" ? "archive" : "to-watch";
+  if (trigger) trigger.querySelector(".modal-action-label").textContent = STATUS_LABELS[tabKey];
   document.querySelectorAll(".modal-action-dropdown-item[data-status]").forEach((btn) => {
-    const isActive = btn.dataset.status === displayStatus;
+    const isActive = btn.dataset.status === tabKey;
     btn.innerHTML = STATUS_LABELS[btn.dataset.status] + (isActive ? " " + CHECK_SVG : "");
   });
 }
@@ -528,7 +550,8 @@ function attachModalFooterHandlers(footer, m) {
       item.addEventListener("click", async (e) => {
         e.stopPropagation();
         const status = item.dataset.status;
-        const current = m.status === "maybe-later" || m.status === "archive" ? "to-watch" : (m.status || "to-watch");
+        const raw = m.status || "to-watch";
+        const current = raw === "watched" ? "watched" : raw === "archive" ? "archive" : "to-watch";
         if (status && status !== current) await setStatusFromCard(m, status);
         statusPanel.classList.remove("open");
         statusTrigger.setAttribute("aria-expanded", "false");

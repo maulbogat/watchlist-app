@@ -22,15 +22,7 @@ import {
   arrayRemove,
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDKnQufhinuv-jKXNOyVM_mQDmRpdOD0VA",
-  authDomain: "movie-trailer-site.firebaseapp.com",
-  projectId: "movie-trailer-site",
-  storageBucket: "movie-trailer-site.firebasestorage.app",
-  messagingSenderId: "760692399711",
-  appId: "1:760692399711:web:322f98f5fe127aa5f2c5ea",
-  measurementId: "G-4799K3WXK4",
-};
+import { firebaseConfig } from "./config/firebase.js";
 
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
