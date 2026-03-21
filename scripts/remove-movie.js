@@ -1,45 +1,85 @@
 /**
- * Remove a movie from the Firestore catalog.
+ * Remove a title: delete titleRegistry doc and remove refs from all lists / status arrays.
  * Run: node scripts/remove-movie.js "Title" [year]
- * Removes the first match. Use year to target a specific one.
  */
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getDb } from "./lib/admin-init.mjs";
+import { findByTitle } from "./lib/registry-query.mjs";
+import { listKey } from "../lib/registry-id.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, "..");
-const key = JSON.parse(readFileSync(join(rootDir, "serviceAccountKey.json"), "utf-8"));
-const app = initializeApp({ credential: cert(key) });
-const db = getFirestore(app);
-
-const [, , title, year] = process.argv;
-if (!title) {
-  console.error('Usage: node scripts/remove-movie.js "Title" [year]');
-  process.exit(1);
+function matchesLegacyRow(m, title, year) {
+  if (!m || m.registryId) return false;
+  if (String(m.title || "").toLowerCase() !== String(title).toLowerCase()) return false;
+  if (year == null || year === "") return true;
+  return String(m.year ?? "") === String(year);
 }
 
-const ref = db.collection("catalog").doc("movies");
-const snap = await ref.get();
-if (!snap.exists || !Array.isArray(snap.data().items)) {
-  console.error("Catalog not found.");
-  process.exit(1);
+async function loadRegMap(db) {
+  const snap = await db.collection("titleRegistry").get();
+  const map = new Map();
+  for (const d of snap.docs) map.set(d.id, { registryId: d.id, ...d.data() });
+  return map;
 }
-const items = snap.data().items;
-const matches = items.filter(
-  (m) =>
-    m.title.toLowerCase() === title.toLowerCase() &&
-    (year == null || String(m.year ?? "") === String(year))
-);
-if (matches.length === 0) {
-  console.error(`"${title}" not found.`);
-  process.exit(1);
+
+async function purgeFromDocument(ref, data, registryIds, matches, title, year) {
+  const items = Array.isArray(data.items) ? data.items : [];
+  const ridSet = new Set(registryIds);
+  const statusKeysToRemove = new Set(registryIds);
+  for (const m of matches) statusKeysToRemove.add(listKey(m));
+  if (matches.length === 0) statusKeysToRemove.add(listKey({ title, year: year ?? "" }));
+  const newItems = items.filter((m) => {
+    if (!m) return true;
+    if (m.registryId && ridSet.has(m.registryId)) return false;
+    if (matchesLegacyRow(m, title, year)) return false;
+    return true;
+  });
+  const strip = (arr) => (Array.isArray(arr) ? arr : []).filter((k) => !statusKeysToRemove.has(k));
+  const watched = strip(data.watched);
+  const maybeLater = strip(data.maybeLater);
+  const archive = strip(data.archive);
+  const changed =
+    newItems.length !== items.length ||
+    watched.length !== (data.watched || []).length ||
+    maybeLater.length !== (data.maybeLater || []).length ||
+    archive.length !== (data.archive || []).length;
+  if (changed) {
+    await ref.set({ items: newItems, watched, maybeLater, archive }, { merge: true });
+  }
 }
-// Remove first match
-const toRemove = matches[0];
-const idx = items.findIndex((m) => m === toRemove);
-items.splice(idx, 1);
-await ref.set({ items, updatedAt: new Date().toISOString() });
-console.log(`Removed "${toRemove.title}" (${toRemove.year ?? "—"})`);
+
+async function main() {
+  const db = getDb();
+  const [, , title, year] = process.argv;
+  if (!title) {
+    console.error('Usage: node scripts/remove-movie.js "Title" [year]');
+    process.exit(1);
+  }
+  const regMap = await loadRegMap(db);
+  const matches = findByTitle(regMap, title, { exact: true, year });
+  const registryIds = matches.map((m) => m.registryId);
+  if (matches.length === 0) {
+    console.warn(
+      `No titleRegistry doc for "${title}"${year != null ? ` (${year})` : ""} — removing legacy list rows / status keys only.`
+    );
+  } else {
+    for (const rid of registryIds) {
+      await db.collection("titleRegistry").doc(rid).delete();
+      console.log(`Deleted titleRegistry/${rid}`);
+    }
+  }
+
+  const us = await db.collection("users").get();
+  for (const d of us.docs) {
+    await purgeFromDocument(d.ref, d.data(), registryIds, matches, title, year);
+    const pl = await d.ref.collection("personalLists").get();
+    for (const p of pl.docs) await purgeFromDocument(p.ref, p.data(), registryIds, matches, title, year);
+  }
+  const sh = await db.collection("sharedLists").get();
+  for (const d of sh.docs) await purgeFromDocument(d.ref, d.data(), registryIds, matches, title, year);
+
+  console.log("Done.");
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

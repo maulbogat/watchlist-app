@@ -1,7 +1,6 @@
 /**
- * Add a movie to a shared list.
- * Finds the movie in catalog, shared lists, or users.
- * Or fetch from OMDb by title/IMDb ID (requires OMDB_API_KEY in .env).
+ * Add a title to a shared list (titleRegistry + { registryId } row).
+ * Resolves from titleRegistry, user/shared rows, watchlist-backup.json, or OMDb (IMDb id / title).
  *
  * Run: node scripts/add-to-shared-list.js "Requiem for a Dream" "Our list"
  * Or:  node scripts/add-to-shared-list.js tt10919420 "Our list"
@@ -10,9 +9,13 @@ import "dotenv/config";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
 import https from "https";
+import { getDb } from "./lib/admin-init.mjs";
+import { loadAllRegistryMap, hydrateListRow } from "./lib/registry-query.mjs";
+import { registryDocIdFromItem, payloadForRegistry, listKey } from "../lib/registry-id.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const rootDir = join(__dirname, "..");
 
 function fetchOMDbByImdbId(imdbId) {
   const apiKey = process.env.OMDB_API_KEY;
@@ -37,17 +40,23 @@ async function fetchOMDbByTitle(title) {
 
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      let data = "";
-      res.on("data", (chunk) => { data += chunk; });
-      res.on("end", () => {
-        try {
-          const json = JSON.parse(data);
-          if (json.Response === "False") reject(new Error(json.Error || "OMDb lookup failed"));
-          else resolve(json);
-        } catch (e) { reject(e); }
-      });
-    }).on("error", reject);
+    https
+      .get(url, (res) => {
+        let data = "";
+        res.on("data", (chunk) => {
+          data += chunk;
+        });
+        res.on("end", () => {
+          try {
+            const json = JSON.parse(data);
+            if (json.Response === "False") reject(new Error(json.Error || "OMDb lookup failed"));
+            else resolve(json);
+          } catch (e) {
+            reject(e);
+          }
+        });
+      })
+      .on("error", reject);
   });
 }
 
@@ -75,60 +84,44 @@ function omdbToMovie(omdb, imdbId) {
   };
 }
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, "..");
-const keyPath = join(rootDir, "serviceAccountKey.json");
-
-let app;
-try {
-  let key;
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    key = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf-8"));
-  } else {
-    key = JSON.parse(readFileSync(keyPath, "utf-8"));
-  }
-  app = initializeApp({ credential: cert(key) });
-} catch (e) {
-  console.error("Need serviceAccountKey.json or FIREBASE_SERVICE_ACCOUNT env var");
-  process.exit(1);
-}
-
-const db = getFirestore(app);
-
-function movieKey(m) {
-  return `${m.title || ""}|${m.year ?? ""}`;
-}
-
 function normalizeMovie(m) {
   const { status, ...rest } = m;
   return rest;
 }
 
-async function findMovie(titleArg) {
+async function findMovie(db, titleArg, regMap) {
   const arg = String(titleArg).trim();
   const search = arg.toLowerCase();
   const matchExact = (m) => String(m.title || "").trim().toLowerCase() === search;
-  const matchFuzzy = (m) => String(m.title || "").trim().toLowerCase().includes(search) || search.includes(String(m.title || "").trim().toLowerCase());
+  const matchFuzzy = (m) => {
+    const t = String(m.title || "").trim().toLowerCase();
+    return t.includes(search) || search.includes(t);
+  };
+
+  if (/^tt\d+$/i.test(arg)) {
+    try {
+      const omdb = await fetchOMDbByImdbId(arg);
+      return normalizeMovie(omdbToMovie(omdb, arg));
+    } catch (e) {
+      throw new Error(`OMDb lookup failed: ${e.message}. Set OMDB_API_KEY for IMDb ID.`);
+    }
+  }
 
   for (const match of [matchExact, matchFuzzy]) {
-    const catalogSnap = await db.collection("catalog").doc("movies").get();
-    if (catalogSnap.exists) {
-      const items = catalogSnap.data()?.items || [];
-      const m = items.find(match);
-      if (m) return normalizeMovie(m);
-    }
+    const fromReg = [...regMap.values()].find(match);
+    if (fromReg) return normalizeMovie(fromReg);
 
     const usersSnap = await db.collection("users").get();
     for (const d of usersSnap.docs) {
       const items = d.data().items || [];
-      const m = items.find(match);
+      const m = items.map((row) => hydrateListRow(row, regMap)).find((h) => h && match(h));
       if (m) return normalizeMovie(m);
     }
 
     const listsSnap = await db.collection("sharedLists").get();
     for (const d of listsSnap.docs) {
       const items = d.data().items || [];
-      const m = items.find(match);
+      const m = items.map((row) => hydrateListRow(row, regMap)).find((h) => h && match(h));
       if (m) return normalizeMovie(m);
     }
 
@@ -140,22 +133,15 @@ async function findMovie(titleArg) {
     } catch (_) {}
   }
 
-  if (/^tt\d+$/i.test(arg)) {
-    try {
-      const omdb = await fetchOMDbByImdbId(arg);
-      return omdbToMovie(omdb, arg);
-    } catch (e) {
-      throw new Error(`OMDb lookup failed: ${e.message}. Set OMDB_API_KEY for IMDb ID.`);
-    }
-  }
-
   const omdb = await fetchOMDbByTitle(arg);
-  if (omdb) return omdbToMovie(omdb);
+  if (omdb) return normalizeMovie(omdbToMovie(omdb));
 
   return null;
 }
 
 async function main() {
+  const db = getDb();
+  const regMap = await loadAllRegistryMap(db);
   const [titleArg, listIdOrName] = process.argv.slice(2);
   if (!titleArg || !listIdOrName) {
     console.error('Usage: node scripts/add-to-shared-list.js "Requiem for a Dream" "Our list"');
@@ -164,7 +150,7 @@ async function main() {
 
   let movie;
   try {
-    movie = await findMovie(titleArg);
+    movie = await findMovie(db, titleArg, regMap);
   } catch (e) {
     console.error(e.message);
     process.exit(1);
@@ -173,6 +159,10 @@ async function main() {
     console.error(`"${titleArg}" not found. Set OMDB_API_KEY to fetch from OMDb by title.`);
     process.exit(1);
   }
+
+  const rid = movie.registryId || registryDocIdFromItem(movie);
+  const payload = payloadForRegistry({ ...movie, registryId: rid });
+  await db.collection("titleRegistry").doc(rid).set(payload, { merge: true });
 
   let listId = listIdOrName;
   if (listIdOrName.length > 20 || listIdOrName.includes(" ")) {
@@ -200,22 +190,28 @@ async function main() {
   const listMaybeLater = new Set(listData.maybeLater || []);
   const listArchive = new Set(listData.archive || []);
 
-  const key = movieKey(movie);
-  const existingKeys = new Set(listItems.map((m) => movieKey(m)));
+  const key = rid;
+  const existingKeys = new Set(listItems.map((m) => (m.registryId ? m.registryId : listKey(m))));
   if (existingKeys.has(key)) {
-    console.log(`"${movie.title}" already in shared list.`);
+    console.log(`"${movie.title}" already in shared list (${key}).`);
     return;
   }
 
-  listItems.push(movie);
-  await db.collection("sharedLists").doc(listId).set({
-    items: listItems,
-    watched: [...listWatched],
-    maybeLater: [...listMaybeLater],
-    archive: [...listArchive],
-  }, { merge: true });
+  listItems.push({ registryId: rid });
+  await db
+    .collection("sharedLists")
+    .doc(listId)
+    .set(
+      {
+        items: listItems,
+        watched: [...listWatched],
+        maybeLater: [...listMaybeLater],
+        archive: [...listArchive],
+      },
+      { merge: true }
+    );
 
-  console.log(`Added "${movie.title}" to shared list.`);
+  console.log(`Added "${movie.title}" to shared list (registry ${rid}).`);
 }
 
 main().catch((e) => {

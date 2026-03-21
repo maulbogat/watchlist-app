@@ -1,6 +1,6 @@
 /**
- * List every movieKey that appears in catalog, sharedLists, or users but not in all three.
- * Matching: movieKey(m) = `${title}|${year ?? ""}` (same as firebase.js).
+ * List keys that appear in titleRegistry, sharedLists, or users but not in all three.
+ * Keys: registryId for `{ registryId }` rows; else title|year for embedded rows.
  *
  * Run: node scripts/report-items-not-in-all-three.js [backup.json]
  * Default: backups/firestore-backup-migrated.json
@@ -9,19 +9,30 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { listKey } from "../lib/registry-id.js";
+import { trMapFromBackup, hydrateBackupRow } from "./lib/backup-list.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
 
-function movieKey(m) {
-  return `${m?.title ?? ""}|${m.year ?? ""}`;
+function collectRegistryKeys(backup) {
+  const s = new Set();
+  for (const [rid, row] of Object.entries(backup.titleRegistry || {})) {
+    if (!row || typeof row !== "object") continue;
+    s.add(rid);
+    s.add(listKey({ registryId: rid, ...row }));
+  }
+  return s;
 }
 
-function collectKeysFromItems(items) {
+function collectKeysFromListItems(items, trMap) {
   const s = new Set();
   if (!Array.isArray(items)) return s;
   for (const m of items) {
-    if (m && (m.title != null || m.year != null)) s.add(movieKey(m));
+    const h = hydrateBackupRow(m, trMap);
+    if (!h) continue;
+    if (m?.registryId) s.add(m.registryId);
+    s.add(listKey(h));
   }
   return s;
 }
@@ -31,11 +42,7 @@ function main() {
   const defaultPath = join(rootDir, "backups", "firestore-backup-migrated.json");
   const altPath = join(rootDir, "backups", "firestore-backup.json");
   const backupPath =
-    arg && !arg.startsWith("--")
-      ? arg
-      : existsSync(defaultPath)
-        ? defaultPath
-        : altPath;
+    arg && !arg.startsWith("--") ? arg : existsSync(defaultPath) ? defaultPath : altPath;
 
   if (!existsSync(backupPath)) {
     console.error("Missing:", backupPath);
@@ -43,67 +50,61 @@ function main() {
   }
 
   const backup = JSON.parse(readFileSync(backupPath, "utf-8"));
+  const trMap = trMapFromBackup(backup);
 
-  const catalogKeys = collectKeysFromItems(backup.catalog?.movies?.items);
+  const registryKeys = collectRegistryKeys(backup);
 
   const sharedKeys = new Set();
-  const sharedByKey = new Map(); // key -> list of list ids
+  const sharedByKey = new Map();
   for (const [listId, doc] of Object.entries(backup.sharedLists || {})) {
-    for (const m of doc?.items || []) {
-      if (m && (m.title != null || m.year != null)) {
-        const key = movieKey(m);
-        sharedKeys.add(key);
-        if (!sharedByKey.has(key)) sharedByKey.set(key, []);
-        sharedByKey.get(key).push(listId);
-      }
+    for (const k of collectKeysFromListItems(doc?.items, trMap)) {
+      sharedKeys.add(k);
+      if (!sharedByKey.has(k)) sharedByKey.set(k, []);
+      sharedByKey.get(k).push(listId);
     }
   }
 
   const userKeys = new Set();
   const usersByKey = new Map();
   for (const [uid, doc] of Object.entries(backup.users || {})) {
-    for (const m of doc?.items || []) {
-      if (m && (m.title != null || m.year != null)) {
-        const key = movieKey(m);
-        userKeys.add(key);
-        if (!usersByKey.has(key)) usersByKey.set(key, []);
-        usersByKey.get(key).push(uid);
-      }
+    for (const k of collectKeysFromListItems(doc?.items, trMap)) {
+      userKeys.add(k);
+      if (!usersByKey.has(k)) usersByKey.set(k, []);
+      usersByKey.get(k).push(uid);
     }
   }
 
-  const union = new Set([...catalogKeys, ...sharedKeys, ...userKeys]);
+  const union = new Set([...registryKeys, ...sharedKeys, ...userKeys]);
 
-  /** @type {{ key: string, inCatalog: boolean, inShared: boolean, inUsers: boolean, count: number }[]} */
   const incomplete = [];
   for (const key of union) {
-    const inCatalog = catalogKeys.has(key);
+    const inRegistry = registryKeys.has(key);
     const inShared = sharedKeys.has(key);
     const inUsers = userKeys.has(key);
-    const count = (inCatalog ? 1 : 0) + (inShared ? 1 : 0) + (inUsers ? 1 : 0);
+    const count = (inRegistry ? 1 : 0) + (inShared ? 1 : 0) + (inUsers ? 1 : 0);
     if (count < 3) {
-      incomplete.push({ key, inCatalog, inShared, inUsers, count });
+      incomplete.push({ key, inRegistry, inShared, inUsers, count });
     }
   }
 
   incomplete.sort((a, b) => {
     if (a.count !== b.count) return a.count - b.count;
-    return a.key.localeCompare(b.key);
+    return String(a.key).localeCompare(String(b.key));
   });
 
   const label = (row) => {
     const p = [];
-    if (row.inCatalog) p.push("catalog");
+    if (row.inRegistry) p.push("registry");
     if (row.inShared) p.push("shared");
     if (row.inUsers) p.push("users");
     return p.join("+") || "(none)";
   };
 
   const lines = [
-    `Items not in all three places (catalog + sharedLists + users)`,
+    `Items not in all three places (titleRegistry + sharedLists + users)`,
     `Backup: ${backupPath}`,
     `Generated: ${new Date().toISOString()}`,
-    `Matching: title|year`,
+    `Keys: registryId and/or title|year`,
     ``,
     `Total unique keys (anywhere): ${union.size}`,
     `Keys in all 3 places: ${union.size - incomplete.length}`,

@@ -15,19 +15,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
 const defaultPath = join(rootDir, "backups", "firestore-backup.json");
 
-function walkAllItems(backup, fn) {
-  const cat = backup.catalog?.movies?.items;
-  if (Array.isArray(cat)) {
-    for (let i = 0; i < cat.length; i++) fn(cat, i);
-  }
-  for (const doc of Object.values(backup.users || {})) {
-    if (!Array.isArray(doc?.items)) continue;
-    for (let i = 0; i < doc.items.length; i++) fn(doc.items, i);
-  }
-  for (const doc of Object.values(backup.sharedLists || {})) {
-    if (!Array.isArray(doc?.items)) continue;
-    for (let i = 0; i < doc.items.length; i++) fn(doc.items, i);
-  }
+function fixYoutube(arr, i) {
+  const y = arr[i]?.youtubeId;
+  if (y == null || y === "") return 0;
+  if (isPlayableYoutubeTrailerId(y)) return 0;
+  arr[i] = { ...arr[i], youtubeId: null };
+  return 1;
+}
+
+function fixYoutubeRow(row) {
+  const y = row?.youtubeId;
+  if (y == null || y === "") return 0;
+  if (isPlayableYoutubeTrailerId(y)) return 0;
+  row.youtubeId = null;
+  return 1;
 }
 
 function main() {
@@ -39,13 +40,26 @@ function main() {
   }
   const backup = JSON.parse(readFileSync(backupPath, "utf-8"));
   let changed = 0;
-  walkAllItems(backup, (arr, i) => {
-    const y = arr[i]?.youtubeId;
-    if (y == null || y === "") return;
-    if (isPlayableYoutubeTrailerId(y)) return;
-    arr[i] = { ...arr[i], youtubeId: null };
-    changed++;
-  });
+  for (const row of Object.values(backup.titleRegistry || {})) {
+    if (row && typeof row === "object") changed += fixYoutubeRow(row);
+  }
+  for (const doc of Object.values(backup.users || {})) {
+    if (!Array.isArray(doc?.items)) continue;
+    for (let i = 0; i < doc.items.length; i++) changed += fixYoutube(doc.items, i);
+  }
+  for (const doc of Object.values(backup.sharedLists || {})) {
+    if (!Array.isArray(doc?.items)) continue;
+    for (let i = 0; i < doc.items.length; i++) changed += fixYoutube(doc.items, i);
+  }
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const lists of Object.values(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const doc of Object.values(lists)) {
+        if (!Array.isArray(doc?.items)) continue;
+        for (let i = 0; i < doc.items.length; i++) changed += fixYoutube(doc.items, i);
+      }
+    }
+  }
   backup.exportedAt = new Date().toISOString();
   writeFileSync(backupPath, JSON.stringify(backup, null, 2), "utf-8");
   console.log(`Updated ${changed} item row(s): invalid youtubeId → null`);

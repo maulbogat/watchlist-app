@@ -1,5 +1,5 @@
 /**
- * 1) Removes any existing youtubeId on every catalog/user/shared list item.
+ * 1) Clears youtubeId on every titleRegistry doc and embedded list rows (skips bare `{ registryId }` stubs).
  * 2) For each item with tmdbId, fetches TMDB /movie|tv/{id}?append_to_response=videos
  *    and sets youtubeId to the YouTube trailer key, or null if TMDB has none.
  * 3) Items without tmdbId get youtubeId: null.
@@ -120,18 +120,38 @@ async function fetchYoutubeOnlyByTmdbId(id, apiKey, hint) {
   }
 }
 
+function isBareRegistryRef(m) {
+  if (!m || typeof m !== "object") return true;
+  const k = Object.keys(m);
+  return k.length === 1 && k[0] === "registryId";
+}
+
 function walkAllItems(backup, fn) {
-  const cat = backup.catalog?.movies?.items;
-  if (Array.isArray(cat)) {
-    for (let i = 0; i < cat.length; i++) fn(cat, i);
+  for (const row of Object.values(backup.titleRegistry || {})) {
+    if (row && typeof row === "object") fn(row);
   }
   for (const doc of Object.values(backup.users || {})) {
     if (!Array.isArray(doc?.items)) continue;
-    for (let i = 0; i < doc.items.length; i++) fn(doc.items, i);
+    for (let i = 0; i < doc.items.length; i++) {
+      if (!isBareRegistryRef(doc.items[i])) fn(doc.items[i]);
+    }
   }
   for (const doc of Object.values(backup.sharedLists || {})) {
     if (!Array.isArray(doc?.items)) continue;
-    for (let i = 0; i < doc.items.length; i++) fn(doc.items, i);
+    for (let i = 0; i < doc.items.length; i++) {
+      if (!isBareRegistryRef(doc.items[i])) fn(doc.items[i]);
+    }
+  }
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const lists of Object.values(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const doc of Object.values(lists)) {
+        if (!Array.isArray(doc?.items)) continue;
+        for (let i = 0; i < doc.items.length; i++) {
+          if (!isBareRegistryRef(doc.items[i])) fn(doc.items[i]);
+        }
+      }
+    }
   }
 }
 
@@ -158,8 +178,7 @@ async function main() {
   }
 
   const hintById = new Map();
-  walkAllItems(backup, (arr, i) => {
-    const m = arr[i];
+  walkAllItems(backup, (m) => {
     const id = numTmdbId(m);
     if (id == null) return;
     const h = m.tmdbMedia === "tv" || m.tmdbMedia === "movie" ? m.tmdbMedia : null;
@@ -191,27 +210,23 @@ async function main() {
 
   let rowsWithTrailerKey = 0;
   let rowsWithNull = 0;
-  walkAllItems(backup, (arr, i) => {
-    const m = arr[i];
-    const next = { ...m };
-    delete next.youtubeId;
-
+  walkAllItems(backup, (m) => {
+    delete m.youtubeId;
     const id = numTmdbId(m);
     if (id == null) {
-      next.youtubeId = null;
+      m.youtubeId = null;
       rowsWithNull++;
     } else {
       const meta = cache.get(id);
       const key = meta?.youtubeId;
       if (key && String(key).trim()) {
-        next.youtubeId = String(key).trim();
+        m.youtubeId = String(key).trim();
         rowsWithTrailerKey++;
       } else {
-        next.youtubeId = null;
+        m.youtubeId = null;
         rowsWithNull++;
       }
     }
-    arr[i] = next;
   });
 
   backup.exportedAt = new Date().toISOString();

@@ -1,5 +1,5 @@
 /**
- * Backfill all list/catalog items that have imdbId: refresh from TMDB (title, year,
+ * Backfill titleRegistry and embedded list items that have imdbId: refresh from TMDB (title, year,
  * type, genre, poster thumb, watch providers, tmdbId, YouTube trailer id).
  * IMDb id is the source of truth key; TMDB supplies everything else.
  *
@@ -139,44 +139,64 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, itemTypeHint) {
 
 function replaceKeyEverywhere(backup, oldKey, newKey) {
   if (!oldKey || oldKey === newKey) return;
-  const userFields = ["watched", "maybeLater", "archive"];
-  const sharedFields = ["watched", "maybeLater", "archive"];
+  const fields = ["watched", "maybeLater", "archive"];
 
-  for (const doc of Object.values(backup.users || {})) {
-    for (const f of userFields) {
+  function patchDoc(doc) {
+    if (!doc || typeof doc !== "object") return;
+    for (const f of fields) {
       if (!Array.isArray(doc[f])) continue;
       doc[f] = doc[f].map((k) => (k === oldKey ? newKey : k));
     }
   }
-  for (const doc of Object.values(backup.sharedLists || {})) {
-    for (const f of sharedFields) {
-      if (!Array.isArray(doc[f])) continue;
-      doc[f] = doc[f].map((k) => (k === oldKey ? newKey : k));
+
+  for (const doc of Object.values(backup.users || {})) patchDoc(doc);
+  for (const doc of Object.values(backup.sharedLists || {})) patchDoc(doc);
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const lists of Object.values(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const doc of Object.values(lists)) patchDoc(doc);
     }
   }
 }
 
+function isBareRegistryRef(m) {
+  if (!m || typeof m !== "object") return true;
+  const k = Object.keys(m);
+  return k.length === 1 && k[0] === "registryId";
+}
+
 function collectItemsWithImdb(backup) {
   const out = [];
-  const cat = backup.catalog?.movies?.items;
-  if (Array.isArray(cat)) {
-    for (let i = 0; i < cat.length; i++) {
-      const m = cat[i];
-      if (m?.imdbId) out.push({ place: "catalog", ref: cat, index: i, m });
-    }
+  const tr = backup.titleRegistry || {};
+  for (const [rid, row] of Object.entries(tr)) {
+    const m = row;
+    if (m?.imdbId) out.push({ place: "titleRegistry", registryId: rid, ref: tr, m });
   }
   for (const [uid, doc] of Object.entries(backup.users || {})) {
     if (!Array.isArray(doc?.items)) continue;
     for (let i = 0; i < doc.items.length; i++) {
       const m = doc.items[i];
-      if (m?.imdbId) out.push({ place: "user", userId: uid, ref: doc.items, index: i, m });
+      if (!isBareRegistryRef(m) && m?.imdbId) out.push({ place: "user", userId: uid, ref: doc.items, index: i, m });
     }
   }
   for (const [listId, doc] of Object.entries(backup.sharedLists || {})) {
     if (!Array.isArray(doc?.items)) continue;
     for (let i = 0; i < doc.items.length; i++) {
       const m = doc.items[i];
-      if (m?.imdbId) out.push({ place: "shared", listId, ref: doc.items, index: i, m });
+      if (!isBareRegistryRef(m) && m?.imdbId) out.push({ place: "shared", listId, ref: doc.items, index: i, m });
+    }
+  }
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const [uid, lists] of Object.entries(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const [plid, doc] of Object.entries(lists)) {
+        if (!Array.isArray(doc?.items)) continue;
+        for (let i = 0; i < doc.items.length; i++) {
+          const m = doc.items[i];
+          if (!isBareRegistryRef(m) && m?.imdbId)
+            out.push({ place: "personal", userId: uid, listId: plid, ref: doc.items, index: i, m });
+        }
+      }
     }
   }
   return out;
@@ -195,18 +215,16 @@ function collectItemsWithoutValidImdb(backup) {
       rawImdbId: m?.imdbId,
     });
   };
-  const cat = backup.catalog?.movies?.items;
-  if (Array.isArray(cat)) {
-    for (let i = 0; i < cat.length; i++) {
-      const m = cat[i];
-      const id = normImdb(m?.imdbId);
-      if (!/^tt\d+$/.test(id)) push("catalog", "catalog", i, m);
-    }
+  for (const [rid, row] of Object.entries(backup.titleRegistry || {})) {
+    const m = row;
+    const id = normImdb(m?.imdbId);
+    if (!/^tt\d+$/.test(id)) push("titleRegistry", rid, 0, m);
   }
   for (const [uid, doc] of Object.entries(backup.users || {})) {
     if (!Array.isArray(doc?.items)) continue;
     for (let i = 0; i < doc.items.length; i++) {
       const m = doc.items[i];
+      if (isBareRegistryRef(m)) continue;
       const id = normImdb(m?.imdbId);
       if (!/^tt\d+$/.test(id)) push("user", uid, i, m);
     }
@@ -215,8 +233,23 @@ function collectItemsWithoutValidImdb(backup) {
     if (!Array.isArray(doc?.items)) continue;
     for (let i = 0; i < doc.items.length; i++) {
       const m = doc.items[i];
+      if (isBareRegistryRef(m)) continue;
       const id = normImdb(m?.imdbId);
       if (!/^tt\d+$/.test(id)) push("shared", listId, i, m);
+    }
+  }
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const [uid, lists] of Object.entries(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const [plid, doc] of Object.entries(lists)) {
+        if (!Array.isArray(doc?.items)) continue;
+        for (let i = 0; i < doc.items.length; i++) {
+          const m = doc.items[i];
+          if (isBareRegistryRef(m)) continue;
+          const id = normImdb(m?.imdbId);
+          if (!/^tt\d+$/.test(id)) push("personal", `${uid}/${plid}`, i, m);
+        }
+      }
     }
   }
   return out;
@@ -301,7 +334,8 @@ async function main() {
   }
 
   let keyRenames = 0;
-  for (const { ref, index, m } of rows) {
+  for (const row of rows) {
+    const { ref, index, registryId, m } = row;
     const id = normImdb(m.imdbId);
     if (!/^tt\d+$/.test(id)) continue;
     const e = cache.get(id);
@@ -324,13 +358,18 @@ async function main() {
       replaceKeyEverywhere(backup, oldKey, newKey);
       keyRenames++;
     }
-    ref[index] = next;
+    if (registryId != null) {
+      ref[registryId] = { id: registryId, ...next };
+    } else {
+      ref[index] = next;
+    }
   }
 
   let itemRowsWithTrailer = 0;
   let itemRowsWithNone = 0;
-  for (const { ref, index } of rows) {
-    const y = ref[index]?.youtubeId;
+  for (const row of rows) {
+    const { ref, index, registryId } = row;
+    const y = registryId != null ? ref[registryId]?.youtubeId : ref[index]?.youtubeId;
     if (isPlayableYoutubeTrailerId(y)) itemRowsWithTrailer++;
     else itemRowsWithNone++;
   }
@@ -396,7 +435,11 @@ async function main() {
         ? `user:${row.userId}`
         : row.place === "shared"
           ? `shared:${row.listId}`
-          : "catalog";
+          : row.place === "titleRegistry"
+            ? `titleRegistry:${row.registryId}`
+            : row.place === "personal"
+              ? `personal:${row.userId}/${row.listId}`
+              : row.idLabel;
     mismatchLines.push(
       `  [${loc}#${row.index}] imdbId=${id} "${row.m.title ?? ""}" (${row.m.year ?? ""})`
     );

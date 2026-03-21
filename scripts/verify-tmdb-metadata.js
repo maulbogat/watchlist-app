@@ -167,9 +167,10 @@ function normGenre(g) {
 }
 
 function walkAllItems(backup, fn) {
-  const cat = backup.catalog?.movies?.items;
-  if (Array.isArray(cat)) {
-    for (let i = 0; i < cat.length; i++) fn(cat, i, `catalog#${i}`);
+  for (const [rid, row] of Object.entries(backup.titleRegistry || {})) {
+    if (!row || typeof row !== "object") continue;
+    const arr = [row];
+    fn(arr, 0, `titleRegistry:${rid}`);
   }
   for (const [uid, doc] of Object.entries(backup.users || {})) {
     if (!Array.isArray(doc?.items)) continue;
@@ -178,6 +179,15 @@ function walkAllItems(backup, fn) {
   for (const [lid, doc] of Object.entries(backup.sharedLists || {})) {
     if (!Array.isArray(doc?.items)) continue;
     for (let i = 0; i < doc.items.length; i++) fn(doc.items, i, `shared:${lid}#${i}`);
+  }
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const [uid, lists] of Object.entries(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const [plid, doc] of Object.entries(lists)) {
+        if (!Array.isArray(doc?.items)) continue;
+        for (let i = 0; i < doc.items.length; i++) fn(doc.items, i, `personal:${uid}/${plid}#${i}`);
+      }
+    }
   }
 }
 

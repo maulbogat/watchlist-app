@@ -1,45 +1,19 @@
 /**
- * Add a movie to the Firestore catalog.
+ * Add a title to titleRegistry (canonical store). Does not add to a user list.
  * Run: node scripts/add-movie.js "Title" [year] [type] [youtubeId] [imdbId]
- * Example: node scripts/add-movie.js "Action" 1999 show "" tt0206467
  *
- * If youtubeId omitted, stores null. Use imdbId (e.g. tt0206467) when adding metadata.
- * Requires: serviceAccountKey.json in project root.
+ * Requires: serviceAccountKey.json or FIREBASE_SERVICE_ACCOUNT
  */
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getDb } from "./lib/admin-init.mjs";
+import { registryDocIdFromItem, payloadForRegistry } from "../lib/registry-id.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, "..");
-
-const keyPath = join(rootDir, "serviceAccountKey.json");
-let app;
-try {
-  const key = JSON.parse(readFileSync(keyPath, "utf-8"));
-  app = initializeApp({ credential: cert(key) });
-} catch (e) {
-  console.error("Create serviceAccountKey.json in project root.");
-  process.exit(1);
-}
-
-const db = getFirestore(app);
-
-async function addMovie(title, year, type, youtubeId, imdbId) {
-  const ref = db.collection("catalog").doc("movies");
-  const snap = await ref.get();
-  if (!snap.exists || !Array.isArray(snap.data().items)) {
-    console.error("Catalog not found.");
+async function main() {
+  const [, , title, year, type, youtubeId, imdbId] = process.argv;
+  if (!title) {
+    console.error('Usage: node scripts/add-movie.js "Title" [year] [type] [youtubeId] [imdbId]');
     process.exit(1);
   }
-  const items = snap.data().items;
-  const exists = items.some((m) => m.title === title && (m.year ?? "") === String(year ?? ""));
-  if (exists) {
-    console.error(`"${title}" (${year}) already in catalog.`);
-    process.exit(1);
-  }
+  const db = getDb();
   const yt =
     youtubeId && String(youtubeId).trim() !== "" && youtubeId !== "null"
       ? String(youtubeId).trim()
@@ -52,27 +26,22 @@ async function addMovie(title, year, type, youtubeId, imdbId) {
     youtubeId: yt,
     services: [],
   };
-  if (yt) {
-    movie.thumb = `https://img.youtube.com/vi/${yt}/hqdefault.jpg`;
+  if (yt) movie.thumb = `https://img.youtube.com/vi/${yt}/hqdefault.jpg`;
+  if (imdbId) movie.imdbId = imdbId.startsWith("tt") ? imdbId : `tt${imdbId}`;
+
+  const rid = registryDocIdFromItem(movie);
+  const ref = db.collection("titleRegistry").doc(rid);
+  const snap = await ref.get();
+  if (snap.exists) {
+    console.error(`Already in titleRegistry as ${rid} (“${snap.data()?.title || title}”).`);
+    process.exit(1);
   }
-  if (imdbId) {
-    movie.imdbId = imdbId.startsWith("tt") ? imdbId : `tt${imdbId}`;
-  }
-  items.push(movie);
-  await ref.set({
-    items,
-    updatedAt: new Date().toISOString(),
-  });
-  console.log(`Added "${title}" (${year || "—"}) to catalog.`);
+  const payload = payloadForRegistry({ ...movie, registryId: rid });
+  await ref.set(payload, { merge: true });
+  console.log(`Added titleRegistry/${rid} — "${title}" (${year || "—"})`);
 }
 
-const [, , title, year, type, youtubeId, imdbId] = process.argv;
-if (!title) {
-  console.error('Usage: node scripts/add-movie.js "Title" [year] [type] [youtubeId] [imdbId]');
-  process.exit(1);
-}
-
-addMovie(title, year, type, youtubeId, imdbId).catch((err) => {
-  console.error(err);
+main().catch((e) => {
+  console.error(e);
   process.exit(1);
 });

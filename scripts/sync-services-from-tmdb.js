@@ -9,7 +9,7 @@
  * Regions:
  *   - users/*: each user's items get providers for that user's `country` (Firestore field),
  *     or DEFAULT_WATCH_REGION / IL.
- *   - catalog/movies: CATALOG_WATCH_REGION (default IL).
+ *   - titleRegistry: REGISTRY_WATCH_REGION or CATALOG_WATCH_REGION (default IL).
  *   - sharedLists/*: for each member uid, look up users[uid].country; fetch every distinct
  *     region so all members see correct chips.
  *
@@ -106,24 +106,38 @@ async function fetchProvidersFor(id, media, region, apiKey) {
   return extractProviders(pdata, region);
 }
 
+function isBareRegistryRef(m) {
+  if (!m || typeof m !== "object") return true;
+  const k = Object.keys(m);
+  return k.length === 1 && k[0] === "registryId";
+}
+
 function walkAllItemsWithTmdb(backup, fn) {
-  const cat = backup.catalog?.movies?.items;
-  if (Array.isArray(cat)) {
-    for (let i = 0; i < cat.length; i++) {
-      const m = cat[i];
-      if (numTmdbId(m) != null) fn(m, "catalog");
-    }
+  for (const [rid, row] of Object.entries(backup.titleRegistry || {})) {
+    const m = row;
+    if (m && typeof m === "object" && numTmdbId(m) != null) fn(m, `titleRegistry:${rid}`);
   }
   for (const [uid, doc] of Object.entries(backup.users || {})) {
     if (!Array.isArray(doc?.items)) continue;
     for (const m of doc.items) {
-      if (numTmdbId(m) != null) fn(m, `user:${uid}`);
+      if (!isBareRegistryRef(m) && numTmdbId(m) != null) fn(m, `user:${uid}`);
     }
   }
   for (const [lid, doc] of Object.entries(backup.sharedLists || {})) {
     if (!Array.isArray(doc?.items)) continue;
     for (const m of doc.items) {
-      if (numTmdbId(m) != null) fn(m, `shared:${lid}`);
+      if (!isBareRegistryRef(m) && numTmdbId(m) != null) fn(m, `shared:${lid}`);
+    }
+  }
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const [uid, lists] of Object.entries(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const [plid, doc] of Object.entries(lists)) {
+        if (!Array.isArray(doc?.items)) continue;
+        for (const m of doc.items) {
+          if (!isBareRegistryRef(m) && numTmdbId(m) != null) fn(m, `personal:${uid}/${plid}`);
+        }
+      }
     }
   }
 }
@@ -167,7 +181,8 @@ async function main() {
   }
 
   const defaultRegion = normRegion(process.env.DEFAULT_WATCH_REGION) || "IL";
-  const catalogRegion = normRegion(process.env.CATALOG_WATCH_REGION) || defaultRegion;
+  const registryRegion =
+    normRegion(process.env.REGISTRY_WATCH_REGION || process.env.CATALOG_WATCH_REGION) || defaultRegion;
 
   let backup;
   try {
@@ -182,7 +197,7 @@ async function main() {
 
   console.log(`Backup: ${backupPath}`);
   console.log(`Unique tmdbIds: ${uniqueIds.length}`);
-  console.log(`Default region: ${defaultRegion}, catalog region: ${catalogRegion}`);
+  console.log(`Default region: ${defaultRegion}, titleRegistry region: ${registryRegion}`);
   if (dryRun) {
     console.log("[--dry-run] No TMDB calls / no file write.");
     process.exit(0);
@@ -208,19 +223,33 @@ async function main() {
   };
 
   for (const id of uniqueIds) {
-    addPair(id, catalogRegion);
+    addPair(id, registryRegion);
   }
   for (const doc of Object.values(backup.users || {})) {
     const r = normRegion(doc.country) || defaultRegion;
     for (const m of doc.items || []) {
+      if (isBareRegistryRef(m)) continue;
       if (numTmdbId(m) != null) addPair(numTmdbId(m), r);
     }
   }
   for (const doc of Object.values(backup.sharedLists || {})) {
     for (const r of regionsForSharedList(backup, doc, defaultRegion)) {
       for (const m of doc.items || []) {
+        if (isBareRegistryRef(m)) continue;
         const id = numTmdbId(m);
         if (id != null) addPair(id, r);
+      }
+    }
+  }
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const [uid, lists] of Object.entries(backup.userPersonalLists)) {
+      const r = normRegion(backup.users?.[uid]?.country) || defaultRegion;
+      for (const doc of Object.values(lists)) {
+        for (const m of doc.items || []) {
+          if (isBareRegistryRef(m)) continue;
+          const id = numTmdbId(m);
+          if (id != null) addPair(id, r);
+        }
       }
     }
   }
@@ -252,22 +281,20 @@ async function main() {
   }
 
   let userRows = 0;
-  let catalogRows = 0;
+  let registryRows = 0;
   let sharedRows = 0;
 
-  const cat = backup.catalog?.movies?.items;
-  if (Array.isArray(cat)) {
-    for (let i = 0; i < cat.length; i++) {
-      const m = cat[i];
-      const id = numTmdbId(m);
-      if (id == null) continue;
-      const names = cache.get(`${id}|${catalogRegion}`) ?? [];
-      const prev =
-        m.servicesByRegion && typeof m.servicesByRegion === "object" ? { ...m.servicesByRegion } : {};
-      prev[catalogRegion] = names;
-      cat[i] = { ...m, servicesByRegion: prev, services: names };
-      catalogRows++;
-    }
+  for (const row of Object.values(backup.titleRegistry || {})) {
+    const m = row;
+    if (!m || typeof m !== "object") continue;
+    const id = numTmdbId(m);
+    if (id == null) continue;
+    const names = cache.get(`${id}|${registryRegion}`) ?? [];
+    const prev =
+      m.servicesByRegion && typeof m.servicesByRegion === "object" ? { ...m.servicesByRegion } : {};
+    prev[registryRegion] = names;
+    Object.assign(m, { servicesByRegion: prev, services: names });
+    registryRows++;
   }
 
   for (const [uid, doc] of Object.entries(backup.users || {})) {
@@ -275,13 +302,14 @@ async function main() {
     const region = normRegion(doc.country) || defaultRegion;
     for (let i = 0; i < doc.items.length; i++) {
       const m = doc.items[i];
+      if (isBareRegistryRef(m)) continue;
       const id = numTmdbId(m);
       if (id == null) continue;
       const names = cache.get(`${id}|${region}`) ?? [];
       const prev =
         m.servicesByRegion && typeof m.servicesByRegion === "object" ? { ...m.servicesByRegion } : {};
       prev[region] = names;
-      doc.items[i] = { ...m, servicesByRegion: prev, services: names };
+      Object.assign(m, { servicesByRegion: prev, services: names });
       userRows++;
     }
   }
@@ -291,6 +319,7 @@ async function main() {
     const regions = regionsForSharedList(backup, doc, defaultRegion);
     for (let i = 0; i < doc.items.length; i++) {
       const m = doc.items[i];
+      if (isBareRegistryRef(m)) continue;
       const id = numTmdbId(m);
       if (id == null) continue;
       const prev =
@@ -299,12 +328,33 @@ async function main() {
         const names = cache.get(`${id}|${r}`) ?? [];
         prev[r] = names;
       }
-      doc.items[i] = {
-        ...m,
+      Object.assign(m, {
         servicesByRegion: prev,
         services: [],
-      };
+      });
       sharedRows++;
+    }
+  }
+
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const [uid, lists] of Object.entries(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      const region = normRegion(backup.users?.[uid]?.country) || defaultRegion;
+      for (const doc of Object.values(lists)) {
+        if (!Array.isArray(doc.items)) continue;
+        for (let i = 0; i < doc.items.length; i++) {
+          const m = doc.items[i];
+          if (isBareRegistryRef(m)) continue;
+          const id = numTmdbId(m);
+          if (id == null) continue;
+          const names = cache.get(`${id}|${region}`) ?? [];
+          const prev =
+            m.servicesByRegion && typeof m.servicesByRegion === "object" ? { ...m.servicesByRegion } : {};
+          prev[region] = names;
+          Object.assign(m, { servicesByRegion: prev, services: names });
+          userRows++;
+        }
+      }
     }
   }
 
@@ -314,12 +364,12 @@ async function main() {
     `sync-services-from-tmdb`,
     `Generated: ${backup.exportedAt}`,
     `Backup: ${backupPath}`,
-    `Default region: ${defaultRegion}, catalog: ${catalogRegion}`,
+    `Default region: ${defaultRegion}, titleRegistry: ${registryRegion}`,
     ``,
     `Unique tmdbIds: ${uniqueIds.length}`,
     `Provider lookups (id × region): ${pairs.length}`,
     `TMDB errors: ${errors.length}`,
-    `Catalog rows updated: ${catalogRows}`,
+    `titleRegistry rows updated: ${registryRows}`,
     `User item rows updated: ${userRows}`,
     `Shared list item rows updated: ${sharedRows}`,
     ``,

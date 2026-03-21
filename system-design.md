@@ -8,7 +8,7 @@ This document describes **only what exists in this repository** as of the last f
 
 | Service name | Purpose | How it's accessed | Authentication | Environment variables |
 |--------------|---------|-------------------|----------------|----------------------|
-| **Firebase (Firestore)** | Persist watchlists, shared lists, optional catalog document, user profile (country, list name). | **Client:** Firebase JS SDK v10.7 from `gstatic` CDN in `firebase.js` (`getFirestore`, `doc`, `getDoc`, `setDoc`, etc.). **Server:** `firebase-admin` in Netlify functions and Node scripts. | **Client:** Firebase Auth user JWT (SDK attaches to requests per Firestore rules). **Server:** Service account JSON (base64) for Admin SDK. | **Client:** None — public web config lives in `config/firebase.js` (imported by `firebase.js`; see Section 7). **Server/scripts:** `FIREBASE_SERVICE_ACCOUNT` (base64 JSON). Scripts may also use `serviceAccountKey.json` in project root (per README / `check-upcoming.mjs`). |
+| **Firebase (Firestore)** | Persist watchlists, shared lists, **`titleRegistry`**, user profile (country, list name). | **Client:** Firebase JS SDK v10.7 from `gstatic` CDN in `firebase.js` (`getFirestore`, `doc`, `getDoc`, `setDoc`, etc.). **Server:** `firebase-admin` in Netlify functions and Node scripts. | **Client:** Firebase Auth user JWT (SDK attaches to requests per Firestore rules). **Server:** Service account JSON (base64) for Admin SDK. | **Client:** None — public web config lives in `config/firebase.js` (imported by `firebase.js`; see Section 7). **Server/scripts:** `FIREBASE_SERVICE_ACCOUNT` (base64 JSON). Scripts may also use `serviceAccountKey.json` in project root (per README / `check-upcoming.mjs`). |
 | **Firebase Auth** | Google Sign-In for end users. | **Client:** `firebase-auth.js` from CDN — `signInWithPopup`, `GoogleAuthProvider`, `onAuthStateChanged`. | OAuth via Google; Firebase-issued ID tokens. | Same as Firebase — `config/firebase.js`. |
 | **Firebase Analytics** | Analytics instance created on app init. | **Client:** `getAnalytics(app)` in `firebase.js`. | Inherits Firebase web app setup. | Defined in `config/firebase.js`. |
 | **The Movie Database (TMDB)** | Resolve IMDb id → TMDB id; poster; genres/year; **YouTube trailer key** from appended `videos`; **watch providers** by region. | **REST:** `https://api.themoviedb.org/3/...` via Node `https.get` in `netlify/functions/add-from-imdb.js`. Same pattern in maintenance scripts (e.g. `scripts/sync-services-from-tmdb.js`, `check-upcoming.mjs` uses `fetch`). **Not** called from the browser in `app.js`. | API key query parameter `api_key`. | `TMDB_API_KEY` in Netlify env; `.env` for local scripts / `check-upcoming.mjs`. |
@@ -36,13 +36,13 @@ This document describes **only what exists in this repository** as of the last f
 - **Serverless functions** (see `netlify.toml` → `functions = "netlify/functions"`):  
   - `add-from-imdb.js` — verifies token, calls OMDb/TMDB, writes Firestore via Admin SDK; after a successful add with `tmdbId`, runs **upcoming alerts** sync for that title (`lib/sync-upcoming-alerts.js`).  
   - `join-shared-list.js` — verifies token, adds caller’s uid to `sharedLists/{listId}.members`.  
-  - `check-upcoming.js` — **scheduled** (3:00 UTC, `netlify.toml` → `[functions."check-upcoming"]`): reads **`titleRegistry`** documents and unions legacy **`catalog/movies`** rows, dedupes by TMDB id + tv/movie, calls TMDB (`/tv`, `/movie`, `/collection`), upserts `upcomingAlerts` via Admin SDK (250ms between TMDB calls, 429 → 10s retry once).  
+  - `check-upcoming.js` — **scheduled** (3:00 UTC, `netlify.toml` → `[functions."check-upcoming"]`): reads **`titleRegistry`** only, dedupes by TMDB id + tv/movie, calls TMDB (`/tv`, `/movie`, `/collection`), upserts `upcomingAlerts` via Admin SDK (250ms between TMDB calls, 429 → 10s retry once).  
 - Functions use **Firebase Admin** with `FIREBASE_SERVICE_ACCOUNT`; they bypass Firestore security rules by design.
 - **`netlify/functions/package.json`** sets `"type": "commonjs"` so handlers stay CommonJS while the repo root `package.json` is `"type": "module"`.
 
 **Firebase**  
 - **Authentication:** Google provider; users identified by `uid`.  
-- **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: catalog read-only to clients; **`titleRegistry` read for signed-in users, no client writes**; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`); `upcomingAlerts` read for any signed-in user, no client writes.
+- **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: **`titleRegistry` read for signed-in users, no client writes**; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`); `upcomingAlerts` read for any signed-in user, no client writes. (Legacy **`catalog`** is removed from rules; delete leftover docs with `scripts/delete-legacy-catalog.mjs`.)
 
 **External APIs — where invoked**  
 - **TMDB / OMDb:** from **`netlify/functions/add-from-imdb.js`** (POST) and from **local Node scripts**, not from the deployed SPA.  
@@ -53,15 +53,9 @@ This document describes **only what exists in this repository** as of the last f
 
 ## Section 3: Data Model
 
-### `catalog` / `movies` (single document)
+### `catalog` (**removed**)
 
-| Field | Type | Notes |
-|-------|------|--------|
-| `items` | `array` | Canonical list of movie/show objects for migration / merge helpers (`getMoviesCatalog`, `mergeImdbIdsFromCatalog`, `mergeTmdbIdsFromCatalog`). |
-
-**Rules:** `allow read: if true`; `allow write: if false` — **clients cannot write catalog**; updates are offline/scripts/admin only.
-
-**Relationship:** Legacy merge source — new lists use **`titleRegistry`**; `mergeImdbIdsFromCatalog` / `mergeTmdbIdsFromCatalog` still match catalog rows by `title|year` for **embedded legacy** items only.
+Legacy collection is **not** used by the app or scripts anymore. **Rules** no longer include `catalog`. Remove any remaining documents with `node scripts/delete-legacy-catalog.mjs --write` (after backup).
 
 ---
 
@@ -83,7 +77,7 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 
 | Field | Type | Notes |
 |-------|------|--------|
-| `items` | `array` | Prefer **`{ registryId }`** per row; legacy pre-migration rows may still be full embedded objects (hydrated + merged on read). |
+| `items` | `array` | Prefer **`{ registryId }`** per row; legacy pre-migration rows may still be full embedded objects (hydrated from **`titleRegistry`** on read; no catalog merge). |
 | `watched` | `array` of string | Keys = **`registryId`** after migration; legacy = `"title|year"`. |
 | `maybeLater` | `array` of string | Same as `watched`. |
 | `archive` | `array` of string | Same as `watched`. |
@@ -256,7 +250,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `index.html` | Shell markup, modals, header, grid container. | — | — | Google Fonts |
 | `app.js` | Watchlist UI, auth chrome, list switching, modal, filters, invite copy/join, bookmarklet link builder. | Via `firebase.js` helpers (`getPersonalListMovies`, `getSharedListMovies`, `setStatus`, etc.) | Same | `fetch` → `join-shared-list`; YouTube embed URLs; clipboard API |
 | `config/firebase.js` | Public Firebase Web SDK config object (`firebaseConfig`). | — | — | — |
-| `firebase.js` | Imports config, initializes App/Auth/Firestore/Analytics; catalog read, user/shared/personal list CRUD, status keys, merge helpers from catalog. | `catalog/movies`, `users/*`, `sharedLists/*`, `personalLists/*` | Same | Firebase SDK only (Gstatic CDN) |
+| `firebase.js` | Imports config, initializes App/Auth/Firestore/Analytics; **`titleRegistry`** hydration, user/shared/personal list CRUD, status keys. | `titleRegistry`, `users/*`, `sharedLists/*`, `personalLists/*` | Same | Firebase SDK only (Gstatic CDN) |
 | `countries.js` | Static ISO country list + flags for country modal. | — | — | — |
 | `lib/youtube-trailer-id.js` | Validate/normalize TMDB YouTube key strings. | — | — | — |
 | `add.html` | Minimal page for add result. | — | — | — |
@@ -267,7 +261,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `netlify/functions/join-shared-list.js` | Add member to shared list. | Firestore via Admin | `sharedLists` | — |
 | `styles.css` | Visual styling. | — | — | — |
 | `check-upcoming.mjs` | Local diagnostic: read Firestore + TMDB, print report. | Admin + `dotenv` | — | TMDB |
-| `scripts/*.js` | Maintenance, backup, migration, catalog sync. | Admin (typical) | Varies | TMDB, OMDb, etc. |
+| `scripts/*.js` | Maintenance, backup, migration (titleRegistry model). | Admin (typical) | Varies | TMDB, OMDb, etc. |
 
 ---
 
@@ -382,7 +376,7 @@ sequenceDiagram
   App->>FS: getSharedListsForUser (array-contains members)
   App->>FS: getPersonalLists
   App->>FS: getPersonalListMovies or getSharedListMovies
-  FS-A->>FS: getDoc catalog/movies (merge helpers)
+  FS-A->>FS: getDoc titleRegistry/* (hydrate list rows)
   FS-->>App: items + status keys applied in memory
   App->>User: buildCards + filters
 ```
@@ -472,7 +466,7 @@ flowchart TD
 
 4. **Secondary personal lists + bookmarklet:** Cookie `bookmarklet_list_id` is set when viewing a **shared** list, not when viewing an extra **personal** subcollection list. The Netlify function only targets `users/{uid}.items` or `sharedLists/{listId}` — **bookmarklet cannot add directly** to `users/.../personalLists/{otherListId}`.
 
-5. **Firestore rules vs Admin:** Client rules deny catalog writes; all list mutations from functions use **Admin SDK** (bypass rules). Compromise of `FIREBASE_SERVICE_ACCOUNT` on Netlify is full database access.
+5. **Firestore rules vs Admin:** Client rules deny **`titleRegistry`** writes; list mutations from functions use **Admin SDK** (bypass rules). Compromise of `FIREBASE_SERVICE_ACCOUNT` on Netlify is full database access.
 
 6. **Shared list join token:** Join uses the same `bookmarklet_token` cookie / Bearer token as add; there is **no separate invite secret** — anyone with a valid account and a `listId` could join if they guess/obtain the id (predictability of random ids should be considered).
 

@@ -1,96 +1,75 @@
 /**
- * Recover titles from Firestore: catalog, sharedLists, and users.
- * Scans all sources and optionally restores to a user's personal list.
+ * Recover titles from Firestore: titleRegistry + all list rows (users, sharedLists, personalLists).
  *
  * Run:
- *   node scripts/recover-titles.js                    # Scan and report what's found
- *   node scripts/recover-titles.js --backup           # Write items to watchlist-backup.json
- *   node scripts/recover-titles.js <uid> --restore    # Copy all found items to users/<uid>
+ *   node scripts/recover-titles.js                    # Scan and report
+ *   node scripts/recover-titles.js --backup           # watchlist-backup.json
+ *   node scripts/recover-titles.js <uid> --restore    # Merge into users/{uid}
  *
- * Requires: serviceAccountKey.json in project root.
+ * Requires: serviceAccountKey.json or FIREBASE_SERVICE_ACCOUNT
  */
-import { readFileSync, writeFileSync } from "fs";
+import { writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getDb } from "./lib/admin-init.mjs";
+import { hydrateListRow } from "./lib/registry-query.mjs";
+import { registryDocIdFromItem, payloadForRegistry, listKey } from "../lib/registry-id.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
-const keyPath = join(rootDir, "serviceAccountKey.json");
 
-let app;
-try {
-  let key;
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    key = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf-8"));
-  } else {
-    key = JSON.parse(readFileSync(keyPath, "utf-8"));
-  }
-  app = initializeApp({ credential: cert(key) });
-} catch (e) {
-  console.error("Need Firebase credentials:");
-  console.error("  1. serviceAccountKey.json in project root, or");
-  console.error("  2. FIREBASE_SERVICE_ACCOUNT env var (base64 of the JSON)");
-  console.error("Get it from Firebase Console → Project Settings → Service Accounts → Generate new key");
-  process.exit(1);
+async function loadRegMap(db) {
+  const snap = await db.collection("titleRegistry").get();
+  const map = new Map();
+  for (const d of snap.docs) map.set(d.id, { registryId: d.id, ...d.data() });
+  return map;
 }
 
-const db = getFirestore(app);
-
-function movieKey(m) {
-  return `${m.title || ""}|${m.year ?? ""}`;
-}
-
-function normalizeMovie(m) {
+function normalizeHydrated(m) {
   const { status, ...rest } = m;
   return rest;
 }
 
-async function collectFromCatalog() {
-  const snap = await db.collection("catalog").doc("movies").get();
-  if (!snap.exists) return [];
-  const data = snap.data();
-  return Array.isArray(data?.items) ? data.items.map(normalizeMovie) : [];
+async function collectFromRegistry(db) {
+  const map = await loadRegMap(db);
+  return [...map.values()].map(normalizeHydrated);
 }
 
-async function collectFromSharedLists() {
-  const snap = await db.collection("sharedLists").get();
-  const all = [];
-  snap.docs.forEach((d) => {
-    const data = d.data();
-    const items = Array.isArray(data?.items) ? data.items : [];
-    items.forEach((m) => all.push(normalizeMovie(m)));
-  });
-  return all;
+async function collectFromListDocs(db, regMap) {
+  const out = [];
+
+  function pushFromItems(items) {
+    if (!Array.isArray(items)) return;
+    for (const m of items) {
+      const h = hydrateListRow(m, regMap);
+      if (h) out.push(normalizeHydrated(h));
+    }
+  }
+
+  const us = await db.collection("users").get();
+  for (const d of us.docs) {
+    pushFromItems(d.data().items);
+    const pl = await d.ref.collection("personalLists").get();
+    for (const p of pl.docs) pushFromItems(p.data().items);
+  }
+  const sh = await db.collection("sharedLists").get();
+  for (const d of sh.docs) pushFromItems(d.data().items);
+  return out;
 }
 
-async function collectFromUsers() {
-  const snap = await db.collection("users").get();
-  const all = [];
-  snap.docs.forEach((d) => {
-    const data = d.data();
-    const items = Array.isArray(data?.items) ? data.items : [];
-    items.forEach((m) => all.push(normalizeMovie(m)));
-  });
-  return all;
-}
-
-function mergeUnique(itemsArrays) {
+function mergeUnique(items) {
   const seen = new Set();
   const result = [];
-  for (const arr of itemsArrays) {
-    for (const m of arr) {
-      const key = movieKey(m);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      result.push(m);
-    }
+  for (const m of items) {
+    const k = m.registryId || listKey(m);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    result.push(m);
   }
   return result;
 }
 
-async function restoreToUser(uid, items) {
+async function restoreToUser(db, uid, items) {
   if (items.length === 0) {
     console.error("No items to restore.");
     return;
@@ -99,16 +78,19 @@ async function restoreToUser(uid, items) {
   const snap = await userRef.get();
   const data = snap.exists ? snap.data() : {};
   const existing = Array.isArray(data.items) ? [...data.items] : [];
-  const existingKeys = new Set(existing.map((m) => movieKey(m)));
+  const existingKeys = new Set(existing.map((m) => (m.registryId ? m.registryId : listKey(m))));
   const watched = new Set(data.watched || []);
   const maybeLater = new Set(data.maybeLater || []);
   const archive = new Set(data.archive || []);
 
   let added = 0;
   for (const m of items) {
-    const key = movieKey(m);
+    const rid = m.registryId || registryDocIdFromItem(m);
+    const key = rid;
     if (existingKeys.has(key)) continue;
-    existing.push(m);
+    const payload = payloadForRegistry({ ...m, registryId: rid });
+    await db.collection("titleRegistry").doc(rid).set(payload, { merge: true });
+    existing.push({ registryId: rid });
     existingKeys.add(key);
     added++;
   }
@@ -122,10 +104,11 @@ async function restoreToUser(uid, items) {
     },
     { merge: true }
   );
-  console.log(`Restored ${added} titles to users/${uid}`);
+  console.log(`Restored ${added} titles to users/${uid} (titleRegistry + { registryId } rows)`);
 }
 
 async function main() {
+  const db = getDb();
   const args = process.argv.slice(2);
   const doBackup = args.includes("--backup");
   const uid = args.find((a) => !a.startsWith("--"));
@@ -133,52 +116,39 @@ async function main() {
 
   console.log("Scanning Firestore...\n");
 
-  const [catalog, shared, users] = await Promise.all([
-    collectFromCatalog(),
-    collectFromSharedLists(),
-    collectFromUsers(),
-  ]);
+  const regMap = await loadRegMap(db);
+  const [fromReg, fromLists] = await Promise.all([collectFromRegistry(db), collectFromListDocs(db, regMap)]);
 
-  console.log(`Catalog (catalog/movies):     ${catalog.length} items`);
-  console.log(`Shared lists:                  ${shared.length} items`);
-  console.log(`Users (all):                   ${users.length} items`);
+  console.log(`titleRegistry docs:           ${fromReg.length}`);
+  console.log(`List rows (hydrated):         ${fromLists.length}`);
 
-  const merged = mergeUnique([catalog, shared, users]);
-  console.log(`\nTotal unique titles found:    ${merged.length}`);
+  const merged = mergeUnique([...fromReg, ...fromLists]);
+  console.log(`\nTotal unique titles:         ${merged.length}`);
 
   if (merged.length > 0) {
     console.log("\nFirst 10 titles:");
     merged.slice(0, 10).forEach((m, i) => {
-      console.log(`  ${i + 1}. ${m.title} (${m.year ?? "—"})`);
+      console.log(`  ${i + 1}. ${m.title || m.registryId} (${m.year ?? "—"})  [${m.registryId || listKey(m)}]`);
     });
-    if (merged.length > 10) {
-      console.log(`  ... and ${merged.length - 10} more`);
-    }
+    if (merged.length > 10) console.log(`  ... and ${merged.length - 10} more`);
   }
 
   if (doBackup && merged.length > 0) {
     const backupPath = join(rootDir, "watchlist-backup.json");
-    const backup = {
-      exportedAt: new Date().toISOString(),
-      count: merged.length,
-      items: merged,
-    };
-    writeFileSync(backupPath, JSON.stringify(backup, null, 2), "utf-8");
+    writeFileSync(
+      backupPath,
+      JSON.stringify({ exportedAt: new Date().toISOString(), count: merged.length, items: merged }, null, 2),
+      "utf-8"
+    );
     console.log(`\nBackup written to ${backupPath}`);
   }
 
   if (doRestore && uid) {
     console.log(`\nRestoring to users/${uid}...`);
-    await restoreToUser(uid, merged);
+    await restoreToUser(db, uid, merged);
     console.log("Done.");
   } else if (doRestore && !uid) {
     console.error("\nUsage: node scripts/recover-titles.js <uid> --restore");
-    console.error("Get your UID from Firebase Console → Authentication → Users, or run: node scripts/list-users.js");
-  } else if (merged.length > 0 && !doRestore && !doBackup) {
-    console.log("\nOptions:");
-    console.log("  node scripts/recover-titles.js --backup           # Save to watchlist-backup.json");
-    console.log("  node scripts/recover-titles.js <your-uid> --restore");
-    console.log("\nGet your UID: node scripts/list-users.js");
   }
 }
 

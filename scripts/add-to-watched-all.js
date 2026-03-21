@@ -1,48 +1,43 @@
 /**
- * Add a movie to watched for all users in Firestore.
+ * Mark a title as watched for every user document.
  * Run: node scripts/add-to-watched-all.js "Alice in Borderland"
- *
- * If no users exist, sign in to the app and mark any movie first.
  */
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getDb } from "./lib/admin-init.mjs";
+import { loadAllRegistryMap, findByTitle } from "./lib/registry-query.mjs";
+import { listKey } from "../lib/registry-id.js";
+import { FieldValue } from "firebase-admin/firestore";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, "..");
-const key = JSON.parse(readFileSync(join(rootDir, "serviceAccountKey.json"), "utf-8"));
-const app = initializeApp({ credential: cert(key) });
-const db = getFirestore(app);
+const titleArg = process.argv[2] || "Alice in Borderland";
 
-const title = process.argv[2] || "Alice in Borderland";
+async function main() {
+  const db = getDb();
+  const regMap = await loadAllRegistryMap(db);
+  let hits = findByTitle(regMap, titleArg, { exact: true });
+  if (hits.length === 0) hits = findByTitle(regMap, titleArg, { exact: false });
+  if (hits.length === 0) {
+    console.error(`No titleRegistry match for "${titleArg}".`);
+    process.exit(1);
+  }
+  if (hits.length > 1) {
+    console.error("Ambiguous matches:", hits.map((h) => h.title).join(", "));
+    process.exit(1);
+  }
+  const movie = hits[0];
+  const key = movie.registryId || listKey(movie);
 
-const catalogSnap = await db.collection("catalog").doc("movies").get();
-if (!catalogSnap.exists || !Array.isArray(catalogSnap.data().items)) {
-  console.error("Catalog not found.");
+  const usersSnap = await db.collection("users").get();
+  if (usersSnap.empty) {
+    console.log("No users in Firestore.");
+    process.exit(0);
+  }
+  for (const doc of usersSnap.docs) {
+    await doc.ref.set({ watched: FieldValue.arrayUnion(key) }, { merge: true });
+    console.log(`Added "${movie.title}" to watched for user ${doc.id}`);
+  }
+  console.log("Done.");
+}
+
+main().catch((e) => {
+  console.error(e);
   process.exit(1);
-}
-const movie = catalogSnap.data().items.find((m) =>
-  m.title.toLowerCase().includes(title.toLowerCase())
-);
-if (!movie) {
-  console.error(`"${title}" not found in catalog.`);
-  process.exit(1);
-}
-const movieKey = `${movie.title}|${movie.year ?? ""}`;
-
-const usersSnap = await db.collection("users").get();
-if (usersSnap.empty) {
-  console.log("No users in Firestore. Sign in to the app and mark any movie as watched first.");
-  process.exit(0);
-}
-
-for (const doc of usersSnap.docs) {
-  await doc.ref.set(
-    { watched: FieldValue.arrayUnion(movieKey) },
-    { merge: true }
-  );
-  console.log(`Added "${movie.title}" to watched for user ${doc.id}`);
-}
-console.log("Done.");
+});

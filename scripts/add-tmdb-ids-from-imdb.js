@@ -1,6 +1,6 @@
 /**
  * Add tmdbId to every item that has imdbId, using TMDB /find?external_source=imdb_id.
- * Writes the numeric TMDB id (movie or tv) on catalog, users, and sharedLists items.
+ * Writes the numeric TMDB id (movie or tv) on titleRegistry, users, and sharedLists items.
  *
  * Run: node scripts/add-tmdb-ids-from-imdb.js [backup.json] [--dry-run]
  * Default: backups/firestore-backup-migrated.json
@@ -57,9 +57,10 @@ async function findTmdbByImdb(imdbId, apiKey, itemTypeHint) {
 }
 
 function walkAllItems(backup, fn) {
-  const cat = backup.catalog?.movies?.items;
-  if (Array.isArray(cat)) {
-    for (let i = 0; i < cat.length; i++) fn(cat, i, "catalog");
+  for (const [rid, row] of Object.entries(backup.titleRegistry || {})) {
+    if (!row || typeof row !== "object") continue;
+    const arr = [row];
+    fn(arr, 0, `titleRegistry:${rid}`);
   }
   for (const [uid, doc] of Object.entries(backup.users || {})) {
     if (!Array.isArray(doc?.items)) continue;
@@ -68,6 +69,15 @@ function walkAllItems(backup, fn) {
   for (const [lid, doc] of Object.entries(backup.sharedLists || {})) {
     if (!Array.isArray(doc?.items)) continue;
     for (let i = 0; i < doc.items.length; i++) fn(doc.items, i, `shared:${lid}`);
+  }
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const [uid, lists] of Object.entries(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const [plid, doc] of Object.entries(lists)) {
+        if (!Array.isArray(doc?.items)) continue;
+        for (let i = 0; i < doc.items.length; i++) fn(doc.items, i, `personal:${uid}/${plid}`);
+      }
+    }
   }
 }
 
@@ -157,9 +167,8 @@ async function main() {
     }
     const hit = cache.get(id);
     if (!hit || hit.tmdbId == null) return;
-    const next = { ...m, tmdbId: hit.tmdbId };
-    if (hit.media) next.tmdbMedia = hit.media;
-    arr[i] = next;
+    m.tmdbId = hit.tmdbId;
+    if (hit.media) m.tmdbMedia = hit.media;
     updated++;
   });
 

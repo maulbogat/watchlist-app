@@ -172,35 +172,61 @@ async function fetchDetailsByTmdbId(id, apiKey, hint) {
 
 function replaceKeyEverywhere(backup, oldKey, newKey) {
   if (!oldKey || oldKey === newKey) return;
-  const userFields = ["watched", "maybeLater", "archive"];
-  const sharedFields = ["watched", "maybeLater", "archive"];
+  const fields = ["watched", "maybeLater", "archive"];
 
-  for (const doc of Object.values(backup.users || {})) {
-    for (const f of userFields) {
+  function patchDoc(doc) {
+    if (!doc || typeof doc !== "object") return;
+    for (const f of fields) {
       if (!Array.isArray(doc[f])) continue;
       doc[f] = doc[f].map((k) => (k === oldKey ? newKey : k));
     }
   }
-  for (const doc of Object.values(backup.sharedLists || {})) {
-    for (const f of sharedFields) {
-      if (!Array.isArray(doc[f])) continue;
-      doc[f] = doc[f].map((k) => (k === oldKey ? newKey : k));
+
+  for (const doc of Object.values(backup.users || {})) patchDoc(doc);
+  for (const doc of Object.values(backup.sharedLists || {})) patchDoc(doc);
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const lists of Object.values(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const doc of Object.values(lists)) patchDoc(doc);
     }
   }
 }
 
+function isBareRegistryRef(m) {
+  if (!m || typeof m !== "object") return true;
+  const k = Object.keys(m);
+  return k.length === 1 && k[0] === "registryId";
+}
+
 function walkAllItems(backup, fn) {
-  const cat = backup.catalog?.movies?.items;
-  if (Array.isArray(cat)) {
-    for (let i = 0; i < cat.length; i++) fn(cat, i, "catalog");
+  for (const [rid, row] of Object.entries(backup.titleRegistry || {})) {
+    if (row && typeof row === "object") fn(row, `titleRegistry:${rid}`);
   }
   for (const [uid, doc] of Object.entries(backup.users || {})) {
     if (!Array.isArray(doc?.items)) continue;
-    for (let i = 0; i < doc.items.length; i++) fn(doc.items, i, `user:${uid}`);
+    for (let i = 0; i < doc.items.length; i++) {
+      const m = doc.items[i];
+      if (!isBareRegistryRef(m)) fn(m, `user:${uid}`);
+    }
   }
   for (const [lid, doc] of Object.entries(backup.sharedLists || {})) {
     if (!Array.isArray(doc?.items)) continue;
-    for (let i = 0; i < doc.items.length; i++) fn(doc.items, i, `shared:${lid}`);
+    for (let i = 0; i < doc.items.length; i++) {
+      const m = doc.items[i];
+      if (!isBareRegistryRef(m)) fn(m, `shared:${lid}`);
+    }
+  }
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const [uid, lists] of Object.entries(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const [plid, doc] of Object.entries(lists)) {
+        if (!Array.isArray(doc?.items)) continue;
+        for (let i = 0; i < doc.items.length; i++) {
+          const m = doc.items[i];
+          if (!isBareRegistryRef(m)) fn(m, `personal:${uid}/${plid}`);
+        }
+      }
+    }
   }
 }
 
@@ -232,8 +258,7 @@ async function main() {
 
   /** @type {Map<number, 'movie'|'tv'|null>} */
   const hintById = new Map();
-  walkAllItems(backup, (arr, i) => {
-    const m = arr[i];
+  walkAllItems(backup, (m) => {
     const id = numTmdbId(m);
     if (id == null) return;
     const h = m.tmdbMedia === "tv" || m.tmdbMedia === "movie" ? m.tmdbMedia : null;
@@ -272,25 +297,21 @@ async function main() {
 
   let rowsUpdated = 0;
   let keyRenames = 0;
-  walkAllItems(backup, (arr, i) => {
-    const m = arr[i];
+  walkAllItems(backup, (m) => {
     const id = numTmdbId(m);
     if (id == null) return;
     const meta = cache.get(id);
     if (!meta) return;
 
     if (thumbOnly || youtubeOnly) {
-      const patch = { ...m };
-      if (thumbOnly) patch.thumb = meta.thumb;
-      if (youtubeOnly) patch.youtubeId = normalizeStoredYoutubeTrailerId(meta.youtubeId);
-      arr[i] = patch;
+      if (thumbOnly) m.thumb = meta.thumb;
+      if (youtubeOnly) m.youtubeId = normalizeStoredYoutubeTrailerId(meta.youtubeId);
       rowsUpdated++;
       return;
     }
 
     const oldKey = movieKey(m);
-    const next = {
-      ...m,
+    Object.assign(m, {
       title: meta.title,
       year: meta.year,
       type: meta.type,
@@ -298,13 +319,12 @@ async function main() {
       tmdbMedia: meta.tmdbMedia,
       thumb: meta.thumb,
       youtubeId: normalizeStoredYoutubeTrailerId(meta.youtubeId),
-    };
-    const newKey = movieKey(next);
+    });
+    const newKey = movieKey(m);
     if (oldKey !== newKey) {
       replaceKeyEverywhere(backup, oldKey, newKey);
       keyRenames++;
     }
-    arr[i] = next;
     rowsUpdated++;
   });
 

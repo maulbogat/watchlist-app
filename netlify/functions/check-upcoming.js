@@ -1,5 +1,5 @@
 /**
- * Scheduled: daily TMDB sync → Firestore upcomingAlerts (titleRegistry ∪ catalog/movies).
+ * Scheduled: daily TMDB sync → Firestore upcomingAlerts (titleRegistry only).
  * Netlify cron 3:00 UTC. Requires TMDB_API_KEY + FIREBASE_SERVICE_ACCOUNT.
  */
 

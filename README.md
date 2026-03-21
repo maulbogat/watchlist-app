@@ -36,9 +36,9 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 3. Set `TMDB_API_KEY` in Netlify → Site settings → Environment variables (for trailer lookup and **upcoming** sync). Get a free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
 
-4. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** (plus legacy **`catalog/movies`** until you retire it) and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
+4. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
 
-   **Existing data:** run `node scripts/migrate-to-title-registry.mjs --dry-run` then without `--dry-run` to move list `items` to `{ registryId }`, remap status keys, and seed `titleRegistry`.
+   **Existing data:** run `node scripts/migrate-to-title-registry.mjs --dry-run` then without `--dry-run` to move list `items` to `{ registryId }` and remap status keys. After migration, remove legacy Firestore docs: `node scripts/delete-legacy-catalog.mjs --dry-run` then `--write`.
 
 5. Visit `/bookmarklet.html` on your deployed site, drag the button to your bookmarks bar, then sign in with Google. When on an IMDb title page, click the bookmarklet to add it to your watchlist.
 
@@ -70,7 +70,7 @@ The header shows the signed-in user's email so family members know whose account
 If you lost titles (e.g. after a failed move), run the recovery script to scan Firestore and restore:
 
 ```bash
-# Scan catalog, shared lists, and users — report what's found
+# Scan shared lists, users, and related sources — report what's found
 node scripts/recover-titles.js
 
 # Restore all found titles to your personal list
@@ -81,16 +81,35 @@ Get your UID: `node scripts/list-users.js` or Firebase Console → Authenticatio
 
 Requires `serviceAccountKey.json` in project root, or `FIREBASE_SERVICE_ACCOUNT` env var.
 
-## Catalog sync (backup JSON)
+## Export Firestore to JSON (inspect / `grep` / `rg`)
 
-Titles added only to a **shared list** (via the bookmarklet) are not written to `catalog/movies` automatically. To copy every user/shared list row into the catalog (for backups and scripts that treat the catalog as source of truth), run:
+Pull **titleRegistry**, **upcomingAlerts**, **sharedLists**, **users**, and each user’s **personalLists** subcollection into one file:
 
 ```bash
-node scripts/sync-missing-items-to-catalog.js [backups/firestore-backup-migrated.json]
-# Optional: --dry-run
+node scripts/backup-firestore.js
+# custom path:
+node scripts/backup-firestore.js backups/my-snapshot.json
+# skip upcomingAlerts if the file gets huge:
+node scripts/backup-firestore.js --no-alerts
+node scripts/backup-firestore.js backups/slim.json --no-alerts
 ```
 
-Then restore to Firestore if needed: `node scripts/restore-from-backup.js <backup>`.
+Then search locally, e.g. `rg 'tt15677150|136311|Shrinking' backups/firestore-backup.json`.
+
+Same credentials as other scripts: `serviceAccountKey.json` or `FIREBASE_SERVICE_ACCOUNT`.
+
+To **delete the legacy `removed` field** from `sharedLists`, `users`, and personal lists (not used by the app):
+
+```bash
+node scripts/strip-removed-field.js --dry-run
+node scripts/strip-removed-field.js --write
+```
+
+## Maintenance scripts (titleRegistry)
+
+- **Registry report** (trailers, thumbs, services): `node scripts/registry-report.js`
+- **Add by IMDb id** (TMDB enrichment): `node scripts/add-title-by-imdb.js tt12345678`
+- **Delete legacy `catalog` collection** (after migration): `node scripts/delete-legacy-catalog.mjs --write`
 
 ## Features
 

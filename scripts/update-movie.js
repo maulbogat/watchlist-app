@@ -1,61 +1,37 @@
 /**
- * Update a movie in Firestore catalog.
+ * Update youtubeId (and thumb) for a title in titleRegistry.
  * Run: node scripts/update-movie.js "Man on the Inside" xhsVj_4ONoA
  * Clear trailer thumb: pass null (literal) as second arg.
  *
- * Requires: serviceAccountKey.json in project root.
+ * Requires: serviceAccountKey.json or FIREBASE_SERVICE_ACCOUNT
  */
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, "..");
-
-const keyPath = join(rootDir, "serviceAccountKey.json");
-let app;
-try {
-  const key = JSON.parse(readFileSync(keyPath, "utf-8"));
-  app = initializeApp({ credential: cert(key) });
-} catch (e) {
-  console.error("Create serviceAccountKey.json in project root.");
-  process.exit(1);
-}
-
-const db = getFirestore(app);
+import { getDb } from "./lib/admin-init.mjs";
+import { loadAllRegistryMap, findByTitle } from "./lib/registry-query.mjs";
 
 async function updateMovie(title, youtubeId) {
-  const ref = db.collection("catalog").doc("movies");
-  const snap = await ref.get();
-  if (!snap.exists || !Array.isArray(snap.data().items)) {
-    console.error("Catalog not found.");
+  const db = getDb();
+  const regMap = await loadAllRegistryMap(db);
+  let hits = findByTitle(regMap, title, { exact: true });
+  if (hits.length === 0) hits = findByTitle(regMap, title, { exact: false });
+  if (hits.length === 0) {
+    console.error(`Movie "${title}" not found in titleRegistry.`);
     process.exit(1);
   }
-  const items = snap.data().items;
-  const idx = items.findIndex(
-    (m) => m.title.toLowerCase() === title.toLowerCase()
-  );
-  if (idx === -1) {
-    console.error(`Movie "${title}" not found.`);
+  if (hits.length > 1) {
+    console.error("Ambiguous title. Matches:", hits.map((h) => `${h.title} (${h.year}) ${h.registryId}`).join("; "));
     process.exit(1);
   }
-  const yt =
-    youtubeId === "null" || youtubeId === ""
-      ? null
-      : youtubeId;
-  items[idx].youtubeId = yt;
+  const m = hits[0];
+  const rid = m.registryId;
+  const yt = youtubeId === "null" || youtubeId === "" ? null : youtubeId;
+  const patch = { youtubeId: yt };
   if (!yt) {
-    delete items[idx].thumb;
+    patch.thumb = null;
   } else {
-    items[idx].thumb = `https://img.youtube.com/vi/${yt}/hqdefault.jpg`;
+    patch.thumb = `https://img.youtube.com/vi/${yt}/hqdefault.jpg`;
   }
-  await ref.set({
-    items,
-    updatedAt: new Date().toISOString(),
-  });
-  console.log(`Updated "${items[idx].title}" youtubeId to ${yt === null ? "null" : yt}`);
+  await db.collection("titleRegistry").doc(rid).set(patch, { merge: true });
+  console.log(`Updated titleRegistry/${rid} "${m.title}" youtubeId → ${yt === null ? "null" : yt}`);
 }
 
 const [, , title, rawYoutube] = process.argv;

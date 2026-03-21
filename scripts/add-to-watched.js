@@ -1,62 +1,41 @@
 /**
- * Add a movie to a user's watched list in Firestore.
- * Run: node scripts/add-to-watched.js <userId> "A Man on the Inside"
- *
- * Get userId from Firebase Console → Authentication → Users (copy UID).
- * Requires: serviceAccountKey.json in project root.
+ * Mark a title as watched for a user (uses registryId / title|year keys).
+ * Run: node scripts/add-to-watched.js <userId> "Movie Title"
  */
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getDb } from "./lib/admin-init.mjs";
+import { loadAllRegistryMap, findByTitle } from "./lib/registry-query.mjs";
+import { listKey } from "../lib/registry-id.js";
+import { FieldValue } from "firebase-admin/firestore";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, "..");
-const keyPath = join(rootDir, "serviceAccountKey.json");
-
-let app;
-try {
-  const key = JSON.parse(readFileSync(keyPath, "utf-8"));
-  app = initializeApp({ credential: cert(key) });
-} catch (e) {
-  console.error("Create serviceAccountKey.json in project root.");
-  process.exit(1);
-}
-
-const db = getFirestore(app);
-
-async function addToWatched(uid, title) {
-  const catalogSnap = await db.collection("catalog").doc("movies").get();
-  if (!catalogSnap.exists || !Array.isArray(catalogSnap.data().items)) {
-    console.error("Catalog not found.");
+async function main() {
+  const [, , uid, title] = process.argv;
+  if (!uid || !title) {
+    console.error('Usage: node scripts/add-to-watched.js <userId> "Movie Title"');
     process.exit(1);
   }
-  const items = catalogSnap.data().items;
-  const movie = items.find((m) => m.title.toLowerCase() === title.toLowerCase());
-  if (!movie) {
-    console.error(`Movie "${title}" not found.`);
+  const db = getDb();
+  const regMap = await loadAllRegistryMap(db);
+  const hits = findByTitle(regMap, title, { exact: true });
+  if (hits.length === 0) {
+    const loose = findByTitle(regMap, title, { exact: false });
+    if (loose.length === 1) {
+      hits.push(loose[0]);
+    } else {
+      console.error(`No titleRegistry match for "${title}".`);
+      process.exit(1);
+    }
+  }
+  if (hits.length > 1) {
+    console.error(`Ambiguous title "${title}". Matches:`, hits.map((h) => `${h.title} (${h.year}) ${h.registryId}`).join("; "));
     process.exit(1);
   }
-  const key = `${movie.title}|${movie.year ?? ""}`;
-  const userRef = db.collection("users").doc(uid);
-  await userRef.set(
-    { watched: FieldValue.arrayUnion(key) },
-    { merge: true }
-  );
-  console.log(`Added "${movie.title}" to watched for user ${uid}`);
+  const movie = hits[0];
+  const key = movie.registryId || listKey(movie);
+  await db.collection("users").doc(uid).set({ watched: FieldValue.arrayUnion(key) }, { merge: true });
+  console.log(`Added "${movie.title}" → watched key ${key} for user ${uid}`);
 }
 
-const [, , uid, title] = process.argv;
-if (!uid || !title) {
-  console.error(
-    'Usage: node scripts/add-to-watched.js <userId> "Movie Title"'
-  );
-  console.error("Get userId from Firebase Console → Authentication → Users");
-  process.exit(1);
-}
-
-addToWatched(uid, title).catch((err) => {
-  console.error(err);
+main().catch((e) => {
+  console.error(e);
   process.exit(1);
 });

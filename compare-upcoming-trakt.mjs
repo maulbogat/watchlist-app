@@ -166,30 +166,41 @@ function initFirestore() {
 }
 
 async function collectAllItems(db) {
-  const out = [];
-
-  const catSnap = await db.collection("catalog").doc("movies").get();
-  if (catSnap.exists) {
-    const items = catSnap.data()?.items;
-    if (Array.isArray(items)) out.push(...items);
-  }
+  const { loadAllRegistryMap, hydrateListRow } = await import("./scripts/lib/registry-query.mjs");
+  const regMap = await loadAllRegistryMap(db);
+  const out = [...regMap.values()];
 
   const usersSnap = await db.collection("users").get();
   for (const userDoc of usersSnap.docs) {
     const d = userDoc.data();
-    if (Array.isArray(d.items)) out.push(...d.items);
+    if (Array.isArray(d.items)) {
+      for (const row of d.items) {
+        const h = hydrateListRow(row, regMap);
+        if (h) out.push(h);
+      }
+    }
 
     const plSnap = await db.collection("users").doc(userDoc.id).collection("personalLists").get();
     for (const plDoc of plSnap.docs) {
       const p = plDoc.data();
-      if (Array.isArray(p.items)) out.push(...p.items);
+      if (Array.isArray(p.items)) {
+        for (const row of p.items) {
+          const h = hydrateListRow(row, regMap);
+          if (h) out.push(h);
+        }
+      }
     }
   }
 
   const sharedSnap = await db.collection("sharedLists").get();
   for (const doc of sharedSnap.docs) {
     const d = doc.data();
-    if (Array.isArray(d.items)) out.push(...d.items);
+    if (Array.isArray(d.items)) {
+      for (const row of d.items) {
+        const h = hydrateListRow(row, regMap);
+        if (h) out.push(h);
+      }
+    }
   }
 
   return out;
@@ -319,7 +330,7 @@ async function main() {
   console.log("TMDB vs Trakt — next episode (filtered)");
   console.log("================================================================");
   console.log(
-    `Shows in catalog: ${tvRows.length} — printing only rows where TMDB ≠ none/TBA OR Trakt ≠ 204 empty`
+    `Shows in titleRegistry / lists: ${tvRows.length} — printing only rows where TMDB ≠ none/TBA OR Trakt ≠ 204 empty`
   );
   console.log("");
 

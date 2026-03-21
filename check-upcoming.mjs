@@ -110,10 +110,9 @@ function initFirestore() {
 async function collectAllItems(db) {
   const out = [];
 
-  const catSnap = await db.collection("catalog").doc("movies").get();
-  if (catSnap.exists) {
-    const items = catSnap.data()?.items;
-    if (Array.isArray(items)) out.push(...items);
+  const regSnap = await db.collection("titleRegistry").get();
+  for (const d of regSnap.docs) {
+    out.push({ ...d.data(), registryId: d.id });
   }
 
   const usersSnap = await db.collection("users").get();
@@ -168,9 +167,9 @@ function dedupeByTmdb(items) {
 }
 
 /**
- * @param {Set<number>} catalogMovieIds — TMDB movie ids present in your lists (deduped).
- * Recently released: only collection parts (same franchise/collection as a catalog title), or
- * recommendations whose id is in catalogMovieIds (title is in your catalog).
+ * @param {Set<number>} catalogMovieIds — TMDB movie ids present in your watchlist data (deduped).
+ * Recently released: only collection parts (same franchise/collection as a listed title), or
+ * recommendations whose id is in this set (title is in your lists / registry).
  */
 async function processMovie(apiKey, movieId, catalogMovieIds) {
   const sections = {
@@ -254,7 +253,7 @@ async function processMovie(apiKey, movieId, catalogMovieIds) {
             id: r.id,
             title: label,
             released: rel,
-            via: "In your catalog",
+            via: "On your watchlist",
           });
         }
       }

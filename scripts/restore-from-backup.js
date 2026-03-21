@@ -68,13 +68,33 @@ async function main() {
   console.log(`Restoring from ${backupPath} (exported ${backup.exportedAt})`);
   if (dryRun) console.log("DRY RUN - no changes will be written\n");
 
-  const [catalogCount, sharedCount, userCount] = await Promise.all([
-    restoreCollection("catalog", backup.catalog || {}, dryRun),
-    restoreCollection("sharedLists", backup.sharedLists || {}, dryRun),
-    restoreCollection("users", backup.users || {}, dryRun),
-  ]);
+  let catalogCount = 0;
+  if (backup.catalog && Object.keys(backup.catalog).length > 0) {
+    catalogCount = await restoreCollection("catalog", backup.catalog, dryRun);
+  }
+  const titleRegistryCount = await restoreCollection("titleRegistry", backup.titleRegistry || {}, dryRun);
+  const alertsCount = await restoreCollection("upcomingAlerts", backup.upcomingAlerts || {}, dryRun);
+  const sharedCount = await restoreCollection("sharedLists", backup.sharedLists || {}, dryRun);
+  const userCount = await restoreCollection("users", backup.users || {}, dryRun);
 
-  console.log(`\nRestored: catalog=${catalogCount}, sharedLists=${sharedCount}, users=${userCount}`);
+  let personalListsCount = 0;
+  for (const [uid, lists] of Object.entries(backup.userPersonalLists || {})) {
+    for (const [listId, data] of Object.entries(lists)) {
+      if (!data || data.id === undefined) continue;
+      const { id, ...rest } = data;
+      if (dryRun) {
+        console.log(`  [dry-run] users/${uid}/personalLists/${listId}`);
+        personalListsCount++;
+      } else {
+        await db.collection("users").doc(uid).collection("personalLists").doc(listId).set(rest, { merge: true });
+        personalListsCount++;
+      }
+    }
+  }
+
+  console.log(
+    `\nRestored: catalog=${catalogCount}, titleRegistry=${titleRegistryCount}, upcomingAlerts=${alertsCount}, sharedLists=${sharedCount}, users=${userCount}, personalLists=${personalListsCount}`
+  );
   if (dryRun) console.log("\nRun without --dry-run to apply changes.");
 }
 

@@ -1,10 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /catalog/{doc} {
-      allow read: if true;
-      allow write: if false;
-    }
     // Canonical title metadata (written by Netlify functions / Admin SDK only)
     match /titleRegistry/{docId} {
       allow read: if request.auth != null;

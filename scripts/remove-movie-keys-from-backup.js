@@ -1,6 +1,7 @@
 /**
- * Remove titles (by movieKey title|year) from catalog, every user list, and every shared list.
- * Strips matching keys from items, watched, maybeLater, archive and from nested string arrays.
+ * Remove titles from titleRegistry and every user / shared / personal list.
+ * Matching keys in REMOVE_KEYS: `title|year` (listKey) and/or registry doc ids (e.g. tt…, legacy-…).
+ * Strips matching keys from items, watched, maybeLater, archive and nested string arrays.
  *
  * Run: node scripts/remove-movie-keys-from-backup.js [backup.json]
  * Edit REMOVE_KEYS below, then run.
@@ -11,25 +12,30 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { listKey } from "../lib/registry-id.js";
+import { mutateTitleRegistryInBackup } from "./lib/backup-title-registry.mjs";
+import { trMapFromBackup, backupListKey } from "./lib/backup-list.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
 
-/** @type {Set<string>} movieKey = title|year — edit for each run */
+/** @type {Set<string>} listKey title|year and/or registryId — edit for each run */
 const REMOVE_KEYS = new Set(["Imperfect Women|2026", "Jury Duty|2023"]);
 
-function movieKey(m) {
-  return `${m?.title ?? ""}|${m.year ?? ""}`;
+function rowMatchesRemove(m, trMap) {
+  if (!m || typeof m !== "object") return false;
+  if (m.registryId && REMOVE_KEYS.has(m.registryId)) return true;
+  return REMOVE_KEYS.has(backupListKey(m, trMap));
 }
 
-function filterItemArrays(obj) {
-  if (!obj || typeof obj !== "object") return;
-  if (Array.isArray(obj.items)) {
-    obj.items = obj.items.filter((m) => !REMOVE_KEYS.has(movieKey(m)));
+function filterItemArrays(doc, trMap) {
+  if (!doc || typeof doc !== "object") return;
+  if (Array.isArray(doc.items)) {
+    doc.items = doc.items.filter((m) => !rowMatchesRemove(m, trMap));
   }
   for (const k of ["watched", "maybeLater", "archive"]) {
-    if (Array.isArray(obj[k])) {
-      obj[k] = obj[k].filter((key) => !REMOVE_KEYS.has(key));
+    if (Array.isArray(doc[k])) {
+      doc[k] = doc[k].filter((key) => !REMOVE_KEYS.has(key));
     }
   }
 }
@@ -70,19 +76,24 @@ function main() {
   }
 
   const backup = JSON.parse(readFileSync(backupPath, "utf-8"));
-  let catRemoved = 0;
 
-  if (backup.catalog?.movies?.items) {
-    const before = backup.catalog.movies.items.length;
-    backup.catalog.movies.items = backup.catalog.movies.items.filter((m) => !REMOVE_KEYS.has(movieKey(m)));
-    catRemoved = before - backup.catalog.movies.items.length;
-  }
+  let regBefore = Object.keys(backup.titleRegistry || {}).length;
+  mutateTitleRegistryInBackup(backup, (items) =>
+    items.filter((m) => {
+      const k = listKey(m);
+      if (REMOVE_KEYS.has(m.registryId)) return false;
+      return !REMOVE_KEYS.has(k);
+    })
+  );
+  let regAfter = Object.keys(backup.titleRegistry || {}).length;
+
+  const trMap2 = trMapFromBackup(backup);
 
   let userDocs = 0;
   if (backup.users && typeof backup.users === "object") {
     for (const doc of Object.values(backup.users)) {
       if (!doc || typeof doc !== "object") continue;
-      filterItemArrays(doc);
+      filterItemArrays(doc, trMap2);
       stripKeysFromAllArrays(doc);
       userDocs++;
     }
@@ -92,9 +103,20 @@ function main() {
   if (backup.sharedLists && typeof backup.sharedLists === "object") {
     for (const doc of Object.values(backup.sharedLists)) {
       if (!doc || typeof doc !== "object") continue;
-      filterItemArrays(doc);
+      filterItemArrays(doc, trMap2);
       stripKeysFromAllArrays(doc);
       sharedDocs++;
+    }
+  }
+
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const lists of Object.values(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const doc of Object.values(lists)) {
+        if (!doc || typeof doc !== "object") continue;
+        filterItemArrays(doc, trMap2);
+        stripKeysFromAllArrays(doc);
+      }
     }
   }
 
@@ -102,7 +124,7 @@ function main() {
   writeFileSync(backupPath, JSON.stringify(backup, null, 2) + "\n", "utf-8");
 
   console.log(`Removed keys: ${[...REMOVE_KEYS].join(", ")}`);
-  console.log(`Catalog rows removed: ${catRemoved}`);
+  console.log(`titleRegistry docs: ${regBefore} → ${regAfter} (removed ${regBefore - regAfter})`);
   console.log(`User docs cleaned: ${userDocs}`);
   console.log(`Shared list docs cleaned: ${sharedDocs}`);
   console.log(`Wrote ${backupPath}`);

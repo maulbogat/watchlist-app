@@ -1,21 +1,16 @@
 /**
- * Add one title to Firestore catalog by IMDb id (TMDB enrichment: thumb, trailer, tmdbId, services).
+ * Add one title to titleRegistry by IMDb id (TMDB enrichment: thumb, trailer, tmdbId, services).
  *
- * Run: node scripts/add-catalog-by-imdb.js tt28000275
- * Requires: .env TMDB_API_KEY, OMDB_API_KEY; serviceAccountKey.json
+ * Run: node scripts/add-title-by-imdb.js tt28000275
+ * Requires: .env TMDB_API_KEY, OMDB_API_KEY; serviceAccountKey.json or FIREBASE_SERVICE_ACCOUNT
  * Optional: WATCH_REGION (default IL) for provider chips
  */
 import "dotenv/config";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
 import https from "https";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getDb } from "./lib/admin-init.mjs";
 import { normalizeStoredYoutubeTrailerId } from "../lib/youtube-trailer-id.js";
+import { registryDocIdFromItem, payloadForRegistry, normalizeImdbId } from "../lib/registry-id.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, "..");
 const TMDB_IMG = "https://image.tmdb.org/t/p/w500";
 
 function fetchJson(url) {
@@ -138,15 +133,13 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint) {
 }
 
 function normImdb(id) {
-  const s = String(id || "").trim();
-  if (!s) return "";
-  return s.startsWith("tt") ? s : `tt${s}`;
+  return normalizeImdbId(id) || "";
 }
 
 async function main() {
   const imdbRaw = process.argv[2];
   if (!imdbRaw) {
-    console.error("Usage: node scripts/add-catalog-by-imdb.js tt12345678");
+    console.error("Usage: node scripts/add-title-by-imdb.js tt12345678");
     process.exit(1);
   }
   const imdbId = normImdb(imdbRaw);
@@ -176,22 +169,15 @@ async function main() {
     process.exit(1);
   }
 
-  const keyPath = join(rootDir, "serviceAccountKey.json");
-  const key = JSON.parse(readFileSync(keyPath, "utf-8"));
-  initializeApp({ credential: cert(key) });
-  const db = getFirestore();
+  const db = getDb();
 
-  const ref = db.collection("catalog").doc("movies");
-  const snap = await ref.get();
-  if (!snap.exists || !Array.isArray(snap.data().items)) {
-    console.error("Catalog not found.");
-    process.exit(1);
-  }
-  const items = [...snap.data().items];
-
-  if (items.some((m) => m.imdbId && normImdb(m.imdbId) === imdbId)) {
-    console.error(`Catalog already has an item with imdbId ${imdbId}.`);
-    process.exit(1);
+  const snap = await db.collection("titleRegistry").get();
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (normalizeImdbId(data.imdbId) === imdbId) {
+      console.error(`titleRegistry already has ${d.id} with imdbId ${imdbId}.`);
+      process.exit(1);
+    }
   }
 
   const movie = {
@@ -207,13 +193,11 @@ async function main() {
     tmdbMedia: e.tmdbMedia,
   };
 
-  items.push(movie);
-  await ref.set({
-    items,
-    updatedAt: new Date().toISOString(),
-  });
+  const rid = registryDocIdFromItem(movie);
+  const payload = payloadForRegistry({ ...movie, registryId: rid });
+  await db.collection("titleRegistry").doc(rid).set(payload, { merge: true });
 
-  console.log(`Added to catalog: "${movie.title}" (${movie.year ?? "—"})  imdb=${imdbId}  tmdbId=${movie.tmdbId}`);
+  console.log(`Added titleRegistry/${rid}: "${movie.title}" (${movie.year ?? "—"})  imdb=${imdbId}  tmdbId=${movie.tmdbId}`);
 }
 
 main().catch((err) => {

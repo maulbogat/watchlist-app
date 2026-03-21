@@ -1,31 +1,31 @@
 /**
- * Find duplicate titles in Firestore catalog.
+ * Find duplicate title+year entries in titleRegistry (same display key, different doc ids).
  * Run: node scripts/find-duplicates.js
  */
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getDb } from "./lib/admin-init.mjs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, "..");
-const key = JSON.parse(readFileSync(join(rootDir, "serviceAccountKey.json"), "utf-8"));
-const app = initializeApp({ credential: cert(key) });
-const db = getFirestore(app);
-
-const snap = await db.collection("catalog").doc("movies").get();
-const items = snap.data().items;
-const byKey = {};
-items.forEach((m, i) => {
-  const k = `${(m.title || "").toLowerCase()}|${m.year ?? ""}`;
-  if (!byKey[k]) byKey[k] = [];
-  byKey[k].push({ ...m, _idx: i });
-});
-const dups = Object.entries(byKey).filter(([, v]) => v.length > 1);
-if (dups.length) {
-  console.log("Duplicates found:");
-  dups.forEach(([k, arr]) => console.log(`  ${k}: ${arr.length} copies`));
-} else {
-  console.log("No duplicates found.");
+async function main() {
+  const db = getDb();
+  const snap = await db.collection("titleRegistry").get();
+  const byKey = {};
+  for (const d of snap.docs) {
+    const m = { registryId: d.id, ...d.data() };
+    const k = `${String(m.title || "").toLowerCase()}|${m.year ?? ""}`;
+    if (!byKey[k]) byKey[k] = [];
+    byKey[k].push(m);
+  }
+  const dups = Object.entries(byKey).filter(([, v]) => v.length > 1);
+  if (dups.length) {
+    console.log("Duplicates (same title|year, multiple registry docs):");
+    dups.forEach(([k, arr]) => {
+      console.log(`  ${k}: ${arr.length} docs → ${arr.map((x) => x.registryId).join(", ")}`);
+    });
+  } else {
+    console.log("No duplicates found.");
+  }
 }
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

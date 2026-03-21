@@ -1,10 +1,11 @@
 /**
- * Add manual imdbIds to backup file. Updates firestore-backup-migrated.json.
+ * Add manual imdbIds to backup file (titleRegistry). Updates firestore-backup-migrated.json.
  * Run: node scripts/add-imdb-manual.js
  */
 import { readFileSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { titleRegistryToArray, titleRegistryFromArray } from "./lib/backup-title-registry.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
@@ -37,9 +38,9 @@ function match(m, spec) {
 }
 
 const backup = JSON.parse(readFileSync(backupPath, "utf-8"));
-const items = backup.catalog?.movies?.items;
-if (!items) {
-  console.error("No catalog.movies.items in backup");
+const items = titleRegistryToArray(backup);
+if (items.length === 0 && !backup.titleRegistry) {
+  console.error("No titleRegistry in backup");
   process.exit(1);
 }
 
@@ -55,5 +56,6 @@ for (const spec of MANUAL_IMDB) {
   }
 }
 
+backup.titleRegistry = titleRegistryFromArray(items);
 writeFileSync(backupPath, JSON.stringify(backup, null, 2), "utf-8");
-console.log(`\nUpdated ${updated} items in ${backupPath}`);
+console.log(`\nUpdated ${updated} titleRegistry rows in ${backupPath}`);

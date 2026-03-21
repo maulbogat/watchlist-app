@@ -1,36 +1,9 @@
 /**
- * Ensure a title is in a user's personal list.
+ * Ensure a title is in a user's personal list (matches main list items by title).
  * Run: node scripts/ensure-in-personal.js "1941" <uid>
  */
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, "..");
-const keyPath = join(rootDir, "serviceAccountKey.json");
-
-let app;
-try {
-  let key;
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    key = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf-8"));
-  } else {
-    key = JSON.parse(readFileSync(keyPath, "utf-8"));
-  }
-  app = initializeApp({ credential: cert(key) });
-} catch (e) {
-  console.error("Need serviceAccountKey.json or FIREBASE_SERVICE_ACCOUNT env var");
-  process.exit(1);
-}
-
-const db = getFirestore(app);
-
-function movieKey(m) {
-  return `${m.title || ""}|${m.year ?? ""}`;
-}
+import { getDb } from "./lib/admin-init.mjs";
+import { loadAllRegistryMap, hydrateListRow } from "./lib/registry-query.mjs";
 
 async function main() {
   const [titleArg, uid] = process.argv.slice(2);
@@ -40,6 +13,8 @@ async function main() {
     process.exit(1);
   }
 
+  const db = getDb();
+  const regMap = await loadAllRegistryMap(db);
   const userSnap = await db.collection("users").doc(uid).get();
   if (!userSnap.exists) {
     console.error("User not found");
@@ -47,13 +22,18 @@ async function main() {
   }
   const userData = userSnap.data();
   const userItems = Array.isArray(userData.items) ? userData.items : [];
+  const t = String(titleArg).trim().toLowerCase();
 
-  const movie = userItems.find((m) => String(m.title || "").trim() === String(titleArg).trim());
+  const movie = userItems
+    .map((row) => hydrateListRow(row, regMap))
+    .find((m) => m && String(m.title || "").trim().toLowerCase() === t);
 
   if (movie) {
     console.log(`"${movie.title}" is in personal list.`);
   } else {
-    console.error(`"${titleArg}" not found in user's items. Need to add from shared list or catalog.`);
+    console.error(
+      `"${titleArg}" not found in user's items. Add it via the app, bookmarklet, or scripts/add-movie.js / titleRegistry.`
+    );
     process.exit(1);
   }
 }

@@ -88,7 +88,7 @@ async function deleteExpiredAlerts(db) {
 /**
  * @param {FirebaseFirestore.Firestore} db
  * @param {string} apiKey TMDB_API_KEY
- * @param {object[]} catalogItems - raw items from catalog/movies
+ * @param {object[]} catalogItems - raw title rows (e.g. from titleRegistry); name kept for compatibility
  */
 async function pruneAlertsOutsideCatalog(db, rows) {
   const valid = new Set(rows.map((r) => `${r.tmdbId}|${r.isTv ? "tv" : "movie"}`));
@@ -133,16 +133,12 @@ async function runFullCatalogSync(db, apiKey, catalogItems) {
 }
 
 /**
- * Full sync from titleRegistry plus legacy catalog/movies (union until catalog is retired).
+ * Full sync from titleRegistry only (catalog/movies is deprecated).
  */
 async function runFullRegistrySync(db, apiKey) {
   const regSnap = await db.collection("titleRegistry").get();
   const regItems = regSnap.docs.map((d) => d.data());
-  const catSnap = await db.doc("catalog/movies").get();
-  const catItems =
-    catSnap.exists && Array.isArray(catSnap.data()?.items) ? catSnap.data().items : [];
-  const merged = [...regItems, ...catItems];
-  return runFullCatalogSync(db, apiKey, merged);
+  return runFullCatalogSync(db, apiKey, regItems);
 }
 
 /**

@@ -23,7 +23,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 import { firebaseConfig } from "./config/firebase.js";
-import { listKey as movieKey, registryDocIdFromItem, normalizeImdbId } from "./lib/registry-id.js";
+import { listKey as movieKey } from "./lib/registry-id.js";
 
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
@@ -58,7 +58,7 @@ async function bulkGetTitleRegistryDocData(ids) {
 
 /**
  * Expand list rows: `{ registryId }` → merged metadata from titleRegistry;
- * legacy embedded rows → catalog merge + title|year status keys.
+ * legacy embedded rows → title|year status keys (embedded fields only; no catalog).
  */
 async function hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet) {
   const refs = [];
@@ -101,7 +101,7 @@ async function hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, ar
     });
   }
 
-  const legacyMerged = await mergeTmdbIdsFromCatalog(await mergeImdbIdsFromCatalog(legacy.map((m) => ({ ...m }))));
+  const legacyMerged = legacy.map((m) => ({ ...m }));
   for (const m of legacyMerged) {
     const k = titleYearKey(m);
     let status = "to-watch";
@@ -119,7 +119,7 @@ async function hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, ar
     );
   }
 
-  return enrichRegistryRefsFromCatalog(out);
+  return out;
 }
 
 /** Persisted list row: reference only when registryId is known; else legacy embedded doc. */
@@ -128,124 +128,6 @@ function rowToStore(movie) {
   if (movie.registryId) return { registryId: movie.registryId };
   const { status, ...clean } = movie;
   return clean;
-}
-
-async function getMoviesCatalog() {
-  const ref = doc(db, "catalog", "movies");
-  const snap = await getDoc(ref);
-  if (!snap.exists() || !Array.isArray(snap.data().items)) return [];
-  return snap.data().items;
-}
-
-/**
- * When list rows are `{ registryId }` only and `titleRegistry` docs are missing/empty
- * (e.g. migration not run or different env), fill from public `catalog/movies` by id.
- */
-async function enrichRegistryRefsFromCatalog(rows) {
-  const needs =
-    Array.isArray(rows) &&
-    rows.some((r) => r?.registryId && (!r.title || r.title === "Unknown"));
-  if (!needs) return rows;
-
-  const catalog = await getMoviesCatalog();
-  if (!catalog.length) return rows;
-
-  const byImdb = new Map();
-  const byTmdb = new Map();
-  const byLegacy = new Map();
-
-  for (const c of catalog) {
-    if (!c || typeof c !== "object") continue;
-    const legacyId = registryDocIdFromItem(c);
-    if (String(legacyId).startsWith("legacy-")) byLegacy.set(legacyId, c);
-
-    const imdb = normalizeImdbId(c.imdbId);
-    if (imdb) byImdb.set(imdb, c);
-
-    const t = c.tmdbId != null && c.tmdbId !== "" ? Number(c.tmdbId) : NaN;
-    if (!Number.isNaN(t)) {
-      const tv = c.tmdbMedia === "tv" || c.type === "show";
-      byTmdb.set(`${t}|${tv ? "tv" : "movie"}`, c);
-    }
-  }
-
-  function catalogRowForRegistryId(rid) {
-    const s = String(rid);
-    if (s.startsWith("tmdb-tv-")) {
-      const n = parseInt(s.slice("tmdb-tv-".length), 10);
-      if (!Number.isNaN(n)) return byTmdb.get(`${n}|tv`) || null;
-    }
-    if (s.startsWith("tmdb-movie-")) {
-      const n = parseInt(s.slice("tmdb-movie-".length), 10);
-      if (!Number.isNaN(n)) return byTmdb.get(`${n}|movie`) || null;
-    }
-    if (s.startsWith("legacy-")) return byLegacy.get(s) || null;
-    const imdb = normalizeImdbId(s);
-    if (imdb && /^tt\d+$/i.test(imdb)) return byImdb.get(imdb) || null;
-    return null;
-  }
-
-  return rows.map((r) => {
-    if (!r?.registryId || (r.title && r.title !== "Unknown")) return r;
-    const c = catalogRowForRegistryId(r.registryId);
-    if (!c) return r;
-    return { ...r, ...c, registryId: r.registryId, status: r.status };
-  });
-}
-
-/**
- * Fill missing imdbId on list rows from catalog (source of truth), by title|year.
- */
-async function mergeImdbIdsFromCatalog(items) {
-  if (!Array.isArray(items) || items.length === 0) return items;
-  if (!items.some((m) => m && !m.imdbId)) return items;
-  const catalog = await getMoviesCatalog();
-  const exact = new Map();
-  const loose = new Map();
-  for (const c of catalog) {
-    if (!c?.imdbId) continue;
-    const id = String(c.imdbId).startsWith("tt") ? c.imdbId : `tt${c.imdbId}`;
-    exact.set(titleYearKey(c), id);
-    const t = String(c.title || "")
-      .trim()
-      .toLowerCase();
-    const y = c.year == null || c.year === "" ? "" : String(c.year);
-    loose.set(`${t}|${y}`, id);
-  }
-  return items.map((m) => {
-    if (!m || m.imdbId) return m;
-    let id = exact.get(titleYearKey(m));
-    if (!id) {
-      const t = String(m.title || "")
-        .trim()
-        .toLowerCase();
-      const y = m.year == null || m.year === "" ? "" : String(m.year);
-      id = loose.get(`${t}|${y}`);
-    }
-    return id ? { ...m, imdbId: id } : m;
-  });
-}
-
-/**
- * Fill missing tmdbId on list rows from catalog, keyed by imdbId.
- */
-async function mergeTmdbIdsFromCatalog(items) {
-  if (!Array.isArray(items) || items.length === 0) return items;
-  if (!items.some((m) => m && m.imdbId && (m.tmdbId == null || m.tmdbId === ""))) return items;
-  const catalog = await getMoviesCatalog();
-  const byImdb = new Map();
-  for (const c of catalog) {
-    if (!c?.imdbId || c.tmdbId == null || c.tmdbId === "") continue;
-    const iid = String(c.imdbId).startsWith("tt") ? c.imdbId : `tt${c.imdbId}`;
-    const tid = Number(c.tmdbId);
-    if (!Number.isNaN(tid)) byImdb.set(iid, tid);
-  }
-  return items.map((m) => {
-    if (!m?.imdbId || (m.tmdbId != null && m.tmdbId !== "")) return m;
-    const iid = String(m.imdbId).startsWith("tt") ? m.imdbId : `tt${m.imdbId}`;
-    const tid = byImdb.get(iid);
-    return tid != null ? { ...m, tmdbId: tid } : m;
-  });
 }
 
 /**
@@ -937,7 +819,6 @@ export {
   fbSignOut,
   onAuthStateChanged,
   movieKey,
-  getMoviesCatalog,
   getUserMovies,
   getWatchedList,
   getStatusData,

@@ -1,37 +1,49 @@
 /**
- * Update a movie's year in Firestore catalog.
- * Run: node scripts/update-year.js "Title" year
+ * Update year on a titleRegistry doc. If doc id changes (legacy hash), rewrites list references.
+ * Run: node scripts/update-year.js "Title" 2024
  */
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getDb } from "./lib/admin-init.mjs";
+import { loadAllRegistryMap, findByTitle } from "./lib/registry-query.mjs";
+import { registryDocIdFromItem, payloadForRegistry } from "../lib/registry-id.js";
+import { rewriteRegistryIdEverywhere } from "./lib/rewrite-registry-id.mjs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, "..");
-const key = JSON.parse(readFileSync(join(rootDir, "serviceAccountKey.json"), "utf-8"));
-const app = initializeApp({ credential: cert(key) });
-const db = getFirestore(app);
+async function main() {
+  const [, , title, year] = process.argv;
+  if (!title || year === undefined) {
+    console.error('Usage: node scripts/update-year.js "Title" year');
+    process.exit(1);
+  }
 
-const [, , title, year] = process.argv;
-if (!title || year === undefined) {
-  console.error('Usage: node scripts/update-year.js "Title" year');
-  process.exit(1);
+  const db = getDb();
+  const regMap = await loadAllRegistryMap(db);
+  const hits = findByTitle(regMap, title, { exact: true });
+  if (hits.length === 0) {
+    console.error(`"${title}" not found in titleRegistry.`);
+    process.exit(1);
+  }
+  if (hits.length > 1) {
+    console.error("Ambiguous title:", hits.map((h) => `${h.title} (${h.year})`).join(", "));
+    process.exit(1);
+  }
+  const cur = hits[0];
+  const oldId = cur.registryId;
+  const y = Number(year) || null;
+  const merged = { ...cur, year: y };
+  const newId = registryDocIdFromItem(merged);
+  const payload = payloadForRegistry({ ...merged, registryId: newId });
+
+  if (newId === oldId) {
+    await db.collection("titleRegistry").doc(oldId).set({ year: y }, { merge: true });
+    console.log(`Updated titleRegistry/${oldId} year → ${y}`);
+  } else {
+    await db.collection("titleRegistry").doc(newId).set(payload, { merge: true });
+    await rewriteRegistryIdEverywhere(db, oldId, newId);
+    await db.collection("titleRegistry").doc(oldId).delete();
+    console.log(`Moved titleRegistry ${oldId} → ${newId} (year ${y})`);
+  }
 }
 
-const ref = db.collection("catalog").doc("movies");
-const snap = await ref.get();
-if (!snap.exists || !Array.isArray(snap.data().items)) {
-  console.error("Catalog not found.");
+main().catch((e) => {
+  console.error(e);
   process.exit(1);
-}
-const items = snap.data().items;
-const idx = items.findIndex((m) => m.title === title);
-if (idx === -1) {
-  console.error(`"${title}" not found.`);
-  process.exit(1);
-}
-items[idx].year = Number(year) || null;
-await ref.set({ items, updatedAt: new Date().toISOString() });
-console.log(`Updated "${title}" year to ${year}`);
+});

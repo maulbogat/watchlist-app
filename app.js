@@ -176,7 +176,7 @@ function getUniqueGenres() {
 
 function getFilteredTitles() {
   if (currentStatus === "recently-added") {
-    // Last 10 items added to catalog (by array order)
+    // Last 10 items in the loaded list (by array order)
     const recent = [];
     for (let i = movies.length - 1; i >= 0 && recent.length < 10; i--) {
       const m = movies[i];

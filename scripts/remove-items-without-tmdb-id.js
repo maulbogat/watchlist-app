@@ -1,6 +1,6 @@
 /**
- * Remove every list/catalog row that has no numeric tmdbId (null, "", or invalid).
- * Strips matching movieKey() from watched / maybeLater / archive (users and shared lists).
+ * Remove titleRegistry docs and list rows that have no numeric tmdbId (null, "", or invalid).
+ * Strips matching registryId / title|year from watched / maybeLater / archive.
  *
  * Run: node scripts/remove-items-without-tmdb-id.js [backup.json] [--dry-run]
  * Default: backups/firestore-backup-migrated.json
@@ -12,13 +12,12 @@ import "dotenv/config";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { listKey } from "../lib/registry-id.js";
+import { mutateTitleRegistryInBackup } from "./lib/backup-title-registry.mjs";
+import { trMapFromBackup, hydrateBackupRow } from "./lib/backup-list.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
-
-function movieKey(m) {
-  return `${m.title}|${m.year ?? ""}`;
-}
 
 function hasTmdbId(m) {
   const t = m?.tmdbId;
@@ -27,14 +26,41 @@ function hasTmdbId(m) {
   return !Number.isNaN(n);
 }
 
-const USER_STATUS = ["watched", "maybeLater", "archive"];
-const SHARED_STATUS = ["watched", "maybeLater", "archive"];
+const STATUS_FIELDS = ["watched", "maybeLater", "archive"];
+
+function keysForRow(m, trMap) {
+  const ks = new Set();
+  if (m?.registryId) ks.add(m.registryId);
+  const h = hydrateBackupRow(m, trMap);
+  if (h) ks.add(listKey(h));
+  return ks;
+}
 
 function stripKeys(doc, fields, keySet) {
   for (const f of fields) {
     if (!Array.isArray(doc[f])) continue;
     doc[f] = doc[f].filter((k) => !keySet.has(k));
   }
+}
+
+function filterListDoc(doc, trMap, removedLines, prefix, dryRun) {
+  if (!Array.isArray(doc?.items)) return 0;
+  const strip = new Set();
+  let n = 0;
+  const next = [];
+  for (const m of doc.items) {
+    const h = hydrateBackupRow(m, trMap);
+    if (!hasTmdbId(h)) {
+      for (const k of keysForRow(m, trMap)) strip.add(k);
+      n++;
+      removedLines.push(`${prefix}  ${[...keysForRow(m, trMap)].join("|")}  "${h?.title ?? ""}"`);
+    } else next.push(m);
+  }
+  if (!dryRun) {
+    doc.items = next;
+    stripKeys(doc, STATUS_FIELDS, strip);
+  }
+  return n;
 }
 
 async function main() {
@@ -54,69 +80,62 @@ async function main() {
   }
 
   const removedLines = [];
-  let catalogRemoved = 0;
+  let registryRemoved = 0;
+
+  const trMap0 = trMapFromBackup(backup);
+  const beforeReg = Object.keys(backup.titleRegistry || {}).length;
+  if (!dryRun) {
+    mutateTitleRegistryInBackup(backup, (items) => {
+      const kept = items.filter((m) => {
+        if (hasTmdbId(m)) return true;
+        registryRemoved++;
+        removedLines.push(`titleRegistry  ${m.registryId}  "${m.title ?? ""}"`);
+        return false;
+      });
+      return kept;
+    });
+  } else {
+    for (const m of Object.values(trMap0)) {
+      if (!hasTmdbId(m)) {
+        registryRemoved++;
+        removedLines.push(`titleRegistry  ${m.registryId}  "${m.title ?? ""}"`);
+      }
+    }
+  }
+  const afterReg = dryRun ? beforeReg : Object.keys(backup.titleRegistry || {}).length;
+
+  const trMap = dryRun ? trMap0 : trMapFromBackup(backup);
+
   let userRemoved = 0;
-  let sharedRemoved = 0;
-
-  const cat = backup.catalog?.movies?.items;
-  if (Array.isArray(cat)) {
-    const drop = [];
-    const next = [];
-    for (const m of cat) {
-      if (!hasTmdbId(m)) {
-        drop.push(movieKey(m));
-        catalogRemoved++;
-        removedLines.push(`catalog  ${movieKey(m)}  "${m.title ?? ""}"`);
-      } else next.push(m);
-    }
-    if (!dryRun) backup.catalog.movies.items = next;
-  }
-
   for (const [uid, doc] of Object.entries(backup.users || {})) {
-    if (!Array.isArray(doc?.items)) continue;
-    const keys = new Set();
-    const next = [];
-    for (const m of doc.items) {
-      if (!hasTmdbId(m)) {
-        keys.add(movieKey(m));
-        userRemoved++;
-        removedLines.push(`user:${uid}  ${movieKey(m)}  "${m.title ?? ""}"`);
-      } else next.push(m);
-    }
-    if (!dryRun) {
-      doc.items = next;
-      stripKeys(doc, USER_STATUS, keys);
-    }
+    userRemoved += filterListDoc(doc, trMap, removedLines, `user:${uid}`, dryRun);
   }
 
+  let sharedRemoved = 0;
   for (const [lid, doc] of Object.entries(backup.sharedLists || {})) {
-    if (!Array.isArray(doc?.items)) continue;
-    const keys = new Set();
-    const next = [];
-    for (const m of doc.items) {
-      if (!hasTmdbId(m)) {
-        keys.add(movieKey(m));
-        sharedRemoved++;
-        removedLines.push(`shared:${lid}  ${movieKey(m)}  "${m.title ?? ""}"`);
-      } else next.push(m);
-    }
-    if (!dryRun) {
-      doc.items = next;
-      stripKeys(doc, SHARED_STATUS, keys);
+    sharedRemoved += filterListDoc(doc, trMap, removedLines, `shared:${lid}`, dryRun);
+  }
+
+  if (backup.userPersonalLists && typeof backup.userPersonalLists === "object") {
+    for (const [uid, lists] of Object.entries(backup.userPersonalLists)) {
+      if (!lists || typeof lists !== "object") continue;
+      for (const [plid, doc] of Object.entries(lists)) {
+        filterListDoc(doc, trMap, removedLines, `personal:${uid}/${plid}`, dryRun);
+      }
     }
   }
 
-  const total = catalogRemoved + userRemoved + sharedRemoved;
+  const total = registryRemoved + userRemoved + sharedRemoved;
   const reportPath = join(rootDir, "backups", "remove-no-tmdb-report.txt");
   const lines = [
-    `remove-items-without-tmdb-id`,
+    `remove-items-without-tmdb-id (titleRegistry model)`,
     dryRun ? "DRY RUN — no file write" : `Written: ${new Date().toISOString()}`,
     `Source: ${backupPath}`,
     ``,
-    `Removed from catalog: ${catalogRemoved}`,
-    `Removed from users: ${userRemoved}`,
-    `Removed from sharedLists: ${sharedRemoved}`,
-    `Total rows removed: ${total}`,
+    `titleRegistry docs removed: ${registryRemoved} (${beforeReg} → ${afterReg})`,
+    `Rows removed from users: ${userRemoved}`,
+    `Rows removed from sharedLists: ${sharedRemoved}`,
+    `Total rows/lines removed: ${total}`,
     ``,
     ...removedLines,
   ];

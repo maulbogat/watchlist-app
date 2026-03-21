@@ -2,8 +2,6 @@
  * One-shot migration: embedded list rows → titleRegistry + `{ registryId }` refs.
  * Status arrays: title|year keys → registry ids where applicable.
  *
- * Also upserts titleRegistry from catalog/movies (does not delete catalog).
- *
  * Usage:
  *   node scripts/migrate-to-title-registry.mjs --dry-run
  *   node scripts/migrate-to-title-registry.mjs
@@ -109,32 +107,8 @@ async function migrateListDocument(ref) {
   return { updated: true, path: ref.path, itemCount: mergedItems.length };
 }
 
-async function seedRegistryFromCatalog() {
-  const ref = db.doc("catalog/movies");
-  const snap = await ref.get();
-  if (!snap.exists || !Array.isArray(snap.data()?.items)) {
-    console.log("No catalog/movies items to seed.");
-    return 0;
-  }
-  const items = snap.data().items;
-  let n = 0;
-  for (const m of items) {
-    if (!m || typeof m !== "object") continue;
-    const rid = registryDocIdFromItem(m);
-    const payload = payloadForRegistry({ ...m, registryId: rid });
-    if (!dryRun) {
-      await db.collection("titleRegistry").doc(rid).set(payload, { merge: true });
-    }
-    n++;
-  }
-  console.log(`${dryRun ? "[dry-run] " : ""}Seeded titleRegistry from ${n} catalog rows.`);
-  return n;
-}
-
 async function main() {
   console.log(dryRun ? "DRY RUN — no writes" : "LIVE migration");
-
-  await seedRegistryFromCatalog();
 
   let lists = 0;
   const usersSnap = await db.collection("users").get();
