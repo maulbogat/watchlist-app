@@ -1,3316 +1,6 @@
 {
-  "exportedAt": "2026-03-21T15:28:37.579Z",
-  "version": 2,
-  "catalog": {
-    "movies": {
-      "id": "movies",
-      "updatedAt": "2026-03-18T19:33:21.831Z",
-      "items": [
-        {
-          "title": "Resident Evil",
-          "year": 2002,
-          "type": "movie",
-          "genre": "Horror / Action / Science Fiction",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYmI3YjJkN2ItY2ZmYS00Y2JhLTk2YTQtYzE5YWU5ODI1MzJmXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0120804",
-          "tmdbId": 1576,
-          "tmdbMedia": "movie",
-          "youtubeId": "HhBAIDHvRTc"
-        },
-        {
-          "title": "The Devil's Advocate",
-          "year": 1997,
-          "type": "movie",
-          "genre": "Horror / Drama / Mystery",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNGIxZmU2ZjEtYjc3OC00Y2FiLWE2ZTQtZGI3NzE0YmRhOTMxXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video",
-            "YouTube"
-          ],
-          "imdbId": "tt0118971",
-          "tmdbId": 1813,
-          "tmdbMedia": "movie",
-          "youtubeId": "etrZJJC4ox8"
-        },
-        {
-          "title": "My Cousin Vinny",
-          "year": 1992,
-          "type": "movie",
-          "genre": "Comedy / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTQxNDYzMTg1M15BMl5BanBnXkFtZTgwNzk4MDgxMTE@._V1_SX300.jpg",
-          "services": [
-            "Hulu",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0104952",
-          "tmdbId": 10377,
-          "tmdbMedia": "movie",
-          "youtubeId": "hITJLnyH9Fc"
-        },
-        {
-          "title": "Shaun of the Dead",
-          "year": 2004,
-          "type": "movie",
-          "genre": "Horror / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNzNjZGE4YTUtOWU3OC00Mzg2LThjNWItMzUwYzEwMDgxYmVjXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0365748",
-          "tmdbId": 747,
-          "tmdbMedia": "movie",
-          "youtubeId": "_QuY93B2FS0"
-        },
-        {
-          "title": "Delivery Man",
-          "year": 2013,
-          "type": "movie",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjIxNjc2MzMzMl5BMl5BanBnXkFtZTgwMjA5NjM0MDE@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt2387559",
-          "tmdbId": 146239,
-          "tmdbMedia": "movie",
-          "youtubeId": "MaM0RzdeQmk"
-        },
-        {
-          "title": "Now You See Me",
-          "year": 2013,
-          "type": "movie",
-          "genre": "Thriller / Crime",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTY0NDY3MDMxN15BMl5BanBnXkFtZTcwOTM5NzMzOQ@@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt1670345",
-          "tmdbId": 75656,
-          "tmdbMedia": "movie",
-          "youtubeId": "DaavRAV8a0A"
-        },
-        {
-          "title": "Runt",
-          "year": 2020,
-          "type": "movie",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZDBmZTJlOTYtY2U0My00NTE0LTkwYWYtNzAwYmYzNzc1YWM4XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV"
-          ],
-          "imdbId": "tt6988296",
-          "tmdbId": 724574,
-          "tmdbMedia": "movie",
-          "youtubeId": "354mHOonbvQ"
-        },
-        {
-          "title": "Final Destination",
-          "year": 2000,
-          "type": "movie",
-          "genre": "Horror",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjE1MjlmOWYtYzdjMS00OTgwLThjMDctZWU4N2FkZjgyNTJiXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Max",
-            "Apple TV",
-            "Prime Video",
-            "YouTube"
-          ],
-          "imdbId": "tt0195714",
-          "tmdbId": 9532,
-          "tmdbMedia": "movie",
-          "youtubeId": "9hvUxRGeBhA"
-        },
-        {
-          "title": "Looper",
-          "year": 2012,
-          "type": "movie",
-          "genre": "Action / Thriller / Science Fiction",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTg5NTA3NTg4NF5BMl5BanBnXkFtZTcwNTA0NDYzOA@@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt1276104",
-          "tmdbId": 59967,
-          "tmdbMedia": "movie",
-          "youtubeId": "4Kn-MmuK3BI"
-        },
-        {
-          "title": "Big Stan",
-          "year": 2007,
-          "type": "movie",
-          "genre": "Comedy / Crime",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNzNkZGQzMWEtZGU3YS00YWI4LTg3YmEtMmVmMjRhZjg2ZTM5XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV"
-          ],
-          "imdbId": "tt0490086",
-          "tmdbId": 13161,
-          "tmdbMedia": "movie",
-          "youtubeId": "kCdtAFar0XM"
-        },
-        {
-          "title": "Big Trouble",
-          "year": 2002,
-          "type": "movie",
-          "genre": "Action / Comedy / Thriller / Mystery / Crime",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZmE2NjQzZmMtZGU0ZS00ZDNlLWEzNGItOGY0MmFmNWUzYmI5XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0246464",
-          "tmdbId": 2185,
-          "tmdbMedia": "movie",
-          "youtubeId": "os-iPdjKgMs"
-        },
-        {
-          "title": "The Girlfriend",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama / Mystery",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjU2OWNjMDctYzdhMi00ZmUwLTk1OTYtYmNkMjE1MDBjMDU1XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Prime Video"
-          ],
-          "imdbId": "tt32267726",
-          "tmdbId": 253376,
-          "tmdbMedia": "tv",
-          "youtubeId": "SKGdid_6V5s"
-        },
-        {
-          "title": "Kennedy",
-          "year": 2023,
-          "type": "show",
-          "genre": "Documentary",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjU0Yzc5NWUtYTY0NC00MDU5LWFlNWQtYjc0MjQ0OTFhZTA5XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "imdbId": "tt13929808",
-          "tmdbId": 237368,
-          "tmdbMedia": "tv",
-          "youtubeId": "zJdNAXtUWgc"
-        },
-        {
-          "title": "Keanu",
-          "year": 2016,
-          "type": "movie",
-          "genre": "Action / Comedy / Crime",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTUwODA0NzQxMl5BMl5BanBnXkFtZTgwNzUyMjY3ODE@._V1_SX300.jpg",
-          "services": [
-            "Max",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt4139124",
-          "tmdbId": 342521,
-          "tmdbMedia": "movie",
-          "youtubeId": "K9zy27apgI8"
-        },
-        {
-          "title": "Would You Rather",
-          "year": 2013,
-          "type": "movie",
-          "genre": "Thriller / Horror",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTI1ODY3MTQwNl5BMl5BanBnXkFtZTcwMjU5MjMxOQ@@._V1_SX300.jpg",
-          "services": [
-            "Hulu",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt1999995",
-          "tmdbId": 97051,
-          "tmdbMedia": "movie",
-          "youtubeId": "zG2z4ng2ghU"
-        },
-        {
-          "title": "Hoosiers",
-          "year": 1986,
-          "type": "movie",
-          "genre": "Drama / Family",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOGFlMjJkNzYtMTMwYS00OWE0LWFkNzYtMGMzODIzOWM0ZDM2XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Prime Video",
-            "Apple TV"
-          ],
-          "imdbId": "tt0091217",
-          "tmdbId": 5693,
-          "tmdbMedia": "movie",
-          "youtubeId": "12h5KGHU8Mg"
-        },
-        {
-          "title": "Speak No Evil",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Horror / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOTJjMDMyMGYtZWU3ZS00OTVmLTg1ZWUtY2E4OGEyOGNmMjhiXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video",
-            "YouTube"
-          ],
-          "imdbId": "tt14253846",
-          "tmdbId": 833339,
-          "tmdbMedia": "movie",
-          "youtubeId": "UhWiiDhmBCM"
-        },
-        {
-          "title": "Companion",
-          "year": 2025,
-          "type": "movie",
-          "genre": "Horror / Science Fiction / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYjkyZTA5NzAtYWU3Zi00MWM4LTgxNzAtNDQxY2JmNjMwYjk4XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Prime Video",
-            "Max",
-            "Apple TV"
-          ],
-          "imdbId": "tt26584495",
-          "tmdbId": 1084199,
-          "tmdbMedia": "movie",
-          "youtubeId": "Qr_kX0D3DNA"
-        },
-        {
-          "title": "Click",
-          "year": 2006,
-          "type": "movie",
-          "genre": "Comedy / Drama / Fantasy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTA1MTUxNDY4NzReQTJeQWpwZ15BbWU2MDE3ODAxNw@@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0389860",
-          "tmdbId": 9339,
-          "tmdbMedia": "movie",
-          "youtubeId": "APUqyhgtCfk"
-        },
-        {
-          "title": "Absolutely Anything",
-          "year": 2015,
-          "type": "movie",
-          "genre": "Comedy / Science Fiction",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjMxNTQ1NDgyOF5BMl5BanBnXkFtZTgwMjMxNjU0NjE@._V1_SX300.jpg",
-          "services": [
-            "Prime Video",
-            "Apple TV"
-          ],
-          "imdbId": "tt1727770",
-          "tmdbId": 86828,
-          "tmdbMedia": "movie",
-          "youtubeId": "0CYVGN98ZLA"
-        },
-        {
-          "title": "The Square",
-          "year": 2017,
-          "type": "movie",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTQ3NzJhYjktYmRkYy00ODMxLThhMGItYWQyODJmZjEyMTgzXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV"
-          ],
-          "imdbId": "tt4995790",
-          "tmdbId": 401246,
-          "tmdbMedia": "movie",
-          "youtubeId": "EUzRjRv0Ib0"
-        },
-        {
-          "title": "Pretend It's a City",
-          "year": 2021,
-          "type": "show",
-          "genre": "Documentary / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BODg4MzZhODctNzEzMi00Njk4LWJhYWMtNzlkNmI4ZGZlMzA4XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt13660958",
-          "tmdbId": 115497,
-          "tmdbMedia": "tv",
-          "youtubeId": "MClMxqD-HNA"
-        },
-        {
-          "title": "Ferris Bueller's Day Off",
-          "year": 1986,
-          "type": "movie",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZWYwMjUxNjMtMzE0MC00NDM3LWIxMmQtYmEyNWVjNjdlZGZjXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video",
-            "YouTube",
-            "Paramount+"
-          ],
-          "imdbId": "tt0091042",
-          "tmdbId": 9377,
-          "tmdbMedia": "movie",
-          "youtubeId": "GDttaV80_BM"
-        },
-        {
-          "title": "M3GAN 2.0",
-          "year": 2025,
-          "type": "movie",
-          "genre": "Action / Science Fiction / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMzFmNjVjZWQtZjI5Zi00YThiLTg0ZWItZDdjYzhhZDE1NTE2XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Peacock",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt26342662",
-          "tmdbId": 1071585,
-          "tmdbMedia": "movie",
-          "youtubeId": "1FeiTZMtwLA"
-        },
-        {
-          "title": "Braveheart",
-          "year": 1995,
-          "type": "movie",
-          "genre": "Action / Drama / History / War",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNGMxZDBhNGQtYTZlNi00N2UzLWI4NDEtNmUzNWM2NTdmZDA0XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix",
-            "Paramount+",
-            "Apple TV",
-            "Prime Video",
-            "YouTube"
-          ],
-          "imdbId": "tt0112573",
-          "tmdbId": 197,
-          "tmdbMedia": "movie",
-          "youtubeId": "WtO3CsleMDg"
-        },
-        {
-          "title": "Love & Mercy",
-          "year": 2015,
-          "type": "movie",
-          "genre": "Drama / Music / History",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTk1MTkwMzU4Nl5BMl5BanBnXkFtZTgwNjY0MDE1NTE@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0903657",
-          "tmdbId": 271714,
-          "tmdbMedia": "movie",
-          "youtubeId": "Xne-_S34T1c"
-        },
-        {
-          "title": "Once Upon a Time... in Hollywood",
-          "year": 2019,
-          "type": "movie",
-          "genre": "Comedy / Drama / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMzMzNmViNjYtN2ViNi00NDM3LWFlMmItNDYyMGIzY2EzZjE2XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt7131622",
-          "tmdbId": 466272,
-          "tmdbMedia": "movie",
-          "youtubeId": "vKgITiP1UMg"
-        },
-        {
-          "title": "Elvis",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Drama / Music / History",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTVhZmUyMDQtY2I5Ny00OWNiLTgzNjUtMTg4YTQwMTc0OTQxXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt3704428",
-          "tmdbId": 614934,
-          "tmdbMedia": "movie",
-          "youtubeId": "ZbrmBotVIGw"
-        },
-        {
-          "title": "You Don't Mess with the Zohan",
-          "year": 2008,
-          "type": "movie",
-          "genre": "Comedy / Action",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMzE2MzEzNDc5M15BMl5BanBnXkFtZTcwMzYxOTA3MQ@@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0960144",
-          "tmdbId": 10661,
-          "tmdbMedia": "movie",
-          "youtubeId": "ucmnTmYpGhI"
-        },
-        {
-          "title": "You've Got Mail",
-          "year": 1998,
-          "type": "movie",
-          "genre": "Comedy / Romance",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BN2FhMWRiODYtMTQwMy00OTE2LTlhZjMtNWRmYmIyZjYwYTk1XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0128853",
-          "tmdbId": 9489,
-          "tmdbMedia": "movie",
-          "youtubeId": "AKlhYZ-HqKs"
-        },
-        {
-          "title": "Sleepless in Seattle",
-          "year": 1993,
-          "type": "movie",
-          "genre": "Comedy / Drama / Romance",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMzYwNzNlYWEtY2NiMC00Y2ZkLWFmYzUtYWU4ZTQ5YTAyNTZmXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0108160",
-          "tmdbId": 858,
-          "tmdbMedia": "movie",
-          "youtubeId": "2bnxHgO59A4"
-        },
-        {
-          "title": "House of David",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZWExMTJiMGQtYTA3OC00ZGM0LTg5MGQtZjMwM2VlNTU3YjRhXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Prime Video"
-          ],
-          "imdbId": "tt30955673",
-          "tmdbId": 243881,
-          "tmdbMedia": "tv",
-          "youtubeId": "luTHd0QrBdE"
-        },
-        {
-          "title": "Mythic Quest",
-          "year": 2020,
-          "type": "show",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYWQ3NDRmZjQtOWViNi00MDJkLWJmODEtZjIwM2UxMjI0MmYyXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV+"
-          ],
-          "imdbId": "tt8879940",
-          "tmdbId": 94951,
-          "tmdbMedia": "tv",
-          "youtubeId": "50Yz1apB7iw"
-        },
-        {
-          "title": "Misfits",
-          "year": 2009,
-          "type": "show",
-          "genre": "Sci-Fi & Fantasy / Drama / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYjJjYjE2MTMtOGE5OS00YWVlLTk4NzktOTRjNjcyZjYxZTkxXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix",
-            "Prime Video",
-            "Hulu"
-          ],
-          "imdbId": "tt1548850",
-          "tmdbId": 31295,
-          "tmdbMedia": "tv",
-          "youtubeId": "VsBYXLYNZlE"
-        },
-        {
-          "title": "Work Later, Drink Now",
-          "year": 2021,
-          "type": "show",
-          "genre": "Drama / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNzY5ZTU4YmYtYzc2Ni00ZmVhLTg0YzctYzFiNDZhY2FlNzJkXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Prime Video"
-          ],
-          "imdbId": "tt15548198",
-          "tmdbId": 133670,
-          "tmdbMedia": "tv",
-          "youtubeId": "HZWTfMiUEeE"
-        },
-        {
-          "title": "Friends with Better Lives",
-          "year": 2014,
-          "type": "show",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjAyNDA4OTk2NF5BMl5BanBnXkFtZTgwNzczNjc2MTE@._V1_SX300.jpg",
-          "services": [
-            "Netflix",
-            "Prime Video",
-            "Apple TV"
-          ],
-          "imdbId": "tt2742174",
-          "tmdbId": 58823,
-          "tmdbMedia": "tv",
-          "youtubeId": "f-5XQCtoKOQ"
-        },
-        {
-          "title": "English Teacher",
-          "year": 2024,
-          "type": "show",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYTExOTg5ZWEtZjA3MC00OTg1LWIxNWYtODhlMzdhOWY3OWUzXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Hulu"
-          ],
-          "imdbId": "tt20782190",
-          "tmdbId": 258902,
-          "tmdbMedia": "tv",
-          "youtubeId": "wgCj-JV3C80"
-        },
-        {
-          "title": "The League",
-          "year": 2009,
-          "type": "show",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOGExNmNhN2YtYjZkYi00ZTkxLWFlMmUtMTRiZDU4YzRkM2UwXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Hulu"
-          ],
-          "imdbId": "tt1480684",
-          "tmdbId": 31497,
-          "tmdbMedia": "tv",
-          "youtubeId": "ZaaSYz1ujgA"
-        },
-        {
-          "title": "Dying for Sex",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjRiMGI5MWItYTQ4Zi00NTNiLWJlMWEtNWQzMzA3YTYwN2FhXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Disney+",
-            "Hulu"
-          ],
-          "imdbId": "tt30252752",
-          "tmdbId": 241405,
-          "tmdbMedia": "tv",
-          "youtubeId": "wN9-JCGtRMo"
-        },
-        {
-          "title": "Hell on Wheels",
-          "year": 2011,
-          "type": "show",
-          "genre": "Action & Adventure / Drama / Western",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjM5ODQ5Nzc3OF5BMl5BanBnXkFtZTgwOTQzMzM4NjE@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt1699748",
-          "tmdbId": 1401,
-          "tmdbMedia": "tv",
-          "youtubeId": "Nkvf9NW4-cQ"
-        },
-        {
-          "title": "Flood",
-          "year": 2007,
-          "type": "movie",
-          "genre": "Drama / Action / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjA1NDYzMTEwMF5BMl5BanBnXkFtZTcwNjE5MjU1MQ@@._V1_SX300.jpg",
-          "services": [
-            "Prime Video",
-            "Apple TV"
-          ],
-          "imdbId": "tt0790665",
-          "tmdbId": 6309,
-          "tmdbMedia": "movie",
-          "youtubeId": "aUWlmED6m5s"
-        },
-        {
-          "title": "The Flood",
-          "year": 2020,
-          "type": "movie",
-          "genre": "Drama / Thriller / History",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjExNDczOGMtNTRmYS00ZWRjLTk4YjgtMjhjYjQyMDlkMTE3XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Prime Video",
-            "Apple TV"
-          ],
-          "imdbId": "tt11609692",
-          "tmdbId": 726897,
-          "tmdbMedia": "movie",
-          "youtubeId": "3epphUttlWM"
-        },
-        {
-          "title": "Better Things",
-          "year": 2016,
-          "type": "show",
-          "genre": "Comedy / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTYwNTMwNDU5M15BMl5BanBnXkFtZTgwMjA3NzU0NzM@._V1_SX300.jpg",
-          "services": [
-            "Hulu"
-          ],
-          "imdbId": "tt4370596",
-          "tmdbId": 66859,
-          "tmdbMedia": "tv",
-          "youtubeId": "qQ8olaETfnI"
-        },
-        {
-          "title": "Alice in Borderland",
-          "year": 2020,
-          "type": "show",
-          "genre": "Mystery / Drama / Action & Adventure",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYmMzODA4M2MtMjBmNC00YjFhLTg4NzgtODgyNzE4NWQxMThmXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt10795658",
-          "tmdbId": 110316,
-          "tmdbMedia": "tv",
-          "youtubeId": "EEJ7nUvXUYA"
-        },
-        {
-          "title": "Nobody Wants This",
-          "year": 2024,
-          "type": "show",
-          "genre": "Comedy / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZGEyNWU3M2EtY2QzNy00NmFmLWI0MDQtMWQzNzdlZjE4MWRiXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt26933824",
-          "tmdbId": 250923,
-          "tmdbMedia": "tv",
-          "youtubeId": "Xn2PsXD8m4A"
-        },
-        {
-          "title": "A Man on the Inside",
-          "year": 2024,
-          "type": "show",
-          "genre": "Comedy / Crime",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMGZiMTFjZDUtYWI1MS00YjFkLWFhMGUtZTdkY2YxY2M2MzJkXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt26670955",
-          "tmdbId": 245312,
-          "tmdbMedia": "tv",
-          "youtubeId": "xhsVj_4ONoA"
-        },
-        {
-          "title": "The Bridge",
-          "year": 2011,
-          "type": "show",
-          "genre": "Crime / Mystery / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjQ3MDAzNDU4NV5BMl5BanBnXkFtZTgwNjE2NDQ0NzE@._V1_SX300.jpg",
-          "services": [
-            "Prime Video",
-            "Apple TV"
-          ],
-          "imdbId": "tt1733785",
-          "tmdbId": 45016,
-          "tmdbMedia": "tv",
-          "youtubeId": "EwJzHyWlsuM"
-        },
-        {
-          "title": "Episodes",
-          "year": 2011,
-          "type": "show",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNWMwODA0YzEtZGRhZC00YjBlLTk5MmMtNjE2MGRlZThlZTA3XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Paramount+",
-            "Apple TV"
-          ],
-          "imdbId": "tt1582350",
-          "tmdbId": 31841,
-          "tmdbMedia": "tv",
-          "youtubeId": "z4yH0mI-yJs"
-        },
-        {
-          "title": "Chernobyl",
-          "year": 2019,
-          "type": "show",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNzU0OTI4YTQtNGQ1ZS00ZjA4LTg3MTMtZjkyZWNjN2RiZDJmXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Max"
-          ],
-          "imdbId": "tt7366338",
-          "tmdbId": 87108,
-          "tmdbMedia": "tv",
-          "youtubeId": "s9APLXM9Ei8"
-        },
-        {
-          "title": "Ted Lasso",
-          "year": 2020,
-          "type": "show",
-          "genre": "Drama / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZmI3YWVhM2UtNDZjMC00YTIzLWI2NGUtZWIxODZkZjVmYTg1XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV+"
-          ],
-          "imdbId": "tt10986410",
-          "tmdbId": 97546,
-          "tmdbMedia": "tv",
-          "youtubeId": "BwPcMIDFVKw"
-        },
-        {
-          "title": "Poker Face",
-          "year": 2023,
-          "type": "show",
-          "genre": "Crime / Mystery",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZmEwZWEyMTktMmVmMy00YjE4LWEzNWEtMjc2Zjk5NWM3MjkxXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Peacock"
-          ],
-          "imdbId": "tt14269590",
-          "tmdbId": 120998,
-          "tmdbMedia": "tv",
-          "youtubeId": "7gmozhMRbmA"
-        },
-        {
-          "title": "Eli Stone",
-          "year": 2008,
-          "type": "show",
-          "genre": "Sci-Fi & Fantasy / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZjc3MDBmNTQtY2I1ZC00YTI2LWE3MGItODM3ODE3NTIyOTIzXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Hulu"
-          ],
-          "imdbId": "tt0892535",
-          "tmdbId": 1365,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "Dept. Q",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama / Crime / Mystery",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNWQ3MDQ2MGQtOGM0MC00MzlkLWE0ODQtYzE4Zjc3Mjc1ZWI5XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt27995114",
-          "tmdbId": 245703,
-          "tmdbMedia": "tv",
-          "youtubeId": "72hK6FUmm8o"
-        },
-        {
-          "title": "NTSF:SD:SUV::",
-          "year": 2011,
-          "type": "show",
-          "genre": "Comedy / Action & Adventure",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNzI1ODg3NTQyMF5BMl5BanBnXkFtZTgwODY4ODAxMDE@._V1_SX300.jpg",
-          "services": [
-            "Max"
-          ],
-          "imdbId": "tt1783495",
-          "tmdbId": 39106,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "The Four Seasons",
-          "year": 2025,
-          "type": "show",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYjljNDUyMDAtOTg5Mi00Njc4LWFhNTgtOGU0NThmMzE0N2JjXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt30826447",
-          "tmdbId": 243316,
-          "tmdbMedia": "tv",
-          "youtubeId": "WKTwtIL4xyk"
-        },
-        {
-          "title": "Wednesday",
-          "year": 2022,
-          "type": "show",
-          "genre": "Sci-Fi & Fantasy / Mystery / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMDE1NjNmZjgtZTg0OC00NjkxLWEzYzItMDNkMTc3YjgxZWQyXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt13443470",
-          "tmdbId": 119051,
-          "tmdbMedia": "tv",
-          "youtubeId": "SoTmSuThMKc"
-        },
-        {
-          "title": "Smash",
-          "year": 2012,
-          "type": "show",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTYwMjEzOTI4M15BMl5BanBnXkFtZTcwODMwNTc3OA@@._V1_SX300.jpg",
-          "services": [
-            "Peacock",
-            "Apple TV"
-          ],
-          "imdbId": "tt1825133",
-          "tmdbId": 39325,
-          "tmdbMedia": "tv",
-          "youtubeId": "ncTxd2bBm4c"
-        },
-        {
-          "title": "The Studio",
-          "year": 2025,
-          "type": "show",
-          "genre": "Comedy / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZDA4MWUyNDYtODNjYi00NjE4LTk0ZTMtZmMzZTU5MzkzMTBlXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV+"
-          ],
-          "imdbId": "tt23649128",
-          "tmdbId": 247767,
-          "tmdbMedia": "tv",
-          "youtubeId": "EIQuE7JGXU8"
-        },
-        {
-          "title": "The Last of Us",
-          "year": 2023,
-          "type": "show",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYWI3ODJlMzktY2U5NC00ZjdlLWE1MGItNWQxZDk3NWNjN2RhXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Max"
-          ],
-          "imdbId": "tt3581920",
-          "tmdbId": 100088,
-          "tmdbMedia": "tv",
-          "youtubeId": "uLtkt8BonwM"
-        },
-        {
-          "title": "Quicksand",
-          "year": 2023,
-          "type": "movie",
-          "genre": "Thriller / Horror / Mystery / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMDhkYzRlOGUtMGE4OS00NzE5LTllMDItMmVmYTQwNzhkYjg0XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt19056070",
-          "tmdbId": 954388,
-          "tmdbMedia": "movie",
-          "youtubeId": "j-9pxP1aO-k"
-        },
-        {
-          "title": "47 Meters Down",
-          "year": 2017,
-          "type": "movie",
-          "genre": "Horror / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNGI3NmMwM2UtNjc5ZC00ZGQzLWJhNjMtOWM4Y2YzZWMwNThmXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Hulu",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt2932536",
-          "tmdbId": 403119,
-          "tmdbMedia": "movie",
-          "youtubeId": "fQdn0XB40kk"
-        },
-        {
-          "title": "Outback",
-          "year": 2020,
-          "type": "movie",
-          "genre": "Thriller / Western",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYzJkNjA4MTUtNGViYi00YjM5LTg1Y2UtZjI0MzVmNzFjNzE0XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Prime Video",
-            "Apple TV"
-          ],
-          "imdbId": "tt7336182",
-          "tmdbId": 614626,
-          "tmdbMedia": "movie",
-          "youtubeId": "yxCtPKqw5Ac"
-        },
-        {
-          "title": "Arctic",
-          "year": 2018,
-          "type": "movie",
-          "genre": "Drama / Adventure",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZGFmMDczODAtMzFiZi00NGQ2LTgyOTYtZmY2YTJlOTE4MzUxXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt6820256",
-          "tmdbId": 453755,
-          "tmdbMedia": "movie",
-          "youtubeId": "N5aD9ppoQIo"
-        },
-        {
-          "title": "Break",
-          "year": 2024,
-          "type": "movie",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNmFlNzhjZDAtYTFhNS00ODU4LWFhOGItNGRlNGFkOTI2ZTNiXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt21072416",
-          "tmdbId": 1271124,
-          "tmdbMedia": "movie",
-          "youtubeId": "W55PpKzKSuw"
-        },
-        {
-          "title": "The Shallows",
-          "year": 2016,
-          "type": "movie",
-          "genre": "Horror / Drama / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjA1MTA4MzU4Ml5BMl5BanBnXkFtZTgwNjUxNjczODE@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt4052882",
-          "tmdbId": 332567,
-          "tmdbMedia": "movie",
-          "youtubeId": "EgdxIlSuB70"
-        },
-        {
-          "title": "Nowhere",
-          "year": 2023,
-          "type": "movie",
-          "genre": "Thriller / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZmQwODM5NTctYzRkMi00MmIwLWFjODAtMTFiMWY2OWE3MGQyXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt15789472",
-          "tmdbId": 1151534,
-          "tmdbMedia": "movie",
-          "youtubeId": "KDUtdcU10YA"
-        },
-        {
-          "title": "Crawl",
-          "year": 2019,
-          "type": "movie",
-          "genre": "Horror / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTE4NjJmZDgtMzk4MS00MmYzLWI0YjAtZWU0NTNmMDJhNzI3XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Paramount+",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt8364368",
-          "tmdbId": 511987,
-          "tmdbMedia": "movie",
-          "youtubeId": "H6MLJG0RdDE"
-        },
-        {
-          "title": "Jumanji: Welcome to the Jungle",
-          "year": 2017,
-          "type": "movie",
-          "genre": "Adventure / Comedy / Fantasy / Action",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZjI5MzdmODctYjA4NS00ZmMxLWJlOWUtOGVhMjA0OGMxMWYzXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt2283362",
-          "tmdbId": 353486,
-          "tmdbMedia": "movie",
-          "youtubeId": "10VphsyJhbU"
-        },
-        {
-          "title": "Frozen",
-          "year": 2010,
-          "type": "movie",
-          "genre": "Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTc5MTg0ODgxMF5BMl5BanBnXkFtZTcwODEzOTYwMw@@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt1323045",
-          "tmdbId": 44363,
-          "tmdbMedia": "movie",
-          "youtubeId": "5cZPZ7dwvZk"
-        },
-        {
-          "title": "Radius",
-          "year": 2017,
-          "type": "movie",
-          "genre": "Thriller / Drama / Horror",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOTY3OTJmNTItNWY3Yi00ZGUyLWE5YWUtNzU0ZGUwN2RlZGE3XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt6097798",
-          "tmdbId": 436274,
-          "tmdbMedia": "movie",
-          "youtubeId": "ZCTATu1xYCA"
-        },
-        {
-          "title": "The Fifth Element",
-          "year": 1997,
-          "type": "movie",
-          "genre": "Science Fiction / Action / Adventure",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BODU4ZTE5MWYtNmY2MC00NDkyLTk0NDgtNTk5YjgzMzc4NmQwXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0119116",
-          "tmdbId": 18,
-          "tmdbMedia": "movie",
-          "youtubeId": "5Sg2RkdkSvk"
-        },
-        {
-          "title": "1941",
-          "year": 1979,
-          "type": "movie",
-          "genre": "Comedy / War",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMzMzOTg0YTAtZTAxYy00MGFjLThmNDktZWQ4MjU2ZGYyYzBhXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0078723",
-          "tmdbId": 11519,
-          "tmdbMedia": "movie",
-          "youtubeId": "6_KOLqpo7z8"
-        },
-        {
-          "title": "The Dark Tower",
-          "year": 2017,
-          "type": "movie",
-          "genre": "Fantasy / Action / Science Fiction",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTU3MjUwMzQ3MF5BMl5BanBnXkFtZTgwMjcwNjkxMjI@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt1648190",
-          "tmdbId": 353491,
-          "tmdbMedia": "movie",
-          "youtubeId": "wZC5FoJ-cPU"
-        },
-        {
-          "title": "Jack Reacher",
-          "year": 2012,
-          "type": "movie",
-          "genre": "Crime / Drama / Thriller / Action",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTM1NjUxMDI3OV5BMl5BanBnXkFtZTcwNjg1ODM3OA@@._V1_SX300.jpg",
-          "services": [
-            "Paramount+",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0790724",
-          "tmdbId": 75780,
-          "tmdbMedia": "movie",
-          "youtubeId": "kAbxn_F8lps"
-        },
-        {
-          "title": "Peaceful Warrior",
-          "year": 2006,
-          "type": "movie",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOGFiOGJmZjItMDQzMy00YTA0LWEyODMtNmRiYTI4OWYwNTk1XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0438315",
-          "tmdbId": 13689,
-          "tmdbMedia": "movie",
-          "youtubeId": "gegNMYvY_yg"
-        },
-        {
-          "title": "Sharknado",
-          "year": 2013,
-          "type": "movie",
-          "genre": "Action / Comedy / Horror / Science Fiction / TV Movie",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTNkOTA0NjYtM2VjOC00ZmYzLWI1NzQtMjY4NTU2MGNkZmU0XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video",
-            "YouTube"
-          ],
-          "imdbId": "tt2724064",
-          "tmdbId": 205321,
-          "tmdbMedia": "movie",
-          "youtubeId": "ZX0213FumK0"
-        },
-        {
-          "title": "The Running Man",
-          "year": 1987,
-          "type": "movie",
-          "genre": "Action / Thriller / Science Fiction",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMDQwYzMwMDItYzFhZC00YjkzLTlmODAtMzg3NDFlNDhhZjYzXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0093894",
-          "tmdbId": 865,
-          "tmdbMedia": "movie",
-          "youtubeId": "i2FMhBg0h_8"
-        },
-        {
-          "title": "Rob Roy",
-          "year": 1995,
-          "type": "movie",
-          "genre": "Adventure / History / Drama / Action / War",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYzU2NzcxMjgtNDdjYi00MDRiLTg4ZWEtNDAzODNlYzEyN2NhXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0114287",
-          "tmdbId": 11780,
-          "tmdbMedia": "movie",
-          "youtubeId": "p76fH8_a32Y"
-        },
-        {
-          "title": "Once Upon a Time in Norway",
-          "year": 2007,
-          "type": "movie",
-          "genre": "Crime / Documentary / Music",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMWMwZmIyMzktOGVmYi00MGY2LTk2MzUtZGQ0MzJmZWYxYzFlXkEyXkFqcGdeQXVyNjMwNzk3Mjk@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt1346294",
-          "tmdbId": 104967,
-          "tmdbMedia": "movie",
-          "youtubeId": "jzjkKZD67nE"
-        },
-        {
-          "title": "Showgirls",
-          "year": 1995,
-          "type": "movie",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNzcyMjExNjg3OF5BMl5BanBnXkFtZTgwOTY4Mjc1MDE@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0114436",
-          "tmdbId": 10802,
-          "tmdbMedia": "movie",
-          "youtubeId": "kDJdLxpdU40"
-        },
-        {
-          "title": "The Pool",
-          "year": 2018,
-          "type": "movie",
-          "genre": "Thriller / Horror",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNDI4NWJhOWMtM2JjZS00YzI1LWE3ZGYtNDhiMWY3NzI5MzUxXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt9128686",
-          "tmdbId": 550201,
-          "tmdbMedia": "movie",
-          "youtubeId": "pAfxR6cQhWw"
-        },
-        {
-          "title": "The Shining",
-          "year": 1980,
-          "type": "movie",
-          "genre": "Horror / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNmM5ZThhY2ItOGRjOS00NzZiLWEwYTItNDgyMjFkOTgxMmRiXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Max",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0081505",
-          "tmdbId": 694,
-          "tmdbMedia": "movie",
-          "youtubeId": "FZQvIJxG9Xs"
-        },
-        {
-          "title": "The Last House on the Left",
-          "year": 2009,
-          "type": "movie",
-          "genre": "Crime / Thriller / Horror / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjExMTM4MDAwOF5BMl5BanBnXkFtZTcwODcyMDIzMg@@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0844708",
-          "tmdbId": 18405,
-          "tmdbMedia": "movie",
-          "youtubeId": "2EZyJxabVck"
-        },
-        {
-          "title": "Open Water",
-          "year": 2004,
-          "type": "movie",
-          "genre": "Horror / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjQ5ODAyOTk3OF5BMl5BanBnXkFtZTcwNzQ1NjYyMQ@@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0374102",
-          "tmdbId": 83,
-          "tmdbMedia": "movie",
-          "youtubeId": "Z9q1qJi1nMs"
-        },
-        {
-          "title": "Primer",
-          "year": 2004,
-          "type": "movie",
-          "genre": "Science Fiction / Drama / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZTRmZDlmNzUtNjM2NS00MjBjLWFmNjQtMTczMWNkZTdiOGZmXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0390384",
-          "tmdbId": 14337,
-          "tmdbMedia": "movie",
-          "youtubeId": "-vD-yj9o664"
-        },
-        {
-          "title": "The Room",
-          "year": 2003,
-          "type": "movie",
-          "genre": "Drama / Romance",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYmNkMThiODYtZTAzMC00ODJkLTg5MmEtMWIyMGFlZDlkYmNlXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0368226",
-          "tmdbId": 17473,
-          "tmdbMedia": "movie",
-          "youtubeId": "KRAUPqK9Y7I"
-        },
-        {
-          "title": "Great Balls of Fire!",
-          "year": 1989,
-          "type": "movie",
-          "genre": "Drama / History / Music",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNDJiODU1MWYtYzcwYS00ZWNhLThmMjktMjY2NDIyNjNmN2M3XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0097457",
-          "tmdbId": 11465,
-          "tmdbMedia": "movie",
-          "youtubeId": "ueSrpfNoIwk"
-        },
-        {
-          "title": "Desperado",
-          "year": 1995,
-          "type": "movie",
-          "genre": "Thriller / Action / Crime",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BN2IzOThmNTMtODE4My00NTI1LThkOWMtNTA4MTc4NWI1NTNlXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0112851",
-          "tmdbId": 8068,
-          "tmdbMedia": "movie",
-          "youtubeId": "nJb0yXRHdi4"
-        },
-        {
-          "title": "Heat",
-          "year": 1995,
-          "type": "movie",
-          "genre": "Crime / Drama / Action",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTkxYjU1OTMtYWViZC00ZjAzLWI3MDktZGQ2N2VmMjVjNDRlXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0113277",
-          "tmdbId": 949,
-          "tmdbMedia": "movie",
-          "youtubeId": "14oNcFxiVaQ"
-        },
-        {
-          "title": "My Girl",
-          "year": 1991,
-          "type": "movie",
-          "genre": "Comedy / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNmI5M2EzZDUtZTBkZS00YWFmLWFhZTMtNjc3YTllZDBhODQ4XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0102492",
-          "tmdbId": 4032,
-          "tmdbMedia": "movie",
-          "youtubeId": "KSyKO0Lklmo"
-        },
-        {
-          "title": "F1",
-          "year": 2025,
-          "type": "movie",
-          "genre": "Action / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNGI0MDI4NjEtOWU3ZS00ODQyLWFhYTgtNGYxM2ZkM2Q2YjE3XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "imdbId": "tt16311594",
-          "tmdbId": 911430,
-          "tmdbMedia": "movie",
-          "youtubeId": "ge_ABjtYx88"
-        },
-        {
-          "title": "Sonic the Hedgehog",
-          "year": 2020,
-          "type": "movie",
-          "genre": "Action / Science Fiction / Comedy / Family",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYTg2Yjc5MzItNzVmMi00MTllLWI2MDQtOTYyOWNjYWIxNzEzXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Paramount+",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt3794354",
-          "tmdbId": 454626,
-          "tmdbMedia": "movie",
-          "youtubeId": "szby7ZHLnkA"
-        },
-        {
-          "title": "Adiós Buenos Aires",
-          "year": 2023,
-          "type": "movie",
-          "genre": "Romance / Comedy / Drama / Music",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOTUwYzhhN2YtOGM5ZC00Y2ZlLThjNzItYTVlMmM1OTEwMDFhXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "imdbId": "tt27042638",
-          "tmdbId": 1084920,
-          "tmdbMedia": "movie",
-          "youtubeId": "bN5S0eHt_zc"
-        },
-        {
-          "title": "Grease",
-          "year": 1978,
-          "type": "movie",
-          "genre": "Romance / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNGY0NzE0ZTctN2YzNC00M2IwLWI0OWYtMTAwZWU2NjZhMTQwXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Paramount+",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0077631",
-          "tmdbId": 621,
-          "tmdbMedia": "movie",
-          "youtubeId": "THd96gHV7Tg"
-        },
-        {
-          "title": "Playdate",
-          "year": 2025,
-          "type": "movie",
-          "genre": "Action / Comedy / Family",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNWQ4N2Y5YjYtNGE1Ni00YWExLWIzNDYtMmM2ZTc0OGJmMDA1XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Prime Video"
-          ],
-          "imdbId": "tt31425731",
-          "tmdbId": 1248226,
-          "tmdbMedia": "movie",
-          "youtubeId": "xGTq0blCPVQ"
-        },
-        {
-          "title": "57 Seconds",
-          "year": 2023,
-          "type": "movie",
-          "genre": "Thriller / Science Fiction / Action",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYTljMTJiOGItNzJlNy00ZWYzLWEwNjktNzMzMWExNTFlZDAzXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt18083578",
-          "tmdbId": 937249,
-          "tmdbMedia": "movie",
-          "youtubeId": "O3MdV7YJWEQ"
-        },
-        {
-          "title": "Undercover Brother",
-          "year": 2002,
-          "type": "movie",
-          "genre": "Action / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BODNkMTgzMjctOWQzYy00YmE4LWE5YTctZDU2OGQ0MTI1NjNhXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0279493",
-          "tmdbId": 12277,
-          "tmdbMedia": "movie",
-          "youtubeId": "lFn1SZj59x8"
-        },
-        {
-          "title": "¡Three Amigos!",
-          "year": 1986,
-          "type": "movie",
-          "genre": "Comedy / Western / Action",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTE5NDQ1NTMyNl5BMl5BanBnXkFtZTcwNjY5MDQ3NA@@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0092086",
-          "tmdbId": 8388,
-          "tmdbMedia": "movie",
-          "youtubeId": "xgOcejbMuq0"
-        },
-        {
-          "title": "The Ballad of Buster Scruggs",
-          "year": 2018,
-          "type": "movie",
-          "genre": "Western / Comedy / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOTc0MzZjYTktYzBlZC00MmViLTgyNDYtNjljNTcxMzdjODRkXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt6412452",
-          "tmdbId": 537996,
-          "tmdbMedia": "movie",
-          "youtubeId": "_2PyxzSH1HM"
-        },
-        {
-          "title": "The Last King of Scotland",
-          "year": 2006,
-          "type": "movie",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZDg4NjA0YzctNWMzMi00NmY1LTkyMGYtZjI4ZjFmZjMzMGE0XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0455590",
-          "tmdbId": 1523,
-          "tmdbMedia": "movie",
-          "youtubeId": "R_W7PC6NnN4"
-        },
-        {
-          "title": "The Glass Castle",
-          "year": 2017,
-          "type": "movie",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTY2Nzk0MDE3Nl5BMl5BanBnXkFtZTgwOTI0ODc0MjI@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt2378507",
-          "tmdbId": 336000,
-          "tmdbMedia": "movie",
-          "youtubeId": "pJUuhCMbWyg"
-        },
-        {
-          "title": "The Informant!",
-          "year": 2009,
-          "type": "movie",
-          "genre": "Drama / Comedy / Crime",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTgyNjE1OTc4Ml5BMl5BanBnXkFtZTgwNjc4MTA3MjI@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt1130080",
-          "tmdbId": 11323,
-          "tmdbMedia": "movie",
-          "youtubeId": "21uA1eWi59s"
-        },
-        {
-          "title": "The Thing",
-          "year": 1982,
-          "type": "movie",
-          "genre": "Horror / Mystery / Science Fiction",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYTA3NDU5MWEtNTk4Yy00ZDNkLThmZTQtMjU3ZGVhYzAyMzU4XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0084787",
-          "tmdbId": 1091,
-          "tmdbMedia": "movie",
-          "youtubeId": "l8A_DMMJC_Q"
-        },
-        {
-          "title": "X",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Horror / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BODUwYTNhMTMtYWQ5Ny00YTdmLWIxOTAtNDczNzVlYzg2NDFkXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Max",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt13560574",
-          "tmdbId": 760104,
-          "tmdbMedia": "movie",
-          "youtubeId": "Awg3cWuHfoc"
-        },
-        {
-          "title": "Don't Breathe",
-          "year": 2016,
-          "type": "movie",
-          "genre": "Horror / Thriller / Crime",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjAxOTJkMmEtNjg4MC00ODk3LTkwYmUtNjM3YzE5YTk1YTFjXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Hulu",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt4160708",
-          "tmdbId": 300669,
-          "tmdbMedia": "movie",
-          "youtubeId": "7koudwTqe0Q"
-        },
-        {
-          "title": "12 Angry Men",
-          "year": 1957,
-          "type": "movie",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYjE4NzdmOTYtYjc5Yi00YzBiLWEzNDEtNTgxZGQ2MWVkN2NiXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video",
-            "YouTube"
-          ],
-          "imdbId": "tt0050083",
-          "tmdbId": 389,
-          "tmdbMedia": "movie",
-          "youtubeId": "TEN-2uTi2c0"
-        },
-        {
-          "title": "The Inventor: Out for Blood in Silicon Valley",
-          "year": 2019,
-          "type": "movie",
-          "genre": "Documentary",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYmM2ZjAxZWYtOTIwYS00NDgyLThlYjctZTdlOTkxOTExZjliXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt8488126",
-          "tmdbId": 566228,
-          "tmdbMedia": "movie",
-          "youtubeId": "wtDaP18OGfw"
-        },
-        {
-          "title": "Loudermilk",
-          "year": 2017,
-          "type": "show",
-          "genre": "Comedy / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjEwMjI4MjIzNl5BMl5BanBnXkFtZTgwNDA2NDQxMzI@._V1_SX300.jpg",
-          "services": [
-            "Netflix",
-            "Prime Video"
-          ],
-          "imdbId": "tt5957766",
-          "tmdbId": 73200,
-          "tmdbMedia": "tv",
-          "youtubeId": "opEzmoBYPNE"
-        },
-        {
-          "title": "Machete",
-          "year": 2010,
-          "type": "movie",
-          "genre": "Action / Comedy / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZTY0OTZmYTMtMjhmOC00NzM3LTk2Y2MtMDg1ODNlOTkyNTcwXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0985694",
-          "tmdbId": 23631,
-          "tmdbMedia": "movie",
-          "youtubeId": "LNDLSS7faQo"
-        },
-        {
-          "title": "Machete Kills",
-          "year": 2013,
-          "type": "movie",
-          "genre": "Action / Crime / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjA2MzUxMTM3M15BMl5BanBnXkFtZTgwMzA2NzkxMDE@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt2002718",
-          "tmdbId": 106747,
-          "tmdbMedia": "movie",
-          "youtubeId": "7fGKttdOWQE"
-        },
-        {
-          "title": "Peep Show",
-          "year": 2003,
-          "type": "show",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNmQ0MGMwNjMtNmEyMC00OTA2LTg4YTEtNjBhNjNkYTgzMmZlXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "BritBox",
-            "Prime Video"
-          ],
-          "imdbId": "tt0387764",
-          "tmdbId": 815,
-          "tmdbMedia": "tv",
-          "youtubeId": "xzsy-haNy1E"
-        },
-        {
-          "title": "Black Bird",
-          "year": 2022,
-          "type": "show",
-          "genre": "Drama / Crime",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNDIzMzRlZjMtN2IyZC00M2M5LWFkNTYtMDQyMTAwZTE2YzY2XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV+"
-          ],
-          "imdbId": "tt4301160",
-          "tmdbId": 155537,
-          "tmdbMedia": "tv",
-          "youtubeId": "aH1FOkJys3Y"
-        },
-        {
-          "title": "Robot Chicken",
-          "year": 2005,
-          "type": "show",
-          "genre": "Comedy / Animation",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNmMxZWM5NzYtMTJkNS00YTA1LWE2MzYtNmI0NTQzOTRmODQ0XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Max",
-            "Adult Swim"
-          ],
-          "imdbId": "tt0437745",
-          "tmdbId": 709,
-          "tmdbMedia": "tv",
-          "youtubeId": "yD0li2eQbJQ"
-        },
-        {
-          "title": "Happy Death Day",
-          "year": 2017,
-          "type": "movie",
-          "genre": "Comedy / Horror / Mystery",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTAxNGQwMjEtNjdjNy00NmQwLTkwYTEtNGIwZWJjZjU5M2FmXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Netflix",
-            "Prime Video"
-          ],
-          "imdbId": "tt5308322",
-          "tmdbId": 440021,
-          "tmdbMedia": "movie",
-          "youtubeId": "v3lXYAzf5TQ"
-        },
-        {
-          "title": "Wilfred",
-          "year": 2011,
-          "type": "show",
-          "genre": "Comedy / Drama / Mystery",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTUxMTk4NDIyMV5BMl5BanBnXkFtZTgwMDQ0MTAyMjE@._V1_SX300.jpg",
-          "services": [
-            "Hulu",
-            "Prime Video"
-          ],
-          "imdbId": "tt1703925",
-          "tmdbId": 39525,
-          "tmdbMedia": "tv",
-          "youtubeId": "aPo9c_DLB94"
-        },
-        {
-          "title": "Man Seeking Woman",
-          "year": 2015,
-          "type": "show",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjA0MzQxODM2Ml5BMl5BanBnXkFtZTgwODExNDI2NzE@._V1_SX300.jpg",
-          "services": [
-            "Hulu"
-          ],
-          "imdbId": "tt4189492",
-          "tmdbId": 61871,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "Friends from College",
-          "year": 2017,
-          "type": "show",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjMyNjgxNDc3MV5BMl5BanBnXkFtZTgwNDUyMzQ2NjM@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt5565334",
-          "tmdbId": 71890,
-          "tmdbMedia": "tv",
-          "youtubeId": "SWUBRto1WZQ"
-        },
-        {
-          "title": "Unbreakable Kimmy Schmidt",
-          "year": 2015,
-          "type": "show",
-          "genre": "Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTgyNTQyNjUwN15BMl5BanBnXkFtZTgwNjMwNjUzNzM@._V1_SX300.jpg",
-          "services": [
-            "Netflix"
-          ],
-          "imdbId": "tt3339966",
-          "tmdbId": 61671,
-          "tmdbMedia": "tv",
-          "youtubeId": "Hl4bOuGNMwo"
-        },
-        {
-          "title": "Vengeance Unlimited",
-          "year": 1998,
-          "type": "show",
-          "genre": "Crime / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOWI3MDNlM2ItOGVjNC00NDI2LTlmMTgtZTZmZDYyNzAzYjMzXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "imdbId": "tt0158421",
-          "tmdbId": 10344,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "HAPPYish",
-          "year": 2015,
-          "type": "show",
-          "genre": "Drama / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYTg0ZjRlM2MtZmZhYS00ODE2LWFlY2ItY2E4NTU2NjRkOGRjXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Paramount+",
-            "Apple TV"
-          ],
-          "imdbId": "tt3095080",
-          "tmdbId": 57391,
-          "tmdbMedia": "tv",
-          "youtubeId": "oZzsRNBq42Q"
-        },
-        {
-          "title": "Jericho",
-          "year": 2006,
-          "type": "show",
-          "genre": "Action & Adventure / Drama / Mystery / Western",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMWU3ZTg3OWQtZWIwNi00ZGI3LWFmYzQtYWFmOTY1NWNhOWI0XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Paramount+",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0805663",
-          "tmdbId": 365,
-          "tmdbMedia": "tv",
-          "youtubeId": "sJ1JDxD2ZY4"
-        },
-        {
-          "title": "Better Man",
-          "year": 2013,
-          "type": "show",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjQ5MTU5MjgtMDZkYy00MmNlLTlhNTAtMGM5ZjdlZTkzMWNkXkEyXkFqcGdeQXVyNjI0NDA3NjM@._V1_SX300.jpg",
-          "services": [],
-          "imdbId": "tt2381048",
-          "tmdbId": 50025,
-          "tmdbMedia": "tv",
-          "youtubeId": "1VKZ3rAiL80"
-        },
-        {
-          "title": "It's My Turn",
-          "year": 1980,
-          "type": "movie",
-          "genre": "Comedy / Romance",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTQxN2U1M2EtMTUyNy00YmRjLTg0NzktNmVmNGRiZDc2YzQ4XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Tubi",
-            "Criterion Channel"
-          ],
-          "imdbId": "tt0080936",
-          "tmdbId": 214181,
-          "tmdbMedia": "movie",
-          "youtubeId": "xsKDh4KxFL0"
-        },
-        {
-          "title": "Shababnikim",
-          "year": 2017,
-          "type": "show",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjhhYjhjYTAtMzM1NC00NzYwLWFiNTYtY2YwMTcxZjg3OWRhXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "ChaiFlicks"
-          ],
-          "imdbId": "tt7865452",
-          "tmdbId": 76882,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "Striptease",
-          "year": 1996,
-          "type": "movie",
-          "genre": "Comedy / Crime / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZjA4N2FjZDktYzFkMi00YzMzLWIyNTctNzY5OTA3ZTQ0OTVlXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0117765",
-          "tmdbId": 9879,
-          "tmdbMedia": "movie",
-          "youtubeId": "ujvOdC3-JGw"
-        },
-        {
-          "title": "Red Alert",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZDM0MDY3ZDEtODYwMS00MjgzLWEzMzAtNjY0ZGY2ZWI5NjRhXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Paramount+"
-          ],
-          "imdbId": "tt34888633",
-          "tmdbId": 301809,
-          "tmdbMedia": "tv",
-          "youtubeId": "ZsAa9ofaL-g"
-        },
-        {
-          "title": "Metallic Blues",
-          "year": 2004,
-          "type": "movie",
-          "genre": "Drama / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BM2Y2YWZhNWQtYWU2Zi00ZGZmLTg2OGUtZDQ2OGU5MGRmNDZlXkEyXkFqcGdeQXVyMjMyMzI4MzY@._V1_SX300.jpg",
-          "services": [],
-          "imdbId": "tt0402374",
-          "tmdbId": 44316,
-          "tmdbMedia": "movie",
-          "youtubeId": null
-        },
-        {
-          "title": "Slow Horses",
-          "year": 2022,
-          "type": "show",
-          "genre": "Crime / Drama / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BY2NkNTBiYWUtMGFiZS00MGI4LWE3YjMtZTU3NzhhZmEyYzlkXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV+"
-          ],
-          "imdbId": "tt5875444",
-          "tmdbId": 95480,
-          "tmdbMedia": "tv",
-          "youtubeId": "O9ZJChzPn0U"
-        },
-        {
-          "title": "Se7en",
-          "year": 1995,
-          "type": "movie",
-          "genre": "Crime / Mystery / Thriller",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BY2IzNzMxZjctZjUxZi00YzAxLTk3ZjMtODFjODdhMDU5NDM1XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0114369",
-          "tmdbId": 807,
-          "tmdbMedia": "movie",
-          "youtubeId": "KPOuJGkpblk"
-        },
-        {
-          "title": "Black Swan",
-          "year": 2010,
-          "type": "movie",
-          "genre": "Drama / Thriller / Horror",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNzY2NzI4OTE5MF5BMl5BanBnXkFtZTcwMjMyNDY4Mw@@._V1_SX300.jpg",
-          "services": [
-            "Hulu",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0947798",
-          "tmdbId": 44214,
-          "tmdbMedia": "movie",
-          "youtubeId": "2Pxc_5f27Kg"
-        },
-        {
-          "title": "Beetlejuice",
-          "year": 1988,
-          "type": "movie",
-          "genre": "Fantasy / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYjkwNzVlNDEtMTJlNy00OTdlLTljYWItM2RkZmZkYzY3YjM2XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Max",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0094721",
-          "tmdbId": 4011,
-          "tmdbMedia": "movie",
-          "youtubeId": "po1HJbmow0g"
-        },
-        {
-          "title": "The Walking Dead: Dead City",
-          "year": 2023,
-          "type": "show",
-          "genre": "Action & Adventure / Drama / Sci-Fi & Fantasy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYWI0ZjgxYWYtODZmNi00ZWI0LWI4MmEtZDBmOTNmMTRlMjY0XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "imdbId": "tt18546730",
-          "tmdbId": 194583,
-          "tmdbMedia": "tv",
-          "youtubeId": "s1xjv2iCQUc"
-        },
-        {
-          "title": "Harry Potter and the Philosopher's Stone",
-          "year": 2001,
-          "type": "movie",
-          "genre": "Adventure / Fantasy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTU1MzgyMDMtMzBlZS00YzczLThmYWEtMjU3YmFlOWEyMjE1XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Max",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0241527",
-          "tmdbId": 671,
-          "tmdbMedia": "movie",
-          "youtubeId": "l91Km49W9qI"
-        },
-        {
-          "title": "The Monkey House",
-          "year": 2023,
-          "type": "movie",
-          "genre": "Drama / Comedy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTQ3MjAxZjItM2FiNy00YzY3LWIwMDUtOTdkYmI4NWZlODkxXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "imdbId": "tt10629360",
-          "tmdbId": 1009460,
-          "tmdbMedia": "movie",
-          "youtubeId": "P_NzZ2GLgPU"
-        },
-        {
-          "title": "Requiem for a Dream",
-          "year": 2000,
-          "type": "movie",
-          "genre": "Crime / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BN2ZlMjIzZjctYzA2My00ZWYyLWI4ZjctMGI2NWYyNzFiZjAwXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0180093",
-          "tmdbId": 641,
-          "tmdbMedia": "movie",
-          "youtubeId": "NEKjZSTo0Uk"
-        },
-        {
-          "title": "The Fault in Our Stars",
-          "year": 2014,
-          "type": "movie",
-          "genre": "Romance / Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYTA4ODg5YWUtYmZiYy00Y2M4LWE0NjEtODE5MzhkYmJmZGEwXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Disney+",
-            "Hulu",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt2582846",
-          "tmdbId": 222935,
-          "tmdbMedia": "movie",
-          "youtubeId": "3Ixw15DE-xY"
-        },
-        {
-          "title": "Rain Man",
-          "year": 1988,
-          "type": "movie",
-          "genre": "Drama",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZDUzODNkNGUtNzJjNi00ODFlLTkzMzktMGNkOTIwYWM2YTQzXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [
-            "Paramount+",
-            "Apple TV",
-            "Prime Video"
-          ],
-          "imdbId": "tt0095953",
-          "tmdbId": 380,
-          "tmdbMedia": "movie",
-          "youtubeId": "W4pqtjZ5MlI"
-        },
-        {
-          "title": "Good Fortune",
-          "year": 2025,
-          "type": "movie",
-          "genre": "Comedy / Fantasy",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYjk3ZTgwZmUtOTVlMy00ODExLTkzMTUtYzRhM2FjNGYyMzZkXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "imdbId": "tt27543578",
-          "tmdbId": 1114967,
-          "tmdbMedia": "movie",
-          "youtubeId": "SAMkXY2Ja80"
-        },
-        {
-          "title": "The Woman in Cabin 10",
-          "year": 2025,
-          "type": "movie",
-          "genre": "Mystery / Thriller / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNDY0YmEyNDMtNTQ0Yi00MWVmLWFiYjMtODM5NmUzZWQ5MDMxXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt7130300",
-          "tmdbId": 1290879,
-          "tmdbMedia": "movie",
-          "youtubeId": "1QbfJzTPY4w"
-        },
-        {
-          "title": "Dead Like Me",
-          "year": 2003,
-          "type": "show",
-          "genre": "Sci-Fi & Fantasy / Drama / Comedy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTE5OTM0NTIzN15BMl5BanBnXkFtZTcwOTQ4MTAwMQ@@._V1_SX300.jpg",
-          "imdbId": "tt0348913",
-          "tmdbId": 2566,
-          "tmdbMedia": "tv",
-          "youtubeId": "cNHDFf1YLlc"
-        },
-        {
-          "title": "Santa Clarita Diet",
-          "year": 2017,
-          "type": "show",
-          "genre": "Comedy / Mystery / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTIwMDkzNTMwMF5BMl5BanBnXkFtZTgwNDA4MjI2NzM@._V1_SX300.jpg",
-          "imdbId": "tt5580540",
-          "tmdbId": 69470,
-          "tmdbMedia": "tv",
-          "youtubeId": "F-XlXPyJRSY"
-        },
-        {
-          "title": "BoJack Horseman",
-          "year": 2014,
-          "type": "show",
-          "genre": "Animation / Comedy / Drama",
-          "services": [],
-          "imdbId": "tt3398228",
-          "tmdbId": 61222,
-          "tmdbMedia": "tv",
-          "youtubeId": "i1eJMig5Ik4"
-        },
-        {
-          "title": "Action",
-          "year": 1999,
-          "type": "show",
-          "genre": "Comedy",
-          "services": [],
-          "imdbId": "tt0206467",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOTBiMzY2NTAtMDE3Ni00ZGIyLWE0YTgtZTQyMDAyMzkxZmI5XkEyXkFqcGc@._V1_SX300.jpg",
-          "tmdbId": 2812,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "Coupling",
-          "year": 2000,
-          "type": "show",
-          "genre": "Comedy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BM2EzMTA4MjgtOTBiYS00NGI2LWJhYTQtYWUzZDI2YjI2NTJlXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0237123",
-          "tmdbId": 2719,
-          "tmdbMedia": "tv",
-          "youtubeId": "hstPHM3R1dY"
-        },
-        {
-          "title": "Parenthood",
-          "year": 1989,
-          "type": "movie",
-          "genre": "Comedy / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYTEyOTQwOWQtNTA5Ny00N2ViLThkMzctY2Y3ZTkxNTQxZGRjXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0098067",
-          "tmdbId": 1552,
-          "tmdbMedia": "movie",
-          "youtubeId": "s4LqmugHDPQ"
-        },
-        {
-          "title": "Parenthood",
-          "year": 2010,
-          "type": "show",
-          "genre": "Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjAwMjA3Mzg2N15BMl5BanBnXkFtZTgwMDY2Nzg3MjE@._V1_SX300.jpg",
-          "imdbId": "tt1416765",
-          "tmdbId": 21762,
-          "tmdbMedia": "tv",
-          "youtubeId": "o_cblVvo5bg"
-        },
-        {
-          "title": "Dogs Are Color Blind",
-          "year": 1996,
-          "type": "movie",
-          "genre": "Comedy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BODg5OGIxYzMtOTEzNS00MzFlLTk4NmMtYTA2ODBjZjQ0NzFmXkEyXkFqcGdeQXVyMjMyMzI4MzY@._V1_SX300.jpg",
-          "imdbId": "tt0116786",
-          "tmdbId": 380716,
-          "tmdbMedia": "movie",
-          "youtubeId": "CJ3GD9CmWt0"
-        },
-        {
-          "title": "Shameless",
-          "year": 2011,
-          "type": "show",
-          "genre": "Drama / Comedy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMWUwZjJmYjctYTY3MC00ZTVlLWI1ZGEtNWQzMTFlMTcwMTY2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt1586680",
-          "tmdbId": 34307,
-          "tmdbMedia": "tv",
-          "youtubeId": "9tvkYS5cA58"
-        },
-        {
-          "title": "Stand by Me",
-          "year": 1986,
-          "type": "movie",
-          "genre": "Crime / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNGJkNTUwM2MtZWE2MS00YjNkLWE3MjktNWQwZDQxMDIyZWVmXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0092005",
-          "tmdbId": 235,
-          "tmdbMedia": "movie",
-          "youtubeId": "9UUcTNZKrks"
-        },
-        {
-          "title": "SAS Rogue Heroes",
-          "year": 2022,
-          "type": "show",
-          "genre": "Drama / War & Politics / Action & Adventure",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BN2JhZThlNjAtY2JjNi00ZGI4LWJkOWMtMjc0OTljOTVkMDIxXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt10405370",
-          "tmdbId": 93870,
-          "tmdbMedia": "tv",
-          "youtubeId": "gTWqFccBsgg"
-        },
-        {
-          "title": "The Stronghold",
-          "year": 2023,
-          "type": "movie",
-          "genre": "Drama / War / History",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjM0YTA4MmQtZGJmOS00ZTU2LWJiM2MtY2Y2NzhhMTg4NTIyXkEyXkFqcGdeQXVyMjMyMzI4MzY@._V1_SX300.jpg",
-          "imdbId": "tt28511459",
-          "tmdbId": 1157392,
-          "tmdbMedia": "movie",
-          "youtubeId": null
-        },
-        {
-          "title": "Dumb",
-          "year": 2016,
-          "type": "show",
-          "genre": "Drama / Comedy / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZmMzMzcwMDktOWIwOS00ZTY1LThjYzAtNmUwNzdkMTk3MDJiXkEyXkFqcGdeQXVyMjMyMzI4MzY@._V1_SX300.jpg",
-          "imdbId": "tt6575296",
-          "tmdbId": 75890,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "Spy",
-          "year": 2015,
-          "type": "movie",
-          "genre": "Action / Comedy / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjI5OTQ0MDQxM15BMl5BanBnXkFtZTgwMzcwNjMyNTE@._V1_SX300.jpg",
-          "imdbId": "tt3079380",
-          "tmdbId": 238713,
-          "tmdbMedia": "movie",
-          "youtubeId": "ltijEmlyqlg"
-        },
-        {
-          "title": "We Are the Revolution",
-          "year": 2020,
-          "type": "movie",
-          "genre": "Drama / Romance",
-          "services": [],
-          "imdbId": "tt14649040",
-          "tmdbId": 765030,
-          "tmdbMedia": "movie",
-          "youtubeId": null
-        },
-        {
-          "title": "The Electric State",
-          "year": 2025,
-          "type": "movie",
-          "genre": "Science Fiction / Adventure / Action",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZDU5YWE3MmItMGI0Ny00MWQ4LWE3NDktMjRkNDk5YmFjYTk2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt7766378",
-          "tmdbId": 777443,
-          "tmdbMedia": "movie",
-          "youtubeId": "QIw6ITiwgBU"
-        },
-        {
-          "title": "Westworld",
-          "year": 2016,
-          "type": "show",
-          "genre": "Sci-Fi & Fantasy / Western",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjM2MTA5NjIwNV5BMl5BanBnXkFtZTgwNjI2OTMxNTM@._V1_SX300.jpg",
-          "imdbId": "tt0475784",
-          "tmdbId": 63247,
-          "tmdbMedia": "tv",
-          "youtubeId": "kEkZdgWu7mM"
-        },
-        {
-          "title": "Inventing Anna",
-          "year": 2022,
-          "type": "show",
-          "genre": "Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOWY5OTVjNGItNjQ4Yy00NTU1LTgxMDgtNTVkMzdmYTFhMGQzXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt8740976",
-          "tmdbId": 95665,
-          "tmdbMedia": "tv",
-          "youtubeId": "65xa8TG2G8o"
-        },
-        {
-          "title": "Fall",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Thriller",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYmZjYjAxMDEtOTE2My00MmM5LTkyYjctOWRjMjgyM2JhMDI0XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt15325794",
-          "tmdbId": 985939,
-          "tmdbMedia": "movie",
-          "youtubeId": "FNk7Cu4sJOs"
-        },
-        {
-          "title": "Dirk Gently's Holistic Detective Agency",
-          "year": 2016,
-          "type": "show",
-          "genre": "Comedy / Sci-Fi & Fantasy / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTU3MDkzNzM5NF5BMl5BanBnXkFtZTgwMzEyNTgyMDI@._V1_SX300.jpg",
-          "imdbId": "tt4047038",
-          "tmdbId": 67773,
-          "tmdbMedia": "tv",
-          "youtubeId": "K0x7DSPoXsI"
-        },
-        {
-          "title": "Severance",
-          "year": 2022,
-          "type": "show",
-          "genre": "Drama / Mystery / Sci-Fi & Fantasy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZDI5YzJhODQtMzQyNy00YWNmLWIxMjUtNDBjNjA5YWRjMzExXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt11280740",
-          "tmdbId": 95396,
-          "tmdbMedia": "tv",
-          "youtubeId": "xEQP4VVuyrY"
-        },
-        {
-          "title": "Amélie",
-          "year": 2001,
-          "type": "movie",
-          "genre": "Comedy / Romance",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOTNmYzY0MWQtZGZmNy00Y2Y4LWFmMDQtMTZjYTdiYzEwZGQ2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0211915",
-          "tmdbId": 194,
-          "tmdbMedia": "movie",
-          "youtubeId": "555A7T_kmIc"
-        },
-        {
-          "title": "Crazy Ex-Girlfriend",
-          "year": 2015,
-          "type": "show",
-          "genre": "Comedy / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjVjM2Y3YzctYzQwMi00OTY2LWEyMjMtODdkZmZiMWQxM2M4XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt4094300",
-          "tmdbId": 63161,
-          "tmdbMedia": "tv",
-          "youtubeId": "J4owK09kW58"
-        },
-        {
-          "title": "Primal Fear",
-          "year": 1996,
-          "type": "movie",
-          "genre": "Crime / Drama / Mystery / Thriller",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZTJlYjM5MTYtZWU3YS00ZDRhLTk1MWEtZGQyODc1ZDU2MWEwXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0117381",
-          "tmdbId": 1592,
-          "tmdbMedia": "movie",
-          "youtubeId": "dUzCu3LntU8"
-        },
-        {
-          "title": "Hummus Full Trailer",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Comedy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMWM4ZjJmYzgtZDIxMS00NWI1LTk5YmYtMzNkOGI4ZWZmMTY5XkEyXkFqcGdeQXVyMjMyMzI4MzY@._V1_SX300.jpg",
-          "imdbId": "tt11167448",
-          "tmdbId": 732492,
-          "tmdbMedia": "movie",
-          "youtubeId": "wcRcSUCiVgA"
-        },
-        {
-          "title": "The Big Short",
-          "year": 2015,
-          "type": "movie",
-          "genre": "Comedy / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZDZkNDQ3YjktYjBlZC00YTY1LTgxOGYtY2RhMWFhZmNkZGY3XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt1596363",
-          "tmdbId": 318846,
-          "tmdbMedia": "movie",
-          "youtubeId": "1kQc3mmtH-o"
-        },
-        {
-          "title": "Soap",
-          "year": 1977,
-          "type": "show",
-          "genre": "Comedy / Soap / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjNiM2UwODctZDEwZS00Y2YxLWJhNGEtMWU0ODNlZDg3ZTlhXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0075584",
-          "tmdbId": 3295,
-          "tmdbMedia": "tv",
-          "youtubeId": "4gTAW5SAW3c"
-        },
-        {
-          "title": "How to Get to Heaven from Belfast",
-          "year": 2026,
-          "type": "show",
-          "genre": "Mystery / Comedy / Drama",
-          "services": [],
-          "imdbId": "tt31709373",
-          "tmdbId": 233079,
-          "tmdbMedia": "tv",
-          "youtubeId": "6flC0y-2iFw"
-        },
-        {
-          "title": "Workin' Moms",
-          "year": 2017,
-          "type": "show",
-          "genre": "Comedy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMDMwOGQ4MGItYTYxOC00ZGJkLTkyN2UtNmE5YTNkMGQ1YmIxXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt6143796",
-          "tmdbId": 69555,
-          "tmdbMedia": "tv",
-          "youtubeId": "ecfDFD6XxXE"
-        },
-        {
-          "title": "Good Girls",
-          "year": 2018,
-          "type": "show",
-          "genre": "Drama / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZTFkMDZkOWMtNDM3ZC00MWE0LTkxZWEtNjYyZTk4ODNiOTc4XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt6474378",
-          "tmdbId": 71715,
-          "tmdbMedia": "tv",
-          "youtubeId": "EXJdwEtqaSs"
-        },
-        {
-          "title": "Dead to Me",
-          "year": 2019,
-          "type": "show",
-          "genre": "Drama / Comedy / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BODFhNzI1ZjgtMTFmNC00MTkyLTg0NTItMTkzYzk4MDFjNzdhXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt8064302",
-          "tmdbId": 81357,
-          "tmdbMedia": "tv",
-          "youtubeId": "BwYBw1raC2o"
-        },
-        {
-          "title": "The Girl from Oslo",
-          "year": 2021,
-          "type": "show",
-          "genre": "Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTllODY0ZGItMjIzMy00NTE3LWI2NjktZjNkOWMxOTJmYWMwXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt13968792",
-          "tmdbId": 121241,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "The Handmaid's Tale",
-          "year": 2017,
-          "type": "show",
-          "genre": "Drama / Sci-Fi & Fantasy / Action & Adventure",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMWIxMzk4NmItZmM1YS00ODUyLWFlNjgtZDQ4MzljZTZmZDQ5XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt5834204",
-          "tmdbId": 69478,
-          "tmdbMedia": "tv",
-          "youtubeId": "81PyH5TH-NQ"
-        },
-        {
-          "title": "Agatha Christie's Seven Dials",
-          "year": 2026,
-          "type": "show",
-          "genre": "Drama / Mystery",
-          "services": [],
-          "imdbId": "tt31974288",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZmM5MjMwOGMtY2U0YS00M2ZlLTlhNmItNDZlZDgxYmJhODdlXkEyXkFqcGc@._V1_SX300.jpg",
-          "tmdbId": 250505,
-          "tmdbMedia": "tv",
-          "youtubeId": "LD16F92LHIY"
-        },
-        {
-          "title": "Glass Onion: A Knives Out Mystery",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Comedy / Crime / Mystery",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMzI2ZDYxZTEtMzVlOC00OTUyLTgyNTAtYWFhNmRhZjAzZWE1XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt11564570",
-          "tmdbId": 661374,
-          "tmdbMedia": "movie",
-          "youtubeId": "gj5ibYSz8C0"
-        },
-        {
-          "title": "Envious",
-          "year": 2024,
-          "type": "show",
-          "genre": "Comedy / Drama",
-          "services": [],
-          "imdbId": "tt29494111",
-          "tmdbId": 261615,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "Wayward Pines",
-          "year": 2015,
-          "type": "show",
-          "genre": "Drama / Mystery / Sci-Fi & Fantasy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjUwY2NmZDItZjdjNC00ZGQ3LTk2NTEtNjY5NTQxOGYwNGY4XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt2618986",
-          "tmdbId": 53425,
-          "tmdbMedia": "tv",
-          "youtubeId": "RsQ9Fl0VCkk"
-        },
-        {
-          "title": "A House of Dynamite",
-          "year": 2025,
-          "type": "movie",
-          "genre": "Thriller",
-          "services": [],
-          "imdbId": "tt32376165",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjAzMjQ4YTUtOGI1Yy00YTFkLTlkMDQtMDEwOWNjYmE3MTU1XkEyXkFqcGc@._V1_SX300.jpg",
-          "tmdbId": 1290159,
-          "tmdbMedia": "movie",
-          "youtubeId": "_wpw2QHJNco"
-        },
-        {
-          "title": "The Holdovers",
-          "year": 2023,
-          "type": "movie",
-          "genre": "Comedy / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOWY3MjUzZTctOTI5ZC00MDA5LTk4ZTMtZWJjNjRmMzE4ZmI2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt14849194",
-          "tmdbId": 840430,
-          "tmdbMedia": "movie",
-          "youtubeId": "AhKLpJmHhIg"
-        },
-        {
-          "title": "Alpha Males",
-          "year": 2022,
-          "type": "show",
-          "genre": "Comedy",
-          "services": [],
-          "imdbId": "tt18482892",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYzdjMjI3OGQtYzRjMi00Nzc5LWExN2ItZjAwMTM3OGVmZGZkXkEyXkFqcGc@._V1_SX300.jpg",
-          "tmdbId": 215092,
-          "tmdbMedia": "tv",
-          "youtubeId": "NpimczviUHA"
-        },
-        {
-          "title": "Legenden",
-          "year": null,
-          "type": "movie",
-          "genre": "",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTFkNTIwM2MtNmFmYS00ZGQ0LWEwNTgtOTNiNGE0NjdmNzBiXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt33293130",
-          "tmdbId": 1578641,
-          "tmdbMedia": "movie",
-          "youtubeId": null
-        },
-        {
-          "title": "Zero Day",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama / War & Politics",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMmYwNWM3ZWEtMmRlMi00MTA5LWFlY2QtMGI2MTdjOWFiZjgxXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt23872886",
-          "tmdbId": 216082,
-          "tmdbMedia": "tv",
-          "youtubeId": "FOfBiiPdQPI"
-        },
-        {
-          "title": "Billionaires' Bunker",
-          "year": 2025,
-          "type": "show",
-          "genre": "Sci-Fi & Fantasy / Drama / Mystery",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMmRmZDA3MTUtYzA1OS00MmI0LTk4MDktYjUwMDQ2ZmU1OTE0XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt31173096",
-          "tmdbId": 245648,
-          "tmdbMedia": "tv",
-          "youtubeId": "Ar68A3Kr-UM"
-        },
-        {
-          "title": "Missing You",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama / Crime / Mystery",
-          "services": [],
-          "imdbId": "tt31019484",
-          "tmdbId": 244243,
-          "tmdbMedia": "tv",
-          "youtubeId": "YICEbGkET_0"
-        },
-        {
-          "title": "Fall for Me",
-          "year": 2025,
-          "type": "movie",
-          "genre": "Romance / Thriller",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BODUyOTc1ZDYtNjc5Ny00MzRkLTg5MDQtYTU3ZjM1MTExY2Y4XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt32543884",
-          "tmdbId": 1300116,
-          "tmdbMedia": "movie",
-          "youtubeId": "pgu-BsBV-2I"
-        },
-        {
-          "title": "Anne with an E",
-          "year": 2017,
-          "type": "show",
-          "genre": "Drama / Family",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZWUzZGM1OTYtMWUyNS00NTBmLTg1YTMtOTllMWFmYjk2NGU2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt5421602",
-          "tmdbId": 70785,
-          "tmdbMedia": "tv",
-          "youtubeId": "S5qJXYNNINo"
-        },
-        {
-          "title": "Heweliusz",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama / Mystery",
-          "services": [],
-          "imdbId": "tt32253092",
-          "tmdbId": 217528,
-          "tmdbMedia": "tv",
-          "youtubeId": "9fBgHvXtGwA"
-        },
-        {
-          "title": "American Manhunt: Osama bin Laden",
-          "year": 2025,
-          "type": "show",
-          "genre": "Documentary",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BY2FmZjA5MTYtYjUyYi00MGUxLTg5YjctNWQxNTFlNGZmMjBkXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt35630036",
-          "tmdbId": 283367,
-          "tmdbMedia": "tv",
-          "youtubeId": "ZzjwcujKvho"
-        },
-        {
-          "title": "Smile",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Horror / Mystery",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjFhMzBlNzktMjE2Ni00YTMyLWI2YWUtYmM1N2QxMDQwZmZhXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt15474916",
-          "tmdbId": 882598,
-          "tmdbMedia": "movie",
-          "youtubeId": "-8d987Wtkxs"
-        },
-        {
-          "title": "Homicide",
-          "year": 2024,
-          "type": "show",
-          "genre": "Documentary / Crime",
-          "services": [],
-          "imdbId": "tt31556143",
-          "tmdbId": 248126,
-          "tmdbMedia": "tv",
-          "youtubeId": "ZsL7lWz1Jbo"
-        },
-        {
-          "title": "Aileen: Queen of the Serial Killers",
-          "year": 2025,
-          "type": "movie",
-          "genre": "Documentary / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYjg4MDg1YTAtNDYwMC00MGEyLTk3NTYtMWY4YjJmNDMyZDdkXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt38457052",
-          "tmdbId": 1550569,
-          "tmdbMedia": "movie",
-          "youtubeId": "cN0PebFoXyw"
-        },
-        {
-          "title": "See How They Run",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Mystery / Comedy / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMGNiNDNlNjQtMGEzMC00NmNjLWJhYWYtODBhNjQ3Mjc2YjZmXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt13640696",
-          "tmdbId": 766475,
-          "tmdbMedia": "movie",
-          "youtubeId": "Q00qh7Ab6Mk"
-        },
-        {
-          "title": "It's What's Inside",
-          "year": 2024,
-          "type": "movie",
-          "genre": "Comedy / Mystery / Science Fiction",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNDkxOTZmZTYtYTNmNS00MDk3LWE0MDAtMzY5M2Y5YmU1MmI2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt14577874",
-          "tmdbId": 1052280,
-          "tmdbMedia": "movie",
-          "youtubeId": "RJBNi0CjX5I"
-        },
-        {
-          "title": "A Good Girl's Guide to Murder",
-          "year": 2024,
-          "type": "show",
-          "genre": "Crime / Mystery / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYmVlYzBjODktZDNlZC00ZmFiLTg5YmItMTc0NmYxZDgzNDg5XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt28118211",
-          "tmdbId": 218342,
-          "tmdbMedia": "tv",
-          "youtubeId": "wA39lIDm75Y"
-        },
-        {
-          "title": "The Breakthrough",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama / Crime",
-          "services": [],
-          "imdbId": "tt23221806",
-          "tmdbId": 279283,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "Enola Holmes 2",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Adventure / Mystery / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZjRjZjZhNzUtMDQyMC00OWZmLWIzMjQtZDM2OWRhNzgwOGU2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt14641788",
-          "tmdbId": 829280,
-          "tmdbMedia": "movie",
-          "youtubeId": "0DIftINqIjo"
-        },
-        {
-          "title": "The Cage",
-          "year": 2024,
-          "type": "show",
-          "genre": "Action & Adventure / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTM5OTk0ZTItNzIyMi00YjEyLTgzNWQtMjRhMjE0YmIxMzM2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt28288478",
-          "tmdbId": 230003,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "High: Confessions of an Ibiza Drug Mule",
-          "year": 2021,
-          "type": "show",
-          "genre": "Documentary",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTcyZTVmMmUtMGI5MS00MDZkLThlY2ItNDRmNTUwZTY1ZTU1XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt14988916",
-          "tmdbId": 128641,
-          "tmdbMedia": "tv",
-          "youtubeId": null
-        },
-        {
-          "title": "Saw X",
-          "year": 2023,
-          "type": "movie",
-          "genre": "Horror / Mystery",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BODRmMzAwMWItZjI5MS00NDYyLWFjMmMtZGUwYjQ1ZTBkNmYzXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt21807222",
-          "tmdbId": 951491,
-          "tmdbMedia": "movie",
-          "youtubeId": "t3PzUo4P21c"
-        },
-        {
-          "title": "Blast from the Past",
-          "year": 1999,
-          "type": "movie",
-          "genre": "Drama / Romance / Comedy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BODQ0ZmNkYzMtYjhlOC00YWM0LTg4NzUtZmM1NWZkNTMyNmYyXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0124298",
-          "tmdbId": 11622,
-          "tmdbMedia": "movie",
-          "youtubeId": "hDNR4CxYtls"
-        },
-        {
-          "title": "Limitless",
-          "year": 2011,
-          "type": "movie",
-          "genre": "Thriller / Mystery / Science Fiction",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMWQ4OTQ4YzYtODlmMi00ZjA0LTg5M2QtZWUzNjA5N2NmODE5XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt1219289",
-          "tmdbId": 51876,
-          "tmdbMedia": "movie",
-          "youtubeId": "4TLppsfzQH8"
-        },
-        {
-          "title": "Whiplash",
-          "year": 2014,
-          "type": "movie",
-          "genre": "Drama / Music / Thriller",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMDFjOWFkYzktYzhhMC00NmYyLTkwY2EtYjViMDhmNzg0OGFkXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt2582802",
-          "tmdbId": 244786,
-          "tmdbMedia": "movie",
-          "youtubeId": "Q7kZy3T6vRM"
-        },
-        {
-          "title": "Tag",
-          "year": 2018,
-          "type": "movie",
-          "genre": "Comedy / Action",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BM2VhYTg4M2MtMWJiNS00ZTExLWI4MTMtNjE1NTQ1ODA0MTJjXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt2854926",
-          "tmdbId": 455980,
-          "tmdbMedia": "movie",
-          "youtubeId": "kjC1zmZo30U"
-        },
-        {
-          "title": "The Morning Show",
-          "year": 2019,
-          "type": "show",
-          "genre": "Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYTY1YjM0Y2QtODFkMy00ZDc4LTg3MWMtMDE4MGY5NzFjYTRhXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt7203552",
-          "tmdbId": 90282,
-          "tmdbMedia": "tv",
-          "youtubeId": "iJjp5p51Cow"
-        },
-        {
-          "title": "The Ledge",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Thriller / Adventure",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTRhNWM0MGMtNzc5My00N2NkLTk0MzgtMDk3NmFkNjY3MGNlXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt6805938",
-          "tmdbId": 924482,
-          "tmdbMedia": "movie",
-          "youtubeId": "JGBa03UPCBU"
-        },
-        {
-          "title": "A Lonely Place to Die",
-          "year": 2011,
-          "type": "movie",
-          "genre": "Adventure / Action / Thriller / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTM5OTA2MTc2N15BMl5BanBnXkFtZTcwMjI3NDQyNg@@._V1_SX300.jpg",
-          "imdbId": "tt1422136",
-          "tmdbId": 81390,
-          "tmdbMedia": "movie",
-          "youtubeId": "MhfbdaQ_ub0"
-        },
-        {
-          "title": "247°F",
-          "year": 2011,
-          "type": "movie",
-          "genre": "Horror / Thriller",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTQ3Njk4OTc2OF5BMl5BanBnXkFtZTcwMjAyNjUzOA@@._V1_SX300.jpg",
-          "imdbId": "tt1877543",
-          "tmdbId": 137145,
-          "tmdbMedia": "movie",
-          "youtubeId": "0X08so-BfFA"
-        },
-        {
-          "title": "Curve",
-          "year": 2015,
-          "type": "movie",
-          "genre": "Horror / Thriller",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNDJhOTYyODQtZjBkMS00ODM4LWJmN2QtYmJhOTA2M2QyYWNmXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt3212904",
-          "tmdbId": 347754,
-          "tmdbMedia": "movie",
-          "youtubeId": "n297-KgI5Sw"
-        },
-        {
-          "title": "The Requin",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Horror / Mystery / Thriller",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNWM1YmZhNWQtZjBlZS00ZmVmLWFlNzItZTIzMzc0OGY2Mzk4XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt11348232",
-          "tmdbId": 803114,
-          "tmdbMedia": "movie",
-          "youtubeId": "kWXK5fibfko"
-        },
-        {
-          "title": "Oxygen",
-          "year": 2021,
-          "type": "movie",
-          "genre": "Science Fiction / Thriller / Horror",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BY2IyZTFkZGEtM2JiOC00NDMyLThmOTktZDEzYzFlZTc4YzJkXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt6341832",
-          "tmdbId": 471498,
-          "tmdbMedia": "movie",
-          "youtubeId": "8IqXgZd-P98"
-        },
-        {
-          "title": "Infinite Storm",
-          "year": 2022,
-          "type": "movie",
-          "genre": "Thriller / Adventure / Drama / Mystery",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjg3YjIxNjgtYzg1MS00MzU1LWJhYzktYzgwNzZhNmUyNmYwXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt14060232",
-          "tmdbId": 811631,
-          "tmdbMedia": "movie",
-          "youtubeId": "zRaUIPMq-u0"
-        },
-        {
-          "title": "Fall 2",
-          "year": 2026,
-          "type": "movie",
-          "genre": "Thriller",
-          "services": [],
-          "imdbId": "tt31192372",
-          "tmdbId": 1101412,
-          "tmdbMedia": "movie",
-          "youtubeId": null
-        },
-        {
-          "title": "Starve",
-          "year": 2014,
-          "type": "movie",
-          "genre": "Thriller / Horror",
-          "services": [],
-          "imdbId": "tt3350890",
-          "tmdbId": 293828,
-          "tmdbMedia": "movie",
-          "youtubeId": "pnplfKHfiVo"
-        },
-        {
-          "title": "12 Feet Deep",
-          "year": 2018,
-          "type": "movie",
-          "genre": "Thriller / Horror",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNDQzMTg0OTYtYjNlMi00OTJiLWFmNzctMTdjMWIzZjNlOTc2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt5143226",
-          "tmdbId": 459928,
-          "tmdbMedia": "movie",
-          "youtubeId": "jxL67tUPt7Q"
-        },
-        {
-          "title": "No Way Up",
-          "year": 2024,
-          "type": "movie",
-          "genre": "Thriller / Horror / Action",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNGFiZmZmNDEtZGRkNC00MDkxLTljNTMtMWI2ZDA1MzBjYzY2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt16253418",
-          "tmdbId": 1096197,
-          "tmdbMedia": "movie",
-          "youtubeId": "e1k1PC0TtmE"
-        },
-        {
-          "title": "Tunnel",
-          "year": 2016,
-          "type": "movie",
-          "genre": "Thriller / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjE3ODYwODE2OV5BMl5BanBnXkFtZTgwMjM5ODA2OTE@._V1_SX300.jpg",
-          "imdbId": "tt5910280",
-          "tmdbId": 390497,
-          "tmdbMedia": "movie",
-          "youtubeId": "GTsY-ol1ays"
-        },
-        {
-          "title": "The Impossible",
-          "year": 2012,
-          "type": "movie",
-          "genre": "Drama / Thriller / History",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZjM1ZTJkMjctY2M0ZC00ZTkyLTliYTktNzYxYWIzYTAyOTRjXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt1649419",
-          "tmdbId": 80278,
-          "tmdbMedia": "movie",
-          "youtubeId": "PaY8EeUYh10"
-        },
-        {
-          "title": "Superdeep",
-          "year": 2020,
-          "type": "movie",
-          "genre": "Horror / Science Fiction / Thriller",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYjgyOTE1OTUtMTAxNC00MWI5LTlkOWEtZWIzZGE5M2JiZTlmXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt11815960",
-          "tmdbId": 579828,
-          "tmdbMedia": "movie",
-          "youtubeId": "2vfmCzuTsaY"
-        },
-        {
-          "title": "Open Water",
-          "year": 2004,
-          "type": "movie",
-          "genre": "Horror / Thriller",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjQ5ODAyOTk3OF5BMl5BanBnXkFtZTcwNzQ1NjYyMQ@@._V1_SX300.jpg",
-          "imdbId": "tt0374102",
-          "tmdbId": 83,
-          "tmdbMedia": "movie",
-          "youtubeId": "Z9q1qJi1nMs"
-        },
-        {
-          "title": "Limitless",
-          "year": 2011,
-          "type": "movie",
-          "genre": "Thriller / Mystery / Science Fiction",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMWQ4OTQ4YzYtODlmMi00ZjA0LTg5M2QtZWUzNjA5N2NmODE5XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt1219289",
-          "tmdbId": 51876,
-          "tmdbMedia": "movie",
-          "youtubeId": "4TLppsfzQH8"
-        },
-        {
-          "title": "Behind Enemy Lines",
-          "year": 2001,
-          "type": "movie",
-          "genre": "Action / Drama / Thriller / War",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNTBjYjM3MTQtNmIxMi00MDY0LWExMGItYzY5MWI2MjU4YWNhXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0159273",
-          "tmdbId": 8007,
-          "tmdbMedia": "movie",
-          "youtubeId": "Ca5GkkEk0kI"
-        },
-        {
-          "title": "Narcos",
-          "year": 2015,
-          "type": "show",
-          "genre": "Crime / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNzQwOTcwMzIwN15BMl5BanBnXkFtZTgwMjYxMTA0NjE@._V1_SX300.jpg",
-          "imdbId": "tt2707408",
-          "tmdbId": 63351,
-          "tmdbMedia": "tv",
-          "youtubeId": "RNWAKZzgbp4"
-        },
-        {
-          "title": "Black Rabbit",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjNkZDQzYTItZDgzNi00ZDU4LWI2NWItYjA0ZDdlMjgyMWI2XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt23055142",
-          "tmdbId": 249039,
-          "tmdbMedia": "tv",
-          "youtubeId": "9j_IFlmFRvU"
-        },
-        {
-          "title": "Parks and Recreation",
-          "year": 2009,
-          "type": "show",
-          "genre": "Comedy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNDlhMzAwNTAtNTk2NS00MTdkLWE3ZWYtMDU0MTFiYmU2ZTc0XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt1266020",
-          "tmdbId": 8592,
-          "tmdbMedia": "tv",
-          "youtubeId": "5IZWeAwdJ-s"
-        },
-        {
-          "title": "Breaking Bad",
-          "year": 2008,
-          "type": "show",
-          "genre": "Drama / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMzU5ZGYzNmQtMTdhYy00OGRiLTg0NmQtYjVjNzliZTg1ZGE4XkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0903747",
-          "tmdbId": 1396,
-          "tmdbMedia": "tv",
-          "youtubeId": "XZ8daibM3AE"
-        },
-        {
-          "title": "The White Lotus",
-          "year": 2021,
-          "type": "show",
-          "genre": "Comedy / Drama / Mystery",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZmM1MGM0MDQtZTAzNy00ZGJkLWI4MDUtNjBmMzdhYjhlM2QwXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt13406094",
-          "tmdbId": 111803,
-          "tmdbMedia": "tv",
-          "youtubeId": "TGLq7_MonZ4"
-        },
-        {
-          "title": "Bodyguard",
-          "year": 2018,
-          "type": "show",
-          "genre": "Crime / Drama / War & Politics / Mystery",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BN2I0NWE2Y2QtM2I3YS00MzRlLThlMjAtMDViNGMwNjRhZjVlXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt7493974",
-          "tmdbId": 80307,
-          "tmdbMedia": "tv",
-          "youtubeId": "tLfLU6-9lxY"
-        },
-        {
-          "title": "Jane Austen's Mafia!",
-          "year": 1998,
-          "type": "movie",
-          "genre": "Comedy / Crime",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYzQzOGNlOTEtYmY0OS00MjE1LWFhMzQtN2JlZTI0ZTQ0NzNjXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0120741",
-          "tmdbId": 9835,
-          "tmdbMedia": "movie",
-          "youtubeId": "afiNZtmIKNE"
-        },
-        {
-          "title": "Django Unchained",
-          "year": 2012,
-          "type": "movie",
-          "genre": "Drama / Western",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjIyNTQ5NjQ1OV5BMl5BanBnXkFtZTcwODg1MDU4OA@@._V1_SX300.jpg",
-          "imdbId": "tt1853728",
-          "tmdbId": 68718,
-          "tmdbMedia": "movie",
-          "youtubeId": "_iH0UBYDI4g"
-        },
-        {
-          "title": "Eiffel",
-          "year": 2021,
-          "type": "movie",
-          "genre": "Romance / Drama",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNWNkNzEyM2QtMmE1ZC00Zjg5LWE2MDUtYWFhNzE5ZTRhZWNlXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt10366514",
-          "tmdbId": 655082,
-          "tmdbMedia": "movie",
-          "youtubeId": "STXwmr01J0o"
-        },
-        {
-          "title": "Safety Not Guaranteed",
-          "year": 2012,
-          "type": "movie",
-          "genre": "Comedy / Romance / Science Fiction",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZDAzYTlhZjktNmFkNi00YzZjLWI4NmMtYWI1MWJiYzYwNTlkXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt1862079",
-          "tmdbId": 84332,
-          "tmdbMedia": "movie",
-          "youtubeId": "h1xKeElnpGk"
-        },
-        {
-          "title": "Community",
-          "year": 2009,
-          "type": "show",
-          "genre": "Comedy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOGIwYzNmYTktZWExZC00MzAyLTk4NTItODgwZmIyNWZhNDEyXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt1439629",
-          "tmdbId": 18347,
-          "tmdbMedia": "tv",
-          "youtubeId": "C4W4L9TLJa8"
-        },
-        {
-          "title": "The Nightmare Before Christmas",
-          "year": 1993,
-          "type": "movie",
-          "genre": "Fantasy / Animation / Family",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNmYxOTAzZWYtOGI3Yi00ODc3LTk5ZjYtZTY0MzVkZTg3YmRiXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt0107688",
-          "tmdbId": 9479,
-          "tmdbMedia": "movie",
-          "youtubeId": "IoYahD_xNR0"
-        },
-        {
-          "title": "Pluribus",
-          "year": 2025,
-          "type": "show",
-          "genre": "Drama / Sci-Fi & Fantasy",
-          "services": [],
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOWNlM2E1MDMtYmI5MS00NDQ1LWI3NTctM2VlNjQ5OTAxYTNmXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt22202452",
-          "tmdbId": 225171,
-          "tmdbMedia": "tv",
-          "youtubeId": "a6lzvWby9UE"
-        },
-        {
-          "title": "The Bear",
-          "year": 2022,
-          "type": "show",
-          "genre": "Drama / Comedy",
-          "imdbId": "tt14452776",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYWZhNDZiMzAtZmZlYS00MWFmLWE2MWEtNDAxZTZiN2U4Y2U2XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "tmdbId": 136315,
-          "tmdbMedia": "tv",
-          "youtubeId": "WBlIUsFEnsw"
-        },
-        {
-          "title": "Deadloch",
-          "year": 2023,
-          "type": "show",
-          "genre": "Comedy / Crime",
-          "imdbId": "tt14671678",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNjc2ZmJkMTYtYzg5Yi00Y2E1LWI5MjEtZmI5ZjQ0MGRhOTQ1XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "tmdbId": 225780,
-          "tmdbMedia": "tv",
-          "youtubeId": "PRYlkqIK_4A"
-        },
-        {
-          "imdbId": "tt2467372",
-          "services": [],
-          "type": "show",
-          "genre": "Comedy / Crime",
-          "year": 2013,
-          "thumb": "https://m.media-amazon.com/images/M/MV5BNzBiODQxZTUtNjc0MC00Yzc1LThmYTMtN2YwYTU3NjgxMmI4XkEyXkFqcGc@._V1_SX300.jpg",
-          "title": "Brooklyn Nine-Nine",
-          "tmdbId": 48891,
-          "tmdbMedia": "tv",
-          "youtubeId": "icTOP9F17pU"
-        },
-        {
-          "genre": "Comedy / Science Fiction / Drama",
-          "year": 2021,
-          "title": "Don't Look Up",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjhhNWFjNzctYTJjOS00MDc0LThiNjItZmM0ZDVmMWViY2UzXkEyXkFqcGc@._V1_SX300.jpg",
-          "imdbId": "tt11286314",
-          "type": "movie",
-          "services": [],
-          "tmdbId": 646380,
-          "tmdbMedia": "movie",
-          "youtubeId": "RbIxYm3mKzI"
-        },
-        {
-          "type": "movie",
-          "services": [],
-          "imdbId": "tt0260866",
-          "title": "Don't Say a Word",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BOGY3OWJmZmQtYWFjZi00MzFhLTg4Y2YtOWI5YTkxZGRmOWNkXkEyXkFqcGc@._V1_SX300.jpg",
-          "year": 2001,
-          "genre": "Thriller / Mystery / Crime",
-          "tmdbId": 12103,
-          "tmdbMedia": "movie",
-          "youtubeId": "aHASWXlET04"
-        },
-        {
-          "title": "Game of Thrones",
-          "year": 2011,
-          "type": "show",
-          "genre": "Sci-Fi & Fantasy / Drama / Action & Adventure",
-          "imdbId": "tt0944947",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMTNhMDJmNmYtNDQ5OS00ODdlLWE0ZDAtZTgyYTIwNDY3OTU3XkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "tmdbId": 1399,
-          "tmdbMedia": "tv",
-          "youtubeId": "KPLWWIOCOOQ"
-        },
-        {
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYTNiMjc3OTEtZDE2NC00ZmViLTk4ZWMtYTJjYTkzMGRjY2M4XkEyXkFqcGc@._V1_SX300.jpg",
-          "title": "Lessons in Chemistry",
-          "genre": "Drama",
-          "year": 2023,
-          "services": [],
-          "type": "show",
-          "imdbId": "tt13911628",
-          "tmdbId": 117303,
-          "tmdbMedia": "tv",
-          "youtubeId": "-1PuK8mxASE"
-        },
-        {
-          "title": "Squid Game",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BYTU3ZDVhNmMtMDVlNC00MDc0LTgwNDMtYWE5MTI2ZGI4YWIwXkEyXkFqcGc@._V1_SX300.jpg",
-          "genre": "Action & Adventure / Mystery / Drama",
-          "year": 2021,
-          "type": "show",
-          "services": [],
-          "imdbId": "tt10919420",
-          "tmdbId": 93405,
-          "tmdbMedia": "tv",
-          "youtubeId": "oqxAJKy0ii4"
-        },
-        {
-          "title": "The Sopranos",
-          "year": 1999,
-          "type": "show",
-          "genre": "Crime / Drama",
-          "imdbId": "tt0141842",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjRmMTNiMTQtMDg1ZS00MGM1LWE1MGUtYjEzMGFjNWUzOWRkXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "tmdbId": 1398,
-          "tmdbMedia": "tv",
-          "youtubeId": "Q8cBFvpqmH0"
-        },
-        {
-          "title": "The Wire",
-          "year": 2002,
-          "type": "show",
-          "genre": "Crime / Drama",
-          "imdbId": "tt0306414",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BZWYyNmRhYjktNjBhNC00M2NhLWEzYmMtZDYwNmIyZTRiZWMzXkEyXkFqcGc@._V1_SX300.jpg",
-          "services": [],
-          "tmdbId": 1438,
-          "tmdbMedia": "tv",
-          "youtubeId": "uDcQbk78CSw"
-        },
-        {
-          "title": "Under the Dome",
-          "year": 2013,
-          "type": "show",
-          "genre": "Drama / Mystery / Sci-Fi & Fantasy",
-          "imdbId": "tt1553656",
-          "thumb": "https://m.media-amazon.com/images/M/MV5BMjA3NDk0NzM1MF5BMl5BanBnXkFtZTcwOTYxMTk3OQ@@._V1_SX300.jpg",
-          "services": [],
-          "tmdbId": 46331,
-          "tmdbMedia": "tv",
-          "youtubeId": "f_Y5YeYrqUk"
-        }
-      ]
-    }
-  },
+  "exportedAt": "2026-03-21T19:26:52.293Z",
+  "version": 3,
   "titleRegistry": {
     "tt0050083": {
       "id": "tt0050083",
@@ -7121,7 +3811,152 @@
       "type": "movie"
     }
   },
-  "upcomingAlerts": {},
+  "upcomingAlerts": {
+    "mv_1101412_upcoming": {
+      "id": "mv_1101412_upcoming",
+      "alertType": "upcoming_movie",
+      "airDate": "2026-08-07",
+      "media": "movie",
+      "title": "Fall 2",
+      "type": "movie",
+      "confirmed": true,
+      "expiresAt": "2026-09-06",
+      "catalogTmdbId": 1101412,
+      "tmdbId": 1101412,
+      "fingerprint": "1101412_upcoming",
+      "sequelTmdbId": null,
+      "detail": "Theatrical release",
+      "detectedAt": "2026-03-21T18:56:20.460Z"
+    },
+    "mv_353486_sequel_1260649": {
+      "id": "mv_353486_sequel_1260649",
+      "alertType": "sequel",
+      "airDate": "2026-12-02",
+      "media": "movie",
+      "title": "Jumanji 3",
+      "type": "movie",
+      "confirmed": true,
+      "expiresAt": "2027-01-01",
+      "catalogTmdbId": 353486,
+      "tmdbId": 353486,
+      "fingerprint": "353486_sequel_1260649",
+      "sequelTmdbId": 1260649,
+      "detail": "Sequel to “Jumanji: Welcome to the Jungle”",
+      "detectedAt": "2026-03-21T18:56:00.615Z"
+    },
+    "mv_454626_sequel_1401586": {
+      "id": "mv_454626_sequel_1401586",
+      "alertType": "sequel",
+      "airDate": "2027-03-11",
+      "media": "movie",
+      "title": "Sonic the Hedgehog 4",
+      "type": "movie",
+      "confirmed": true,
+      "expiresAt": "2027-04-10",
+      "catalogTmdbId": 454626,
+      "tmdbId": 454626,
+      "fingerprint": "454626_sequel_1401586",
+      "sequelTmdbId": 1401586,
+      "detail": "Sequel to “Sonic the Hedgehog”",
+      "detectedAt": "2026-03-21T18:56:31.201Z"
+    },
+    "mv_985939_sequel_1101412": {
+      "id": "mv_985939_sequel_1101412",
+      "alertType": "sequel",
+      "airDate": "2026-08-07",
+      "media": "movie",
+      "title": "Fall 2",
+      "type": "movie",
+      "confirmed": true,
+      "expiresAt": "2026-09-06",
+      "catalogTmdbId": 985939,
+      "tmdbId": 985939,
+      "fingerprint": "985939_sequel_1101412",
+      "sequelTmdbId": 1101412,
+      "detail": "Sequel to “Fall”",
+      "detectedAt": "2026-03-21T18:55:32.263Z"
+    },
+    "tv_108181_1_3": {
+      "id": "tv_108181_1_3",
+      "alertType": "new_episode",
+      "airDate": "2026-03-24",
+      "media": "tv",
+      "title": "Imperfect Women",
+      "type": "tv",
+      "confirmed": true,
+      "expiresAt": "2026-04-23",
+      "catalogTmdbId": 108181,
+      "tmdbId": 108181,
+      "fingerprint": "108181_1_3",
+      "sequelTmdbId": null,
+      "detail": "Season 1, Episode 3 — Monster",
+      "detectedAt": "2026-03-21T18:56:22.385Z"
+    },
+    "tv_136311_3_9": {
+      "id": "tv_136311_3_9",
+      "alertType": "new_episode",
+      "airDate": "2026-03-24",
+      "media": "tv",
+      "title": "Shrinking",
+      "type": "tv",
+      "confirmed": true,
+      "expiresAt": "2026-04-23",
+      "catalogTmdbId": 136311,
+      "tmdbId": 136311,
+      "fingerprint": "136311_3_9",
+      "sequelTmdbId": null,
+      "detail": "Season 3, Episode 9 — Daddy Issues",
+      "detectedAt": "2026-03-21T18:55:46.245Z"
+    },
+    "tv_243316_2_1": {
+      "id": "tv_243316_2_1",
+      "alertType": "new_episode",
+      "airDate": "2026-05-28",
+      "media": "tv",
+      "title": "The Four Seasons",
+      "type": "tv",
+      "confirmed": true,
+      "expiresAt": "2026-06-27",
+      "catalogTmdbId": 243316,
+      "tmdbId": 243316,
+      "fingerprint": "243316_2_1",
+      "sequelTmdbId": null,
+      "detail": "Season 2, Episode 1 — Episode 1",
+      "detectedAt": "2026-03-21T18:56:17.942Z"
+    },
+    "tv_248126_3_1": {
+      "id": "tv_248126_3_1",
+      "alertType": "new_episode",
+      "airDate": "2026-03-25",
+      "media": "tv",
+      "title": "Homicide",
+      "type": "tv",
+      "confirmed": true,
+      "expiresAt": "2026-04-24",
+      "catalogTmdbId": 248126,
+      "tmdbId": 248126,
+      "fingerprint": "248126_3_1",
+      "sequelTmdbId": null,
+      "detail": "Season 3, Episode 1 — Episode 1",
+      "detectedAt": "2026-03-21T18:56:21.355Z"
+    },
+    "tv_313739_1_8": {
+      "id": "tv_313739_1_8",
+      "alertType": "new_episode",
+      "airDate": "2026-03-26",
+      "media": "tv",
+      "title": "All Mothers Lie",
+      "type": "tv",
+      "confirmed": true,
+      "expiresAt": "2026-04-25",
+      "catalogTmdbId": 313739,
+      "tmdbId": 313739,
+      "fingerprint": "313739_1_8",
+      "sequelTmdbId": null,
+      "detail": "Season 1, Episode 8 — Nobody likes bad kids",
+      "detectedAt": "2026-03-21T18:56:32.104Z"
+    }
+  },
   "sharedLists": {
     "8osdlgaa4bukwenf9loz": {
       "id": "8osdlgaa4bukwenf9loz",
@@ -7601,488 +4436,96 @@
         },
         {
           "registryId": "tt0455590"
-        }
-      ]
-    },
-    "bsx1oqgcddsw1qupjzai": {
-      "id": "bsx1oqgcddsw1qupjzai",
-      "watched": [
-        "tt0960144",
-        "tt26933824",
-        "tt26670955",
-        "tt10986410",
-        "tt30826447",
-        "tt13443470",
-        "tt0112851",
-        "tt0050083",
-        "tt5308322",
-        "tt4189492",
-        "tt5565334",
-        "tt3339966",
-        "tt3095080",
-        "tt0805663",
-        "tt0348913",
-        "tt5580540",
-        "tt3398228",
-        "tt0237123",
-        "tt3079380",
-        "tt15325794",
-        "tt4047038",
-        "tt0211915",
-        "tt4094300",
-        "tt0117381",
-        "tt1596363",
-        "tt6143796",
-        "tt6474378",
-        "tt8064302",
-        "tt11564570",
-        "tt2854926",
-        "tt5143226"
-      ],
-      "archive": [
-        "tt10795658",
-        "tt23649128",
-        "tt34888633",
-        "tt6575296",
-        "tt0475784",
-        "tt11280740",
-        "tt11167448"
-      ],
-      "items": [
-        {
-          "registryId": "tt14671678"
-        },
-        {
-          "registryId": "tt0120804"
-        },
-        {
-          "registryId": "tt0118971"
-        },
-        {
-          "registryId": "tt0104952"
-        },
-        {
-          "registryId": "tt0365748"
-        },
-        {
-          "registryId": "tt2387559"
-        },
-        {
-          "registryId": "tt1670345"
-        },
-        {
-          "registryId": "tt6988296"
-        },
-        {
-          "registryId": "tt0195714"
-        },
-        {
-          "registryId": "tt1276104"
-        },
-        {
-          "registryId": "tt0490086"
-        },
-        {
-          "registryId": "tt0246464"
-        },
-        {
-          "registryId": "tt32267726"
-        },
-        {
-          "registryId": "tt13929808"
-        },
-        {
-          "registryId": "tt4139124"
-        },
-        {
-          "registryId": "tt1999995"
-        },
-        {
-          "registryId": "tt0091217"
-        },
-        {
-          "registryId": "tt14253846"
-        },
-        {
-          "registryId": "tt26584495"
-        },
-        {
-          "registryId": "tt0389860"
-        },
-        {
-          "registryId": "tt1727770"
-        },
-        {
-          "registryId": "tt4995790"
-        },
-        {
-          "registryId": "tt13660958"
-        },
-        {
-          "registryId": "tt0091042"
-        },
-        {
-          "registryId": "tt26342662"
-        },
-        {
-          "registryId": "tt0112573"
-        },
-        {
-          "registryId": "tt0903657"
-        },
-        {
-          "registryId": "tt7131622"
-        },
-        {
-          "registryId": "tt3704428"
-        },
-        {
-          "registryId": "tt0960144"
-        },
-        {
-          "registryId": "tt0128853"
-        },
-        {
-          "registryId": "tt0108160"
-        },
-        {
-          "registryId": "tt30955673"
-        },
-        {
-          "registryId": "tt8879940"
-        },
-        {
-          "registryId": "tt1548850"
-        },
-        {
-          "registryId": "tt15548198"
-        },
-        {
-          "registryId": "tt2742174"
-        },
-        {
-          "registryId": "tt20782190"
-        },
-        {
-          "registryId": "tt1480684"
-        },
-        {
-          "registryId": "tt30252752"
-        },
-        {
-          "registryId": "tt1699748"
-        },
-        {
-          "registryId": "tt0790665"
-        },
-        {
-          "registryId": "tt11609692"
-        },
-        {
-          "registryId": "tt4370596"
-        },
-        {
-          "registryId": "tt10795658"
-        },
-        {
-          "registryId": "tt26933824"
-        },
-        {
-          "registryId": "tt26670955"
-        },
-        {
-          "registryId": "tt1733785"
-        },
-        {
-          "registryId": "tt1582350"
-        },
-        {
-          "registryId": "tt7366338"
-        },
-        {
-          "registryId": "tt10986410"
-        },
-        {
-          "registryId": "tt14269590"
-        },
-        {
-          "registryId": "tt0892535"
-        },
-        {
-          "registryId": "tt27995114"
-        },
-        {
-          "registryId": "tt1783495"
-        },
-        {
-          "registryId": "tt30826447"
-        },
-        {
-          "registryId": "tt13443470"
-        },
-        {
-          "registryId": "tt1825133"
-        },
-        {
-          "registryId": "tt23649128"
-        },
-        {
-          "registryId": "tt3581920"
-        },
-        {
-          "registryId": "tt19056070"
-        },
-        {
-          "registryId": "tt2932536"
-        },
-        {
-          "registryId": "tt7336182"
-        },
-        {
-          "registryId": "tt6820256"
-        },
-        {
-          "registryId": "tt21072416"
-        },
-        {
-          "registryId": "tt4052882"
-        },
-        {
-          "registryId": "tt15789472"
-        },
-        {
-          "registryId": "tt8364368"
-        },
-        {
-          "registryId": "tt2283362"
-        },
-        {
-          "registryId": "tt1323045"
-        },
-        {
-          "registryId": "tt6097798"
-        },
-        {
-          "registryId": "tt0119116"
-        },
-        {
-          "registryId": "tt0078723"
-        },
-        {
-          "registryId": "tt1648190"
-        },
-        {
-          "registryId": "tt0790724"
-        },
-        {
-          "registryId": "tt0438315"
-        },
-        {
-          "registryId": "tt2724064"
-        },
-        {
-          "registryId": "tt0093894"
-        },
-        {
-          "registryId": "tt0114287"
-        },
-        {
-          "registryId": "tt1346294"
-        },
-        {
-          "registryId": "tt0114436"
-        },
-        {
-          "registryId": "tt9128686"
-        },
-        {
-          "registryId": "tt0081505"
-        },
-        {
-          "registryId": "tt0844708"
-        },
-        {
-          "registryId": "tt0374102"
-        },
-        {
-          "registryId": "tt0390384"
-        },
-        {
-          "registryId": "tt0368226"
-        },
-        {
-          "registryId": "tt0097457"
-        },
-        {
-          "registryId": "tt0112851"
-        },
-        {
-          "registryId": "tt0113277"
-        },
-        {
-          "registryId": "tt0102492"
-        },
-        {
-          "registryId": "tt16311594"
-        },
-        {
-          "registryId": "tt3794354"
-        },
-        {
-          "registryId": "tt27042638"
-        },
-        {
-          "registryId": "tt0077631"
-        },
-        {
-          "registryId": "tt31425731"
         },
         {
           "registryId": "tt18083578"
         },
         {
-          "registryId": "tt0279493"
+          "registryId": "tt35630036"
         },
         {
-          "registryId": "tt0092086"
-        },
-        {
-          "registryId": "tt6412452"
-        },
-        {
-          "registryId": "tt0455590"
-        },
-        {
-          "registryId": "tt2378507"
-        },
-        {
-          "registryId": "tt1130080"
-        },
-        {
-          "registryId": "tt0084787"
-        },
-        {
-          "registryId": "tt13560574"
-        },
-        {
-          "registryId": "tt4160708"
-        },
-        {
-          "registryId": "tt0050083"
-        },
-        {
-          "registryId": "tt8488126"
-        },
-        {
-          "registryId": "tt5957766"
-        },
-        {
-          "registryId": "tt0985694"
-        },
-        {
-          "registryId": "tt2002718"
-        },
-        {
-          "registryId": "tt0387764"
-        },
-        {
-          "registryId": "tt4301160"
-        },
-        {
-          "registryId": "tt0437745"
-        },
-        {
-          "registryId": "tt5308322"
-        },
-        {
-          "registryId": "tt1703925"
-        },
-        {
-          "registryId": "tt4189492"
-        },
-        {
-          "registryId": "tt5565334"
-        },
-        {
-          "registryId": "tt3339966"
-        },
-        {
-          "registryId": "tt0158421"
-        },
-        {
-          "registryId": "tt3095080"
-        },
-        {
-          "registryId": "tt0805663"
+          "registryId": "tt5421602"
         },
         {
           "registryId": "tt2381048"
         },
         {
+          "registryId": "tt4370596"
+        },
+        {
+          "registryId": "tt0246464"
+        },
+        {
+          "registryId": "tt31173096"
+        },
+        {
+          "registryId": "tt4301160"
+        },
+        {
+          "registryId": "tt0124298"
+        },
+        {
+          "registryId": "tt7493974"
+        },
+        {
+          "registryId": "tt7366338"
+        },
+        {
+          "registryId": "tt21072416"
+        },
+        {
+          "registryId": "tt20782190"
+        },
+        {
+          "registryId": "tt29494111"
+        },
+        {
+          "registryId": "tt1582350"
+        },
+        {
+          "registryId": "tt0091042"
+        },
+        {
+          "registryId": "tt0195714"
+        },
+        {
+          "registryId": "tt2742174"
+        },
+        {
+          "registryId": "tt0097457"
+        },
+        {
+          "registryId": "tt0113277"
+        },
+        {
+          "registryId": "tt14988916"
+        },
+        {
           "registryId": "tt0080936"
         },
         {
-          "registryId": "tt7865452"
+          "registryId": "tt14577874"
         },
         {
-          "registryId": "tt0117765"
+          "registryId": "tt13929808"
         },
         {
-          "registryId": "tt34888633"
+          "registryId": "tt1548850"
         },
         {
-          "registryId": "tt0402374"
+          "registryId": "tt31019484"
         },
         {
-          "registryId": "tt5875444"
+          "registryId": "tt0104952"
         },
         {
-          "registryId": "tt0114369"
+          "registryId": "tt0102492"
         },
         {
-          "registryId": "tt0947798"
+          "registryId": "tt1670345"
         },
         {
-          "registryId": "tt0094721"
-        },
-        {
-          "registryId": "tt18546730"
-        },
-        {
-          "registryId": "tt0241527"
-        },
-        {
-          "registryId": "tt10629360"
-        },
-        {
-          "registryId": "tt0180093"
-        },
-        {
-          "registryId": "tt2582846"
-        },
-        {
-          "registryId": "tt0095953"
-        },
-        {
-          "registryId": "tt27543578"
-        },
-        {
-          "registryId": "tt7130300"
-        },
-        {
-          "registryId": "tt0348913"
-        },
-        {
-          "registryId": "tt5580540"
-        },
-        {
-          "registryId": "tt3398228"
-        },
-        {
-          "registryId": "tt0206467"
-        },
-        {
-          "registryId": "tt0237123"
+          "registryId": "tt1346294"
         },
         {
           "registryId": "tt0098067"
@@ -8091,1375 +4534,317 @@
           "registryId": "tt1416765"
         },
         {
-          "registryId": "tt0116786"
+          "registryId": "tt1266020"
         },
         {
-          "registryId": "tt1586680"
+          "registryId": "tt0120804"
         },
         {
-          "registryId": "tt0092005"
+          "registryId": "tt6988296"
         },
         {
           "registryId": "tt10405370"
         },
         {
-          "registryId": "tt28511459"
+          "registryId": "tt0108160"
         },
         {
-          "registryId": "tt6575296"
+          "registryId": "tt1825133"
         },
         {
-          "registryId": "tt3079380"
-        },
-        {
-          "registryId": "tt14649040"
-        },
-        {
-          "registryId": "tt7766378"
-        },
-        {
-          "registryId": "tt0475784"
-        },
-        {
-          "registryId": "tt8740976"
-        },
-        {
-          "registryId": "tt15325794"
-        },
-        {
-          "registryId": "tt4047038"
-        },
-        {
-          "registryId": "tt11280740"
-        },
-        {
-          "registryId": "tt0211915"
-        },
-        {
-          "registryId": "tt4094300"
-        },
-        {
-          "registryId": "tt0117381"
-        },
-        {
-          "registryId": "tt11167448"
-        },
-        {
-          "registryId": "tt1596363"
-        },
-        {
-          "registryId": "tt0075584"
-        },
-        {
-          "registryId": "tt31709373"
-        },
-        {
-          "registryId": "tt6143796"
-        },
-        {
-          "registryId": "tt6474378"
-        },
-        {
-          "registryId": "tt8064302"
-        },
-        {
-          "registryId": "tt13968792"
-        },
-        {
-          "registryId": "tt5834204"
-        },
-        {
-          "registryId": "tt31974288"
-        },
-        {
-          "registryId": "tt11564570"
-        },
-        {
-          "registryId": "tt29494111"
-        },
-        {
-          "registryId": "tt2618986"
-        },
-        {
-          "registryId": "tt32376165"
-        },
-        {
-          "registryId": "tt14849194"
-        },
-        {
-          "registryId": "tt18482892"
-        },
-        {
-          "registryId": "tt33293130"
-        },
-        {
-          "registryId": "tt23872886"
-        },
-        {
-          "registryId": "tt31173096"
-        },
-        {
-          "registryId": "tt31019484"
-        },
-        {
-          "registryId": "tt32543884"
-        },
-        {
-          "registryId": "tt5421602"
-        },
-        {
-          "registryId": "tt32253092"
-        },
-        {
-          "registryId": "tt35630036"
-        },
-        {
-          "registryId": "tt15474916"
-        },
-        {
-          "registryId": "tt31556143"
-        },
-        {
-          "registryId": "tt38457052"
-        },
-        {
-          "registryId": "tt13640696"
-        },
-        {
-          "registryId": "tt14577874"
-        },
-        {
-          "registryId": "tt28118211"
+          "registryId": "tt0092005"
         },
         {
           "registryId": "tt23221806"
         },
         {
-          "registryId": "tt14641788"
-        },
-        {
-          "registryId": "tt28288478"
-        },
-        {
-          "registryId": "tt14988916"
-        },
-        {
-          "registryId": "tt21807222"
-        },
-        {
-          "registryId": "tt0124298"
-        },
-        {
-          "registryId": "tt1219289"
-        },
-        {
-          "registryId": "tt2582802"
-        },
-        {
-          "registryId": "tt2854926"
-        },
-        {
-          "registryId": "tt7203552"
-        },
-        {
-          "registryId": "tt6805938"
-        },
-        {
-          "registryId": "tt1422136"
-        },
-        {
-          "registryId": "tt1877543"
-        },
-        {
-          "registryId": "tt3212904"
-        },
-        {
-          "registryId": "tt11348232"
-        },
-        {
-          "registryId": "tt6341832"
-        },
-        {
-          "registryId": "tt14060232"
-        },
-        {
-          "registryId": "tt31192372"
-        },
-        {
-          "registryId": "tt3350890"
-        },
-        {
-          "registryId": "tt5143226"
-        },
-        {
-          "registryId": "tt16253418"
-        },
-        {
-          "registryId": "tt5910280"
-        },
-        {
-          "registryId": "tt1649419"
-        },
-        {
-          "registryId": "tt11815960"
-        },
-        {
-          "registryId": "tt0159273"
-        },
-        {
-          "registryId": "tt2707408"
-        },
-        {
-          "registryId": "tt23055142"
-        },
-        {
-          "registryId": "tt1266020"
-        },
-        {
-          "registryId": "tt0903747"
-        },
-        {
-          "registryId": "tt13406094"
-        },
-        {
-          "registryId": "tt7493974"
-        },
-        {
-          "registryId": "tt0120741"
-        },
-        {
-          "registryId": "tt1853728"
-        },
-        {
-          "registryId": "tt10366514"
-        },
-        {
-          "registryId": "tt1862079"
-        },
-        {
-          "registryId": "tt1439629"
-        },
-        {
-          "registryId": "tt0107688"
-        },
-        {
-          "registryId": "tt22202452"
-        },
-        {
-          "registryId": "tt14452776"
+          "registryId": "tt0118971"
         }
-      ],
-      "maybeLater": [
-        "tt13660958",
-        "tt2932536",
-        "tt0078723",
-        "tt2724064",
-        "tt5957766",
-        "tt0985694",
-        "tt2002718",
-        "tt0437745",
-        "tt0158421",
-        "tt0206467",
-        "tt1877543",
-        "tt3212904"
       ]
     }
   },
   "users": {
     "fSyHdUXB56fBTeKlNFXPiAq1Lip2": {
       "id": "fSyHdUXB56fBTeKlNFXPiAq1Lip2",
-      "maybeLater": [],
-      "archive": [],
       "country": "IL",
       "countryName": "Israel",
-      "watched": [
-        "tt10795658"
-      ],
-      "items": [
-        {
-          "registryId": "tt0120804"
-        },
-        {
-          "registryId": "tt0118971"
-        },
-        {
-          "registryId": "tt0104952"
-        },
-        {
-          "registryId": "tt1670345"
-        },
-        {
-          "registryId": "tt6988296"
-        },
-        {
-          "registryId": "tt0195714"
-        },
-        {
-          "registryId": "tt0246464"
-        },
-        {
-          "registryId": "tt13929808"
-        },
-        {
-          "registryId": "tt1999995"
-        },
-        {
-          "registryId": "tt0091217"
-        },
-        {
-          "registryId": "tt13660958"
-        },
-        {
-          "registryId": "tt0091042"
-        },
-        {
-          "registryId": "tt0108160"
-        },
-        {
-          "registryId": "tt1548850"
-        },
-        {
-          "registryId": "tt15548198"
-        },
-        {
-          "registryId": "tt2742174"
-        },
-        {
-          "registryId": "tt20782190"
-        },
-        {
-          "registryId": "tt1699748"
-        },
-        {
-          "registryId": "tt0790665"
-        },
-        {
-          "registryId": "tt11609692"
-        },
-        {
-          "registryId": "tt4370596"
-        },
-        {
-          "registryId": "tt10795658"
-        },
-        {
-          "registryId": "tt1582350"
-        },
-        {
-          "registryId": "tt7366338"
-        },
-        {
-          "registryId": "tt14269590"
-        },
-        {
-          "registryId": "tt1783495"
-        },
-        {
-          "registryId": "tt1825133"
-        },
-        {
-          "registryId": "tt3581920"
-        },
-        {
-          "registryId": "tt19056070"
-        },
-        {
-          "registryId": "tt2932536"
-        },
-        {
-          "registryId": "tt7336182"
-        },
-        {
-          "registryId": "tt6820256"
-        },
-        {
-          "registryId": "tt21072416"
-        },
-        {
-          "registryId": "tt4052882"
-        },
-        {
-          "registryId": "tt15789472"
-        },
-        {
-          "registryId": "tt8364368"
-        },
-        {
-          "registryId": "tt1323045"
-        },
-        {
-          "registryId": "tt0119116"
-        },
-        {
-          "registryId": "tt0078723"
-        },
-        {
-          "registryId": "tt1648190"
-        },
-        {
-          "registryId": "tt0790724"
-        },
-        {
-          "registryId": "tt0438315"
-        },
-        {
-          "registryId": "tt2724064"
-        },
-        {
-          "registryId": "tt0093894"
-        },
-        {
-          "registryId": "tt0114287"
-        },
-        {
-          "registryId": "tt1346294"
-        },
-        {
-          "registryId": "tt0114436"
-        },
-        {
-          "registryId": "tt9128686"
-        },
-        {
-          "registryId": "tt0081505"
-        },
-        {
-          "registryId": "tt0844708"
-        },
-        {
-          "registryId": "tt0374102"
-        },
-        {
-          "registryId": "tt0368226"
-        },
-        {
-          "registryId": "tt0097457"
-        },
-        {
-          "registryId": "tt0113277"
-        },
-        {
-          "registryId": "tt0102492"
-        },
-        {
-          "registryId": "tt18083578"
-        },
-        {
-          "registryId": "tt0279493"
-        },
-        {
-          "registryId": "tt0092086"
-        },
-        {
-          "registryId": "tt6412452"
-        },
-        {
-          "registryId": "tt2378507"
-        },
-        {
-          "registryId": "tt1130080"
-        },
-        {
-          "registryId": "tt0084787"
-        },
-        {
-          "registryId": "tt13560574"
-        },
-        {
-          "registryId": "tt4160708"
-        },
-        {
-          "registryId": "tt8488126"
-        },
-        {
-          "registryId": "tt5957766"
-        },
-        {
-          "registryId": "tt0985694"
-        },
-        {
-          "registryId": "tt2002718"
-        },
-        {
-          "registryId": "tt0387764"
-        },
-        {
-          "registryId": "tt4301160"
-        },
-        {
-          "registryId": "tt0437745"
-        },
-        {
-          "registryId": "tt1703925"
-        },
-        {
-          "registryId": "tt0158421"
-        },
-        {
-          "registryId": "tt2381048"
-        },
-        {
-          "registryId": "tt0080936"
-        },
-        {
-          "registryId": "tt0117765"
-        },
-        {
-          "registryId": "tt18546730"
-        },
-        {
-          "registryId": "tt0095953"
-        },
-        {
-          "registryId": "tt0206467"
-        },
-        {
-          "registryId": "tt0098067"
-        },
-        {
-          "registryId": "tt1416765"
-        },
-        {
-          "registryId": "tt0092005"
-        },
-        {
-          "registryId": "tt10405370"
-        },
-        {
-          "registryId": "tt7766378"
-        },
-        {
-          "registryId": "tt8740976"
-        },
-        {
-          "registryId": "tt0075584"
-        },
-        {
-          "registryId": "tt29494111"
-        },
-        {
-          "registryId": "tt2618986"
-        },
-        {
-          "registryId": "tt14849194"
-        },
-        {
-          "registryId": "tt18482892"
-        },
-        {
-          "registryId": "tt31173096"
-        },
-        {
-          "registryId": "tt31019484"
-        },
-        {
-          "registryId": "tt5421602"
-        },
-        {
-          "registryId": "tt32253092"
-        },
-        {
-          "registryId": "tt35630036"
-        },
-        {
-          "registryId": "tt15474916"
-        },
-        {
-          "registryId": "tt14577874"
-        },
-        {
-          "registryId": "tt23221806"
-        },
-        {
-          "registryId": "tt28288478"
-        },
-        {
-          "registryId": "tt14988916"
-        },
-        {
-          "registryId": "tt21807222"
-        },
-        {
-          "registryId": "tt0124298"
-        },
-        {
-          "registryId": "tt7203552"
-        },
-        {
-          "registryId": "tt6805938"
-        },
-        {
-          "registryId": "tt1422136"
-        },
-        {
-          "registryId": "tt1877543"
-        },
-        {
-          "registryId": "tt3212904"
-        },
-        {
-          "registryId": "tt11348232"
-        },
-        {
-          "registryId": "tt6341832"
-        },
-        {
-          "registryId": "tt14060232"
-        },
-        {
-          "registryId": "tt31192372"
-        },
-        {
-          "registryId": "tt3350890"
-        },
-        {
-          "registryId": "tt16253418"
-        },
-        {
-          "registryId": "tt5910280"
-        },
-        {
-          "registryId": "tt11815960"
-        },
-        {
-          "registryId": "tt1266020"
-        },
-        {
-          "registryId": "tt7493974"
-        },
-        {
-          "registryId": "tt0120741"
-        },
-        {
-          "registryId": "tt1862079"
-        },
-        {
-          "registryId": "tt1439629"
-        },
-        {
-          "registryId": "tt0107688"
-        },
-        {
-          "registryId": "tt2950342"
-        },
-        {
-          "registryId": "tt11486960"
-        },
-        {
-          "registryId": "tt30423279"
-        },
-        {
-          "registryId": "tt1520211"
-        }
-      ]
-    },
-    "twSSVBeGhHUS4ELC6KzLYkS2yvM2": {
-      "id": "twSSVBeGhHUS4ELC6KzLYkS2yvM2",
+      "defaultPersonalListId": "v2hph7o2i40tlw0oqilw",
+      "listName": "My list 2",
       "watched": [],
       "archive": [],
-      "maybeLater": [],
-      "items": [
-        {
-          "registryId": "tt14671678"
-        },
-        {
-          "registryId": "tt0120804"
-        },
-        {
-          "registryId": "tt0118971"
-        },
-        {
-          "registryId": "tt0104952"
-        },
-        {
-          "registryId": "tt0365748"
-        },
-        {
-          "registryId": "tt2387559"
-        },
-        {
-          "registryId": "tt1670345"
-        },
-        {
-          "registryId": "tt6988296"
-        },
-        {
-          "registryId": "tt0195714"
-        },
-        {
-          "registryId": "tt1276104"
-        },
-        {
-          "registryId": "tt0490086"
-        },
-        {
-          "registryId": "tt0246464"
-        },
-        {
-          "registryId": "tt32267726"
-        },
-        {
-          "registryId": "tt13929808"
-        },
-        {
-          "registryId": "tt4139124"
-        },
-        {
-          "registryId": "tt1999995"
-        },
-        {
-          "registryId": "tt0091217"
-        },
-        {
-          "registryId": "tt14253846"
-        },
-        {
-          "registryId": "tt26584495"
-        },
-        {
-          "registryId": "tt0389860"
-        },
-        {
-          "registryId": "tt1727770"
-        },
-        {
-          "registryId": "tt4995790"
-        },
-        {
-          "registryId": "tt13660958"
-        },
-        {
-          "registryId": "tt0091042"
-        },
-        {
-          "registryId": "tt26342662"
-        },
-        {
-          "registryId": "tt0112573"
-        },
-        {
-          "registryId": "tt0903657"
-        },
-        {
-          "registryId": "tt7131622"
-        },
-        {
-          "registryId": "tt3704428"
-        },
-        {
-          "registryId": "tt0960144"
-        },
-        {
-          "registryId": "tt0128853"
-        },
-        {
-          "registryId": "tt0108160"
-        },
-        {
-          "registryId": "tt30955673"
-        },
-        {
-          "registryId": "tt8879940"
-        },
-        {
-          "registryId": "tt1548850"
-        },
-        {
-          "registryId": "tt15548198"
-        },
-        {
-          "registryId": "tt2742174"
-        },
-        {
-          "registryId": "tt20782190"
-        },
-        {
-          "registryId": "tt1480684"
-        },
-        {
-          "registryId": "tt30252752"
-        },
-        {
-          "registryId": "tt1699748"
-        },
-        {
-          "registryId": "tt0790665"
-        },
-        {
-          "registryId": "tt11609692"
-        },
-        {
-          "registryId": "tt4370596"
-        },
-        {
-          "registryId": "tt10795658"
-        },
-        {
-          "registryId": "tt26933824"
-        },
-        {
-          "registryId": "tt26670955"
-        },
-        {
-          "registryId": "tt1733785"
-        },
-        {
-          "registryId": "tt1582350"
-        },
-        {
-          "registryId": "tt7366338"
-        },
-        {
-          "registryId": "tt10986410"
-        },
-        {
-          "registryId": "tt14269590"
-        },
-        {
-          "registryId": "tt0892535"
-        },
-        {
-          "registryId": "tt27995114"
-        },
-        {
-          "registryId": "tt1783495"
-        },
-        {
-          "registryId": "tt30826447"
-        },
-        {
-          "registryId": "tt13443470"
-        },
-        {
-          "registryId": "tt1825133"
-        },
-        {
-          "registryId": "tt23649128"
-        },
-        {
-          "registryId": "tt3581920"
-        },
-        {
-          "registryId": "tt19056070"
-        },
-        {
-          "registryId": "tt2932536"
-        },
-        {
-          "registryId": "tt7336182"
-        },
-        {
-          "registryId": "tt6820256"
-        },
-        {
-          "registryId": "tt21072416"
-        },
-        {
-          "registryId": "tt4052882"
-        },
-        {
-          "registryId": "tt15789472"
-        },
-        {
-          "registryId": "tt8364368"
-        },
-        {
-          "registryId": "tt2283362"
-        },
-        {
-          "registryId": "tt1323045"
-        },
-        {
-          "registryId": "tt6097798"
-        },
-        {
-          "registryId": "tt0119116"
-        },
-        {
-          "registryId": "tt0078723"
-        },
-        {
-          "registryId": "tt1648190"
-        },
-        {
-          "registryId": "tt0790724"
-        },
-        {
-          "registryId": "tt0438315"
-        },
-        {
-          "registryId": "tt2724064"
-        },
-        {
-          "registryId": "tt0093894"
-        },
-        {
-          "registryId": "tt0114287"
-        },
-        {
-          "registryId": "tt1346294"
-        },
-        {
-          "registryId": "tt0114436"
-        },
-        {
-          "registryId": "tt9128686"
-        },
-        {
-          "registryId": "tt0081505"
-        },
-        {
-          "registryId": "tt0844708"
-        },
-        {
-          "registryId": "tt0374102"
-        },
-        {
-          "registryId": "tt0390384"
-        },
-        {
-          "registryId": "tt0368226"
-        },
-        {
-          "registryId": "tt0097457"
-        },
-        {
-          "registryId": "tt0112851"
-        },
-        {
-          "registryId": "tt0113277"
-        },
-        {
-          "registryId": "tt0102492"
-        },
-        {
-          "registryId": "tt16311594"
-        },
-        {
-          "registryId": "tt3794354"
-        },
-        {
-          "registryId": "tt27042638"
-        },
-        {
-          "registryId": "tt0077631"
-        },
-        {
-          "registryId": "tt31425731"
-        },
-        {
-          "registryId": "tt18083578"
-        },
-        {
-          "registryId": "tt0279493"
-        },
-        {
-          "registryId": "tt0092086"
-        },
-        {
-          "registryId": "tt6412452"
-        },
-        {
-          "registryId": "tt0455590"
-        },
-        {
-          "registryId": "tt2378507"
-        },
-        {
-          "registryId": "tt1130080"
-        },
-        {
-          "registryId": "tt0084787"
-        },
-        {
-          "registryId": "tt13560574"
-        },
-        {
-          "registryId": "tt4160708"
-        },
-        {
-          "registryId": "tt0050083"
-        },
-        {
-          "registryId": "tt8488126"
-        },
-        {
-          "registryId": "tt5957766"
-        },
-        {
-          "registryId": "tt0985694"
-        },
-        {
-          "registryId": "tt2002718"
-        },
-        {
-          "registryId": "tt0387764"
-        },
-        {
-          "registryId": "tt4301160"
-        },
-        {
-          "registryId": "tt0437745"
-        },
-        {
-          "registryId": "tt5308322"
-        },
-        {
-          "registryId": "tt1703925"
-        },
-        {
-          "registryId": "tt4189492"
-        },
-        {
-          "registryId": "tt5565334"
-        },
-        {
-          "registryId": "tt3339966"
-        },
-        {
-          "registryId": "tt0158421"
-        },
-        {
-          "registryId": "tt3095080"
-        },
-        {
-          "registryId": "tt0805663"
-        },
-        {
-          "registryId": "tt2381048"
-        },
-        {
-          "registryId": "tt0080936"
-        },
-        {
-          "registryId": "tt7865452"
-        },
-        {
-          "registryId": "tt0117765"
-        },
-        {
-          "registryId": "tt34888633"
-        },
-        {
-          "registryId": "tt0402374"
-        },
-        {
-          "registryId": "tt5875444"
-        },
-        {
-          "registryId": "tt0114369"
-        },
-        {
-          "registryId": "tt0947798"
-        },
-        {
-          "registryId": "tt0094721"
-        },
-        {
-          "registryId": "tt18546730"
-        },
-        {
-          "registryId": "tt0241527"
-        },
-        {
-          "registryId": "tt10629360"
-        },
-        {
-          "registryId": "tt0180093"
-        },
-        {
-          "registryId": "tt2582846"
-        },
-        {
-          "registryId": "tt0095953"
-        },
-        {
-          "registryId": "tt27543578"
-        },
-        {
-          "registryId": "tt7130300"
-        },
-        {
-          "registryId": "tt0348913"
-        },
-        {
-          "registryId": "tt5580540"
-        },
-        {
-          "registryId": "tt3398228"
-        },
-        {
-          "registryId": "tt0206467"
-        },
-        {
-          "registryId": "tt0237123"
-        },
-        {
-          "registryId": "tt0098067"
-        },
-        {
-          "registryId": "tt1416765"
-        },
-        {
-          "registryId": "tt0116786"
-        },
-        {
-          "registryId": "tt1586680"
-        },
-        {
-          "registryId": "tt0092005"
-        },
-        {
-          "registryId": "tt10405370"
-        },
-        {
-          "registryId": "tt28511459"
-        },
-        {
-          "registryId": "tt6575296"
-        },
-        {
-          "registryId": "tt3079380"
-        },
-        {
-          "registryId": "tt14649040"
-        },
-        {
-          "registryId": "tt7766378"
-        },
-        {
-          "registryId": "tt0475784"
-        },
-        {
-          "registryId": "tt8740976"
-        },
-        {
-          "registryId": "tt15325794"
-        },
-        {
-          "registryId": "tt4047038"
-        },
-        {
-          "registryId": "tt11280740"
-        },
-        {
-          "registryId": "tt0211915"
-        },
-        {
-          "registryId": "tt4094300"
-        },
-        {
-          "registryId": "tt0117381"
-        },
-        {
-          "registryId": "tt11167448"
-        },
-        {
-          "registryId": "tt1596363"
-        },
-        {
-          "registryId": "tt0075584"
-        },
-        {
-          "registryId": "tt31709373"
-        },
-        {
-          "registryId": "tt6143796"
-        },
-        {
-          "registryId": "tt6474378"
-        },
-        {
-          "registryId": "tt8064302"
-        },
-        {
-          "registryId": "tt13968792"
-        },
-        {
-          "registryId": "tt5834204"
-        },
-        {
-          "registryId": "tt31974288"
-        },
-        {
-          "registryId": "tt11564570"
-        },
-        {
-          "registryId": "tt29494111"
-        },
-        {
-          "registryId": "tt2618986"
-        },
-        {
-          "registryId": "tt32376165"
-        },
-        {
-          "registryId": "tt14849194"
-        },
-        {
-          "registryId": "tt18482892"
-        },
-        {
-          "registryId": "tt33293130"
-        },
-        {
-          "registryId": "tt23872886"
-        },
-        {
-          "registryId": "tt31173096"
-        },
-        {
-          "registryId": "tt31019484"
-        },
-        {
-          "registryId": "tt32543884"
-        },
-        {
-          "registryId": "tt5421602"
-        },
-        {
-          "registryId": "tt32253092"
-        },
-        {
-          "registryId": "tt35630036"
-        },
-        {
-          "registryId": "tt15474916"
-        },
-        {
-          "registryId": "tt31556143"
-        },
-        {
-          "registryId": "tt38457052"
-        },
-        {
-          "registryId": "tt13640696"
-        },
-        {
-          "registryId": "tt14577874"
-        },
-        {
-          "registryId": "tt28118211"
-        },
-        {
-          "registryId": "tt23221806"
-        },
-        {
-          "registryId": "tt14641788"
-        },
-        {
-          "registryId": "tt28288478"
-        },
-        {
-          "registryId": "tt14988916"
-        },
-        {
-          "registryId": "tt21807222"
-        },
-        {
-          "registryId": "tt0124298"
-        },
-        {
-          "registryId": "tt1219289"
-        },
-        {
-          "registryId": "tt2582802"
-        },
-        {
-          "registryId": "tt2854926"
-        },
-        {
-          "registryId": "tt7203552"
-        },
-        {
-          "registryId": "tt6805938"
-        },
-        {
-          "registryId": "tt1422136"
-        },
-        {
-          "registryId": "tt1877543"
-        },
-        {
-          "registryId": "tt3212904"
-        },
-        {
-          "registryId": "tt11348232"
-        },
-        {
-          "registryId": "tt6341832"
-        },
-        {
-          "registryId": "tt14060232"
-        },
-        {
-          "registryId": "tt31192372"
-        },
-        {
-          "registryId": "tt3350890"
-        },
-        {
-          "registryId": "tt5143226"
-        },
-        {
-          "registryId": "tt16253418"
-        },
-        {
-          "registryId": "tt5910280"
-        },
-        {
-          "registryId": "tt1649419"
-        },
-        {
-          "registryId": "tt11815960"
-        },
-        {
-          "registryId": "tt0159273"
-        },
-        {
-          "registryId": "tt2707408"
-        },
-        {
-          "registryId": "tt23055142"
-        },
-        {
-          "registryId": "tt1266020"
-        },
-        {
-          "registryId": "tt0903747"
-        },
-        {
-          "registryId": "tt13406094"
-        },
-        {
-          "registryId": "tt7493974"
-        },
-        {
-          "registryId": "tt0120741"
-        },
-        {
-          "registryId": "tt1853728"
-        },
-        {
-          "registryId": "tt10366514"
-        },
-        {
-          "registryId": "tt1862079"
-        },
-        {
-          "registryId": "tt1439629"
-        },
-        {
-          "registryId": "tt0107688"
-        },
-        {
-          "registryId": "tt22202452"
-        },
-        {
-          "registryId": "tt14452776"
-        }
-      ]
+      "items": [],
+      "maybeLater": []
     }
   },
-  "userPersonalLists": {}
+  "userPersonalLists": {
+    "fSyHdUXB56fBTeKlNFXPiAq1Lip2": {
+      "v2hph7o2i40tlw0oqilw": {
+        "id": "v2hph7o2i40tlw0oqilw",
+        "name": "My list",
+        "items": [
+          {
+            "registryId": "tt1999995"
+          },
+          {
+            "registryId": "tt0091217"
+          },
+          {
+            "registryId": "tt13660958"
+          },
+          {
+            "registryId": "tt15548198"
+          },
+          {
+            "registryId": "tt1699748"
+          },
+          {
+            "registryId": "tt0790665"
+          },
+          {
+            "registryId": "tt11609692"
+          },
+          {
+            "registryId": "tt10795658"
+          },
+          {
+            "registryId": "tt14269590"
+          },
+          {
+            "registryId": "tt1783495"
+          },
+          {
+            "registryId": "tt3581920"
+          },
+          {
+            "registryId": "tt19056070"
+          },
+          {
+            "registryId": "tt2932536"
+          },
+          {
+            "registryId": "tt7336182"
+          },
+          {
+            "registryId": "tt6820256"
+          },
+          {
+            "registryId": "tt4052882"
+          },
+          {
+            "registryId": "tt15789472"
+          },
+          {
+            "registryId": "tt8364368"
+          },
+          {
+            "registryId": "tt1323045"
+          },
+          {
+            "registryId": "tt0119116"
+          },
+          {
+            "registryId": "tt0078723"
+          },
+          {
+            "registryId": "tt1648190"
+          },
+          {
+            "registryId": "tt0790724"
+          },
+          {
+            "registryId": "tt0438315"
+          },
+          {
+            "registryId": "tt2724064"
+          },
+          {
+            "registryId": "tt0093894"
+          },
+          {
+            "registryId": "tt0114287"
+          },
+          {
+            "registryId": "tt0114436"
+          },
+          {
+            "registryId": "tt9128686"
+          },
+          {
+            "registryId": "tt0081505"
+          },
+          {
+            "registryId": "tt0844708"
+          },
+          {
+            "registryId": "tt0374102"
+          },
+          {
+            "registryId": "tt0368226"
+          },
+          {
+            "registryId": "tt0279493"
+          },
+          {
+            "registryId": "tt0092086"
+          },
+          {
+            "registryId": "tt6412452"
+          },
+          {
+            "registryId": "tt2378507"
+          },
+          {
+            "registryId": "tt1130080"
+          },
+          {
+            "registryId": "tt0084787"
+          },
+          {
+            "registryId": "tt13560574"
+          },
+          {
+            "registryId": "tt4160708"
+          },
+          {
+            "registryId": "tt8488126"
+          },
+          {
+            "registryId": "tt5957766"
+          },
+          {
+            "registryId": "tt0985694"
+          },
+          {
+            "registryId": "tt2002718"
+          },
+          {
+            "registryId": "tt0387764"
+          },
+          {
+            "registryId": "tt0437745"
+          },
+          {
+            "registryId": "tt1703925"
+          },
+          {
+            "registryId": "tt0158421"
+          },
+          {
+            "registryId": "tt0117765"
+          },
+          {
+            "registryId": "tt18546730"
+          },
+          {
+            "registryId": "tt0095953"
+          },
+          {
+            "registryId": "tt0206467"
+          },
+          {
+            "registryId": "tt7766378"
+          },
+          {
+            "registryId": "tt8740976"
+          },
+          {
+            "registryId": "tt0075584"
+          },
+          {
+            "registryId": "tt2618986"
+          },
+          {
+            "registryId": "tt14849194"
+          },
+          {
+            "registryId": "tt18482892"
+          },
+          {
+            "registryId": "tt32253092"
+          },
+          {
+            "registryId": "tt15474916"
+          },
+          {
+            "registryId": "tt28288478"
+          },
+          {
+            "registryId": "tt21807222"
+          },
+          {
+            "registryId": "tt7203552"
+          },
+          {
+            "registryId": "tt6805938"
+          },
+          {
+            "registryId": "tt1422136"
+          },
+          {
+            "registryId": "tt1877543"
+          },
+          {
+            "registryId": "tt3212904"
+          },
+          {
+            "registryId": "tt11348232"
+          },
+          {
+            "registryId": "tt6341832"
+          },
+          {
+            "registryId": "tt14060232"
+          },
+          {
+            "registryId": "tt31192372"
+          },
+          {
+            "registryId": "tt3350890"
+          },
+          {
+            "registryId": "tt16253418"
+          },
+          {
+            "registryId": "tt5910280"
+          },
+          {
+            "registryId": "tt11815960"
+          },
+          {
+            "registryId": "tt0120741"
+          },
+          {
+            "registryId": "tt1862079"
+          },
+          {
+            "registryId": "tt1439629"
+          },
+          {
+            "registryId": "tt0107688"
+          },
+          {
+            "registryId": "tt2950342"
+          },
+          {
+            "registryId": "tt11486960"
+          },
+          {
+            "registryId": "tt30423279"
+          },
+          {
+            "registryId": "tt1520211"
+          },
+          {
+            "registryId": "tt21072416"
+          }
+        ],
+        "watched": [
+          "tt10795658"
+        ],
+        "maybeLater": [],
+        "archive": [],
+        "createdAt": "2026-03-21T16:44:54.926Z"
+      }
+    }
+  }
 }

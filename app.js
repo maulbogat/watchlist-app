@@ -1241,16 +1241,85 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+/** Normalize Firestore string / Timestamp-shaped values to a YYYY-MM-DD or ISO-ish string for display/rules. */
+function getUpcomingAirDateString(alert) {
+  const d = alert?.airDate;
+  if (d == null) return "";
+  if (typeof d === "string") return d.trim();
+  if (typeof d === "object" && typeof d.toDate === "function") {
+    try {
+      const dt = d.toDate();
+      return Number.isNaN(dt.getTime()) ? "" : dt.toISOString().slice(0, 10);
+    } catch {
+      return "";
+    }
+  }
+  if (typeof d === "object" && d.seconds != null) {
+    const dt = new Date(d.seconds * 1000);
+    return Number.isNaN(dt.getTime()) ? "" : dt.toISOString().slice(0, 10);
+  }
+  const s = String(d).trim();
+  return s && s !== "[object Object]" ? s : "";
+}
+
 function formatUpcomingAirLabel(alert) {
-  if (!alert.airDate) return "TBA";
+  const raw = getUpcomingAirDateString(alert);
+  if (!raw) return "TBA";
   try {
-    const raw = String(alert.airDate);
     const d = new Date(raw.includes("T") ? raw : `${raw}T12:00:00`);
     if (Number.isNaN(d.getTime())) return raw;
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   } catch {
-    return String(alert.airDate);
+    return raw;
   }
+}
+
+/** True when airDate is a real calendar value (gold accent + calendar row; not tied to `confirmed`). */
+function upcomingAlertHasRealAirDate(alert) {
+  const s = getUpcomingAirDateString(alert);
+  if (!s || s.toUpperCase() === "TBA") return false;
+  const raw = s.includes("T") ? s : `${s}T12:00:00`;
+  const dt = new Date(raw);
+  return !Number.isNaN(dt.getTime());
+}
+
+/** Compact "Season 3, Episode 9 — Name" → "S3 E9 · Name" for the second line. */
+function compactUpcomingDetail(detail) {
+  const s = String(detail || "").trim();
+  const m = s.match(/^Season\s+(\d+),\s*Episode\s+(\d+)\s*(?:[—–-]\s*(.+))?$/i);
+  if (m) {
+    const name = (m[3] || "").trim();
+    return name ? `S${m[1]} E${m[2]} · ${name}` : `S${m[1]} E${m[2]}`;
+  }
+  return s;
+}
+
+const UPCOMING_CAL_ICON_SVG = `<svg class="upcoming-alert-cal-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg>`;
+
+function renderUpcomingAlertPill(a) {
+  const hasDate = upcomingAlertHasRealAirDate(a);
+  const cls = hasDate
+    ? "upcoming-alert-pill upcoming-alert-pill--confirmed"
+    : "upcoming-alert-pill upcoming-alert-pill--tba";
+  const dateLabel = formatUpcomingAirLabel(a);
+  const fp = escapeHtml(String(a.fingerprint));
+  const title = escapeHtml(String(a.title || ""));
+  const detailCompact = escapeHtml(compactUpcomingDetail(a.detail));
+  const dateBlock = hasDate
+    ? `<span class="upcoming-alert-date-block">${UPCOMING_CAL_ICON_SVG}<span class="upcoming-alert-date-text">${escapeHtml(dateLabel)}</span></span>`
+    : `<span class="upcoming-alert-tba-badge">TBA</span>`;
+  return `<div class="${cls}" data-fp="${fp}" role="status">
+    <div class="upcoming-alert-pill-body">
+      <div class="upcoming-alert-title">${title}</div>
+      <div class="upcoming-alert-second-row">
+        <span class="upcoming-alert-detail-compact">${detailCompact}</span>
+        ${dateBlock}
+      </div>
+    </div>
+    <div class="upcoming-alert-dismiss-col">
+      <button type="button" class="upcoming-alert-dismiss" aria-label="Dismiss upcoming alert">×</button>
+    </div>
+  </div>`;
 }
 
 function clearUpcomingAlertsBar() {
@@ -1259,8 +1328,38 @@ function clearUpcomingAlertsBar() {
   if (mount) {
     mount.hidden = true;
     mount.innerHTML = "";
-    mount.classList.remove("upcoming-alerts-mount--visible");
+    mount.classList.remove("upcoming-alerts-mount--visible", "upcoming-alerts-mount--hiding");
+    mount.removeAttribute("data-expanded");
   }
+}
+
+/** Fade/slide the whole bar away, then clear DOM (dismiss-all / list has no alerts). */
+function hideUpcomingBarWithAnimation(mount) {
+  const panel = mount.querySelector(".upcoming-alerts-panel");
+  const done = () => {
+    upcomingAlertsExpanded = false;
+    mount.hidden = true;
+    mount.innerHTML = "";
+    mount.classList.remove("upcoming-alerts-mount--visible", "upcoming-alerts-mount--hiding");
+    mount.removeAttribute("data-expanded");
+  };
+  if (!panel) {
+    done();
+    return;
+  }
+  requestAnimationFrame(() => {
+    mount.classList.add("upcoming-alerts-mount--hiding");
+  });
+  const fallback = setTimeout(done, 500);
+  panel.addEventListener(
+    "transitionend",
+    (e) => {
+      if (e.target !== panel || (e.propertyName !== "opacity" && e.propertyName !== "transform")) return;
+      clearTimeout(fallback);
+      done();
+    },
+    { once: true }
+  );
 }
 
 async function refreshUpcomingAlertsBar(user) {
@@ -1283,66 +1382,94 @@ async function refreshUpcomingAlertsBar(user) {
       return String(a.title || "").localeCompare(String(b.title || ""));
     });
     if (active.length === 0) {
-      mount.hidden = true;
-      mount.innerHTML = "";
-      mount.classList.remove("upcoming-alerts-mount--visible");
+      if (mount.classList.contains("upcoming-alerts-mount--visible") && mount.querySelector(".upcoming-alert-pill")) {
+        hideUpcomingBarWithAnimation(mount);
+        return;
+      }
+      clearUpcomingAlertsBar();
       return;
     }
+    const wasBarHidden = mount.hidden || !mount.classList.contains("upcoming-alerts-mount--visible");
     mount.hidden = false;
+    mount.classList.remove("upcoming-alerts-mount--hiding");
     mount.classList.add("upcoming-alerts-mount--visible");
+    mount.dataset.expanded = upcomingAlertsExpanded ? "true" : "false";
     const maxInitial = 3;
-    const shown = upcomingAlertsExpanded ? active : active.slice(0, maxInitial);
     const restCount = Math.max(0, active.length - maxInitial);
-    const pills = shown
-      .map((a) => {
-        const tba = !a.confirmed || !a.airDate;
-        const cls = tba
-          ? "upcoming-alert-pill upcoming-alert-pill--tba"
-          : "upcoming-alert-pill upcoming-alert-pill--confirmed";
-        const dateLabel = formatUpcomingAirLabel(a);
-        const fp = escapeHtml(String(a.fingerprint));
-        return `<div class="${cls}" data-fp="${fp}" role="status">
-        <span class="upcoming-alert-title">${escapeHtml(String(a.title || ""))}</span>
-        <span class="upcoming-alert-detail">${escapeHtml(String(a.detail || ""))}</span>
-        <span class="upcoming-alert-date">${tba ? "TBA" : escapeHtml(dateLabel)}</span>
-        <button type="button" class="upcoming-alert-dismiss" aria-label="Dismiss">×</button>
-      </div>`;
-      })
-      .join("");
-    let moreHtml = "";
-    if (!upcomingAlertsExpanded && restCount > 0) {
-      moreHtml = `<div class="upcoming-alerts-more-wrap"><button type="button" class="upcoming-alerts-more">and ${restCount} more →</button></div>`;
-    } else if (upcomingAlertsExpanded && active.length > maxInitial) {
-      moreHtml = `<div class="upcoming-alerts-more-wrap"><button type="button" class="upcoming-alerts-more upcoming-alerts-less">Show less</button></div>`;
+    const allPillsHtml = active.map((a) => renderUpcomingAlertPill(a)).join("");
+    const firstOnlyHtml = active.slice(0, maxInitial).map((a) => renderUpcomingAlertPill(a)).join("");
+    const extraOnlyHtml = active.slice(maxInitial).map((a) => renderUpcomingAlertPill(a)).join("");
+
+    let pillsRowHtml = "";
+    let lessRowHtml = "";
+
+    if (upcomingAlertsExpanded && restCount > 0) {
+      /* One continuous flex-wrap row — same wrapping rules for every pill, no divider block */
+      pillsRowHtml = allPillsHtml;
+      lessRowHtml = `<div class="upcoming-alerts-toggle-row"><button type="button" class="upcoming-alerts-less-btn">Show less ↑</button></div>`;
+    } else if (restCount > 0) {
+      const moreBtnHtml = `<button type="button" class="upcoming-alert-pill upcoming-alerts-more-btn"><span class="upcoming-alerts-more-btn-label">and ${restCount} more →</span></button>`;
+      pillsRowHtml = `${firstOnlyHtml}${moreBtnHtml}<div class="upcoming-alerts-extras">${extraOnlyHtml}</div>`;
+    } else {
+      pillsRowHtml = allPillsHtml;
     }
-    mount.innerHTML = `<div class="upcoming-alerts-inner">${pills}${moreHtml}</div>`;
+
+    mount.innerHTML = `<div class="upcoming-alerts-panel">
+      <div class="upcoming-alerts-inner">
+        <div class="upcoming-alerts-pills">
+          ${pillsRowHtml}
+        </div>
+        ${lessRowHtml}
+      </div>
+    </div>`;
+    const panel = mount.querySelector(".upcoming-alerts-panel");
+    if (panel && wasBarHidden) {
+      panel.classList.add("upcoming-alerts-panel--animate-in");
+      panel.addEventListener(
+        "animationend",
+        () => panel.classList.remove("upcoming-alerts-panel--animate-in"),
+        { once: true }
+      );
+    }
     mount.querySelectorAll(".upcoming-alert-dismiss").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        const pill = btn.closest(".upcoming-alert-pill");
-        const fp = pill?.dataset.fp;
+        const pillEl = btn.closest(".upcoming-alert-pill");
+        const fp = pillEl?.dataset.fp;
         if (!fp || !auth.currentUser) return;
-        pill.classList.add("upcoming-alert-pill--out");
+        pillEl.classList.add("upcoming-alert-pill--out");
+        let doneRemove = false;
         const removePill = () => {
-          pill.remove();
-          const inner = mount.querySelector(".upcoming-alerts-inner");
-          if (inner && !inner.querySelector(".upcoming-alert-pill")) {
-            clearUpcomingAlertsBar();
+          if (doneRemove) return;
+          doneRemove = true;
+          pillEl.remove();
+          const pillsRoot = mount.querySelector(".upcoming-alerts-pills");
+          if (pillsRoot && !pillsRoot.querySelector(".upcoming-alert-pill")) {
+            hideUpcomingBarWithAnimation(mount);
           }
         };
-        pill.addEventListener("transitionend", removePill, { once: true });
+        pillEl.addEventListener("transitionend", (ev) => {
+          if (ev.propertyName === "opacity") removePill();
+        });
         try {
           await dismissUpcomingAlert(auth.currentUser.uid, fp);
         } catch (err) {
           console.warn("dismiss upcoming:", err);
         }
-        setTimeout(removePill, 400);
+        setTimeout(removePill, 480);
       });
     });
-    const moreBtn = mount.querySelector(".upcoming-alerts-more");
+    const moreBtn = mount.querySelector(".upcoming-alerts-more-btn");
     if (moreBtn) {
       moreBtn.addEventListener("click", () => {
-        upcomingAlertsExpanded = !upcomingAlertsExpanded;
+        upcomingAlertsExpanded = true;
+        refreshUpcomingAlertsBar(auth.currentUser);
+      });
+    }
+    const lessBtn = mount.querySelector(".upcoming-alerts-less-btn");
+    if (lessBtn) {
+      lessBtn.addEventListener("click", () => {
+        upcomingAlertsExpanded = false;
         refreshUpcomingAlertsBar(auth.currentUser);
       });
     }
