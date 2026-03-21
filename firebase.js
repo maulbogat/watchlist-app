@@ -23,7 +23,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 import { firebaseConfig } from "./config/firebase.js";
-import { listKey as movieKey } from "./lib/registry-id.js";
+import { listKey as movieKey, registryDocIdFromItem, normalizeImdbId } from "./lib/registry-id.js";
 
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
@@ -38,14 +38,18 @@ function titleYearKey(m) {
 const REGISTRY_READ_BATCH = 30;
 
 async function bulkGetTitleRegistryDocData(ids) {
-  const unique = [...new Set((ids || []).filter(Boolean))];
+  const unique = [...new Set((ids || []).filter(Boolean).map((id) => String(id)))];
   const map = new Map();
   for (let i = 0; i < unique.length; i += REGISTRY_READ_BATCH) {
     const slice = unique.slice(i, i + REGISTRY_READ_BATCH);
     await Promise.all(
       slice.map(async (id) => {
-        const snap = await getDoc(doc(db, "titleRegistry", id));
-        if (snap.exists()) map.set(id, snap.data());
+        try {
+          const snap = await getDoc(doc(db, "titleRegistry", id));
+          if (snap.exists()) map.set(id, snap.data());
+        } catch (e) {
+          console.warn("titleRegistry read failed:", id, e?.message || e);
+        }
       })
     );
   }
@@ -60,8 +64,9 @@ async function hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, ar
   const refs = [];
   const legacy = [];
   for (const m of items || []) {
-    if (!m) continue;
-    if (m.registryId) refs.push(m);
+    if (!m || typeof m !== "object") continue;
+    const rid = m.registryId;
+    if (rid != null && rid !== "") refs.push(m);
     else legacy.push(m);
   }
 
@@ -69,8 +74,11 @@ async function hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, ar
   const out = [];
 
   for (const r of refs) {
-    const rid = r.registryId;
-    const meta = regMap.get(rid) || {};
+    const rid = String(r.registryId);
+    const fromRegistry = regMap.get(rid) || {};
+    /** Inline fields saved on the list row (legacy / partial rows) fill gaps if registry is missing. */
+    const { registryId: _ignore, status: _st, ...inline } = r;
+    const meta = { ...inline, ...fromRegistry };
     let status = "to-watch";
     if (watchedSet.has(rid)) status = "watched";
     else if (maybeLaterSet.has(rid)) status = "maybe-later";
@@ -103,7 +111,15 @@ async function hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, ar
     out.push({ ...m, status });
   }
 
-  return out;
+  const rawCount = (items || []).filter((m) => m != null).length;
+  if (rawCount > 0 && out.length === 0) {
+    console.error(
+      "hydrateListItemsFromRegistry: Firestore had list items but none could be hydrated. Check document shapes or deploy firestore.rules (titleRegistry read).",
+      { rawCount, firstItem: items[0] }
+    );
+  }
+
+  return enrichRegistryRefsFromCatalog(out);
 }
 
 /** Persisted list row: reference only when registryId is known; else legacy embedded doc. */
@@ -119,6 +135,62 @@ async function getMoviesCatalog() {
   const snap = await getDoc(ref);
   if (!snap.exists() || !Array.isArray(snap.data().items)) return [];
   return snap.data().items;
+}
+
+/**
+ * When list rows are `{ registryId }` only and `titleRegistry` docs are missing/empty
+ * (e.g. migration not run or different env), fill from public `catalog/movies` by id.
+ */
+async function enrichRegistryRefsFromCatalog(rows) {
+  const needs =
+    Array.isArray(rows) &&
+    rows.some((r) => r?.registryId && (!r.title || r.title === "Unknown"));
+  if (!needs) return rows;
+
+  const catalog = await getMoviesCatalog();
+  if (!catalog.length) return rows;
+
+  const byImdb = new Map();
+  const byTmdb = new Map();
+  const byLegacy = new Map();
+
+  for (const c of catalog) {
+    if (!c || typeof c !== "object") continue;
+    const legacyId = registryDocIdFromItem(c);
+    if (String(legacyId).startsWith("legacy-")) byLegacy.set(legacyId, c);
+
+    const imdb = normalizeImdbId(c.imdbId);
+    if (imdb) byImdb.set(imdb, c);
+
+    const t = c.tmdbId != null && c.tmdbId !== "" ? Number(c.tmdbId) : NaN;
+    if (!Number.isNaN(t)) {
+      const tv = c.tmdbMedia === "tv" || c.type === "show";
+      byTmdb.set(`${t}|${tv ? "tv" : "movie"}`, c);
+    }
+  }
+
+  function catalogRowForRegistryId(rid) {
+    const s = String(rid);
+    if (s.startsWith("tmdb-tv-")) {
+      const n = parseInt(s.slice("tmdb-tv-".length), 10);
+      if (!Number.isNaN(n)) return byTmdb.get(`${n}|tv`) || null;
+    }
+    if (s.startsWith("tmdb-movie-")) {
+      const n = parseInt(s.slice("tmdb-movie-".length), 10);
+      if (!Number.isNaN(n)) return byTmdb.get(`${n}|movie`) || null;
+    }
+    if (s.startsWith("legacy-")) return byLegacy.get(s) || null;
+    const imdb = normalizeImdbId(s);
+    if (imdb && /^tt\d+$/i.test(imdb)) return byImdb.get(imdb) || null;
+    return null;
+  }
+
+  return rows.map((r) => {
+    if (!r?.registryId || (r.title && r.title !== "Unknown")) return r;
+    const c = catalogRowForRegistryId(r.registryId);
+    if (!c) return r;
+    return { ...r, ...c, registryId: r.registryId, status: r.status };
+  });
 }
 
 /**
