@@ -120,6 +120,10 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 
 ---
 
+### `syncState` / `upcomingAlerts` (single doc)
+
+**Writes:** Admin SDK only. Holds **`nextIndex`** and **`registryDocCount`** so `check-upcoming` can sync `titleRegistry` → `upcomingAlerts` in **multiple Netlify invocations** (each capped at ~30s). Clients cannot read or write (`firestore.rules`).
+
 ### `upcomingAlerts` / `{docId}`
 
 Top-level collection. **Writes:** Admin SDK only (`check-upcoming` scheduled function, `add-from-imdb` single-title sync). **Reads:** Any signed-in user (`firestore.rules`).
@@ -198,6 +202,8 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 8. Netlify function verifies token → `uid`; loads OMDb; if `TMDB_API_KEY` present, runs TMDB find + detail + videos + watch providers; else falls back to OMDb-only row; writes to `sharedLists/{listId}` or `users/{uid}/personalLists/{personalListId}` (default id from profile if cookie absent); migrates legacy `users/{uid}.items` on first write when needed.  
 9. Response JSON returned; `add.js` displays message; `postMessage({ type: "add-result", ... })` to opener/parent; bookmarklet shows toast and closes popup.  
 10. **Main watchlist tab does not automatically reload** from this flow; user refreshes or revisits to see new titles (unless they were already polling — they are not).
+
+**Upcoming alerts sync (separate from bookmarklet):** Manual HTTP / `curl` should call `/.netlify/functions/trigger-upcoming-sync` (GET/POST), not the scheduled `check-upcoming` URL (often fails fast on Netlify). Both use `runRegistrySyncWithTimeBudget`.
 
 ### 3. TMDB enrichment flow (add path)
 

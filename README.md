@@ -38,13 +38,23 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 4. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
 
-   **If `curl …/check-upcoming` returns Netlify “Internal Error”** or the `upcomingAlerts` collection never appears: open **Netlify → Functions → check-upcoming → Logs** for the real error. Full-registry sync does many rate-limited TMDB calls and often **exceeds Netlify’s function time limit** (scheduled functions are capped around **30s**). Run the same sync **locally** (writes to the same Firestore as your service account):
+   **If `curl …/check-upcoming` returns Netlify “Internal Error”** or logs show **Duration: 30000 ms** with no `check-upcoming: done`: the old “full registry in one run” flow **exceeds Netlify’s ~30s limit**. The deployed function now uses a **time budget + Firestore cursor** (`syncState/upcomingAlerts`, Admin-only — deploy updated **`firestore.rules`**). Use **Netlify → Functions → check-upcoming → Run now** repeatedly until logs show **`completed":true`** (or wait for daily cron). Each run should finish under 30s; **`upcomingAlerts`** appears after the first chunk writes.
+
+   **Manual HTTP / `curl`:** Do **not** call `/.netlify/functions/check-upcoming` — Netlify **scheduled** functions often fail **within ~1s** when hit by URL (while **Run now** in the dashboard still works). Use the separate HTTP function:
+
+   ```bash
+   curl -X POST "https://YOUR-SITE.netlify.app/.netlify/functions/trigger-upcoming-sync"
+   ```
+
+   Repeat until the JSON shows `"completed":true` (same chunked sync as the scheduler). Optional: set **`UPCOMING_SYNC_TRIGGER_SECRET`** in Netlify and send `Authorization: Bearer <that-value>` so random people can’t trigger TMDB/Firestore work.
+
+   **One-shot full sync on your machine** (no 30s limit):
 
    ```bash
    node scripts/sync-upcoming-alerts.mjs
    ```
 
-   Uses `TMDB_API_KEY` and `FIREBASE_SERVICE_ACCOUNT` / `serviceAccountKey.json` like other scripts. May take several minutes on a large `titleRegistry`.
+   Uses `TMDB_API_KEY` and `FIREBASE_SERVICE_ACCOUNT` / `serviceAccountKey.json`. May take several minutes on a large `titleRegistry`.
 
    **Existing data:** run `node scripts/migrate-to-title-registry.mjs --dry-run` then without `--dry-run` to move list `items` to `{ registryId }` and remap status keys. After migration, remove legacy Firestore docs: `node scripts/delete-legacy-catalog.mjs --dry-run` then `--write`.
 

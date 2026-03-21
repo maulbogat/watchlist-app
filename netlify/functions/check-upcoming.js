@@ -1,24 +1,14 @@
 /**
  * Scheduled: daily TMDB sync → Firestore upcomingAlerts (titleRegistry only).
  * Netlify cron 3:00 UTC. Requires TMDB_API_KEY + FIREBASE_SERVICE_ACCOUNT.
+ *
+ * Do not rely on curling this URL — Netlify often rejects HTTP calls to **scheduled** functions quickly.
+ * Use `trigger-upcoming-sync` for manual/curl runs instead.
  */
 
-const { initializeApp, cert } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
-const { runFullRegistrySync } = require("./lib/sync-upcoming-alerts");
-
-function getApp() {
-  if (global.__fbAdmin) return global.__fbAdmin;
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT not set");
-  const key = JSON.parse(Buffer.from(raw, "base64").toString("utf-8"));
-  const app = initializeApp({ credential: cert(key) });
-  global.__fbAdmin = app;
-  return app;
-}
+const { runUpcomingSyncCore } = require("./lib/execute-upcoming-sync");
 
 exports.handler = async (event) => {
-  // Helps Netlify function logs show invocations (scheduled + "Run now"); was silent until error/end.
   const trigger = event?.headers?.["x-netlify-event"] || event?.httpMethod || "unknown";
   console.log("check-upcoming: start", JSON.stringify({ trigger }));
 
@@ -27,16 +17,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const apiKey = process.env.TMDB_API_KEY;
-    if (!apiKey || !String(apiKey).trim()) {
-      console.error("check-upcoming: TMDB_API_KEY missing");
-      return { statusCode: 500, body: JSON.stringify({ ok: false, error: "TMDB_API_KEY missing" }) };
-    }
-
-    const app = getApp();
-    const db = getFirestore(app);
-
-    const result = await runFullRegistrySync(db, apiKey);
+    const result = await runUpcomingSyncCore(20000);
     console.log("check-upcoming: done", JSON.stringify(result));
 
     return {
@@ -46,8 +27,9 @@ exports.handler = async (event) => {
     };
   } catch (e) {
     console.error("check-upcoming:", e);
+    const code = e.statusCode || 500;
     return {
-      statusCode: 500,
+      statusCode: code,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ok: false, error: e.message || String(e) }),
     };

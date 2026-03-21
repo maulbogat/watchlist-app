@@ -6,6 +6,9 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { buildAlertsForCatalogRow, dedupeCatalogByTmdb } = require("./tmdb-upcoming-fetch");
 
 const COLLECTION = "upcomingAlerts";
+/** Admin-only cursor so Netlify can finish within ~30s per invocation. */
+const SYNC_STATE_COLLECTION = "syncState";
+const SYNC_STATE_DOC_ID = "upcomingAlerts";
 
 /**
  * @param {FirebaseFirestore.Firestore} db
@@ -134,11 +137,118 @@ async function runFullCatalogSync(db, apiKey, catalogItems) {
 
 /**
  * Full sync from titleRegistry only (catalog/movies is deprecated).
+ * Prefer **runRegistrySyncWithTimeBudget** on Netlify (30s limit).
  */
 async function runFullRegistrySync(db, apiKey) {
   const regSnap = await db.collection("titleRegistry").get();
   const regItems = regSnap.docs.map((d) => d.data());
   return runFullCatalogSync(db, apiKey, regItems);
+}
+
+/**
+ * Sync titleRegistry → upcomingAlerts in chunks that fit Netlify's ~30s limit.
+ * Persists `nextIndex` in syncState/upcomingAlerts; run again until `completed: true`.
+ * If titleRegistry doc count changes, cursor resets to 0.
+ *
+ * @param {number} maxMs stop starting new TMDB rows after this elapsed time (default 25s)
+ */
+async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
+  const t0 = Date.now();
+  let expiredRemoved = await deleteExpiredAlerts(db);
+
+  const regSnap = await db.collection("titleRegistry").get();
+  const regCount = regSnap.size;
+  const regItems = regSnap.docs.map((d) => d.data());
+  const rows = dedupeCatalogByTmdb(regItems);
+
+  const stateRef = db.collection(SYNC_STATE_COLLECTION).doc(SYNC_STATE_DOC_ID);
+  const stateSnap = await stateRef.get();
+  let nextIndex = 0;
+  if (stateSnap.exists) {
+    const st = stateSnap.data();
+    const prevCount = st.registryDocCount;
+    if (prevCount === regCount && typeof st.nextIndex === "number" && st.nextIndex >= 0) {
+      nextIndex = st.nextIndex;
+    }
+  }
+
+  if (rows.length === 0) {
+    await stateRef.set(
+      {
+        nextIndex: 0,
+        registryDocCount: regCount,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return {
+      rowsChecked: 0,
+      alertsUpserted: 0,
+      pruned: 0,
+      expiredRemoved,
+      completed: true,
+      budgetMs: maxMs,
+      elapsedMs: Date.now() - t0,
+      message: "No titleRegistry rows with tmdbId to sync",
+    };
+  }
+
+  let upserted = 0;
+  let i = nextIndex;
+  for (; i < rows.length; i++) {
+    if (Date.now() - t0 > maxMs) break;
+    const row = rows[i];
+    const built = await buildAlertsForCatalogRow(apiKey, row);
+    const ids = built.map((a) => a.docId);
+    await deleteStaleAlertsForRow(db, row.tmdbId, row.isTv ? "tv" : "movie", ids);
+    await upsertAlerts(db, built);
+    upserted += built.length;
+  }
+
+  const completed = i >= rows.length;
+  if (completed) {
+    const pruned = await pruneAlertsOutsideCatalog(db, rows);
+    expiredRemoved += await deleteExpiredAlerts(db);
+    await stateRef.set(
+      {
+        nextIndex: 0,
+        registryDocCount: regCount,
+        lastCompletedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return {
+      rowsChecked: rows.length,
+      alertsUpserted: upserted,
+      pruned,
+      expiredRemoved,
+      completed: true,
+      budgetMs: maxMs,
+      elapsedMs: Date.now() - t0,
+    };
+  }
+
+  await stateRef.set(
+    {
+      nextIndex: i,
+      registryDocCount: regCount,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+  return {
+    rowsChecked: rows.length,
+    alertsUpserted: upserted,
+    pruned: 0,
+    expiredRemoved,
+    completed: false,
+    nextIndex: i,
+    totalRows: rows.length,
+    budgetMs: maxMs,
+    elapsedMs: Date.now() - t0,
+    message: "Partial sync — click Run again (or wait for cron) until completed is true",
+  };
 }
 
 /**
@@ -159,11 +269,14 @@ async function runSingleTitleSync(db, apiKey, tmdbId, media, titleHint) {
 
 module.exports = {
   COLLECTION,
+  SYNC_STATE_COLLECTION,
+  SYNC_STATE_DOC_ID,
   upsertAlerts,
   deleteStaleAlertsForRow,
   deleteExpiredAlerts,
   runFullCatalogSync,
   runFullRegistrySync,
+  runRegistrySyncWithTimeBudget,
   runSingleTitleSync,
   dedupeCatalogByTmdb,
   buildAlertsForCatalogRow,
