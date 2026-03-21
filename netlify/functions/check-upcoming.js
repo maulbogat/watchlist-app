@@ -18,6 +18,10 @@ function getApp() {
 }
 
 exports.handler = async (event) => {
+  // Helps Netlify function logs show invocations (scheduled + "Run now"); was silent until error/end.
+  const trigger = event?.headers?.["x-netlify-event"] || event?.httpMethod || "unknown";
+  console.log("check-upcoming: start", JSON.stringify({ trigger }));
+
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: { "Access-Control-Allow-Origin": "*" } };
   }
@@ -25,6 +29,7 @@ exports.handler = async (event) => {
   try {
     const apiKey = process.env.TMDB_API_KEY;
     if (!apiKey || !String(apiKey).trim()) {
+      console.error("check-upcoming: TMDB_API_KEY missing");
       return { statusCode: 500, body: JSON.stringify({ ok: false, error: "TMDB_API_KEY missing" }) };
     }
 
@@ -32,6 +37,7 @@ exports.handler = async (event) => {
     const db = getFirestore(app);
 
     const result = await runFullRegistrySync(db, apiKey);
+    console.log("check-upcoming: done", JSON.stringify(result));
 
     return {
       statusCode: 200,

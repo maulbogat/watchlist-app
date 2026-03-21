@@ -38,6 +38,14 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 4. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
 
+   **If `curl …/check-upcoming` returns Netlify “Internal Error”** or the `upcomingAlerts` collection never appears: open **Netlify → Functions → check-upcoming → Logs** for the real error. Full-registry sync does many rate-limited TMDB calls and often **exceeds Netlify’s function time limit** (scheduled functions are capped around **30s**). Run the same sync **locally** (writes to the same Firestore as your service account):
+
+   ```bash
+   node scripts/sync-upcoming-alerts.mjs
+   ```
+
+   Uses `TMDB_API_KEY` and `FIREBASE_SERVICE_ACCOUNT` / `serviceAccountKey.json` like other scripts. May take several minutes on a large `titleRegistry`.
+
    **Existing data:** run `node scripts/migrate-to-title-registry.mjs --dry-run` then without `--dry-run` to move list `items` to `{ registryId }` and remap status keys. After migration, remove legacy Firestore docs: `node scripts/delete-legacy-catalog.mjs --dry-run` then `--write`.
 
    **Personal list storage:** Watchlist rows live under `users/{uid}/personalLists/{listId}` (same idea as `sharedLists`). The user doc keeps profile fields and `defaultPersonalListId` only. Legacy `users/{uid}.items` is migrated automatically when users open the app or use the bookmarklet; optional bulk: `node scripts/migrate-personal-items-to-subcollection.mjs --dry-run` then `--write`.
