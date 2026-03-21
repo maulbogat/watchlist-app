@@ -79,13 +79,26 @@ exports.handler = async (event, context) => {
 
   const data = listSnap.data();
   const members = Array.isArray(data.members) ? data.members : [];
+  const listName = typeof data.name === "string" ? data.name.trim() : "";
+
   if (members.includes(uid)) {
-    return jsonRes(200, { ok: true, joined: false, message: "Already a member", name: data.name || "Shared list" }, event);
+    return jsonRes(200, { ok: true, joined: false, message: "Already a member", name: listName }, event);
+  }
+
+  if (!listName) {
+    return jsonRes(
+      400,
+      {
+        ok: false,
+        error: "This shared list has no name. The owner must set a name in the app before others can join.",
+      },
+      event
+    );
   }
 
   await listRef.update({
     members: FieldValue.arrayUnion(uid),
   });
 
-  return jsonRes(200, { ok: true, joined: true, message: `Joined "${data.name || "Shared list"}"`, name: data.name || "Shared list" }, event);
+  return jsonRes(200, { ok: true, joined: true, message: `Joined "${listName}"`, name: listName }, event);
 };

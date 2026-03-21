@@ -2276,6 +2276,27 @@ header h1 span {
   color: var(--bg);
 }
 
+.list-name-modal-body .list-name-error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #e57373;
+}
+.list-name-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+.list-name-secondary-btn {
+  background: transparent !important;
+  color: var(--muted) !important;
+  border: 1px solid var(--border) !important;
+}
+.list-name-secondary-btn:hover {
+  color: var(--text) !important;
+  border-color: var(--muted) !important;
+}
+
 /* --- Upcoming alerts (TMDB sync → Firestore) --- */
 .upcoming-alerts-mount {
   width: 100%;

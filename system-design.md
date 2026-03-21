@@ -81,7 +81,7 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 | `watched` | `array` of string | Keys = **`registryId`** after migration; legacy = `"title|year"`. |
 | `maybeLater` | `array` of string | Same as `watched`. |
 | `archive` | `array` of string | Same as `watched`. |
-| `listName` | `string` | Display name for default list (default `"My list"`). |
+| `listName` | `string` | **Required** non-empty display name for the main list (`users/{uid}.items`). The app prompts on first sign-in until set; reads return trimmed text with no client default. |
 | `country` | `string` | ISO 3166-1 alpha-2 (e.g. `"IL"`) for TMDB watch region when adding titles. |
 | `countryName` | `string` | Human-readable country name for UI. |
 | `upcomingDismissals` | `map` | Optional. Keys = alert **fingerprints** (e.g. `136311_3_9`, `12345_sequel_999`); values = ISO date string when the user dismissed that pill. Used so dismissed upcoming notifications stay hidden until a new fingerprint appears. |
@@ -96,7 +96,7 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 
 | Field | Type | Notes |
 |-------|------|--------|
-| `name` | `string` | List name. |
+| `name` | `string` | **Required** non-empty when creating a subcollection list; stored trimmed. |
 | `items` | `array` | Same **Item object** shape as `users/{uid}.items`. |
 | `watched`, `maybeLater`, `archive` | `array` of string | Status keys, same as user doc. |
 | `createdAt` | `string` (ISO) | Set on create. |
@@ -109,7 +109,7 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 
 | Field | Type | Notes |
 |-------|------|--------|
-| `name` | `string` | |
+| `name` | `string` | **Required** non-empty when creating; `join-shared-list` rejects new joins if missing (legacy lists without a name must be renamed in-app first). |
 | `ownerId` | `string` | Firebase `uid` of creator. |
 | `members` | `array` of string | Uids with access; creator included on create. |
 | `items` | `array` | **Item objects** (no `status` stored in Firestore; status derived from key sets). |
@@ -225,7 +225,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 **Join via link:**  
 1. User opens site with `?join={listId}` while signed in.  
 2. `app.js` `POST`s `/.netlify/functions/join-shared-list` with JSON `{ listId }`, `credentials: "include"` (cookie `bookmarklet_token` may be sent, or logic also supports Bearer — join function reads cookie or `Authorization` header).  
-3. Function verifies Firebase ID token, `arrayUnion(uid)` on `members` if not already present.  
+3. Function verifies Firebase ID token, `arrayUnion(uid)` on `members` if not already present (fails with **400** if the list document has no non-empty `name` and the user was not already a member).  
 4. Client refreshes shared lists, switches `currentListMode` to that shared list.
 
 **Join via paste:**  

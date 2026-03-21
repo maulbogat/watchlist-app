@@ -143,7 +143,7 @@ async function getStatusData(uid) {
     watched: Array.isArray(data.watched) ? data.watched : [],
     maybeLater: Array.isArray(data.maybeLater) ? data.maybeLater : [],
     archive: Array.isArray(data.archive) ? data.archive : [],
-    listName: data.listName || "My list",
+    listName: typeof data.listName === "string" ? data.listName.trim() : "",
     country: data.country || null,
     countryName: data.countryName || null,
     upcomingDismissals:
@@ -158,6 +158,7 @@ async function getUserProfile(uid) {
   return {
     country: data.country || null,
     countryName: data.countryName || null,
+    listName: typeof data.listName === "string" ? data.listName.trim() : "",
   };
 }
 
@@ -232,11 +233,18 @@ function randomId() {
   return Math.random().toString(36).slice(2, 12);
 }
 
+function requirePersistedListName(name, label = "List name") {
+  const n = String(name ?? "").trim();
+  if (!n) throw new Error(`${label} is required`);
+  return n;
+}
+
 async function createSharedList(uid, name) {
+  const persistedName = requirePersistedListName(name, "List name");
   const listId = randomId() + randomId();
   const ref = doc(db, "sharedLists", listId);
   await setDoc(ref, {
-    name: name || "Shared list",
+    name: persistedName,
     ownerId: uid,
     members: [uid],
     items: [],
@@ -252,7 +260,9 @@ async function getSharedList(listId) {
   const ref = doc(db, "sharedLists", listId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
-  return { id: listId, ...snap.data() };
+  const data = snap.data();
+  const name = typeof data.name === "string" ? data.name.trim() : "";
+  return { id: listId, ...data, name };
 }
 
 async function getSharedListsForUser(uid) {
@@ -261,7 +271,11 @@ async function getSharedListsForUser(uid) {
     where("members", "array-contains", uid)
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return snap.docs.map((d) => {
+    const data = d.data();
+    const name = typeof data.name === "string" ? data.name.trim() : "";
+    return { id: d.id, ...data, name };
+  });
 }
 
 async function getSharedListMovies(listId) {
@@ -565,34 +579,31 @@ async function moveItemFromPersonalToShared(uid, listId, movie) {
 }
 
 /**
- * Create a new personal list. Never throws - returns null on failure.
+ * Create a new personal list (subcollection). Requires a non-empty trimmed name.
  */
 async function createPersonalList(uid, name) {
-  try {
-    const listId = randomId() + randomId();
-    const ref = doc(db, "users", uid, "personalLists", listId);
-    await setDoc(ref, {
-      name: (name || "Personal list").trim(),
-      items: [],
-      watched: [],
-      maybeLater: [],
-      archive: [],
-      createdAt: new Date().toISOString(),
-    });
-    return listId;
-  } catch (e) {
-    console.warn("createPersonalList failed:", e);
-    return null;
-  }
+  const persistedName = requirePersistedListName(name, "List name");
+  const listId = randomId() + randomId();
+  const ref = doc(db, "users", uid, "personalLists", listId);
+  await setDoc(ref, {
+    name: persistedName,
+    items: [],
+    watched: [],
+    maybeLater: [],
+    archive: [],
+    createdAt: new Date().toISOString(),
+  });
+  return listId;
 }
 
 /**
- * Get all personal lists. Never throws - returns at least default list on any error.
+ * Get all personal lists. Never throws - returns main list row plus subcollection lists on any error.
  */
 async function getPersonalLists(uid) {
   try {
     const defaultData = await getStatusData(uid);
-    const defaultName = defaultData.listName || "My list";
+    const defaultName =
+      typeof defaultData.listName === "string" ? defaultData.listName.trim() : "";
     const defaultCount = Array.isArray(defaultData.items) ? defaultData.items.length : 0;
     const lists = [{ id: "personal", name: defaultName, count: defaultCount, isDefault: true }];
     try {
@@ -601,7 +612,8 @@ async function getPersonalLists(uid) {
       for (const d of snap.docs) {
         const data = d.data();
         const items = Array.isArray(data.items) ? data.items : [];
-        lists.push({ id: d.id, name: data.name || "Personal list", count: items.length, isDefault: false });
+        const subName = typeof data.name === "string" ? data.name.trim() : "";
+        lists.push({ id: d.id, name: subName, count: items.length, isDefault: false });
       }
     } catch (subErr) {
       console.warn("getPersonalLists subcollection read failed:", subErr);
@@ -609,7 +621,7 @@ async function getPersonalLists(uid) {
     return lists;
   } catch (e) {
     console.warn("getPersonalLists failed:", e);
-    return [{ id: "personal", name: "My list", count: 0, isDefault: true }];
+    return [{ id: "personal", name: "", count: 0, isDefault: true }];
   }
 }
 

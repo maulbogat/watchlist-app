@@ -56,6 +56,12 @@ let upcomingAlertsExpanded = false;
 /** User's selected country code (e.g. 'IL') for TMDB watch provider API. Set from Firestore profile. */
 let userCountryCode = "IL";
 
+/** Shown in UI when Firestore has no persisted name yet (legacy). Not a stored default. */
+function displayListName(name) {
+  const n = String(name ?? "").trim();
+  return n || "Set name…";
+}
+
 function getListFromUrl() {
   const list = new URLSearchParams(window.location.search).get("list");
   return list || null;
@@ -586,12 +592,14 @@ function attachModalFooterHandlers(footer, m) {
         const items = [];
         for (const l of personalLists) {
           const inList = containing.has(l.id);
-          const name = escapeHtml(l.name || "My list");
+          const label = displayListName(l.name);
+          const name = escapeHtml(label);
           items.push(`<button type="button" class="modal-action-dropdown-item" role="menuitem" data-type="personal" data-list-id="${l.id}" data-list-name="${name}" data-in-list="${inList}">${name}${inList ? " " + CHECK_SVG : ""}</button>`);
         }
         for (const l of sharedLists) {
           const inList = containing.has(l.id);
-          const name = escapeHtml(l.name || "Shared list");
+          const label = displayListName(l.name);
+          const name = escapeHtml(label);
           items.push(`<button type="button" class="modal-action-dropdown-item" role="menuitem" data-type="shared" data-list-id="${l.id}" data-list-name="${name}" data-in-list="${inList}">${name}${inList ? " " + CHECK_SVG : ""}</button>`);
         }
         addPanel.innerHTML = items.length ? items.join("") : '<span class="modal-add-to-list-empty">No lists</span>';
@@ -902,14 +910,17 @@ function getCurrentListValue() {
 function getCurrentListLabel() {
   if (currentListMode === "personal") {
     const p = personalLists.find((l) => l.id === "personal");
-    return p?.name || "My list";
+    return displayListName(p?.name);
   }
   if (typeof currentListMode === "object" && currentListMode?.type === "personal") {
     const p = personalLists.find((l) => l.id === currentListMode.listId);
-    return p?.name || currentListMode.name || "Personal list";
+    return displayListName(p?.name ?? currentListMode.name);
   }
-  if (typeof currentListMode === "object" && currentListMode?.type === "shared") return currentListMode.name || "Shared list";
-  return "My list";
+  if (typeof currentListMode === "object" && currentListMode?.type === "shared") {
+    return displayListName(currentListMode.name);
+  }
+  const main = personalLists.find((l) => l.id === "personal");
+  return displayListName(main?.name);
 }
 
 function renderListSelector() {
@@ -928,8 +939,8 @@ function renderListSelector() {
 
   panel.innerHTML = "";
   const items = [
-    ...personalLists.map((l) => ({ value: l.id, label: l.name || "Personal list", icon: iconPerson })),
-    ...sharedLists.map((l) => ({ value: l.id, label: l.name || "Shared list", icon: iconGroup })),
+    ...personalLists.map((l) => ({ value: l.id, label: displayListName(l.name), icon: iconPerson })),
+    ...sharedLists.map((l) => ({ value: l.id, label: displayListName(l.name), icon: iconGroup })),
   ];
   items.forEach(({ value, label, icon }) => {
     const div = document.createElement("div");
@@ -988,6 +999,88 @@ function hideListsModal() {
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
   }
+}
+
+let listNameModalAbortController = null;
+
+/**
+ * Ask for a non-empty list name. Resolves trimmed string, or `null` if cancelled (allowCancel).
+ */
+function showListNameModal({ title, placeholder = "", initialValue = "", allowCancel = false } = {}) {
+  const modal = document.getElementById("list-name-modal");
+  const titleEl = document.getElementById("list-name-modal-title");
+  const input = document.getElementById("list-name-input");
+  const saveBtn = document.getElementById("list-name-save-btn");
+  const cancelBtn = document.getElementById("list-name-cancel-btn");
+  const errEl = document.getElementById("list-name-error");
+  if (!modal || !titleEl || !input || !saveBtn || !errEl) {
+    return Promise.reject(new Error("List name modal elements missing"));
+  }
+
+  listNameModalAbortController?.abort();
+  listNameModalAbortController = new AbortController();
+  const ac = listNameModalAbortController;
+
+  if (cancelBtn) {
+    cancelBtn.hidden = !allowCancel;
+  }
+
+  titleEl.textContent = title || "List name";
+  input.value = initialValue ?? "";
+  input.placeholder = placeholder || "";
+  errEl.hidden = true;
+  errEl.textContent = "";
+
+  const closeModal = () => {
+    ac.abort();
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+    saveBtn.onclick = null;
+    if (cancelBtn) cancelBtn.onclick = null;
+  };
+
+  input.addEventListener(
+    "input",
+    () => {
+      errEl.hidden = true;
+    },
+    { signal: ac.signal }
+  );
+  input.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        saveBtn.click();
+      }
+    },
+    { signal: ac.signal }
+  );
+
+  return new Promise((resolve) => {
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    input.focus();
+
+    if (cancelBtn && allowCancel) {
+      cancelBtn.onclick = () => {
+        closeModal();
+        resolve(null);
+      };
+    }
+
+    saveBtn.onclick = () => {
+      const raw = input.value.trim();
+      if (!raw) {
+        errEl.textContent = "Enter a name.";
+        errEl.hidden = false;
+        input.focus();
+        return;
+      }
+      closeModal();
+      resolve(raw);
+    };
+  });
 }
 
 let countryModalAbortController = null;
@@ -1267,7 +1360,7 @@ function renderListsModalContent() {
     li.dataset.type = "personal";
     li.dataset.count = String(l.count || 0);
     li.innerHTML = `
-      <span class="lists-modal-list-item-name">${iconPerson}<span class="lists-modal-list-item-name-text">${escapeHtml(l.name || "My list")}</span></span>
+      <span class="lists-modal-list-item-name">${iconPerson}<span class="lists-modal-list-item-name-text">${escapeHtml(displayListName(l.name))}</span></span>
       <div class="lists-modal-list-item-actions">
         <button type="button" class="lists-modal-list-item-action lists-modal-rename-btn" data-list-id="${l.id}" data-type="personal">Rename</button>
         <button type="button" class="lists-modal-list-item-action lists-modal-list-item-action--delete lists-modal-delete-btn" data-list-id="${l.id}" data-type="personal">Delete</button>
@@ -1285,7 +1378,7 @@ function renderListsModalContent() {
     li.dataset.type = "shared";
     li.dataset.count = String((l.items || []).length);
     li.innerHTML = `
-      <span class="lists-modal-list-item-name">${iconGroup}<span class="lists-modal-list-item-name-text">${escapeHtml(l.name || "Shared list")}</span></span>
+      <span class="lists-modal-list-item-name">${iconGroup}<span class="lists-modal-list-item-name-text">${escapeHtml(displayListName(l.name))}</span></span>
       <div class="lists-modal-list-item-actions">
         <button type="button" class="lists-modal-list-item-action lists-modal-rename-btn" data-list-id="${l.id}" data-type="shared">Rename</button>
         ${isOwner
@@ -1409,6 +1502,27 @@ function init() {
     }
 
     try {
+      profile = await getUserProfile(user.uid);
+    } catch (e) {
+      console.warn("getUserProfile refresh failed:", e);
+    }
+    if (!String(profile.listName || "").trim()) {
+      grid.innerHTML = '<div class="empty-state">Loading…</div>';
+      try {
+        const mainName = await showListNameModal({
+          title: "Name your main list",
+          placeholder: "e.g. My weekend watchlist",
+          initialValue: "",
+          allowCancel: false,
+        });
+        await renamePersonalList(user.uid, "personal", mainName);
+      } catch (e) {
+        console.warn("Main list name step failed:", e);
+        alert(e?.message || "Could not save your main list name. Reload and try again.");
+      }
+    }
+
+    try {
       sharedLists = await getSharedListsForUser(user.uid);
     } catch (e) {
       sharedLists = [];
@@ -1417,7 +1531,7 @@ function init() {
       personalLists = await getPersonalLists(user.uid);
     } catch (e) {
       console.warn("getPersonalLists failed, using default:", e);
-      personalLists = [{ id: "personal", name: "My list", count: 0, isDefault: true }];
+      personalLists = [{ id: "personal", name: "", count: 0, isDefault: true }];
     }
 
     const wrap = document.getElementById("list-selector-wrap");
@@ -1435,8 +1549,11 @@ function init() {
         const data = await res.json();
         if (data.ok) {
           sharedLists = await getSharedListsForUser(user.uid);
-          currentListMode = { type: "shared", listId: joinListId, name: data.name || "Shared list" };
+          currentListMode = { type: "shared", listId: joinListId, name: data.name };
           saveLastList(user, currentListMode);
+        } else if (data.error) {
+          console.warn("Join failed:", data.error);
+          alert(data.error);
         }
       } catch (e) {
         console.warn("Join failed:", e);
@@ -1596,16 +1713,16 @@ function init() {
   document.getElementById("lists-new-personal-btn")?.addEventListener("click", async () => {
     const user = auth.currentUser;
     if (!user) return;
-    const name = prompt("Enter a name for the new personal list:", "Personal list");
-    if (!name) return;
+    const name = await showListNameModal({
+      title: "Name your personal list",
+      placeholder: "e.g. Weekend picks",
+      allowCancel: true,
+    });
+    if (name == null) return;
     try {
-      const listId = await createPersonalList(user.uid, name.trim());
-      if (!listId) {
-        alert("Failed to create list. Please try again.");
-        return;
-      }
+      const listId = await createPersonalList(user.uid, name);
       personalLists = await getPersonalLists(user.uid);
-      currentListMode = { type: "personal", listId, name: name.trim() };
+      currentListMode = { type: "personal", listId, name };
       saveLastList(user, currentListMode);
       renderListSelector();
       renderListsModalContent();
@@ -1632,12 +1749,16 @@ function init() {
   document.getElementById("lists-create-btn")?.addEventListener("click", async () => {
     const user = auth.currentUser;
     if (!user) return;
-    const name = prompt("Enter a name for the shared list:", "Family watchlist");
-    if (!name) return;
+    const name = await showListNameModal({
+      title: "Name your shared list",
+      placeholder: "e.g. Family watchlist",
+      allowCancel: true,
+    });
+    if (name == null) return;
     try {
-      const listId = await createSharedList(user.uid, name.trim());
+      const listId = await createSharedList(user.uid, name);
       sharedLists = await getSharedListsForUser(user.uid);
-      currentListMode = { type: "shared", listId, name: name.trim() };
+      currentListMode = { type: "shared", listId, name };
       saveLastList(user, currentListMode);
       renderListSelector();
       renderListsModalContent();
@@ -1696,7 +1817,7 @@ function init() {
       const data = await res.json();
       if (data.ok) {
         sharedLists = await getSharedListsForUser(user.uid);
-        currentListMode = { type: "shared", listId, name: data.name || "Shared list" };
+        currentListMode = { type: "shared", listId, name: data.name };
         saveLastList(user, currentListMode);
         renderListSelector();
         renderListsModalContent();

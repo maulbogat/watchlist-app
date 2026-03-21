@@ -7,7 +7,7 @@
 <title>My Watchlist</title>
 <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="./styles.css?v=5" />
+<link rel="stylesheet" href="./styles.css?v=6" />
 </head>
 <body>
 
@@ -28,11 +28,11 @@
         <div class="list-controls-pair">
           <div class="custom-dropdown" id="list-selector">
             <button type="button" class="custom-dropdown-trigger" id="list-selector-trigger" aria-haspopup="listbox" aria-expanded="false" title="Switch list">
-              <span class="custom-dropdown-value">My list</span>
+              <span class="custom-dropdown-value">…</span>
               <svg class="custom-dropdown-chevron" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
             </button>
             <div class="custom-dropdown-panel" id="list-selector-panel" role="listbox" aria-hidden="true">
-              <div class="custom-dropdown-item" role="option" data-value="personal" aria-selected="true">My list</div>
+              <div class="custom-dropdown-item" role="option" data-value="personal" aria-selected="true">…</div>
             </div>
           </div>
           <button type="button" class="list-settings-btn" id="list-settings-btn" title="Manage lists" aria-label="Manage lists">
@@ -184,8 +184,24 @@
   </div>
 </div>
 
+<div class="modal-bg country-modal-bg" id="list-name-modal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal country-modal">
+    <div class="modal-header">
+      <span class="modal-title" id="list-name-modal-title">List name</span>
+    </div>
+    <div class="country-modal-body list-name-modal-body">
+      <input type="text" id="list-name-input" class="country-search list-name-input" placeholder="" maxlength="120" autocomplete="off" />
+      <p class="list-name-error" id="list-name-error" hidden role="alert"></p>
+      <div class="list-name-modal-actions">
+        <button type="button" class="country-save-btn list-name-secondary-btn" id="list-name-cancel-btn" hidden>Cancel</button>
+        <button type="button" class="country-save-btn" id="list-name-save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-<script type="module" src="./app.js?v=6"></script>
+<script type="module" src="./app.js?v=7"></script>
 </body>
 </html>
