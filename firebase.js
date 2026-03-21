@@ -23,14 +23,95 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 import { firebaseConfig } from "./config/firebase.js";
+import { listKey as movieKey } from "./lib/registry-id.js";
 
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-function movieKey(m) {
-  return `${m.title}|${m.year ?? ""}`;
+/** Legacy status key when items were embedded (no registryId). */
+function titleYearKey(m) {
+  return `${m?.title ?? ""}|${m?.year ?? ""}`;
+}
+
+const REGISTRY_READ_BATCH = 30;
+
+async function bulkGetTitleRegistryDocData(ids) {
+  const unique = [...new Set((ids || []).filter(Boolean))];
+  const map = new Map();
+  for (let i = 0; i < unique.length; i += REGISTRY_READ_BATCH) {
+    const slice = unique.slice(i, i + REGISTRY_READ_BATCH);
+    await Promise.all(
+      slice.map(async (id) => {
+        const snap = await getDoc(doc(db, "titleRegistry", id));
+        if (snap.exists()) map.set(id, snap.data());
+      })
+    );
+  }
+  return map;
+}
+
+/**
+ * Expand list rows: `{ registryId }` → merged metadata from titleRegistry;
+ * legacy embedded rows → catalog merge + title|year status keys.
+ */
+async function hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet) {
+  const refs = [];
+  const legacy = [];
+  for (const m of items || []) {
+    if (!m) continue;
+    if (m.registryId) refs.push(m);
+    else legacy.push(m);
+  }
+
+  const regMap = await bulkGetTitleRegistryDocData(refs.map((r) => r.registryId));
+  const out = [];
+
+  for (const r of refs) {
+    const rid = r.registryId;
+    const meta = regMap.get(rid) || {};
+    let status = "to-watch";
+    if (watchedSet.has(rid)) status = "watched";
+    else if (maybeLaterSet.has(rid)) status = "maybe-later";
+    else if (archiveSet.has(rid)) status = "archive";
+    out.push({
+      ...meta,
+      registryId: rid,
+      title: meta.title ?? "Unknown",
+      year: meta.year ?? null,
+      type: meta.type ?? "movie",
+      genre: meta.genre ?? "",
+      thumb: meta.thumb ?? null,
+      youtubeId: meta.youtubeId ?? null,
+      imdbId: meta.imdbId ?? null,
+      tmdbId: meta.tmdbId ?? null,
+      tmdbMedia: meta.tmdbMedia ?? null,
+      services: Array.isArray(meta.services) ? meta.services : [],
+      servicesByRegion: meta.servicesByRegion,
+      status,
+    });
+  }
+
+  const legacyMerged = await mergeTmdbIdsFromCatalog(await mergeImdbIdsFromCatalog(legacy.map((m) => ({ ...m }))));
+  for (const m of legacyMerged) {
+    const k = titleYearKey(m);
+    let status = "to-watch";
+    if (watchedSet.has(k)) status = "watched";
+    else if (maybeLaterSet.has(k)) status = "maybe-later";
+    else if (archiveSet.has(k)) status = "archive";
+    out.push({ ...m, status });
+  }
+
+  return out;
+}
+
+/** Persisted list row: reference only when registryId is known; else legacy embedded doc. */
+function rowToStore(movie) {
+  if (!movie || typeof movie !== "object") return {};
+  if (movie.registryId) return { registryId: movie.registryId };
+  const { status, ...clean } = movie;
+  return clean;
 }
 
 async function getMoviesCatalog() {
@@ -52,7 +133,7 @@ async function mergeImdbIdsFromCatalog(items) {
   for (const c of catalog) {
     if (!c?.imdbId) continue;
     const id = String(c.imdbId).startsWith("tt") ? c.imdbId : `tt${c.imdbId}`;
-    exact.set(movieKey(c), id);
+    exact.set(titleYearKey(c), id);
     const t = String(c.title || "")
       .trim()
       .toLowerCase();
@@ -61,7 +142,7 @@ async function mergeImdbIdsFromCatalog(items) {
   }
   return items.map((m) => {
     if (!m || m.imdbId) return m;
-    let id = exact.get(movieKey(m));
+    let id = exact.get(titleYearKey(m));
     if (!id) {
       const t = String(m.title || "")
         .trim()
@@ -111,6 +192,8 @@ async function getStatusData(uid) {
     listName: data.listName || "My list",
     country: data.country || null,
     countryName: data.countryName || null,
+    upcomingDismissals:
+      data.upcomingDismissals && typeof data.upcomingDismissals === "object" ? data.upcomingDismissals : {},
   };
 }
 
@@ -131,50 +214,16 @@ async function setUserCountry(uid, countryCode, countryName) {
 
 /**
  * Returns the user's movie list with status applied. Each account has its own list.
- * Migrates legacy users (catalog + status) to per-user items on first load.
+ * Items are `{ registryId }` + titleRegistry metadata (hydrated), or legacy embedded rows until migration.
  */
 async function getUserMovies(uid) {
   const data = await getStatusData(uid);
-  let items = data.items;
+  const items = data.items;
+  const watchedSet = new Set(data.watched || []);
+  const maybeLaterSet = new Set(data.maybeLater || []);
+  const archiveSet = new Set(data.archive || []);
 
-  const hasLegacyData =
-    data.watched?.length > 0 ||
-    data.maybeLater?.length > 0 ||
-    data.archive?.length > 0;
-
-  if (items.length === 0 && hasLegacyData) {
-    const catalog = await getMoviesCatalog();
-    if (catalog.length > 0) {
-      const watchedSet = new Set(data.watched);
-      const maybeLaterSet = new Set(data.maybeLater);
-      const archiveSet = new Set(data.archive);
-      items = catalog.map((m) => {
-        const key = movieKey(m);
-        let status = "to-watch";
-        if (watchedSet.has(key)) status = "watched";
-        else if (maybeLaterSet.has(key)) status = "maybe-later";
-        else if (archiveSet.has(key)) status = "archive";
-        return { ...m, status };
-      });
-      await setDoc(doc(db, "users", uid), { items }, { merge: true });
-    }
-  }
-
-  if (items.length > 0) {
-    const watchedSet = new Set(data.watched);
-    const maybeLaterSet = new Set(data.maybeLater);
-    const archiveSet = new Set(data.archive);
-    items = items.map((m) => {
-      const key = movieKey(m);
-      let status = "to-watch";
-      if (watchedSet.has(key)) status = "watched";
-      else if (maybeLaterSet.has(key)) status = "maybe-later";
-      else if (archiveSet.has(key)) status = "archive";
-      return { ...m, status };
-    });
-  }
-
-  return mergeTmdbIdsFromCatalog(await mergeImdbIdsFromCatalog(items));
+  return hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
 }
 
 /** @deprecated Use getStatusData. Kept for backward compat. */
@@ -268,18 +317,7 @@ async function getSharedListMovies(listId) {
   const watchedSet = new Set(data.watched || []);
   const maybeLaterSet = new Set(data.maybeLater || []);
   const archiveSet = new Set(data.archive || []);
-  return mergeTmdbIdsFromCatalog(
-    await mergeImdbIdsFromCatalog(
-      items.map((m) => {
-        const key = movieKey(m);
-        let status = "to-watch";
-        if (watchedSet.has(key)) status = "watched";
-        else if (maybeLaterSet.has(key)) status = "maybe-later";
-        else if (archiveSet.has(key)) status = "archive";
-        return { ...m, status };
-      })
-    )
-  );
+  return hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
 }
 
 async function setSharedListStatus(listId, key, status) {
@@ -323,12 +361,11 @@ async function addToSharedList(listId, movie) {
   const key = movieKey(movie);
   const exists = items.some((m) => movieKey(m) === key);
   if (exists) return;
-  const { status, ...movieClean } = movie;
-  items.push(movieClean);
+  items.push(rowToStore(movie));
   const watched = new Set(data.watched || []);
   const maybeLater = new Set(data.maybeLater || []);
   const archive = new Set(data.archive || []);
-  const s = status || "to-watch";
+  const s = movie.status || "to-watch";
   if (s === "watched") watched.add(key);
   else if (s === "maybe-later") maybeLater.add(key);
   else if (s === "archive") archive.add(key);
@@ -337,15 +374,14 @@ async function addToSharedList(listId, movie) {
 
 async function addToPersonalList(uid, listId, movie) {
   const key = movieKey(movie);
-  const { status, ...movieClean } = movie;
-  const s = status || "to-watch";
+  const s = movie.status || "to-watch";
   if (listId === "personal") {
     const ref = doc(db, "users", uid);
     const snap = await getDoc(ref);
     const data = snap.exists() ? snap.data() : {};
     const items = Array.isArray(data.items) ? [...data.items] : [];
     if (items.some((m) => movieKey(m) === key)) return;
-    items.push(movieClean);
+    items.push(rowToStore(movie));
     const watched = new Set(data.watched || []);
     const maybeLater = new Set(data.maybeLater || []);
     const archive = new Set(data.archive || []);
@@ -360,7 +396,7 @@ async function addToPersonalList(uid, listId, movie) {
     const data = snap.data();
     const items = Array.isArray(data.items) ? [...data.items] : [];
     if (items.some((m) => movieKey(m) === key)) return;
-    items.push(movieClean);
+    items.push(rowToStore(movie));
     const watched = new Set(data.watched || []);
     const maybeLater = new Set(data.maybeLater || []);
     const archive = new Set(data.archive || []);
@@ -402,8 +438,7 @@ async function moveAllToSharedList(uid, listId) {
   for (const m of userItems) {
     const key = movieKey(m);
     if (existingKeys.has(key)) continue;
-    const { status, ...movie } = m;
-    listItems.push(movie);
+    listItems.push(rowToStore(m));
     existingKeys.add(key);
     if (userWatched.has(key)) listWatched.add(key);
     else if (userMaybeLater.has(key)) listMaybeLater.add(key);
@@ -450,8 +485,7 @@ async function copySharedListToPersonal(uid, listId) {
   for (const m of listItems) {
     const key = movieKey(m);
     if (existingKeys.has(key)) continue;
-    const { status, ...movie } = m;
-    userItems.push(movie);
+    userItems.push(rowToStore(m));
     existingKeys.add(key);
     if (listWatched.has(key)) userWatched.add(key);
     else if (listMaybeLater.has(key)) userMaybeLater.add(key);
@@ -490,9 +524,8 @@ async function moveItemFromSharedToPersonal(uid, listId, movie) {
 
   const existingKeys = new Set(userItems.map((m) => movieKey(m)));
   if (!existingKeys.has(key)) {
-    const { status, ...movieClean } = movie;
-    userItems.push(movieClean);
-    const s = status || "to-watch";
+    userItems.push(rowToStore(movie));
+    const s = movie.status || "to-watch";
     if (s === "watched") userWatched.add(key);
     else if (s === "maybe-later") userMaybeLater.add(key);
     else if (s === "archive") userArchive.add(key);
@@ -543,9 +576,8 @@ async function moveItemFromPersonalToShared(uid, listId, movie) {
   const listKeys = new Set(listItems.map((m) => movieKey(m)));
 
   if (!listKeys.has(key)) {
-    const { status, ...movieClean } = movie;
-    listItems.push(movieClean);
-    const s = status || "to-watch";
+    listItems.push(rowToStore(movie));
+    const s = movie.status || "to-watch";
     if (s === "watched") listWatched.add(key);
     else if (s === "maybe-later") listMaybeLater.add(key);
     else if (s === "archive") listArchive.add(key);
@@ -641,18 +673,7 @@ async function getPersonalListMovies(uid, listId) {
     const watchedSet = new Set(data.watched || []);
     const maybeLaterSet = new Set(data.maybeLater || []);
     const archiveSet = new Set(data.archive || []);
-    return mergeTmdbIdsFromCatalog(
-      await mergeImdbIdsFromCatalog(
-        items.map((m) => {
-          const key = movieKey(m);
-          let status = "to-watch";
-          if (watchedSet.has(key)) status = "watched";
-          else if (maybeLaterSet.has(key)) status = "maybe-later";
-          else if (archiveSet.has(key)) status = "archive";
-          return { ...m, status };
-        })
-      )
-    );
+    return hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
   } catch (e) {
     console.warn("getPersonalListMovies failed:", e);
     return [];
@@ -745,6 +766,68 @@ async function leaveSharedList(uid, listId) {
   await setDoc(ref, { members: arrayRemove(uid) }, { merge: true });
 }
 
+/** @returns {{ tmdbId: number, media: 'tv'|'movie' } | null} */
+function listItemToUpcomingPair(m) {
+  if (!m || typeof m !== "object") return null;
+  const t = m.tmdbId;
+  if (t == null || t === "") return null;
+  const n = Number(t);
+  if (Number.isNaN(n)) return null;
+  const isTv = m.tmdbMedia === "tv" || m.type === "show";
+  return { tmdbId: n, media: isTv ? "tv" : "movie" };
+}
+
+/**
+ * Fetch upcomingAlerts for list rows (catalogTmdbId + media match). Chunks Firestore `in` (max 10).
+ * @param {object[]} items — current list movies
+ */
+async function fetchUpcomingAlertsForItems(items) {
+  const pairKeys = new Set();
+  const tmdbIds = new Set();
+  for (const m of items || []) {
+    const p = listItemToUpcomingPair(m);
+    if (!p) continue;
+    pairKeys.add(`${p.tmdbId}|${p.media}`);
+    tmdbIds.add(p.tmdbId);
+  }
+  if (tmdbIds.size === 0) return [];
+
+  const ids = [...tmdbIds];
+  const CHUNK = 10;
+  /** @type {Map<string, object>} */
+  const byId = new Map();
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    const q = query(collection(db, "upcomingAlerts"), where("catalogTmdbId", "in", chunk));
+    const snap = await getDocs(q);
+    snap.forEach((d) => {
+      byId.set(d.id, { id: d.id, ...d.data() });
+    });
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const out = [];
+  for (const a of byId.values()) {
+    const c = a.catalogTmdbId;
+    const med = a.media;
+    if (c == null || !med) continue;
+    if (!pairKeys.has(`${c}|${med}`)) continue;
+    if (a.expiresAt && String(a.expiresAt) < today) continue;
+    out.push(a);
+  }
+  return out;
+}
+
+/**
+ * Persist dismissal fingerprint on users/{uid}.upcomingDismissals.{fingerprint}
+ */
+async function dismissUpcomingAlert(uid, fingerprint) {
+  if (!uid || !fingerprint) return;
+  const day = new Date().toISOString().slice(0, 10);
+  const ref = doc(db, "users", uid);
+  await setDoc(ref, { upcomingDismissals: { [String(fingerprint)]: day } }, { merge: true });
+}
+
 /**
  * Remove from user's personal list any item that exists in the shared list.
  * Keeps items only in the shared list.
@@ -815,4 +898,6 @@ export {
   moveItemFromSharedToPersonal,
   moveItemFromPersonalToShared,
   removeDuplicatesFromPersonal,
+  fetchUpcomingAlertsForItems,
+  dismissUpcomingAlert,
 };

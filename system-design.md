@@ -34,13 +34,15 @@ This document describes **only what exists in this repository** as of the last f
 **Netlify**  
 - **Static hosting** for HTML, CSS, JS, SVG assets.  
 - **Serverless functions** (see `netlify.toml` → `functions = "netlify/functions"`):  
-  - `add-from-imdb.js` — verifies token, calls OMDb/TMDB, writes Firestore via Admin SDK.  
+  - `add-from-imdb.js` — verifies token, calls OMDb/TMDB, writes Firestore via Admin SDK; after a successful add with `tmdbId`, runs **upcoming alerts** sync for that title (`lib/sync-upcoming-alerts.js`).  
   - `join-shared-list.js` — verifies token, adds caller’s uid to `sharedLists/{listId}.members`.  
+  - `check-upcoming.js` — **scheduled** (3:00 UTC, `netlify.toml` → `[functions."check-upcoming"]`): reads **`titleRegistry`** documents and unions legacy **`catalog/movies`** rows, dedupes by TMDB id + tv/movie, calls TMDB (`/tv`, `/movie`, `/collection`), upserts `upcomingAlerts` via Admin SDK (250ms between TMDB calls, 429 → 10s retry once).  
 - Functions use **Firebase Admin** with `FIREBASE_SERVICE_ACCOUNT`; they bypass Firestore security rules by design.
+- **`netlify/functions/package.json`** sets `"type": "commonjs"` so handlers stay CommonJS while the repo root `package.json` is `"type": "module"`.
 
 **Firebase**  
 - **Authentication:** Google provider; users identified by `uid`.  
-- **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: catalog read-only to clients; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`).
+- **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: catalog read-only to clients; **`titleRegistry` read for signed-in users, no client writes**; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`); `upcomingAlerts` read for any signed-in user, no client writes.
 
 **External APIs — where invoked**  
 - **TMDB / OMDb:** from **`netlify/functions/add-from-imdb.js`** (POST) and from **local Node scripts**, not from the deployed SPA.  
@@ -59,7 +61,21 @@ This document describes **only what exists in this repository** as of the last f
 
 **Rules:** `allow read: if true`; `allow write: if false` — **clients cannot write catalog**; updates are offline/scripts/admin only.
 
-**Relationship:** Logical reference only — user list items may be enriched from catalog by matching `title|year` or `imdbId`.
+**Relationship:** Legacy merge source — new lists use **`titleRegistry`**; `mergeImdbIdsFromCatalog` / `mergeTmdbIdsFromCatalog` still match catalog rows by `title|year` for **embedded legacy** items only.
+
+---
+
+### `titleRegistry` / `{registryId}`
+
+Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only (`add-from-imdb`, migration scripts). **Reads:** Any signed-in user.
+
+| Field | Type | Notes |
+|-------|------|--------|
+| (same as former embedded item) | | `title`, `year`, `type`, `genre`, `thumb`, `youtubeId`, `imdbId`, `tmdbId`, `tmdbMedia`, `services`, … |
+
+**`registryId` algorithm:** `lib/registry-id.js` — prefer normalized IMDb id (`tt…`), else `tmdb-tv-{id}` / `tmdb-movie-{id}`, else deterministic `legacy-{hash}` from `title|year`.
+
+**List rows** in `users` / `sharedLists` / `personalLists` store **`{ registryId: "<id>" }`** only (after migration). Status arrays use the same string as the key (`registryId`). Per-user display overrides can attach here or on list rows in a future version.
 
 ---
 
@@ -67,13 +83,14 @@ This document describes **only what exists in this repository** as of the last f
 
 | Field | Type | Notes |
 |-------|------|--------|
-| `items` | `array` | Default personal watchlist rows (each element: see **Item object** below). |
-| `watched` | `array` of string | Keys matching `movieKey(m)` → `"title|year"`. |
-| `maybeLater` | `array` of string | Same key format. |
-| `archive` | `array` of string | Same key format. |
+| `items` | `array` | Prefer **`{ registryId }`** per row; legacy pre-migration rows may still be full embedded objects (hydrated + merged on read). |
+| `watched` | `array` of string | Keys = **`registryId`** after migration; legacy = `"title|year"`. |
+| `maybeLater` | `array` of string | Same as `watched`. |
+| `archive` | `array` of string | Same as `watched`. |
 | `listName` | `string` | Display name for default list (default `"My list"`). |
 | `country` | `string` | ISO 3166-1 alpha-2 (e.g. `"IL"`) for TMDB watch region when adding titles. |
 | `countryName` | `string` | Human-readable country name for UI. |
+| `upcomingDismissals` | `map` | Optional. Keys = alert **fingerprints** (e.g. `136311_3_9`, `12345_sequel_999`); values = ISO date string when the user dismissed that pill. Used so dismissed upcoming notifications stay hidden until a new fingerprint appears. |
 
 **Relationship:** Parent for subcollection `personalLists`. Referenced by `sharedLists.members` and `sharedLists.ownerId`.
 
@@ -111,12 +128,44 @@ This document describes **only what exists in this repository** as of the last f
 
 ---
 
-### Item object (embedded in any `items` array)
+### `upcomingAlerts` / `{docId}`
 
-Typical fields as produced by `add-from-imdb` and consumed by `app.js` / `firebase.js`:
+Top-level collection. **Writes:** Admin SDK only (`check-upcoming` scheduled function, `add-from-imdb` single-title sync). **Reads:** Any signed-in user (`firestore.rules`).
+
+Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
 | Field | Type | Notes |
 |-------|------|--------|
+| `catalogTmdbId` | `number` | TMDB id of the catalog row this alert was built from (same as list item after merge). |
+| `media` | `"tv"` \| `"movie"` | Matches list classification (`show` → tv). |
+| `fingerprint` | `string` | Dismissal / identity key (e.g. `136311_3_9`, `12345_sequel_999`, `12345_upcoming`). |
+| `tmdbId` | `number` | Same as `catalogTmdbId` in current implementation (show in list). |
+| `type` | `"tv"` \| `"movie"` | Same as `media`. |
+| `alertType` | `string` | `new_episode`, `new_season`, `upcoming_movie`, `sequel`. |
+| `title`, `detail` | `string` | UI copy. |
+| `airDate` | `string` or null | `YYYY-MM-DD` when known; null for TBA-style. |
+| `confirmed` | `bool` | `false` for returning series without `next_episode_to_air`. |
+| `expiresAt` | `string` | `YYYY-MM-DD`; expired docs deleted by the scheduled job. |
+| `sequelTmdbId` | `number` or null | For `sequel` alerts. |
+| `detectedAt` | `timestamp` | Server time on upsert. |
+
+**Client:** `firebase.js` → `fetchUpcomingAlertsForItems` (chunks `catalogTmdbId` `in` queries), `dismissUpcomingAlert` merges into `users/{uid}.upcomingDismissals`. `app.js` shows pills for the **currently loaded list** only, max 3 + expand, sorted by `airDate`.
+
+**Admin queries:** Composite `(catalogTmdbId, media)` may be required for `deleteStaleAlertsForRow`; Firebase console may prompt to create an index on first scheduled run.
+
+---
+
+### List row in Firestore (`items` array)
+
+**Current (normalized):** `{ "registryId": "tt1234567" }` (or `tmdb-tv-…` / `legacy-…`). Metadata lives in **`titleRegistry/{registryId}`**; the client merges on read (`firebase.js` → `hydrateListItemsFromRegistry`).
+
+**Legacy (pre-migration):** full embedded objects with the same fields as **`titleRegistry`** docs; still supported until `scripts/migrate-to-title-registry.mjs` is run.
+
+**Registry / hydrated fields** (from `titleRegistry` or legacy embed):
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `registryId` | `string` | Present on hydrated client objects; not stored in `titleRegistry` payload (doc id is the id). |
 | `title` | `string` | |
 | `year` | `number` or null | |
 | `type` | `"movie"` \| `"show"` | TV uses `"show"`. |
@@ -127,9 +176,9 @@ Typical fields as produced by `add-from-imdb` and consumed by `app.js` / `fireba
 | `tmdbId` | `number` | When TMDB enrichment succeeds. |
 | `services` | `array` of string | Provider display names for a region (legacy / default). |
 | `servicesByRegion` | `object` | Optional map `{ "IL": [...], ... }`; may be populated by maintenance scripts or future client code (not written by current SPA). |
-| `tmdbMedia` | `string` | Used in scripts / dedupe (`"tv"`); client dedupe in diagnostics uses `tmdbMedia === "tv"` or `type === "show"`. |
+| `tmdbMedia` | `string` | `"tv"` \| `"movie"` for TMDB dedupe / upcoming sync. |
 
-**Runtime-only:** `status` (`to-watch` \| `watched` \| `maybe-later` \| `archive`) is **computed in memory** when loading lists, from `watched` / `maybeLater` / `archive` key arrays, not stored inside each item in Firestore.
+**Runtime-only:** `status` (`to-watch` \| `watched` \| `maybe-later` \| `archive`) is **computed in memory** when loading lists, from `watched` / `maybeLater` / `archive` key arrays (`listKey` / `registryId`).
 
 ---
 

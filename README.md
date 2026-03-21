@@ -34,9 +34,13 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 2. Set `OMDB_API_KEY` in Netlify → Site settings → Environment variables. Get a free key at [omdbapi.com](https://www.omdbapi.com/apikey.aspx).
 
-3. Set `TMDB_API_KEY` in Netlify → Site settings → Environment variables (for trailer lookup). Get a free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
+3. Set `TMDB_API_KEY` in Netlify → Site settings → Environment variables (for trailer lookup and **upcoming** sync). Get a free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
 
-4. Visit `/bookmarklet.html` on your deployed site, drag the button to your bookmarks bar, then sign in with Google. When on an IMDb title page, click the bookmarklet to add it to your watchlist.
+4. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** (plus legacy **`catalog/movies`** until you retire it) and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
+
+   **Existing data:** run `node scripts/migrate-to-title-registry.mjs --dry-run` then without `--dry-run` to move list `items` to `{ registryId }`, remap status keys, and seed `titleRegistry`.
+
+5. Visit `/bookmarklet.html` on your deployed site, drag the button to your bookmarks bar, then sign in with Google. When on an IMDb title page, click the bookmarklet to add it to your watchlist.
 
 ## Multi-user support
 

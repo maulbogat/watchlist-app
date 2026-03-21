@@ -30,6 +30,9 @@ import {
   moveItemFromPersonalToShared,
   getUserProfile,
   setUserCountry,
+  getStatusData,
+  fetchUpcomingAlertsForItems,
+  dismissUpcomingAlert,
 } from "./firebase.js";
 import { COUNTRIES, countryCodeToFlag } from "./countries.js";
 import { isPlayableYoutubeTrailerId } from "./lib/youtube-trailer-id.js";
@@ -46,6 +49,9 @@ let currentModalMovie = null; // movie currently shown in modal
 let currentListMode = "personal"; // "personal" | { type: "personal", listId, name } | { type: "shared", listId, name }
 let sharedLists = [];
 let personalLists = [];
+
+/** Inline expansion for upcoming alert pills (>3 items). */
+let upcomingAlertsExpanded = false;
 
 /** User's selected country code (e.g. 'IL') for TMDB watch provider API. Set from Firestore profile. */
 let userCountryCode = "IL";
@@ -1127,6 +1133,123 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+function formatUpcomingAirLabel(alert) {
+  if (!alert.airDate) return "TBA";
+  try {
+    const raw = String(alert.airDate);
+    const d = new Date(raw.includes("T") ? raw : `${raw}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return String(alert.airDate);
+  }
+}
+
+function clearUpcomingAlertsBar() {
+  upcomingAlertsExpanded = false;
+  const mount = document.getElementById("upcoming-alerts-mount");
+  if (mount) {
+    mount.hidden = true;
+    mount.innerHTML = "";
+    mount.classList.remove("upcoming-alerts-mount--visible");
+  }
+}
+
+async function refreshUpcomingAlertsBar(user) {
+  const mount = document.getElementById("upcoming-alerts-mount");
+  if (!mount) return;
+  const u = user || auth.currentUser;
+  if (!u) {
+    clearUpcomingAlertsBar();
+    return;
+  }
+  try {
+    const data = await getStatusData(u.uid);
+    const dismissals = data.upcomingDismissals || {};
+    const raw = await fetchUpcomingAlertsForItems(movies);
+    const active = raw.filter((a) => a.fingerprint && !dismissals[a.fingerprint]);
+    active.sort((a, b) => {
+      const ad = a.confirmed && a.airDate ? String(a.airDate) : "9999-12-31";
+      const bd = b.confirmed && b.airDate ? String(b.airDate) : "9999-12-31";
+      if (ad !== bd) return ad.localeCompare(bd);
+      return String(a.title || "").localeCompare(String(b.title || ""));
+    });
+    if (active.length === 0) {
+      mount.hidden = true;
+      mount.innerHTML = "";
+      mount.classList.remove("upcoming-alerts-mount--visible");
+      return;
+    }
+    mount.hidden = false;
+    mount.classList.add("upcoming-alerts-mount--visible");
+    const maxInitial = 3;
+    const shown = upcomingAlertsExpanded ? active : active.slice(0, maxInitial);
+    const restCount = Math.max(0, active.length - maxInitial);
+    const pills = shown
+      .map((a) => {
+        const tba = !a.confirmed || !a.airDate;
+        const cls = tba
+          ? "upcoming-alert-pill upcoming-alert-pill--tba"
+          : "upcoming-alert-pill upcoming-alert-pill--confirmed";
+        const dateLabel = formatUpcomingAirLabel(a);
+        const fp = escapeHtml(String(a.fingerprint));
+        return `<div class="${cls}" data-fp="${fp}" role="status">
+        <span class="upcoming-alert-title">${escapeHtml(String(a.title || ""))}</span>
+        <span class="upcoming-alert-detail">${escapeHtml(String(a.detail || ""))}</span>
+        <span class="upcoming-alert-date">${tba ? "TBA" : escapeHtml(dateLabel)}</span>
+        <button type="button" class="upcoming-alert-dismiss" aria-label="Dismiss">×</button>
+      </div>`;
+      })
+      .join("");
+    let moreHtml = "";
+    if (!upcomingAlertsExpanded && restCount > 0) {
+      moreHtml = `<div class="upcoming-alerts-more-wrap"><button type="button" class="upcoming-alerts-more">and ${restCount} more →</button></div>`;
+    } else if (upcomingAlertsExpanded && active.length > maxInitial) {
+      moreHtml = `<div class="upcoming-alerts-more-wrap"><button type="button" class="upcoming-alerts-more upcoming-alerts-less">Show less</button></div>`;
+    }
+    mount.innerHTML = `<div class="upcoming-alerts-inner">${pills}${moreHtml}</div>`;
+    mount.querySelectorAll(".upcoming-alert-dismiss").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const pill = btn.closest(".upcoming-alert-pill");
+        const fp = pill?.dataset.fp;
+        if (!fp || !auth.currentUser) return;
+        pill.classList.add("upcoming-alert-pill--out");
+        const removePill = () => {
+          pill.remove();
+          const inner = mount.querySelector(".upcoming-alerts-inner");
+          if (inner && !inner.querySelector(".upcoming-alert-pill")) {
+            clearUpcomingAlertsBar();
+          }
+        };
+        pill.addEventListener("transitionend", removePill, { once: true });
+        try {
+          await dismissUpcomingAlert(auth.currentUser.uid, fp);
+        } catch (err) {
+          console.warn("dismiss upcoming:", err);
+        }
+        setTimeout(removePill, 400);
+      });
+    });
+    const moreBtn = mount.querySelector(".upcoming-alerts-more");
+    if (moreBtn) {
+      moreBtn.addEventListener("click", () => {
+        upcomingAlertsExpanded = !upcomingAlertsExpanded;
+        refreshUpcomingAlertsBar(auth.currentUser);
+      });
+    }
+  } catch (e) {
+    console.warn("upcoming alerts:", e);
+    mount.hidden = true;
+  }
+}
+
+async function afterMoviesReloaded(user) {
+  const u = user || auth.currentUser;
+  if (!u) return;
+  await refreshUpcomingAlertsBar(u);
+}
+
 function renderListsModalContent() {
   const listEl = document.getElementById("lists-modal-list");
   if (!listEl) return;
@@ -1232,6 +1355,7 @@ async function handleListSelect(val) {
     }
     updateCopyInviteButton();
   }
+  await afterMoviesReloaded(user);
   renderListSelector();
 }
 
@@ -1252,6 +1376,7 @@ function init() {
       currentFilter = "both";
       currentGenre = "";
       currentStatus = "to-watch";
+      clearUpcomingAlertsBar();
       const wrap = document.getElementById("list-selector-wrap");
       if (wrap) wrap.style.display = "none";
       updateFilterCount("");
@@ -1365,6 +1490,7 @@ function init() {
       renderGenreFilter();
     }
     updateCopyInviteButton();
+    await afterMoviesReloaded(user);
   });
 
   // Custom dropdown: toggle, select, close on outside click
@@ -1497,6 +1623,7 @@ function init() {
         if (grid) grid.innerHTML = '<div class="empty-state">Your list is empty. Add titles from <a href="./bookmarklet.html">IMDb</a>.</div>';
       }
       updateCopyInviteButton();
+      await afterMoviesReloaded(user);
     } catch (err) {
       alert("Failed to create: " + (err.message || "Unknown error"));
     }
@@ -1538,6 +1665,7 @@ function init() {
       buildCards();
       renderGenreFilter();
       updateCopyInviteButton();
+      await afterMoviesReloaded(user);
     } catch (err) {
       alert("Failed to create: " + (err.message || "Unknown error"));
     }
@@ -1580,6 +1708,7 @@ function init() {
         buildCards();
         renderGenreFilter();
         updateCopyInviteButton();
+        await afterMoviesReloaded(user);
         if (input) input.value = "";
       } else {
         alert(data.error || "Failed to join");
@@ -1702,6 +1831,7 @@ function init() {
               buildCards();
               renderGenreFilter();
             }
+            await afterMoviesReloaded(user);
           }
           renderListSelector();
           renderListsModalContent();

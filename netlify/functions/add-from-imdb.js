@@ -2,6 +2,8 @@ const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 const https = require("https");
+const { runSingleTitleSync } = require("./lib/sync-upcoming-alerts");
+const { registryDocIdFromItem, payloadForRegistry, listKey } = require("./lib/registry-id.cjs");
 
 /** Same rule as lib/youtube-trailer-id.js (YouTube video id from TMDB). */
 const YOUTUBE_VIDEO_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
@@ -26,10 +28,6 @@ function getApp() {
   const app = initializeApp({ credential: cert(key) });
   global.__fbAdmin = app;
   return app;
-}
-
-function movieKey(m) {
-  return `${m.title}|${m.year ?? ""}`;
 }
 
 function corsHeaders(event) {
@@ -261,6 +259,7 @@ exports.handler = async (event, context) => {
           imdbId: nImdb,
           services: Array.isArray(e.services) ? e.services : [],
           tmdbId: e.tmdbId,
+          tmdbMedia: e.type === "show" ? "tv" : "movie",
         };
       }
     } catch (err) {}
@@ -302,9 +301,48 @@ exports.handler = async (event, context) => {
     };
   }
 
-  const key = movieKey(movie);
-
+  const registryId = registryDocIdFromItem(movie);
   const db = getFirestore(getApp());
+  const regDoc = db.collection("titleRegistry").doc(registryId);
+
+  async function writeRegistryMerge(mergedMovie) {
+    const payload = payloadForRegistry({ ...mergedMovie, registryId });
+    await regDoc.set(payload, { merge: true });
+  }
+
+  async function syncUpcomingForAddedTitle(m) {
+    if (!m || m.tmdbId == null || m.tmdbId === "" || !tmdbKey) return;
+    try {
+      const media = m.tmdbMedia === "tv" || m.type === "show" ? "tv" : "movie";
+      await runSingleTitleSync(db, tmdbKey, m.tmdbId, media, m.title);
+    } catch (e) {
+      console.warn("upcomingAlerts sync:", e?.message || e);
+    }
+  }
+
+  function findItemIndex(items) {
+    const byRid = items.findIndex((m) => m && m.registryId === registryId);
+    if (byRid >= 0) return byRid;
+    const byImdb = items.findIndex((m) => m && m.imdbId && norm(m.imdbId) === nImdb);
+    if (byImdb >= 0) return byImdb;
+    return items.findIndex(
+      (m) =>
+        m &&
+        !m.registryId &&
+        m.title === movie.title &&
+        String(m.year ?? "") === String(movie.year ?? "")
+    );
+  }
+
+  function remapStatusKeys(arr, fromKey, toKey) {
+    if (fromKey == null || toKey == null || fromKey === toKey || !Array.isArray(arr)) return arr || [];
+    const s = new Set(arr);
+    if (s.has(fromKey)) {
+      s.delete(fromKey);
+      s.add(toKey);
+    }
+    return [...s];
+  }
 
   if (listId) {
     const listRef = db.collection("sharedLists").doc(listId);
@@ -318,15 +356,34 @@ exports.handler = async (event, context) => {
       return jsonRes(403, { ok: false, error: "Not a member of this shared list" }, event);
     }
     const items = Array.isArray(listData.items) ? [...listData.items] : [];
-    const existing = items.find((m) => m.imdbId && norm(m.imdbId) === nImdb)
-      || items.find(
-          (m) => m.title === movie.title && String(m.year ?? "") === String(movie.year ?? "")
-        );
-    if (existing) {
-      return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in the list` }, event);
+    let watched = Array.isArray(listData.watched) ? [...listData.watched] : [];
+    let maybeLater = Array.isArray(listData.maybeLater) ? [...listData.maybeLater] : [];
+    let archive = Array.isArray(listData.archive) ? [...listData.archive] : [];
+
+    const idx = findItemIndex(items);
+    const statusKey = idx >= 0 ? listKey(items[idx]) : registryId;
+
+    if (idx >= 0) {
+      if (watched.includes(statusKey) || maybeLater.includes(statusKey) || archive.includes(statusKey)) {
+        return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in the list` }, event);
+      }
+      const existing = items[idx];
+      const merged = { ...existing, ...movie };
+      await writeRegistryMerge(merged);
+      const oldKey = listKey(existing);
+      items[idx] = { registryId };
+      watched = remapStatusKeys(watched, oldKey, registryId);
+      maybeLater = remapStatusKeys(maybeLater, oldKey, registryId);
+      archive = remapStatusKeys(archive, oldKey, registryId);
+    } else {
+      await writeRegistryMerge(movie);
+      items.push({ registryId });
     }
-    items.push(movie);
-    await listRef.update({ items });
+
+    await listRef.set({ items, watched, maybeLater, archive }, { merge: true });
+    const regSnap = await regDoc.get();
+    const mergedRow = { ...(regSnap.exists ? regSnap.data() : {}), ...movie, registryId };
+    await syncUpcomingForAddedTitle(mergedRow);
     return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to shared list` }, event);
   }
 
@@ -334,62 +391,56 @@ exports.handler = async (event, context) => {
   const userSnap = await userRef.get();
   const data = userSnap.exists ? userSnap.data() : {};
   const items = Array.isArray(data.items) ? [...data.items] : [];
-  const watched = Array.isArray(data.watched) ? data.watched : [];
-  const maybeLater = Array.isArray(data.maybeLater) ? data.maybeLater : [];
-  const archive = Array.isArray(data.archive) ? data.archive : [];
+  let watched = Array.isArray(data.watched) ? [...data.watched] : [];
+  let maybeLater = Array.isArray(data.maybeLater) ? [...data.maybeLater] : [];
+  let archive = Array.isArray(data.archive) ? [...data.archive] : [];
 
-  let existing = items.find((m) => m.imdbId && norm(m.imdbId) === nImdb);
-  if (!existing) {
-    existing = items.find(
-      (m) => m.title === movie.title && String(m.year ?? "") === String(movie.year ?? "")
-    );
-  }
+  const idx = findItemIndex(items);
+  const statusKey = idx >= 0 ? listKey(items[idx]) : registryId;
 
-  if (existing) {
-    if (watched.includes(key) || maybeLater.includes(key) || archive.includes(key)) {
+  let shouldSyncUpcoming = false;
+
+  if (idx >= 0) {
+    if (watched.includes(statusKey) || maybeLater.includes(statusKey) || archive.includes(statusKey)) {
       return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in your list` }, event);
     }
-    const idx = items.findIndex((m) => m === existing);
-    if (idx >= 0) {
-      const needMerge =
-        (existing.year == null && movie.year != null) ||
-        (!existing.thumb && movie.thumb) ||
-        (!existing.genre && movie.genre) ||
-        (!isPlayableYoutubeTrailerId(existing.youtubeId) &&
-          isPlayableYoutubeTrailerId(movie.youtubeId)) ||
-        ((!existing.services || existing.services.length === 0) &&
-          movie.services &&
-          movie.services.length > 0);
-      if (needMerge) {
-        if (existing.year == null && movie.year != null) existing.year = movie.year;
-        if (!existing.thumb && movie.thumb) existing.thumb = movie.thumb;
-        if (!existing.genre && movie.genre) existing.genre = movie.genre;
-        if (
-          !isPlayableYoutubeTrailerId(existing.youtubeId) &&
-          isPlayableYoutubeTrailerId(movie.youtubeId)
-        ) {
-          existing.youtubeId = movie.youtubeId;
-        }
-        if ((!existing.services || existing.services.length === 0) && movie.services?.length) {
-          existing.services = movie.services;
-        }
-        if (!existing.imdbId && movie.imdbId) existing.imdbId = movie.imdbId;
-        if (movie.tmdbId && !existing.tmdbId) existing.tmdbId = movie.tmdbId;
+    const existing = items[idx];
+    const merged = { ...existing, ...movie };
+    const needMerge =
+      (existing.year == null && movie.year != null) ||
+      (!existing.thumb && movie.thumb) ||
+      (!existing.genre && movie.genre) ||
+      (!isPlayableYoutubeTrailerId(existing.youtubeId) && isPlayableYoutubeTrailerId(movie.youtubeId)) ||
+      ((!existing.services || existing.services.length === 0) && movie.services && movie.services.length > 0) ||
+      (movie.tmdbId != null && movie.tmdbId !== "" && (existing.tmdbId == null || existing.tmdbId === ""));
+
+    if (needMerge) {
+      if (movie.tmdbId != null && movie.tmdbId !== "" && (existing.tmdbId == null || existing.tmdbId === "")) {
+        shouldSyncUpcoming = true;
       }
+    } else if (movie.tmdbId != null && movie.tmdbId !== "" && (existing.tmdbId == null || existing.tmdbId === "")) {
+      shouldSyncUpcoming = true;
     }
+
+    await writeRegistryMerge(merged);
+    const oldKey = listKey(existing);
+    items[idx] = { registryId };
+    watched = remapStatusKeys(watched, oldKey, registryId);
+    maybeLater = remapStatusKeys(maybeLater, oldKey, registryId);
+    archive = remapStatusKeys(archive, oldKey, registryId);
   } else {
-    items.push(movie);
+    await writeRegistryMerge(movie);
+    items.push({ registryId });
+    if (movie.tmdbId != null && movie.tmdbId !== "") shouldSyncUpcoming = true;
   }
 
-  await userRef.set(
-    {
-      items,
-      watched: watched.filter((k) => k !== key),
-      maybeLater: maybeLater.filter((k) => k !== key),
-      archive: archive.filter((k) => k !== key),
-    },
-    { merge: true }
-  );
+  await userRef.set({ items, watched, maybeLater, archive }, { merge: true });
+
+  if (shouldSyncUpcoming || idx < 0) {
+    const regSnap = await regDoc.get();
+    const mergedRow = { ...(regSnap.exists ? regSnap.data() : {}), ...movie, registryId };
+    await syncUpcomingForAddedTitle(mergedRow);
+  }
 
   return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to To Watch` }, event);
 };

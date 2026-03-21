@@ -2275,3 +2275,137 @@ header h1 span {
   background: #f0d87a;
   color: var(--bg);
 }
+
+/* --- Upcoming alerts (TMDB sync → Firestore) --- */
+.upcoming-alerts-mount {
+  width: 100%;
+  position: relative;
+  z-index: 50;
+}
+
+.upcoming-alerts-mount[hidden] {
+  display: none !important;
+}
+
+.upcoming-alerts-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem 0.65rem;
+  padding: 0.65rem 1rem 0.75rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  animation: upcomingSlideDown 0.4s ease-out;
+}
+
+@keyframes upcomingSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.upcoming-alert-pill {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  max-width: 100%;
+  padding: 0.35rem 0.55rem 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.upcoming-alert-pill--confirmed {
+  border-color: rgba(232, 201, 106, 0.35);
+  box-shadow: 0 0 0 1px rgba(232, 201, 106, 0.08);
+}
+
+.upcoming-alert-pill--confirmed .upcoming-alert-date {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.upcoming-alert-pill--tba {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.upcoming-alert-pill--tba .upcoming-alert-date {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.upcoming-alert-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.upcoming-alert-detail {
+  color: var(--muted);
+  max-width: 14rem;
+}
+
+.upcoming-alert-date {
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.upcoming-alert-dismiss {
+  margin-left: 0.15rem;
+  padding: 0 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.upcoming-alert-dismiss:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.upcoming-alert-pill--out {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+.upcoming-alerts-more-wrap {
+  width: 100%;
+  flex-basis: 100%;
+}
+
+.upcoming-alerts-more {
+  padding: 0.2rem 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.upcoming-alerts-more:hover {
+  color: #f0d87a;
+}
+
+.upcoming-alerts-less {
+  color: var(--muted);
+}
+
+.upcoming-alerts-less:hover {
+  color: var(--text);
+}
