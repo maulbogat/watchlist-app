@@ -1274,7 +1274,11 @@ function formatUpcomingAirLabel(alert) {
   }
 }
 
-/** True when airDate is a real calendar value (gold accent + calendar row; not tied to `confirmed`). */
+/**
+ * True when `airDate` parses to a real calendar day.
+ * Server sync (`tmdb-upcoming-fetch.js`) only writes rows with a concrete TMDB date — no TBA placeholders.
+ * This guards against legacy/corrupt `upcomingAlerts` docs; the bar filters these out so we never show TBA pills.
+ */
 function upcomingAlertHasRealAirDate(alert) {
   const s = getUpcomingAirDateString(alert);
   if (!s || s.toUpperCase() === "TBA") return false;
@@ -1294,21 +1298,123 @@ function compactUpcomingDetail(detail) {
   return s;
 }
 
+/** YYYY-MM-DD from alert, or "" if invalid. */
+function getUpcomingAirDateYmd(alert) {
+  const raw = getUpcomingAirDateString(alert);
+  if (!raw || String(raw).toUpperCase() === "TBA") return "";
+  const ymd = String(raw).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return "";
+  return ymd;
+}
+
+function icsEscapeText(str) {
+  return String(str || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,");
+}
+
+/** Fold a single logical line to ≤75 octets per RFC 5545 (ASCII-safe). */
+function icsFoldLine(line) {
+  const max = 73;
+  if (line.length <= max) return line;
+  const out = [];
+  let rest = line;
+  let first = true;
+  while (rest.length > 0) {
+    const chunkLen = first ? max : max - 1;
+    out.push(first ? rest.slice(0, chunkLen) : ` ${rest.slice(0, chunkLen)}`);
+    rest = rest.slice(chunkLen);
+    first = false;
+  }
+  return out.join("\r\n");
+}
+
+function icsAllDayEndExclusiveYmd(ymd) {
+  const d = new Date(`${ymd}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+/**
+ * Build an iCalendar (.ics) document for an upcoming row (all-day on air date).
+ * @returns {string|null}
+ */
+function buildUpcomingIcsDocument({ ymd, title, detail, uid }) {
+  if (!ymd) return null;
+  const start = ymd.replace(/-/g, "");
+  if (start.length !== 8) return null;
+  const endExcl = icsAllDayEndExclusiveYmd(ymd);
+  if (!endExcl) return null;
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const sum = icsFoldLine(`SUMMARY:${icsEscapeText(title || "Upcoming")}`);
+  const uidSafe = String(uid || "upcoming").replace(/[^\w.-]/g, "-");
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Watchlist//Upcoming//EN",
+    "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `UID:${uidSafe}@watchlist-upcoming`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${start}`,
+    `DTEND;VALUE=DATE:${endExcl}`,
+    sum,
+  ];
+  const descRaw = String(detail || "").trim();
+  if (descRaw) {
+    lines.push(icsFoldLine(`DESCRIPTION:${icsEscapeText(descRaw)}`));
+  }
+  lines.push("END:VEVENT", "END:VCALENDAR");
+  return lines.join("\r\n");
+}
+
+function safeIcsDownloadFilename(title) {
+  const base = String(title || "upcoming")
+    .replace(/[\\/:*?"<>|]+/g, "")
+    .trim()
+    .slice(0, 72);
+  const slug = base.replace(/\s+/g, "-").replace(/-+/g, "-") || "upcoming";
+  return `${slug}.ics`;
+}
+
+function downloadUpcomingIcs(icsBody, filename) {
+  const blob = new Blob([icsBody], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 const UPCOMING_CAL_ICON_SVG = `<svg class="upcoming-alert-cal-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg>`;
 
+const UPCOMING_ADD_CAL_ICON_SVG = `<svg class="upcoming-alert-add-cal-icon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5zm7 5h2v3h3v2h-3v3h-2v-3H9v-2h3z"/></svg>`;
+
 function renderUpcomingAlertPill(a) {
-  const hasDate = upcomingAlertHasRealAirDate(a);
-  const cls = hasDate
-    ? "upcoming-alert-pill upcoming-alert-pill--confirmed"
-    : "upcoming-alert-pill upcoming-alert-pill--tba";
+  const ymd = getUpcomingAirDateYmd(a);
   const dateLabel = formatUpcomingAirLabel(a);
   const fp = escapeHtml(String(a.fingerprint));
   const title = escapeHtml(String(a.title || ""));
   const detailCompact = escapeHtml(compactUpcomingDetail(a.detail));
-  const dateBlock = hasDate
-    ? `<span class="upcoming-alert-date-block">${UPCOMING_CAL_ICON_SVG}<span class="upcoming-alert-date-text">${escapeHtml(dateLabel)}</span></span>`
-    : `<span class="upcoming-alert-tba-badge">TBA</span>`;
-  return `<div class="${cls}" data-fp="${fp}" role="status">
+  const dateBlock = `<span class="upcoming-alert-date-block">${UPCOMING_CAL_ICON_SVG}<span class="upcoming-alert-date-text">${escapeHtml(dateLabel)}</span></span>`;
+  const calCol = ymd
+    ? `<div class="upcoming-alert-cal-add-col">
+      <button type="button" class="upcoming-alert-add-cal-btn" aria-label="Add to calendar" title="Download calendar file (.ics) for Apple Calendar, Google Calendar, Outlook…"
+        data-cal-date="${escapeHtml(ymd)}"
+        data-cal-title="${encodeURIComponent(String(a.title || ""))}"
+        data-cal-detail="${encodeURIComponent(String(a.detail || ""))}">
+        ${UPCOMING_ADD_CAL_ICON_SVG}
+      </button>
+    </div>`
+      : "";
+  return `<div class="upcoming-alert-pill upcoming-alert-pill--confirmed" data-fp="${fp}" role="status">
     <div class="upcoming-alert-pill-body">
       <div class="upcoming-alert-title">${title}</div>
       <div class="upcoming-alert-second-row">
@@ -1316,6 +1422,7 @@ function renderUpcomingAlertPill(a) {
         ${dateBlock}
       </div>
     </div>
+    ${calCol}
     <div class="upcoming-alert-dismiss-col">
       <button type="button" class="upcoming-alert-dismiss" aria-label="Dismiss upcoming alert">×</button>
     </div>
@@ -1374,10 +1481,12 @@ async function refreshUpcomingAlertsBar(user) {
     const data = await getStatusData(u.uid);
     const dismissals = data.upcomingDismissals || {};
     const raw = await fetchUpcomingAlertsForItems(movies);
-    const active = raw.filter((a) => a.fingerprint && !dismissals[a.fingerprint]);
+    const active = raw.filter(
+      (a) => a.fingerprint && !dismissals[a.fingerprint] && upcomingAlertHasRealAirDate(a)
+    );
     active.sort((a, b) => {
-      const ad = a.confirmed && a.airDate ? String(a.airDate) : "9999-12-31";
-      const bd = b.confirmed && b.airDate ? String(b.airDate) : "9999-12-31";
+      const ad = getUpcomingAirDateYmd(a) || "9999-12-31";
+      const bd = getUpcomingAirDateYmd(b) || "9999-12-31";
       if (ad !== bd) return ad.localeCompare(bd);
       return String(a.title || "").localeCompare(String(b.title || ""));
     });
@@ -1431,6 +1540,30 @@ async function refreshUpcomingAlertsBar(user) {
         { once: true }
       );
     }
+    mount.querySelectorAll(".upcoming-alert-add-cal-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const pillEl = btn.closest(".upcoming-alert-pill");
+        const fp = pillEl?.dataset.fp || "upcoming";
+        const ymd = btn.dataset.calDate;
+        let title = "";
+        let detail = "";
+        try {
+          title = decodeURIComponent(btn.dataset.calTitle || "");
+        } catch {
+          title = "";
+        }
+        try {
+          detail = decodeURIComponent(btn.dataset.calDetail || "");
+        } catch {
+          detail = "";
+        }
+        const doc = buildUpcomingIcsDocument({ ymd, title, detail, uid: fp });
+        if (!doc) return;
+        downloadUpcomingIcs(doc, safeIcsDownloadFilename(title));
+      });
+    });
     mount.querySelectorAll(".upcoming-alert-dismiss").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();

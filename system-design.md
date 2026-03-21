@@ -145,7 +145,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `sequelTmdbId` | `number` or null | For `sequel` alerts. |
 | `detectedAt` | `timestamp` | Server time on upsert. |
 
-**Client:** `firebase.js` → `fetchUpcomingAlertsForItems` (chunks `catalogTmdbId` `in` queries), `dismissUpcomingAlert` merges into `users/{uid}.upcomingDismissals`. `app.js` shows pills for the **currently loaded list** only, max 3 + expand, sorted by `airDate`.
+**Client:** `firebase.js` → `fetchUpcomingAlertsForItems` (chunks `catalogTmdbId` / `sequelTmdbId` `in` queries), `dismissUpcomingAlert` merges into `users/{uid}.upcomingDismissals`. `app.js` shows pills for the **currently loaded list** only, max 3 + expand, sorted by `airDate`. Sync never writes undated/TBA rows; the client drops any alert without a parseable date (legacy junk). Each pill includes **Add to calendar** (all-day **`.ics`**) when `airDate` is a normal `YYYY-MM-DD`.
 
 **Admin queries:** Composite `(catalogTmdbId, media)` may be required for `deleteStaleAlertsForRow`; Firebase console may prompt to create an index on first scheduled run.
 

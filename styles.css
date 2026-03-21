@@ -2371,7 +2371,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   flex-direction: row;
   align-items: stretch;
   flex: 0 1 auto;
-  min-width: min(100%, 280px);
+  min-width: min(100%, 300px);
   max-width: 100%;
   height: var(--upcoming-pill-h);
   min-height: var(--upcoming-pill-h);
@@ -2399,11 +2399,6 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .upcoming-alert-pill--confirmed {
   border-color: var(--border);
   border-left-color: rgba(232, 201, 106, 0.65);
-}
-
-.upcoming-alert-pill--tba {
-  border-color: var(--border);
-  border-left-color: rgba(255, 255, 255, 0.2);
 }
 
 .upcoming-alert-pill-body {
@@ -2474,18 +2469,42 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   min-width: 0;
 }
 
-.upcoming-alert-tba-badge {
+.upcoming-alert-cal-add-col {
   flex: 0 0 auto;
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.12rem 0.38rem;
-  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  justify-content: center;
+  padding: 0 0.25rem;
+  border-left: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.upcoming-alert-add-cal-btn {
+  margin: 0;
+  padding: 0.25rem;
+  border: none;
+  background: transparent;
+  color: rgba(232, 201, 106, 0.55);
+  cursor: pointer;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  color: var(--muted);
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.upcoming-alert-add-cal-btn:hover {
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.upcoming-alert-add-cal-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .upcoming-alert-dismiss-col {
