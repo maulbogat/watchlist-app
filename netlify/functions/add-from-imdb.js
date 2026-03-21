@@ -1,5 +1,5 @@
 const { initializeApp, cert } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 const https = require("https");
 const { runSingleTitleSync } = require("./lib/sync-upcoming-alerts");
@@ -188,6 +188,65 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint) {
   };
 }
 
+function adminRandomListId() {
+  return Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 12);
+}
+
+/** Mirror client migrate: move legacy users/{uid}.items → users/{uid}/personalLists/{id}. */
+async function migrateLegacyPersonalListAdmin(db, uid) {
+  const userRef = db.collection("users").doc(uid);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) return;
+  const data = userSnap.data() || {};
+
+  let defId = typeof data.defaultPersonalListId === "string" ? data.defaultPersonalListId.trim() : "";
+  if (defId) {
+    const plSnap = await userRef.collection("personalLists").doc(defId).get();
+    if (plSnap.exists) return;
+    await userRef.update({ defaultPersonalListId: FieldValue.delete() });
+  }
+
+  const subSnap = await userRef.collection("personalLists").get();
+  if (subSnap.docs.length === 1) {
+    await userRef.set({ defaultPersonalListId: subSnap.docs[0].id }, { merge: true });
+    return;
+  }
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  const watched = Array.isArray(data.watched) ? data.watched : [];
+  const maybeLater = Array.isArray(data.maybeLater) ? data.maybeLater : [];
+  const archive = Array.isArray(data.archive) ? data.archive : [];
+  const listName = typeof data.listName === "string" ? data.listName.trim() : "";
+
+  const hasPayload =
+    items.length > 0 ||
+    watched.length > 0 ||
+    maybeLater.length > 0 ||
+    archive.length > 0 ||
+    listName.length > 0;
+
+  if (!hasPayload) return;
+
+  const newId = adminRandomListId();
+  const plRef = userRef.collection("personalLists").doc(newId);
+  await plRef.set({
+    name: listName,
+    items,
+    watched,
+    maybeLater,
+    archive,
+    createdAt: new Date().toISOString(),
+  });
+  await userRef.update({
+    defaultPersonalListId: newId,
+    items: FieldValue.delete(),
+    watched: FieldValue.delete(),
+    maybeLater: FieldValue.delete(),
+    archive: FieldValue.delete(),
+    listName: FieldValue.delete(),
+  });
+}
+
 exports.handler = async (event, context) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(event) };
@@ -223,8 +282,11 @@ exports.handler = async (event, context) => {
   } catch (e) {
     return jsonRes(400, { ok: false, error: "Invalid JSON body" }, event);
   }
-  const { imdbId, listId: bodyListId, watch_region: bodyWatch } = body;
+  const { imdbId, listId: bodyListId, personalListId: bodyPersonalListId, watch_region: bodyWatch } = body;
   const listId = bodyListId || cookies.bookmarklet_list_id || null;
+  const cookiePersonalListId =
+    cookies.bookmarklet_personal_list_id ||
+    (typeof bodyPersonalListId === "string" ? bodyPersonalListId : null);
   if (!imdbId) {
     return jsonRes(400, { ok: false, error: "imdbId required" }, event);
   }
@@ -387,9 +449,30 @@ exports.handler = async (event, context) => {
     return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to shared list` }, event);
   }
 
+  await migrateLegacyPersonalListAdmin(db, uid);
   const userRef = db.collection("users").doc(uid);
   const userSnap = await userRef.get();
-  const data = userSnap.exists ? userSnap.data() : {};
+  const uData = userSnap.exists ? userSnap.data() : {};
+  const defaultPl =
+    typeof uData.defaultPersonalListId === "string" ? uData.defaultPersonalListId.trim() : "";
+  const targetPlId = (cookiePersonalListId && String(cookiePersonalListId).trim()) || defaultPl;
+  if (!targetPlId) {
+    return jsonRes(
+      400,
+      {
+        ok: false,
+        error:
+          "Open the watchlist app, name your main list, then try again (or pick a personal list so the site can set the bookmarklet target).",
+      },
+      event
+    );
+  }
+  const plRef = userRef.collection("personalLists").doc(targetPlId);
+  const plSnap = await plRef.get();
+  if (!plSnap.exists) {
+    return jsonRes(404, { ok: false, error: "Personal list not found. Switch list in the app and try again." }, event);
+  }
+  const data = plSnap.data() || {};
   const items = Array.isArray(data.items) ? [...data.items] : [];
   let watched = Array.isArray(data.watched) ? [...data.watched] : [];
   let maybeLater = Array.isArray(data.maybeLater) ? [...data.maybeLater] : [];
@@ -434,7 +517,7 @@ exports.handler = async (event, context) => {
     if (movie.tmdbId != null && movie.tmdbId !== "") shouldSyncUpcoming = true;
   }
 
-  await userRef.set({ items, watched, maybeLater, archive }, { merge: true });
+  await plRef.set({ items, watched, maybeLater, archive }, { merge: true });
 
   if (shouldSyncUpcoming || idx < 0) {
     const regSnap = await regDoc.get();

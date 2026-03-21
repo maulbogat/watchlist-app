@@ -48,6 +48,8 @@ if (!imdbId || !/^tt\d+$/.test(nImdb)) {
       const body = { imdbId: nImdb, watch_region: watchRegion };
       const listMatch = document.cookie.match(/bookmarklet_list_id=([^;]+)/);
       if (listMatch) body.listId = decodeURIComponent(listMatch[1].trim());
+      const plMatch = document.cookie.match(/bookmarklet_personal_list_id=([^;]+)/);
+      if (plMatch) body.personalListId = decodeURIComponent(plMatch[1].trim());
 
       const res = await fetch("/.netlify/functions/add-from-imdb", {
         method: "POST",

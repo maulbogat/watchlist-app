@@ -77,14 +77,12 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 
 | Field | Type | Notes |
 |-------|------|--------|
-| `items` | `array` | Prefer **`{ registryId }`** per row; legacy pre-migration rows may still be full embedded objects (hydrated from **`titleRegistry`** on read; no catalog merge). |
-| `watched` | `array` of string | Keys = **`registryId`** after migration; legacy = `"title|year"`. |
-| `maybeLater` | `array` of string | Same as `watched`. |
-| `archive` | `array` of string | Same as `watched`. |
-| `listName` | `string` | **Required** non-empty display name for the main list (`users/{uid}.items`). The app prompts on first sign-in until set; reads return trimmed text with no client default. |
+| `defaultPersonalListId` | `string` | Firestore id of the **default** personal list doc under `users/{uid}/personalLists/{id}`. Set when the user names their main list or when legacy data is migrated. |
 | `country` | `string` | ISO 3166-1 alpha-2 (e.g. `"IL"`) for TMDB watch region when adding titles. |
 | `countryName` | `string` | Human-readable country name for UI. |
 | `upcomingDismissals` | `map` | Optional. Keys = alert **fingerprints** (e.g. `136311_3_9`, `12345_sequel_999`); values = ISO date string when the user dismissed that pill. Used so dismissed upcoming notifications stay hidden until a new fingerprint appears. |
+
+**Legacy (removed after migration):** `items`, `watched`, `maybeLater`, `archive`, `listName` on the user root doc were moved into the default `personalLists` subdoc. The client and `add-from-imdb` run a one-time migration; optional bulk script: `scripts/migrate-personal-items-to-subcollection.mjs`.
 
 **Relationship:** Parent for subcollection `personalLists`. Referenced by `sharedLists.members` and `sharedLists.ownerId`.
 
@@ -97,11 +95,11 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 | Field | Type | Notes |
 |-------|------|--------|
 | `name` | `string` | **Required** non-empty when creating a subcollection list; stored trimmed. |
-| `items` | `array` | Same **Item object** shape as `users/{uid}.items`. |
-| `watched`, `maybeLater`, `archive` | `array` of string | Status keys, same as user doc. |
+| `items` | `array` | Same **Item object** shape as **`sharedLists`** rows (`{ registryId }` after migration). |
+| `watched`, `maybeLater`, `archive` | `array` of string | Status keys, same pattern as `sharedLists`. |
 | `createdAt` | `string` (ISO) | Set on create. |
 
-**Relationship:** Same user only; `listId === "personal"` is **virtual** in app logic — default list lives on `users/{uid}`, not in this subcollection.
+**Relationship:** All personal list **content** lives here (including the default list). The app uses virtual `listId === "personal"` for the list whose real id is `users/{uid}.defaultPersonalListId`.
 
 ---
 
@@ -195,9 +193,9 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 3. Script opens popup to `{site}/add.html?imdbId=...&embed=1` (production URL hardcoded in `bookmarklet.js`).  
 4. `add.js` validates IMDb id; subscribes to `onAuthStateChanged`.  
 5. If not signed in: show error; `postMessage` to parent/opener; optionally close popup.  
-6. If signed in: read `getUserProfile` for `watch_region`; read optional `listId` from cookie `bookmarklet_list_id` (set from main app when a **shared** list is active).  
-7. `fetch("/.netlify/functions/add-from-imdb", { POST, Authorization: Bearer <getIdToken()> })` with body `{ imdbId, watch_region, listId? }`.  
-8. Netlify function verifies token → `uid`; loads OMDb; if `TMDB_API_KEY` present, runs TMDB find + detail + videos + watch providers; else falls back to OMDb-only row; writes to `sharedLists/{listId}` or `users/{uid}` per Section 4 continuation.  
+6. If signed in: read `getUserProfile` for `watch_region`; read optional `listId` from cookie `bookmarklet_list_id` (shared list) and optional `personalListId` from cookie `bookmarklet_personal_list_id` (current personal list’s real subdoc id, set by the main app).  
+7. `fetch("/.netlify/functions/add-from-imdb", { POST, Authorization: Bearer <getIdToken()> })` with body `{ imdbId, watch_region, listId?, personalListId? }`.  
+8. Netlify function verifies token → `uid`; loads OMDb; if `TMDB_API_KEY` present, runs TMDB find + detail + videos + watch providers; else falls back to OMDb-only row; writes to `sharedLists/{listId}` or `users/{uid}/personalLists/{personalListId}` (default id from profile if cookie absent); migrates legacy `users/{uid}.items` on first write when needed.  
 9. Response JSON returned; `add.js` displays message; `postMessage({ type: "add-result", ... })` to opener/parent; bookmarklet shows toast and closes popup.  
 10. **Main watchlist tab does not automatically reload** from this flow; user refreshes or revisits to see new titles (unless they were already polling — they are not).
 
@@ -464,7 +462,7 @@ flowchart TD
 
 3. **Bookmarklet portability:** `bookmarklet.js` and `bookmarklet.html` hardcode **`https://watchlist-trailers.netlify.app`** for the script URL and popup base. Forks or alternate deployments must edit these files.
 
-4. **Secondary personal lists + bookmarklet:** Cookie `bookmarklet_list_id` is set when viewing a **shared** list, not when viewing an extra **personal** subcollection list. The Netlify function only targets `users/{uid}.items` or `sharedLists/{listId}` — **bookmarklet cannot add directly** to `users/.../personalLists/{otherListId}`.
+4. **Bookmarklet target lists:** Cookie `bookmarklet_list_id` selects a **shared** list. Cookie `bookmarklet_personal_list_id` holds the Firestore id of the **currently viewed personal list** (default or extra subdoc); `add-from-imdb` writes to that `users/{uid}/personalLists/{id}` document.
 
 5. **Firestore rules vs Admin:** Client rules deny **`titleRegistry`** writes; list mutations from functions use **Admin SDK** (bypass rules). Compromise of `FIREBASE_SERVICE_ACCOUNT` on Netlify is full database access.
 

@@ -12,6 +12,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   deleteDoc,
   collection,
   addDoc,
@@ -20,6 +21,7 @@ import {
   getDocs,
   arrayUnion,
   arrayRemove,
+  deleteField,
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 import { firebaseConfig } from "./config/firebase.js";
@@ -130,20 +132,120 @@ function rowToStore(movie) {
   return clean;
 }
 
+function randomId() {
+  return Math.random().toString(36).slice(2, 12);
+}
+
+function requirePersistedListName(name, label = "List name") {
+  const n = String(name ?? "").trim();
+  if (!n) throw new Error(`${label} is required`);
+  return n;
+}
+
 /**
- * Returns status data from Firestore.
- * Data model: users/{uid} = { items: [], watched: [], maybeLater: [], archive: [] }
+ * Personal list rows live on users/{uid}/personalLists/{listId} (same shape as sharedLists).
+ * users/{uid} holds profile + defaultPersonalListId only.
+ * One-time move from legacy users/{uid}.items → default subdoc.
+ */
+async function migrateLegacyPersonalListIfNeeded(uid) {
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) return;
+  const data = userSnap.data() || {};
+
+  let defId = typeof data.defaultPersonalListId === "string" ? data.defaultPersonalListId.trim() : "";
+  if (defId) {
+    const plSnap = await getDoc(doc(db, "users", uid, "personalLists", defId));
+    if (plSnap.exists()) return;
+    await updateDoc(userRef, { defaultPersonalListId: deleteField() });
+  }
+
+  const collSnap = await getDocs(collection(db, "users", uid, "personalLists"));
+  if (collSnap.docs.length === 1) {
+    const onlyId = collSnap.docs[0].id;
+    await setDoc(userRef, { defaultPersonalListId: onlyId }, { merge: true });
+    return;
+  }
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  const watched = Array.isArray(data.watched) ? data.watched : [];
+  const maybeLater = Array.isArray(data.maybeLater) ? data.maybeLater : [];
+  const archive = Array.isArray(data.archive) ? data.archive : [];
+  const listName = typeof data.listName === "string" ? data.listName.trim() : "";
+
+  const hasPayload =
+    items.length > 0 ||
+    watched.length > 0 ||
+    maybeLater.length > 0 ||
+    archive.length > 0 ||
+    listName.length > 0;
+
+  if (!hasPayload) return;
+
+  const newId = randomId() + randomId();
+  const plRef = doc(db, "users", uid, "personalLists", newId);
+  await setDoc(plRef, {
+    name: listName,
+    items,
+    watched,
+    maybeLater,
+    archive,
+    createdAt: new Date().toISOString(),
+  });
+  await updateDoc(userRef, {
+    defaultPersonalListId: newId,
+    items: deleteField(),
+    watched: deleteField(),
+    maybeLater: deleteField(),
+    archive: deleteField(),
+    listName: deleteField(),
+  });
+}
+
+async function resolveDefaultPersonalListId(uid) {
+  await migrateLegacyPersonalListIfNeeded(uid);
+  const userSnap = await getDoc(doc(db, "users", uid));
+  if (!userSnap.exists()) return "";
+  const raw = userSnap.data().defaultPersonalListId;
+  const id = typeof raw === "string" ? raw.trim() : "";
+  if (!id) return "";
+  const plSnap = await getDoc(doc(db, "users", uid, "personalLists", id));
+  return plSnap.exists() ? id : "";
+}
+
+/**
+ * Returns status for the user's default personal list + profile fields from users/{uid}.
  */
 async function getStatusData(uid) {
-  const ref = doc(db, "users", uid);
-  const snap = await getDoc(ref);
+  const userRef = doc(db, "users", uid);
+  const snap = await getDoc(userRef);
   const data = snap.exists() ? snap.data() : {};
+  const defaultId = await resolveDefaultPersonalListId(uid);
+
+  let items = [];
+  let watched = [];
+  let maybeLater = [];
+  let archive = [];
+  let listName = "";
+  if (defaultId) {
+    const plSnap = await getDoc(doc(db, "users", uid, "personalLists", defaultId));
+    if (plSnap.exists()) {
+      const ld = plSnap.data();
+      items = Array.isArray(ld.items) ? ld.items : [];
+      watched = Array.isArray(ld.watched) ? ld.watched : [];
+      maybeLater = Array.isArray(ld.maybeLater) ? ld.maybeLater : [];
+      archive = Array.isArray(ld.archive) ? ld.archive : [];
+      listName = typeof ld.name === "string" ? ld.name.trim() : "";
+    }
+  }
+
   return {
-    items: Array.isArray(data.items) ? data.items : [],
-    watched: Array.isArray(data.watched) ? data.watched : [],
-    maybeLater: Array.isArray(data.maybeLater) ? data.maybeLater : [],
-    archive: Array.isArray(data.archive) ? data.archive : [],
-    listName: typeof data.listName === "string" ? data.listName.trim() : "",
+    items,
+    watched,
+    maybeLater,
+    archive,
+    listName,
+    defaultPersonalListId: defaultId || null,
     country: data.country || null,
     countryName: data.countryName || null,
     upcomingDismissals:
@@ -155,10 +257,20 @@ async function getUserProfile(uid) {
   const ref = doc(db, "users", uid);
   const snap = await getDoc(ref);
   const data = snap.exists() ? snap.data() : {};
+  const defaultId = await resolveDefaultPersonalListId(uid);
+  let listName = "";
+  if (defaultId) {
+    const plSnap = await getDoc(doc(db, "users", uid, "personalLists", defaultId));
+    if (plSnap.exists()) {
+      const n = plSnap.data().name;
+      listName = typeof n === "string" ? n.trim() : "";
+    }
+  }
   return {
     country: data.country || null,
     countryName: data.countryName || null,
-    listName: typeof data.listName === "string" ? data.listName.trim() : "",
+    listName,
+    defaultPersonalListId: defaultId || null,
   };
 }
 
@@ -188,7 +300,9 @@ async function getWatchedList(uid) {
 }
 
 async function setStatus(uid, key, status) {
-  const ref = doc(db, "users", uid);
+  const listId = await resolveDefaultPersonalListId(uid);
+  if (!listId) throw new Error("No personal list. Open the app and name your list first.");
+  const ref = doc(db, "users", uid, "personalLists", listId);
   const removeFromAll = {
     watched: arrayRemove(key),
     maybeLater: arrayRemove(key),
@@ -211,7 +325,9 @@ async function removeWatched(uid, key) {
 }
 
 async function removeTitle(uid, key) {
-  const ref = doc(db, "users", uid);
+  const listId = await resolveDefaultPersonalListId(uid);
+  if (!listId) return;
+  const ref = doc(db, "users", uid, "personalLists", listId);
   const snap = await getDoc(ref);
   const data = snap.exists() ? snap.data() : {};
   const items = Array.isArray(data.items) ? data.items.filter((m) => movieKey(m) !== key) : [];
@@ -228,16 +344,6 @@ async function removeTitle(uid, key) {
 }
 
 // --- Shared lists ---
-
-function randomId() {
-  return Math.random().toString(36).slice(2, 12);
-}
-
-function requirePersistedListName(name, label = "List name") {
-  const n = String(name ?? "").trim();
-  if (!n) throw new Error(`${label} is required`);
-  return n;
-}
 
 async function createSharedList(uid, name) {
   const persistedName = requirePersistedListName(name, "List name");
@@ -344,7 +450,9 @@ async function addToPersonalList(uid, listId, movie) {
   const key = movieKey(movie);
   const s = movie.status || "to-watch";
   if (listId === "personal") {
-    const ref = doc(db, "users", uid);
+    const resolved = await resolveDefaultPersonalListId(uid);
+    if (!resolved) throw new Error("No personal list. Open the app and name your list first.");
+    const ref = doc(db, "users", uid, "personalLists", resolved);
     const snap = await getDoc(ref);
     const data = snap.exists() ? snap.data() : {};
     const items = Array.isArray(data.items) ? [...data.items] : [];
@@ -460,9 +568,11 @@ async function copySharedListToPersonal(uid, listId) {
     else if (listArchive.has(key)) userArchive.add(key);
   }
 
-  const userRef = doc(db, "users", uid);
+  const defaultId = await resolveDefaultPersonalListId(uid);
+  if (!defaultId) throw new Error("No personal list. Open the app and name your list first.");
+  const userListRef = doc(db, "users", uid, "personalLists", defaultId);
   await setDoc(
-    userRef,
+    userListRef,
     {
       items: userItems,
       watched: [...userWatched],
@@ -499,9 +609,11 @@ async function moveItemFromSharedToPersonal(uid, listId, movie) {
     else if (s === "archive") userArchive.add(key);
   }
 
-  const userRef = doc(db, "users", uid);
+  const defaultId = await resolveDefaultPersonalListId(uid);
+  if (!defaultId) throw new Error("No personal list. Open the app and name your list first.");
+  const userListRef = doc(db, "users", uid, "personalLists", defaultId);
   await setDoc(
-    userRef,
+    userListRef,
     {
       items: userItems,
       watched: [...userWatched],
@@ -565,9 +677,11 @@ async function moveItemFromPersonalToShared(uid, listId, movie) {
   userWatched.delete(key);
   userMaybeLater.delete(key);
   userArchive.delete(key);
-  const userRef = doc(db, "users", uid);
+  const defaultId = await resolveDefaultPersonalListId(uid);
+  if (!defaultId) throw new Error("No personal list. Open the app and name your list first.");
+  const userListRef = doc(db, "users", uid, "personalLists", defaultId);
   await setDoc(
-    userRef,
+    userListRef,
     {
       items: newUserItems,
       watched: [...userWatched],
@@ -597,22 +711,36 @@ async function createPersonalList(uid, name) {
 }
 
 /**
- * Get all personal lists. Never throws - returns main list row plus subcollection lists on any error.
+ * Get all personal lists. Never throws - returns default list (virtual id "personal") plus other subcollection lists.
  */
 async function getPersonalLists(uid) {
   try {
-    const defaultData = await getStatusData(uid);
-    const defaultName =
-      typeof defaultData.listName === "string" ? defaultData.listName.trim() : "";
-    const defaultCount = Array.isArray(defaultData.items) ? defaultData.items.length : 0;
-    const lists = [{ id: "personal", name: defaultName, count: defaultCount, isDefault: true }];
+    await migrateLegacyPersonalListIfNeeded(uid);
+    const userSnap = await getDoc(doc(db, "users", uid));
+    const data = userSnap.exists() ? userSnap.data() : {};
+    const defaultId = typeof data.defaultPersonalListId === "string" ? data.defaultPersonalListId.trim() : "";
+    const lists = [];
+    if (defaultId) {
+      const plSnap = await getDoc(doc(db, "users", uid, "personalLists", defaultId));
+      let defaultName = "";
+      let defaultCount = 0;
+      if (plSnap.exists()) {
+        const ld = plSnap.data();
+        defaultName = typeof ld.name === "string" ? ld.name.trim() : "";
+        defaultCount = Array.isArray(ld.items) ? ld.items.length : 0;
+      }
+      lists.push({ id: "personal", name: defaultName, count: defaultCount, isDefault: true });
+    } else {
+      lists.push({ id: "personal", name: "", count: 0, isDefault: true });
+    }
     try {
       const coll = collection(db, "users", uid, "personalLists");
       const snap = await getDocs(coll);
       for (const d of snap.docs) {
-        const data = d.data();
-        const items = Array.isArray(data.items) ? data.items : [];
-        const subName = typeof data.name === "string" ? data.name.trim() : "";
+        if (d.id === defaultId) continue;
+        const pdata = d.data();
+        const items = Array.isArray(pdata.items) ? pdata.items : [];
+        const subName = typeof pdata.name === "string" ? pdata.name.trim() : "";
         lists.push({ id: d.id, name: subName, count: items.length, isDefault: false });
       }
     } catch (subErr) {
@@ -629,9 +757,13 @@ async function getPersonalLists(uid) {
  * Get movies for a personal list.
  */
 async function getPersonalListMovies(uid, listId) {
-  if (listId === "personal") return getUserMovies(uid);
+  let targetId = listId;
+  if (listId === "personal") {
+    targetId = await resolveDefaultPersonalListId(uid);
+    if (!targetId) return [];
+  }
   try {
-    const ref = doc(db, "users", uid, "personalLists", listId);
+    const ref = doc(db, "users", uid, "personalLists", targetId);
     const snap = await getDoc(ref);
     if (!snap.exists()) return [];
     const data = snap.data();
@@ -690,7 +822,21 @@ async function renamePersonalList(uid, listId, newName) {
   const name = String(newName || "").trim();
   if (!name) throw new Error("Name cannot be empty");
   if (listId === "personal") {
-    await setDoc(doc(db, "users", uid), { listName: name }, { merge: true });
+    let id = await resolveDefaultPersonalListId(uid);
+    if (!id) {
+      const newId = randomId() + randomId();
+      await setDoc(doc(db, "users", uid, "personalLists", newId), {
+        name,
+        items: [],
+        watched: [],
+        maybeLater: [],
+        archive: [],
+        createdAt: new Date().toISOString(),
+      });
+      await setDoc(doc(db, "users", uid), { defaultPersonalListId: newId }, { merge: true });
+    } else {
+      await setDoc(doc(db, "users", uid, "personalLists", id), { name }, { merge: true });
+    }
   } else {
     const ref = doc(db, "users", uid, "personalLists", listId);
     await setDoc(ref, { name }, { merge: true });
@@ -699,8 +845,10 @@ async function renamePersonalList(uid, listId, newName) {
 
 async function deletePersonalList(uid, listId) {
   if (listId === "personal") {
+    const id = await resolveDefaultPersonalListId(uid);
+    if (!id) return;
     await setDoc(
-      doc(db, "users", uid),
+      doc(db, "users", uid, "personalLists", id),
       { items: [], watched: [], maybeLater: [], archive: [] },
       { merge: true }
     );
@@ -822,6 +970,17 @@ async function removeDuplicatesFromPersonal(uid, listId) {
   return toRemove.length;
 }
 
+/**
+ * Real Firestore id under users/{uid}/personalLists/{id} for bookmarklet cookies.
+ * Pass listId "personal" for the default list, or an existing subcollection id.
+ */
+async function getBookmarkletPersonalListFirestoreId(uid, listIdOrAlias) {
+  if (listIdOrAlias === "personal") {
+    return (await resolveDefaultPersonalListId(uid)) || null;
+  }
+  return listIdOrAlias || null;
+}
+
 export {
   auth,
   db,
@@ -865,4 +1024,5 @@ export {
   removeDuplicatesFromPersonal,
   fetchUpcomingAlertsForItems,
   dismissUpcomingAlert,
+  getBookmarkletPersonalListFirestoreId,
 };

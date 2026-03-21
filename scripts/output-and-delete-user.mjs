@@ -1,6 +1,6 @@
 /**
- * Print all titles for a user (main + personalLists), then delete the user doc,
- * personalLists subcollection, and remove uid from sharedLists.members.
+ * Print all titles for a user (legacy users/{uid}.items if present + all personalLists),
+ * then delete the user doc, personalLists subcollection, and remove uid from sharedLists.members.
  *
  * Usage: node scripts/output-and-delete-user.mjs <uid> --write
  *        node scripts/output-and-delete-user.mjs <uid>   # dry-run (print only)
@@ -51,10 +51,13 @@ async function main() {
   console.log("\n========== USER " + uid + " ==========\n");
 
   const udata = userSnap.data();
-  console.log("Main list (users/{uid}.items):");
+  console.log("Legacy root list (users/{uid}.items — empty after migration):");
   const mainRows = rowsFromItems(udata.items, trMap);
   mainRows.forEach((r) => console.log(`  ${r.n}. ${r.rid} — ${r.label}`));
   console.log(`  (${mainRows.length} titles)\n`);
+  if (udata.defaultPersonalListId) {
+    console.log(`defaultPersonalListId: ${udata.defaultPersonalListId}\n`);
+  }
 
   const plSnap = await userRef.collection("personalLists").get();
   if (!plSnap.empty) {
