@@ -118,6 +118,28 @@ Then search locally, e.g. `rg 'tt15677150|136311|Shrinking' backups/firestore-ba
 
 Same credentials as other scripts: `serviceAccountKey.json` or `FIREBASE_SERVICE_ACCOUNT`.
 
+**Move default personal list → shared “Our list”** (merge + clear personal; dedupes by registry id):
+
+```bash
+node -r dotenv/config scripts/move-personal-to-shared.mjs --dry-run <uid>
+node -r dotenv/config scripts/move-personal-to-shared.mjs --write <uid>   # optional: third arg = shared list name
+```
+
+**Shared list: put every title on the “To Watch” tab** (keeps `items`; clears `watched` / `maybeLater` / `archive`):
+
+```bash
+node -r dotenv/config scripts/reset-shared-list-all-to-watch.mjs --dry-run "Our list"
+node -r dotenv/config scripts/reset-shared-list-all-to-watch.mjs --write "Our list"
+```
+
+**Audit candidate titles vs “Our list”** (lines = `Title|Year` and/or `tt…` comments; edit `scripts/audit-candidates-input.txt`):
+
+```bash
+node -r dotenv/config scripts/audit-candidates-vs-our-list.mjs
+```
+
+Also writes **`backups/audit-candidates-manual-review.txt`**: every line that is unresolved, not on “Our list”, or doesn’t exactly match `titleRegistry` title/year (including fallback matches like title-only).
+
 To **delete the legacy `removed` field** from `sharedLists`, `users`, and personal lists (not used by the app):
 
 ```bash

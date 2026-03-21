@@ -23,6 +23,7 @@ backups/backfill-youtube-from-tmdb-report.txt
 backups/items-without-youtube-trailer.txt
 backups/items-not-in-all-three-report.txt
 backups/sync-missing-to-catalog-report.txt
+backups/audit-candidates-manual-review.txt
 
 # Dependencies
 node_modules/
