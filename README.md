@@ -1,6 +1,8 @@
 # movie-trailer-site
 
-A personal movie/show watchlist with YouTube trailers, filters, and Firestore. Each account has its own list.
+A personal movie/show watchlist with YouTube trailers, filters, and Firestore. **Architecture, data model, and flows** are documented in **[`system-design.md`](./system-design.md)** (source of truth for how pieces fit together).
+
+**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via root **`firebase.js`** (Firebase JS SDK from Google CDN + committed **`config/firebase.js`**). Netlify hosts **`dist/`** and runs **`netlify/functions/*.js`** (Admin SDK) for the IMDb add flow, shared-list joins, and upcoming-title sync.
 
 ## Run locally
 
@@ -36,7 +38,7 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
    ```
    Or paste the rules in Firebase Console → Firestore → Rules
 
-4. **Movie lists** are stored per user in `users/{uid}`. Users add titles via the bookmarklet; no shared catalog is needed for new users.
+4. **Movie lists** are stored under **`users/{uid}/personalLists/{listId}`** (plus optional **shared lists** in **`sharedLists/{listId}`**). The **`users/{uid}`** document holds profile fields (e.g. country, **`defaultPersonalListId`**) and optional **`upcomingDismissals`** — not the row arrays. Canonical title metadata lives in **`titleRegistry/{registryId}`** (client read-only; writes via Netlify/scripts). Users add titles via the bookmarklet; no legacy **`catalog`** collection is used.
 
 ## Netlify deployment (bookmarklet)
 
@@ -82,7 +84,7 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 ## Multi-user support
 
-Multiple people can use the app with their own Google accounts. Each account has its own list of titles—items added via the bookmarklet go only to that account's list.
+Multiple people can use the app with their own Google accounts. Each account has its own **personal lists** (default list + optional extra lists in the subcollection). The bookmarklet adds to the **currently selected** list in the main app (personal or shared). Items go only to lists that user is allowed to write (see Firestore rules).
 
 ## Shared lists
 
@@ -99,7 +101,7 @@ Deploy Firestore rules: `firebase deploy --only firestore:rules`
 
 1. **Authentication → Sign-in method** → Google → Enabled
 2. **Authentication → Settings → Authorized domains** → Add your Netlify URL (e.g. `watchlist-trailers.netlify.app`) and `localhost` for local dev
-3. **Firestore rules** (in `firestore.rules`) — users can only read/write their own `users/{uid}` data
+3. **Firestore rules** (in `firestore.rules`) — signed-in users: read/write their **`users/{uid}`** doc and **`users/{uid}/personalLists/*`**; read/write **`sharedLists/{listId}`** only when their uid is in **`members`**; read **`titleRegistry`** and **`upcomingAlerts`** (no client writes there). **`syncState`** is Admin-only.
 
 The header shows the signed-in user's email so family members know whose account they're using on shared devices.
 
@@ -171,11 +173,21 @@ node scripts/strip-removed-field.js --write
 - **Add by IMDb id** (TMDB enrichment): `node scripts/add-title-by-imdb.js tt12345678`
 - **Delete legacy `catalog` collection** (after migration): `node scripts/delete-legacy-catalog.mjs --write`
 
+**Local diagnostics** (Admin + `.env` / `serviceAccountKey.json`; see each file’s header for env vars):
+
+- **Upcoming alerts vs TMDB** (read-only report): `node check-upcoming.mjs`
+- **TMDB vs Trakt “next episode”** (read-only): `node compare-upcoming-trakt.mjs`
+
+Many scripts expect **`TMDB_API_KEY`**, **`FIREBASE_SERVICE_ACCOUNT`** (base64) or **`serviceAccountKey.json`**, and often **`dotenv`** — e.g. `node -r dotenv/config scripts/...`.
+
 ## Features
 
-- Per-user lists (each account has its own titles)
-- To Watch / Watched tabs
-- Filter by Movies, Series, or Both
-- Mark titles as watched (persists across devices via Google sign-in)
-- Checkmark on watched cards
-- Service chips (Netflix, Prime Video, etc.)
+- **Watchlist UI (React):** grid of titles with poster, status controls, and **trailer modal** (YouTube embed).
+- **Personal lists:** default list + extra lists; **manage lists** modal (create/rename/delete, pick default).
+- **Shared lists:** create, copy invite link (`?join=`), join while signed in; bookmarklet targets the list you’re viewing.
+- **Status tabs:** Recently Added, To Watch (**includes “maybe later”** rows), Watched, Archive — persisted in Firestore.
+- **Filters:** Movies / TV / Both, **genre**, persisted per account in **localStorage** (with session restore).
+- **Country / region:** set in app for TMDB **watch providers** at add time; **service chips** on cards (e.g. Netflix, Prime).
+- **Upcoming:** dismissible **upcoming alerts** bar for the current list (backed by **`upcomingAlerts`** + scheduled **`check-upcoming`**; optional calendar export when dated).
+- **Bookmarklet:** add from **imdb.com** via **`add.html`** + **`/.netlify/functions/add-from-imdb`**.
+- **Google sign-in:** same Firebase project as production; remember **authorized domains** for each host/port you use locally.

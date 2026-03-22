@@ -14,7 +14,6 @@ import {
   updateDoc,
   deleteDoc,
   collection,
-  addDoc,
   query,
   where,
   getDocs,
@@ -27,9 +26,6 @@ import { firebaseConfig } from "./config/firebase.js";
 import { listKey as movieKey } from "./lib/registry-id.js";
 
 const app = initializeApp(firebaseConfig);
-
-/** Set only when web Analytics loads (skipped in Vite dev and when offline). */
-let analytics = null;
 
 function shouldLoadWebAnalytics() {
   if (typeof window === "undefined") return false;
@@ -49,7 +45,7 @@ if (shouldLoadWebAnalytics()) {
       isSupported().then((ok) => {
         if (!ok) return;
         try {
-          analytics = getAnalytics(app);
+          getAnalytics(app);
         } catch (e) {
           console.warn("Firebase Analytics disabled:", e?.message || e);
         }
@@ -310,26 +306,6 @@ async function setUserCountry(uid, countryCode, countryName) {
   await setDoc(ref, { country: countryCode, countryName: countryName || countryCode }, { merge: true });
 }
 
-/**
- * Returns the user's movie list with status applied. Each account has its own list.
- * Items are `{ registryId }` + titleRegistry metadata (hydrated), or legacy embedded rows until migration.
- */
-async function getUserMovies(uid) {
-  const data = await getStatusData(uid);
-  const items = data.items;
-  const watchedSet = new Set(data.watched || []);
-  const maybeLaterSet = new Set(data.maybeLater || []);
-  const archiveSet = new Set(data.archive || []);
-
-  return hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
-}
-
-/** @deprecated Use getStatusData. Kept for backward compat. */
-async function getWatchedList(uid) {
-  const { watched } = await getStatusData(uid);
-  return watched;
-}
-
 async function setStatus(uid, key, status) {
   const listId = await resolveDefaultPersonalListId(uid);
   if (!listId) throw new Error("No personal list. Open the app and name your list first.");
@@ -345,14 +321,6 @@ async function setStatus(uid, key, status) {
   }
   const addTo = status === "watched" ? "watched" : status === "maybe-later" ? "maybeLater" : "archive";
   await setDoc(ref, { ...removeFromAll, [addTo]: arrayUnion(key) }, { merge: true });
-}
-
-async function addWatched(uid, key) {
-  await setStatus(uid, key, "watched");
-}
-
-async function removeWatched(uid, key) {
-  await setStatus(uid, key, "to-watch");
 }
 
 async function removeTitle(uid, key) {
@@ -512,215 +480,6 @@ async function addToPersonalList(uid, listId, movie) {
     else if (s === "archive") archive.add(key);
     await setDoc(ref, { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] }, { merge: true });
   }
-}
-
-/**
- * Copy all items from user's personal list to a shared list. Preserves status (watched, maybe-later, archive).
- * Does NOT remove items from the personal list — both lists keep the items.
- */
-async function moveAllToSharedList(uid, listId) {
-  const listData = await getSharedList(listId);
-  if (!listData) throw new Error("Shared list not found");
-  const members = Array.isArray(listData.members) ? listData.members : [];
-  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
-
-  const userData = await getStatusData(uid);
-  const userItems = Array.isArray(userData.items) ? userData.items : [];
-  const userWatched = new Set(userData.watched || []);
-  const userMaybeLater = new Set(userData.maybeLater || []);
-  const userArchive = new Set(userData.archive || []);
-
-  if (userItems.length === 0) throw new Error("Your list is empty");
-
-  const listRef = doc(db, "sharedLists", listId);
-  const listSnap = await getDoc(listRef);
-  const listDoc = listSnap.exists() ? listSnap.data() : {};
-  const listItems = Array.isArray(listDoc.items) ? [...listDoc.items] : [];
-  const listWatched = new Set(listDoc.watched || []);
-  const listMaybeLater = new Set(listDoc.maybeLater || []);
-  const listArchive = new Set(listDoc.archive || []);
-
-  const existingKeys = new Set(listItems.map((m) => movieKey(m)));
-
-  for (const m of userItems) {
-    const key = movieKey(m);
-    if (existingKeys.has(key)) continue;
-    listItems.push(rowToStore(m));
-    existingKeys.add(key);
-    if (userWatched.has(key)) listWatched.add(key);
-    else if (userMaybeLater.has(key)) listMaybeLater.add(key);
-    else if (userArchive.has(key)) listArchive.add(key);
-  }
-
-  await setDoc(
-    listRef,
-    {
-      items: listItems,
-      watched: [...listWatched],
-      maybeLater: [...listMaybeLater],
-      archive: [...listArchive],
-    },
-    { merge: true }
-  );
-}
-
-/**
- * Copy all items from a shared list back to the user's personal list. Use to recover after a move.
- * Preserves status (watched, maybe-later, archive). Does not remove items from the shared list.
- */
-async function copySharedListToPersonal(uid, listId) {
-  const listData = await getSharedList(listId);
-  if (!listData) throw new Error("Shared list not found");
-  const members = Array.isArray(listData.members) ? listData.members : [];
-  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
-
-  const listItems = Array.isArray(listData.items) ? listData.items : [];
-  const listWatched = new Set(listData.watched || []);
-  const listMaybeLater = new Set(listData.maybeLater || []);
-  const listArchive = new Set(listData.archive || []);
-
-  if (listItems.length === 0) throw new Error("Shared list is empty");
-
-  const userData = await getStatusData(uid);
-  const userItems = Array.isArray(userData.items) ? [...userData.items] : [];
-  const userWatched = new Set(userData.watched || []);
-  const userMaybeLater = new Set(userData.maybeLater || []);
-  const userArchive = new Set(userData.archive || []);
-
-  const existingKeys = new Set(userItems.map((m) => movieKey(m)));
-
-  for (const m of listItems) {
-    const key = movieKey(m);
-    if (existingKeys.has(key)) continue;
-    userItems.push(rowToStore(m));
-    existingKeys.add(key);
-    if (listWatched.has(key)) userWatched.add(key);
-    else if (listMaybeLater.has(key)) userMaybeLater.add(key);
-    else if (listArchive.has(key)) userArchive.add(key);
-  }
-
-  const defaultId = await resolveDefaultPersonalListId(uid);
-  if (!defaultId) throw new Error("No personal list. Open the app and name your list first.");
-  const userListRef = doc(db, "users", uid, "personalLists", defaultId);
-  await setDoc(
-    userListRef,
-    {
-      items: userItems,
-      watched: [...userWatched],
-      maybeLater: [...userMaybeLater],
-      archive: [...userArchive],
-    },
-    { merge: true }
-  );
-}
-
-/**
- * Move a single item from a shared list to the user's personal list.
- * Adds to personal if not there, removes from shared list.
- */
-async function moveItemFromSharedToPersonal(uid, listId, movie) {
-  const listData = await getSharedList(listId);
-  if (!listData) throw new Error("Shared list not found");
-  const members = Array.isArray(listData.members) ? listData.members : [];
-  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
-
-  const key = movieKey(movie);
-  const userData = await getStatusData(uid);
-  const userItems = Array.isArray(userData.items) ? [...userData.items] : [];
-  const userWatched = new Set(userData.watched || []);
-  const userMaybeLater = new Set(userData.maybeLater || []);
-  const userArchive = new Set(userData.archive || []);
-
-  const existingKeys = new Set(userItems.map((m) => movieKey(m)));
-  if (!existingKeys.has(key)) {
-    userItems.push(rowToStore(movie));
-    const s = movie.status || "to-watch";
-    if (s === "watched") userWatched.add(key);
-    else if (s === "maybe-later") userMaybeLater.add(key);
-    else if (s === "archive") userArchive.add(key);
-  }
-
-  const defaultId = await resolveDefaultPersonalListId(uid);
-  if (!defaultId) throw new Error("No personal list. Open the app and name your list first.");
-  const userListRef = doc(db, "users", uid, "personalLists", defaultId);
-  await setDoc(
-    userListRef,
-    {
-      items: userItems,
-      watched: [...userWatched],
-      maybeLater: [...userMaybeLater],
-      archive: [...userArchive],
-    },
-    { merge: true }
-  );
-
-  await removeFromSharedList(listId, key);
-}
-
-/**
- * Move a single item from the user's personal list to a shared list.
- * Adds to shared list, removes from personal list.
- */
-async function moveItemFromPersonalToShared(uid, listId, movie) {
-  const listData = await getSharedList(listId);
-  if (!listData) throw new Error("Shared list not found");
-  const members = Array.isArray(listData.members) ? listData.members : [];
-  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
-
-  const key = movieKey(movie);
-  const userData = await getStatusData(uid);
-  const userItems = Array.isArray(userData.items) ? userData.items : [];
-  const userWatched = new Set(userData.watched || []);
-  const userMaybeLater = new Set(userData.maybeLater || []);
-  const userArchive = new Set(userData.archive || []);
-
-  const existingKeys = new Set(userItems.map((m) => movieKey(m)));
-  if (!existingKeys.has(key)) throw new Error("Movie not in your personal list");
-
-  const listRef = doc(db, "sharedLists", listId);
-  const listSnap = await getDoc(listRef);
-  const listDoc = listSnap.exists() ? listSnap.data() : {};
-  const listItems = Array.isArray(listDoc.items) ? [...listDoc.items] : [];
-  const listWatched = new Set(listDoc.watched || []);
-  const listMaybeLater = new Set(listDoc.maybeLater || []);
-  const listArchive = new Set(listDoc.archive || []);
-  const listKeys = new Set(listItems.map((m) => movieKey(m)));
-
-  if (!listKeys.has(key)) {
-    listItems.push(rowToStore(movie));
-    const s = movie.status || "to-watch";
-    if (s === "watched") listWatched.add(key);
-    else if (s === "maybe-later") listMaybeLater.add(key);
-    else if (s === "archive") listArchive.add(key);
-    await setDoc(
-      listRef,
-      {
-        items: listItems,
-        watched: [...listWatched],
-        maybeLater: [...listMaybeLater],
-        archive: [...listArchive],
-      },
-      { merge: true }
-    );
-  }
-
-  const newUserItems = userItems.filter((m) => movieKey(m) !== key);
-  userWatched.delete(key);
-  userMaybeLater.delete(key);
-  userArchive.delete(key);
-  const defaultId = await resolveDefaultPersonalListId(uid);
-  if (!defaultId) throw new Error("No personal list. Open the app and name your list first.");
-  const userListRef = doc(db, "users", uid, "personalLists", defaultId);
-  await setDoc(
-    userListRef,
-    {
-      items: newUserItems,
-      watched: [...userWatched],
-      maybeLater: [...userMaybeLater],
-      archive: [...userArchive],
-    },
-    { merge: true }
-  );
 }
 
 /**
@@ -974,34 +733,6 @@ async function dismissUpcomingAlert(uid, fingerprint) {
 }
 
 /**
- * Remove from user's personal list any item that exists in the shared list.
- * Keeps items only in the shared list.
- */
-async function removeDuplicatesFromPersonal(uid, listId) {
-  const listData = await getSharedList(listId);
-  if (!listData) throw new Error("Shared list not found");
-  const members = Array.isArray(listData.members) ? listData.members : [];
-  if (!members.includes(uid)) throw new Error("You are not a member of this shared list");
-
-  const listItems = Array.isArray(listData.items) ? listData.items : [];
-  const sharedKeys = new Set(listItems.map((m) => movieKey(m)));
-
-  const userData = await getStatusData(uid);
-  const userItems = Array.isArray(userData.items) ? userData.items : [];
-
-  const toRemove = [];
-  for (const m of userItems) {
-    const key = movieKey(m);
-    if (sharedKeys.has(key)) toRemove.push(key);
-  }
-
-  for (const key of toRemove) {
-    await removeTitle(uid, key);
-  }
-  return toRemove.length;
-}
-
-/**
  * Real Firestore id under users/{uid}/personalLists/{id} for bookmarklet cookies.
  * Pass listId "personal" for the default list, or an existing subcollection id.
  */
@@ -1014,21 +745,15 @@ async function getBookmarkletPersonalListFirestoreId(uid, listIdOrAlias) {
 
 export {
   auth,
-  db,
-  analytics,
   signInWithPopup,
   GoogleAuthProvider,
   fbSignOut,
   onAuthStateChanged,
   movieKey,
-  getUserMovies,
-  getWatchedList,
   getStatusData,
   getUserProfile,
   setUserCountry,
   setStatus,
-  addWatched,
-  removeWatched,
   removeTitle,
   createSharedList,
   getSharedList,
@@ -1048,11 +773,6 @@ export {
   deletePersonalList,
   renameSharedList,
   deleteSharedList,
-  moveAllToSharedList,
-  copySharedListToPersonal,
-  moveItemFromSharedToPersonal,
-  moveItemFromPersonalToShared,
-  removeDuplicatesFromPersonal,
   fetchUpcomingAlertsForItems,
   dismissUpcomingAlert,
   getBookmarkletPersonalListFirestoreId,

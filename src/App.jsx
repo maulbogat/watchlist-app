@@ -40,15 +40,15 @@ export default function App() {
   if (!user) {
     return (
       <div className="react-migration-shell">
-        <h1 className="react-migration-title">React shell</h1>
+        <h1 className="react-migration-title">My Watchlist</h1>
         <p className="react-migration-meta react-migration-signin-note">
-          Firebase keeps a <strong>separate session per site URL</strong>. If the
-          legacy app runs on another port or host (not{" "}
-          <code>{window.location.host}</code>), sign in here too.
+          Firebase Auth uses a <strong>separate session per origin</strong> (host + port). If you open
+          this app on another URL than <code>{window.location.host}</code>, sign in again there. If
+          sign-in fails with <code>auth/unauthorized-domain</code>, add that host in Firebase Console →
+          Authentication → Authorized domains.
         </p>
         <p className="react-migration-meta">
-          This is the watchlist app (lists, filters, grid, trailer modal). The same build is deployed
-          to Netlify.
+          Lists, filters, grid, and trailer modal. Production build is deployed to Netlify.
         </p>
         <button
           type="button"

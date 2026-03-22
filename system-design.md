@@ -1,6 +1,6 @@
 # System Design Document
 
-This document describes **only what exists in this repository** as of the last full pass over the code (static site, Netlify functions, Firestore rules, Firebase client module, and operational scripts). It does not specify future or assumed behavior.
+This document describes **only what exists in this repository** (static site, Netlify functions, Firestore rules, Firebase client module, and operational scripts). It does not specify future or assumed behavior.
 
 ---
 
@@ -24,7 +24,7 @@ This document describes **only what exists in this repository** as of the last f
 ## Section 2: Architecture Overview
 
 **Browser (client-side)**  
-- **Watchlist UI — React + Vite:** Root **`index.html`** loads **`#root`** and **`/src/main.jsx`**. **`npm run dev:react`** / **`npm run build:react`**; Netlify publishes **`dist/`** from **`npm run build:react`** (`netlify.toml`). **`firebase.js`** (CDN SDK) initializes App, Auth, Firestore, optional Analytics; list CRUD uses the same module. **`src/store/useAppStore.js`** (Zustand) + **`src/store/watchlistConstants.js`** (status labels, SVG snippets). **`src/hooks/useWatchlist.js`** (TanStack Query) loads lists; **`useAuthUser.js`** → **`onAuthStateChanged`**. **`WatchlistPage.jsx`**: list selector, **`ManageListsModal`**, auth menu, **`CountryModal`** / **`ListNameModal`**, **`UpcomingAlertsBar`**, filters, **`TitleGrid`** / **`TitleCard`**, **`TrailerModal`** (incl. **`src/lib/listsContainingMovie.js`**). Session restore **`useWatchlistSessionRestore.js`**; **`src/lib/watchlistFilters.js`**, **`titleListActions.js`**, **`bookmarkletCookie.js`**, **`storage.js`**, **`movieDisplay.js`** (service chips + trailer id helpers for cards/modal). **`src/main.jsx`** warns if **`#root`** is missing.
+- **Watchlist UI — React + Vite:** Root **`index.html`** loads **`#root`** and **`/src/main.jsx`**. **`npm run dev:react`** / **`npm run build:react`**; Netlify publishes **`dist/`** from **`npm run build:react`** (`netlify.toml`). **`firebase.js`** (CDN SDK) initializes App, Auth, Firestore, optional Analytics; list CRUD uses the same module. **`src/store/useAppStore.js`** (Zustand) + **`src/store/watchlistConstants.js`** (status labels, SVG snippets). **`src/hooks/useWatchlist.js`** (TanStack Query) loads lists; **`useAuthUser.js`** → **`onAuthStateChanged`**. **`WatchlistPage.jsx`**: **`ListSelector`**, **`WatchlistToolbar`**, **`ManageListsModal`**, auth menu, **`CountryModal`**, **`src/components/modals/*.jsx`** (e.g. **`ListNameModal`**, **`SharedCreatedModal`**, **`DeleteConfirmModal`**), **`UpcomingAlertsBar`**, filters, **`TitleGrid`** / **`TitleCard`**, **`TrailerModal`** (incl. **`src/lib/listsContainingMovie.js`**). Session restore **`useWatchlistSessionRestore.js`**; **`src/lib/watchlistFilters.js`**, **`titleListActions.js`**, **`listModeDisplay.js`**, **`bookmarkletCookie.js`**, **`storage.js`**, **`movieDisplay.js`**, **`utils.js`**. **`src/main.jsx`** warns if **`#root`** is missing.
 - All routine Firestore access uses the **signed-in user’s** Firebase session and **`firestore.rules`**.  
 - **`add.html`** + **`add.js`** — bookmarklet popup: auth, POST **`/.netlify/functions/add-from-imdb`**, `postMessage` handshake.  
 - **`bookmarklet.js`** on **imdb.com** opens hosted **`add.html`**. Production origin is hardcoded in **`bookmarklet.js`** (see file).
@@ -34,7 +34,8 @@ This document describes **only what exists in this repository** as of the last f
 - **Serverless functions** (see `netlify.toml` → `functions = "netlify/functions"`):  
   - `add-from-imdb.js` — verifies token, calls OMDb/TMDB, writes Firestore via Admin SDK; after a successful add with `tmdbId`, runs **upcoming alerts** sync for that title (`lib/sync-upcoming-alerts.js`).  
   - `join-shared-list.js` — verifies token, adds caller’s uid to `sharedLists/{listId}.members`.  
-  - `check-upcoming.js` — **scheduled** (3:00 UTC, `netlify.toml` → `[functions."check-upcoming"]`): reads **`titleRegistry`** only, dedupes by TMDB id + tv/movie, calls TMDB (`/tv`, `/movie`, `/collection`), upserts `upcomingAlerts` via Admin SDK (250ms between TMDB calls, 429 → 10s retry once).  
+  - `check-upcoming.js` — **scheduled** (3:00 UTC, `netlify.toml` → `[functions."check-upcoming"]`): reads **`titleRegistry`** only, dedupes by TMDB id + tv/movie, calls TMDB (`/tv`, `/movie`, `/collection`), upserts `upcomingAlerts` via Admin SDK (250ms between TMDB calls, 429 → 10s retry once). Uses shared logic in **`lib/execute-upcoming-sync.js`**.  
+  - `trigger-upcoming-sync.js` — **HTTP** (GET/POST) manual trigger for the same upcoming sync as `check-upcoming` (preferred over curling the scheduled function URL). Optional env **`UPCOMING_SYNC_TRIGGER_SECRET`** + `Authorization: Bearer …`.  
 - Functions use **Firebase Admin** with `FIREBASE_SERVICE_ACCOUNT`; they bypass Firestore security rules by design.
 - **`netlify/functions/package.json`** sets `"type": "commonjs"` so handlers stay CommonJS while the repo root `package.json` is `"type": "module"`.
 
@@ -182,7 +183,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
 1. User opens the site (**deployed `dist/` from Netlify**, or **`npm run dev:react`** locally).  
 2. User clicks “Sign in with Google”.  
-3. **`src/App.jsx`** calls `signInWithPopup(auth, GoogleAuthProvider)` (custom parameter `prompt: "select_account"`).  
+3. **`src/App.jsx`** calls `signInWithPopup(auth, GoogleAuthProvider)` (custom parameter `prompt: "select_account"`). Firebase Auth sessions are **per origin** (host + port); local dev on a different port than production is a separate session. **`auth/unauthorized-domain`** is handled in UI (add the host in Firebase Console → Authentication → Authorized domains).  
 4. Firebase Auth completes Google OAuth; `onAuthStateChanged` fires with a user.  
 5. **`WatchlistPage`** loads profile / lists via React Query and **`useWatchlistSessionRestore`** (`?join=`, last list, filter prefs from **`storage.js`**).  
 6. List data: `getPersonalListMovies` / `getSharedListMovies` via **`firebase.js`**.  
@@ -250,11 +251,11 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | Name / file | Responsibility | Reads Firestore | Writes Firestore | External APIs |
 |-------------|----------------|-----------------|------------------|---------------|
 | `index.html` / `src/main.jsx` | Vite entry; mounts React (`App` → `WatchlistPage`). | — | — | Google Fonts (from HTML) |
-| `src/components/*.jsx`, `src/hooks/*` | React watchlist UI (see Architecture). | Via `firebase.js` | Via `firebase.js` | `fetch` → `join-shared-list` where used; YouTube embeds; clipboard |
+| `src/components/*.jsx`, `src/components/modals/*.jsx`, `src/hooks/*` | React watchlist UI (see Architecture). | Via `firebase.js` | Via `firebase.js` | `fetch` → `join-shared-list` where used; YouTube embeds; clipboard |
 | `src/store/watchlistConstants.js` | Status labels, checkmark/upcoming SVG snippets, `GENRE_LIMIT`. | — | — | — |
 | `src/lib/movieDisplay.js` | `servicesForMovie`, `renderServiceChips`, `hasPlayableTrailerYoutubeId`. | — | — | — |
 | `config/firebase.js` | Public Firebase Web SDK config object (`firebaseConfig`). | — | — | — |
-| `firebase.js` | Imports config, initializes App/Auth/Firestore/Analytics; **`titleRegistry`** hydration, user/shared/personal list CRUD, status keys. | `titleRegistry`, `users/*`, `sharedLists/*`, `personalLists/*` | Same | Firebase SDK only (Gstatic CDN) |
+| `firebase.js` | Imports config, initializes App/Auth/Firestore, optional Analytics (`getAnalytics(app)` when allowed — not exported); **`titleRegistry`** hydration, user/shared/personal list CRUD, status keys. | `titleRegistry`, `users/*`, `sharedLists/*`, `personalLists/*` | Same | Firebase SDK only (Gstatic CDN) |
 | `countries.js` | Static ISO country list + flags for country modal. | — | — | — |
 | `lib/youtube-trailer-id.js` | Validate/normalize TMDB YouTube key strings. | — | — | — |
 | `add.html` | Minimal page for add result. | — | — | — |
@@ -265,7 +266,8 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `netlify/functions/join-shared-list.js` | Add member to shared list. | Firestore via Admin | `sharedLists` | — |
 | `styles.css` | Visual styling. | — | — | — |
 | `check-upcoming.mjs` | Local diagnostic: read Firestore + TMDB, print report. | Admin + `dotenv` | — | TMDB |
-| `scripts/*.js` | Maintenance, backup, migration (titleRegistry model). | Admin (typical) | Varies | TMDB, OMDb, etc. |
+| `compare-upcoming-trakt.mjs` | Optional read-only compare: TMDB vs Trakt “next episode” (same Firestore sources as `check-upcoming.mjs`). | Admin + `dotenv` | — | Trakt, TMDB |
+| `scripts/*.js`, `scripts/*.mjs`, `scripts/lib/*` | Maintenance, backup, migration (titleRegistry model). | Admin (typical) | Varies | TMDB, OMDb, etc. |
 
 ---
 
@@ -284,6 +286,8 @@ flowchart LR
   subgraph Netlify["Netlify"]
     NF1["add-from-imdb"]
     NF2["join-shared-list"]
+    NF3["check-upcoming (scheduled)"]
+    NF4["trigger-upcoming-sync (HTTP)"]
     Static["Static assets"]
   end
 
@@ -316,6 +320,10 @@ flowchart LR
   NF1 --> OMDb
   NF2 --> FS
   NF2 --> FA
+  NF3 --> FS
+  NF3 --> TMDB
+  NF4 --> FS
+  NF4 --> TMDB
 
   SPA --> YT
 ```
@@ -387,16 +395,14 @@ sequenceDiagram
 
 ### Firestore ER (entity relationship)
 
+**Note:** List **content** (`items`, status arrays) lives on **`personalLists`** and **`sharedLists`** docs only. The **`users/{uid}`** doc holds profile + **`defaultPersonalListId`** + dismissals; legacy root-level `items` / `listName` were migrated into the default personal list (Section 3). **`catalog`** was removed (Section 3).
+
 ```mermaid
 erDiagram
   USER_DOC ||--o{ PERSONAL_LIST : "users/uid/personalLists"
   USER_DOC {
     string uid PK "document id"
-    array items
-    array watched
-    array maybeLater
-    array archive
-    string listName
+    string defaultPersonalListId
     string country
     string countryName
   }
@@ -421,11 +427,13 @@ erDiagram
     string createdAt
   }
   USER_DOC }o--o{ SHARED_LIST : "uid in members"
-  CATALOG_MOVIES {
-    string docId "movies"
-    array items
+  TITLE_REGISTRY {
+    string registryId PK
+    string title
+    number tmdbId
   }
-  CATALOG_MOVIES }o--o{ USER_DOC : "optional client merge"
+  PERSONAL_LIST }o--o{ TITLE_REGISTRY : "items[].registryId"
+  SHARED_LIST }o--o{ TITLE_REGISTRY : "items[].registryId"
 ```
 
 ### TMDB enrichment decision logic (flowchart)
@@ -452,7 +460,7 @@ flowchart TD
   M -->|yes| N{uid in members?}
   N -->|no| X403[403]
   N -->|yes| P[Dedupe by imdb or title+year append items]
-  M -->|no| Q[users uid items merge or append]
+  M -->|no| Q[users/uid/personalLists/{id} items merge or append]
   OMDbOnly --> Q
   P --> R[200 success]
   Q --> R
@@ -479,6 +487,8 @@ flowchart TD
 8. **Composite indexes:** `array-contains` query on `sharedLists` has **no committed `firestore.indexes.json`**; if Firebase ever requires a composite index for an expanded query, it would be created in console only.
 
 9. **“Recently Added” tab:** Driven by **order of items in the loaded array** (last N in array), not a server-side `addedAt` field — reordering or merge logic can change meaning without a timestamp.
+
+10. **`firebase.js` public surface:** The module intentionally keeps Firestore **`db`** and Analytics instances **internal** (not re-exported). Call sites use the named helpers (`getPersonalListMovies`, etc.).
 
 ---
 
