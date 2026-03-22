@@ -81,7 +81,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
   const bookmarkletRef = useRef<HTMLAnchorElement | null>(null);
 
   const bookmarkletHref = useMemo(() => {
-    const scriptUrl = `${window.location.origin}/bookmarklet.js?v=9`;
+    const scriptUrl = `${window.location.origin}/bookmarklet.js?v=10`;
     return `javascript:(function(){var s=document.createElement('script');s.src='${scriptUrl}';document.body.appendChild(s);})();`;
   }, []);
 
