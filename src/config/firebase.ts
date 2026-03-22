@@ -38,7 +38,13 @@ function normalizeAuthDomain(value: unknown): string {
 function resolveAuthDomain(rawAuthDomain: unknown, rawProjectId: unknown): string {
   const projectId = cleanEnv(rawProjectId);
   const authDomain = normalizeAuthDomain(rawAuthDomain);
-  const fallback = projectId ? `${projectId}.firebaseapp.com` : authDomain;
+  const safeProjectId =
+    projectId && !projectId.includes("*") && /^[a-z0-9-]+$/i.test(projectId)
+      ? projectId
+      : "movie-trailer-site";
+  const fallback = `${safeProjectId}.firebaseapp.com`;
+  // Prefer deterministic project-based authDomain in production to avoid bad env values.
+  if (import.meta.env.PROD) return fallback;
   // Guard against masked/invalid values (e.g. ********.com) making Firebase iframe URL illegal.
   if (!authDomain || authDomain.includes("*") || !/^[a-z0-9.-]+$/i.test(authDomain)) return fallback;
   return authDomain;
