@@ -16,12 +16,31 @@ for (const key of required) {
   }
 }
 
+function cleanEnv(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim().replace(/^['"]|['"]$/g, "");
+}
+
+function normalizeAuthDomain(value: unknown): string {
+  let v = cleanEnv(value);
+  if (!v) return "";
+  try {
+    v = decodeURIComponent(v);
+  } catch {
+    // Keep raw value if not URL-encoded.
+  }
+  v = v.replace(/^https?:\/\//i, "");
+  v = v.replace(/\/+$/, "");
+  if (v.includes("/")) v = v.split("/")[0] ?? v;
+  return v;
+}
+
 export const firebaseConfig: FirebaseOptions = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string,
+  apiKey: cleanEnv(import.meta.env.VITE_FIREBASE_API_KEY),
+  authDomain: normalizeAuthDomain(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
+  projectId: cleanEnv(import.meta.env.VITE_FIREBASE_PROJECT_ID),
+  storageBucket: cleanEnv(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET),
+  messagingSenderId: cleanEnv(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID),
+  appId: cleanEnv(import.meta.env.VITE_FIREBASE_APP_ID),
+  measurementId: cleanEnv(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID),
 };
