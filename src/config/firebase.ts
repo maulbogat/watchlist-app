@@ -35,10 +35,21 @@ function normalizeAuthDomain(value: unknown): string {
   return v;
 }
 
+function resolveAuthDomain(rawAuthDomain: unknown, rawProjectId: unknown): string {
+  const projectId = cleanEnv(rawProjectId);
+  const authDomain = normalizeAuthDomain(rawAuthDomain);
+  const fallback = projectId ? `${projectId}.firebaseapp.com` : authDomain;
+  // Guard against masked/invalid values (e.g. ********.com) making Firebase iframe URL illegal.
+  if (!authDomain || authDomain.includes("*") || !/^[a-z0-9.-]+$/i.test(authDomain)) return fallback;
+  return authDomain;
+}
+
+const projectId = cleanEnv(import.meta.env.VITE_FIREBASE_PROJECT_ID);
+
 export const firebaseConfig: FirebaseOptions = {
   apiKey: cleanEnv(import.meta.env.VITE_FIREBASE_API_KEY),
-  authDomain: normalizeAuthDomain(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
-  projectId: cleanEnv(import.meta.env.VITE_FIREBASE_PROJECT_ID),
+  authDomain: resolveAuthDomain(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, projectId),
+  projectId,
   storageBucket: cleanEnv(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET),
   messagingSenderId: cleanEnv(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID),
   appId: cleanEnv(import.meta.env.VITE_FIREBASE_APP_ID),
