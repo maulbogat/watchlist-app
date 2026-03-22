@@ -4,6 +4,18 @@ A personal movie/show watchlist with YouTube trailers, filters, and Firestore. *
 
 **Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). Netlify hosts **`dist/`** and runs **`netlify/functions/*.js`** (Admin SDK) for the IMDb add flow, shared-list joins, and upcoming-title sync.
 
+## Environment Quick Start
+
+```bash
+cp .env.example .env
+cp .env.example .env.local
+```
+
+Then fill in:
+
+- `VITE_FIREBASE_*` in `.env.local` (required for app startup/build)
+- `TMDB_API_KEY`, `OMDB_API_KEY` (and optional script vars) in `.env`
+
 ## Run locally
 
 The watchlist is **React** (`src/`) served by **Vite**. Root **`index.html`** is the Vite entry (`#root` + `/src/main.jsx`). **`npm run build:react`** outputs **`dist/`**, which Netlify publishes.
