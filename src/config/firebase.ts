@@ -3,12 +3,25 @@
  */
 import type { FirebaseOptions } from "firebase/app";
 
+const required = [
+  "VITE_FIREBASE_API_KEY",
+  "VITE_FIREBASE_AUTH_DOMAIN",
+  "VITE_FIREBASE_PROJECT_ID",
+  "VITE_FIREBASE_APP_ID",
+] as const;
+
+for (const key of required) {
+  if (!import.meta.env[key]) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+}
+
 export const firebaseConfig: FirebaseOptions = {
-  apiKey: "AIzaSyDKnQufhinuv-jKXNOyVM_mQDmRpdOD0VA",
-  authDomain: "movie-trailer-site.firebaseapp.com",
-  projectId: "movie-trailer-site",
-  storageBucket: "movie-trailer-site.firebasestorage.app",
-  messagingSenderId: "760692399711",
-  appId: "1:760692399711:web:322f98f5fe127aa5f2c5ea",
-  measurementId: "G-4799K3WXK4",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string,
 };

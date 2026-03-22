@@ -8,16 +8,16 @@ This document describes **only what exists in this repository** (static site, Ne
 
 | Service name | Purpose | How it's accessed | Authentication | Environment variables |
 |--------------|---------|-------------------|----------------|----------------------|
-| **Firebase (Firestore)** | Persist watchlists, shared lists, **`titleRegistry`**, user profile (country, list name). | **Client:** Firebase JS SDK v10.7 from `gstatic` CDN in `firebase.js` (`getFirestore`, `doc`, `getDoc`, `setDoc`, etc.). **Server:** `firebase-admin` in Netlify functions and Node scripts. | **Client:** Firebase Auth user JWT (SDK attaches to requests per Firestore rules). **Server:** Service account JSON (base64) for Admin SDK. | **Client:** None — public web config lives in `config/firebase.js` (imported by `firebase.js`; see Section 7). **Server/scripts:** `FIREBASE_SERVICE_ACCOUNT` (base64 JSON). Scripts may also use `serviceAccountKey.json` in project root (per README / `check-upcoming.mjs`). |
-| **Firebase Auth** | Google Sign-In for end users. | **Client:** `firebase-auth.js` from CDN — `signInWithPopup`, `GoogleAuthProvider`, `onAuthStateChanged`. | OAuth via Google; Firebase-issued ID tokens. | Same as Firebase — `config/firebase.js`. |
-| **Firebase Analytics** | Optional; skipped when **offline**, in **Vite dev** (`import.meta.env.DEV`), or when blocked. | **Client:** `firebase.js` dynamically imports Analytics only if `shouldLoadWebAnalytics()` passes, then `isSupported()` + `getAnalytics(app)` (avoids Installations `app-offline` noise locally). | Inherits Firebase web app setup. | Defined in `config/firebase.js`. |
+| **Firebase (Firestore)** | Persist watchlists, shared lists, **`titleRegistry`**, user profile (country, list name). | **Client:** Firebase JS SDK v10 in `src/firebase.ts` (`getFirestore`, `doc`, `getDoc`, `setDoc`, etc.). **Server:** `firebase-admin` in Netlify functions and Node scripts. | **Client:** Firebase Auth user JWT (SDK attaches to requests per Firestore rules). **Server:** Service account JSON (base64) for Admin SDK. | **Client:** `VITE_FIREBASE_*` variables (read in `src/config/firebase.ts` via `import.meta.env`). **Server/scripts:** `FIREBASE_SERVICE_ACCOUNT` (base64 JSON). Scripts may also use `serviceAccountKey.json` in project root (per README / `check-upcoming.mjs`). |
+| **Firebase Auth** | Google Sign-In for end users. | **Client:** Firebase Auth SDK from npm (`signInWithPopup`, `GoogleAuthProvider`, `onAuthStateChanged`) in `src/firebase.ts`. | OAuth via Google; Firebase-issued ID tokens. | Same Firebase client env vars (`VITE_FIREBASE_*`). |
+| **Firebase Analytics** | Optional; skipped when **offline**, in **Vite dev** (`import.meta.env.DEV`), or when blocked. | **Client:** `src/firebase.ts` dynamically imports Analytics only if `shouldLoadWebAnalytics()` passes, then `isSupported()` + `getAnalytics(app)` (avoids Installations `app-offline` noise locally). | Inherits Firebase web app setup. | Uses the same `VITE_FIREBASE_*` values. |
 | **The Movie Database (TMDB)** | Resolve IMDb id → TMDB id; poster; genres/year; **YouTube trailer key** from appended `videos`; **watch providers** by region. | **REST:** `https://api.themoviedb.org/3/...` via Node `https.get` in `netlify/functions/add-from-imdb.js`. Same pattern in maintenance scripts (e.g. `scripts/sync-services-from-tmdb.js`, `check-upcoming.mjs` uses `fetch`). **Not** called from the browser watchlist UI. | API key query parameter `api_key`. | `TMDB_API_KEY` in Netlify env; `.env` for local scripts / `check-upcoming.mjs`. |
 | **OMDb** | Title metadata by IMDb id; disambiguate movie vs TV when TMDB returns both; fallback row when TMDB has no match. | **REST:** `https://www.omdbapi.com/?i=...&apikey=...` in `add-from-imdb.js` and various scripts. | API key query parameter. | `OMDB_API_KEY` (Netlify + local scripts per README / `.env.example`). |
 | **YouTube** | Trailer playback in modal via iframe embed. | **Browser:** `https://www.youtube-nocookie.com/embed/{youtubeId}?...` and link to `youtube.com/watch`. | None for embed (public video ids). | None. |
 | **Google Fonts** | UI typography (Bebas Neue, DM Sans). | `<link href="https://fonts.googleapis.com/...">` in HTML. | None. | None. |
 | **Netlify** | Host static HTML/CSS/JS; run serverless functions under `/.netlify/functions/*`. | **Browser:** `fetch` to same-origin function paths. **Functions:** Node.js handlers in `netlify/functions/*.js`. | Functions verify Firebase ID token (cookie or `Authorization: Bearer`). | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY` documented in README. |
 
-**Note:** `.env.example` includes `WATCH_REGION` for backfill scripts; the **live add flow** uses the signed-in user’s Firestore `country` (via `getUserProfile` in `add.js`), not `WATCH_REGION`, when calling the Netlify function.
+**Note:** `.env.example` includes `WATCH_REGION` for backfill scripts; the **live add flow** uses the signed-in user’s Firestore `country` (via `getUserProfile` in `add.js`), not `WATCH_REGION`, when calling the Netlify function. Client Firebase setup now comes from `VITE_FIREBASE_*` vars.
 
 ---
 
@@ -185,7 +185,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 2. User clicks “Sign in with Google”.  
 3. **`src/App.jsx`** calls `signInWithPopup(auth, GoogleAuthProvider)` (custom parameter `prompt: "select_account"`). Firebase Auth sessions are **per origin** (host + port); local dev on a different port than production is a separate session. **`auth/unauthorized-domain`** is handled in UI (add the host in Firebase Console → Authentication → Authorized domains).  
 4. Firebase Auth completes Google OAuth; `onAuthStateChanged` fires with a user.  
-5. **`WatchlistPage`** loads profile / lists via React Query and **`useWatchlistSessionRestore`** (`?join=`, last list, filter prefs from **`storage.js`**).  
+5. **`WatchlistPage`** loads profile / lists via React Query and **`useWatchlistSessionRestore`** (`/join/:listId` plus legacy `?join=` redirect, last list, filter prefs from **`storage.js`**).  
 6. List data: `getPersonalListMovies` / `getSharedListMovies` via **`firebase.js`**.  
 7. **`TitleGrid`** / **`TitleCard`** render the grid; filters persisted per uid in **`localStorage`**.
 
@@ -223,11 +223,11 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 **Create:**  
 1. Signed-in user opens list settings modal → “Create shared list”, enters name.  
 2. `createSharedList(uid, name)` writes `sharedLists/{listId}` with `ownerId`, `members: [uid]`, empty arrays.  
-3. Modal shows URL `?join={listId}` and copy button.
+3. Modal shows URL `/join/{listId}` and copy button.
 
 **Join via link:**  
-1. User opens site with `?join={listId}` while signed in.  
-2. Client `POST`s `/.netlify/functions/join-shared-list` with JSON `{ listId }`, `credentials: "include"` — **`useWatchlistSessionRestore.js`** (`?join=` on load) or **`ManageListsModal.jsx`** (paste URL). Function reads Firebase ID token from cookie and/or `Authorization` header.  
+1. User opens site with `/join/{listId}` while signed in (legacy `?join=` links are redirected).
+2. Client `POST`s `/.netlify/functions/join-shared-list` with JSON `{ listId }`, `credentials: "include"` — **`useWatchlistSessionRestore.ts`** (legacy query redirect on load) or **`ManageListsModal.tsx`** (paste URL). Function reads Firebase ID token from cookie and/or `Authorization` header.
 3. Function verifies Firebase ID token, `arrayUnion(uid)` on `members` if not already present (fails with **400** if the list document has no non-empty `name` and the user was not already a member).  
 4. Client refreshes shared lists, switches `currentListMode` to that shared list.
 
@@ -235,7 +235,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 - Lists modal “Join” reads URL from input, extracts `join` query param, same POST as above.
 
 **Copy invite (header):**  
-- When viewing a shared list, “Copy invite link” copies `origin + pathname + "?join=" + listId`.
+- When viewing a shared list, “Copy invite link” copies `/join/{listId}`.
 
 ### 5. Watch provider lookup flow
 
@@ -254,7 +254,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `src/components/*.jsx`, `src/components/modals/*.jsx`, `src/hooks/*` | React watchlist UI (see Architecture). | Via `firebase.js` | Via `firebase.js` | `fetch` → `join-shared-list` where used; YouTube embeds; clipboard |
 | `src/store/watchlistConstants.js` | Status labels, checkmark/upcoming SVG snippets, `GENRE_LIMIT`. | — | — | — |
 | `src/lib/movieDisplay.js` | `servicesForMovie`, `renderServiceChips`, `hasPlayableTrailerYoutubeId`. | — | — | — |
-| `config/firebase.js` | Public Firebase Web SDK config object (`firebaseConfig`). | — | — | — |
+| `src/config/firebase.ts` | Firebase Web SDK config from `import.meta.env` (`VITE_FIREBASE_*`) with required-var guard. | — | — | — |
 | `firebase.js` | Imports config, initializes App/Auth/Firestore, optional Analytics (`getAnalytics(app)` when allowed — not exported); **`titleRegistry`** hydration, user/shared/personal list CRUD, status keys. | `titleRegistry`, `users/*`, `sharedLists/*`, `personalLists/*` | Same | Firebase SDK only (Gstatic CDN) |
 | `countries.js` | Static ISO country list + flags for country modal. | — | — | — |
 | `lib/youtube-trailer-id.js` | Validate/normalize TMDB YouTube key strings. | — | — | — |
@@ -470,9 +470,9 @@ flowchart TD
 
 ## Section 7: Open Questions & Gaps
 
-1. **Web app config:** Public Firebase web SDK settings live in **`config/firebase.js`** and are imported by `firebase.js`. They are not loaded from `.env` at build time (values are committed for the client bundle).
+1. **Web app config:** Firebase web SDK settings are read from `VITE_FIREBASE_*` (`src/config/firebase.ts`) at build/runtime via Vite env loading.
 
-2. **Secrets in repository:** Full Firebase web config (including `apiKey`) is committed. This is normal for Firebase client apps but means the document is not “secret-free”; `FIREBASE_SERVICE_ACCOUNT` correctly stays out of git.
+2. **Secrets in repository:** Firebase client config is no longer hardcoded in source; keep real values in `.env.local` (gitignored) and in Netlify environment variables. `FIREBASE_SERVICE_ACCOUNT` stays out of git.
 
 3. **Bookmarklet portability:** `bookmarklet.js` and `bookmarklet.html` hardcode **`https://watchlist-trailers.netlify.app`** for the script URL and popup base. Forks or alternate deployments must edit these files.
 

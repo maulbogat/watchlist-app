@@ -2,7 +2,7 @@
 
 A personal movie/show watchlist with YouTube trailers, filters, and Firestore. **Architecture, data model, and flows** are documented in **[`system-design.md`](./system-design.md)** (source of truth for how pieces fit together).
 
-**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via root **`firebase.js`** (Firebase JS SDK from Google CDN + committed **`config/firebase.js`**). Netlify hosts **`dist/`** and runs **`netlify/functions/*.js`** (Admin SDK) for the IMDb add flow, shared-list joins, and upcoming-title sync.
+**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). Netlify hosts **`dist/`** and runs **`netlify/functions/*.js`** (Admin SDK) for the IMDb add flow, shared-list joins, and upcoming-title sync.
 
 ## Run locally
 
@@ -18,7 +18,7 @@ npm run dev:react
 Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--host` so LAN devices can reach it if needed.
 
 - **Firebase Auth:** Add your dev host (e.g. `localhost` and the port you use) under Firebase Console → Authentication → Settings → **Authorized domains**.
-- **Netlify functions locally:** `vite.config.js` proxies `/.netlify/functions/*` to `http://localhost:8888`. To exercise the bookmarklet add flow against real functions, run **`netlify dev`** in another terminal (or start the functions server on `8888` per Netlify docs) while using the Vite app.
+- **Netlify functions locally:** `vite.config.ts` proxies `/.netlify/functions/*` to `http://localhost:8888`. To exercise the bookmarklet add flow against real functions, run **`netlify dev`** in another terminal (or start the functions server on `8888` per Netlify docs) while using the Vite app.
 
 **Other commands**
 
@@ -27,6 +27,21 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
 | `npm run dev:react` | Dev server (HMR) |
 | `npm run build:react` | Production bundle → `dist/` |
 | `npm run preview:react` | Serve `dist/` locally |
+| `npm run test:run` | Run Vitest test suite once |
+
+## Environment configuration
+
+- Copy `/.env.example` to `/.env` for local scripts/functions.
+- Create `/.env.local` for Vite client variables (this file is gitignored).
+- Required client variables:
+  - `VITE_FIREBASE_API_KEY`
+  - `VITE_FIREBASE_AUTH_DOMAIN`
+  - `VITE_FIREBASE_PROJECT_ID`
+  - `VITE_FIREBASE_STORAGE_BUCKET`
+  - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+  - `VITE_FIREBASE_APP_ID`
+  - `VITE_FIREBASE_MEASUREMENT_ID`
+- `src/config/firebase.ts` validates required Firebase env keys at runtime and throws a clear error when missing.
 
 ## Firebase setup
 
@@ -56,7 +71,16 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 3. Set `TMDB_API_KEY` in Netlify → Site settings → Environment variables (for trailer lookup and **upcoming** sync). Get a free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
 
-4. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
+4. Set all `VITE_FIREBASE_*` variables in Netlify → Site settings → Environment variables so production `vite build` can initialize Firebase:
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
+   - `VITE_FIREBASE_MEASUREMENT_ID`
+
+5. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
 
    **If `curl …/check-upcoming` returns Netlify “Internal Error”** or logs show **Duration: 30000 ms** with no `check-upcoming: done`: the old “full registry in one run” flow **exceeds Netlify’s ~30s limit**. The deployed function now uses a **time budget + Firestore cursor** (`syncState/upcomingAlerts`, Admin-only — deploy updated **`firestore.rules`**). Use **Netlify → Functions → check-upcoming → Run now** repeatedly until logs show **`completed":true`** (or wait for daily cron). Each run should finish under 30s; **`upcomingAlerts`** appears after the first chunk writes.
 
@@ -82,7 +106,7 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
    **Personal list storage:** Watchlist rows live under `users/{uid}/personalLists/{listId}` (same idea as `sharedLists`). The user doc keeps profile fields and `defaultPersonalListId` only. Legacy `users/{uid}.items` is migrated automatically when users open the app or use the bookmarklet; optional bulk: `node scripts/migrate-personal-items-to-subcollection.mjs --dry-run` then `--write`.
 
-5. Visit `/bookmarklet.html` on your deployed site, drag the button to your bookmarks bar, then sign in with Google. When on an IMDb title page, click the bookmarklet to add it to your watchlist.
+6. Visit `/bookmarklet.html` on your deployed site, drag the button to your bookmarks bar, then sign in with Google. When on an IMDb title page, click the bookmarklet to add it to your watchlist.
 
 ## Multi-user support
 
@@ -186,7 +210,7 @@ Many scripts expect **`TMDB_API_KEY`**, **`FIREBASE_SERVICE_ACCOUNT`** (base64) 
 
 - **Watchlist UI (React):** grid of titles with poster, status controls, and **trailer modal** (YouTube embed).
 - **Personal lists:** default list + extra lists; **manage lists** modal (create/rename/delete, pick default).
-- **Shared lists:** create, copy invite link (`?join=`), join while signed in; bookmarklet targets the list you’re viewing.
+- **Shared lists:** create, copy invite link (`/join/:listId`), join while signed in; bookmarklet targets the list you’re viewing.
 - **Status tabs:** Recently Added, To Watch (**includes “maybe later”** rows), Watched, Archive — persisted in Firestore.
 - **Filters:** Movies / TV / Both, **genre**, persisted per account in **localStorage** (with session restore).
 - **Country / region:** set in app for TMDB **watch providers** at add time; **service chips** on cards (e.g. Netflix, Prime).

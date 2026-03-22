@@ -1,4 +1,5 @@
-import FocusTrap from "focus-trap-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export interface DeleteConfirmModalProps {
   open: boolean;
@@ -20,47 +21,40 @@ export function DeleteConfirmModal({
   if (!open) return null;
 
   return (
-    <div
-      className="modal-bg open"
-      id="delete-confirm-modal"
-      onClick={(e) => e.target === e.currentTarget && onCancel()}
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onCancel();
+      }}
     >
-      <FocusTrap
-        active={open}
-        focusTrapOptions={{
-          escapeDeactivates: false,
-          allowOutsideClick: true,
-          initialFocus: false,
+      <DialogContent
+        className="modal delete-confirm-modal bg-[#131317] border-white/10 text-[#f0ede8]"
+        id="delete-confirm-modal"
+        onEscapeKeyDown={(e) => {
+          e.preventDefault();
+          onCancel();
+        }}
+        onInteractOutside={() => {
+          onCancel();
         }}
       >
-        <div
-          className="modal delete-confirm-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-hidden="false"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="modal-header">
-            <span className="modal-title" id="delete-confirm-title">
-              {title}
-            </span>
-            <button type="button" className="modal-close" aria-label="Close" onClick={onCancel}>
-              &#x2715;
-            </button>
-          </div>
-          <div className="delete-confirm-body">
-            <p id="delete-confirm-message">{message}</p>
-            <div className="delete-confirm-actions">
-              <button type="button" className="delete-confirm-cancel" onClick={onCancel}>
-                Cancel
-              </button>
-              <button type="button" className="delete-confirm-delete" onClick={onConfirm}>
-                {confirmLabel}
-              </button>
-            </div>
+        <DialogHeader className="modal-header">
+          <DialogTitle className="modal-title font-title tracking-widest" id="delete-confirm-title">
+            {title}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="delete-confirm-body">
+          <p id="delete-confirm-message">{message}</p>
+          <div className="delete-confirm-actions">
+            <Button type="button" variant="outline" className="delete-confirm-cancel" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" className="delete-confirm-delete" onClick={onConfirm}>
+              {confirmLabel}
+            </Button>
           </div>
         </div>
-      </FocusTrap>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

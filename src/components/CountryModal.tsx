@@ -1,5 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
-import FocusTrap from "focus-trap-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { COUNTRIES } from "../countries.js";
 import type { Country } from "../types/index.js";
 
@@ -62,92 +64,99 @@ export function CountryModal({
   }
 
   return (
-    <div
-      className="modal-bg country-modal-bg open"
-      id="country-modal"
-      onClick={(e) => allowCancel && e.target === e.currentTarget && onCancel?.()}
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && allowCancel) onCancel?.();
+      }}
     >
-      <FocusTrap
-        active={open}
-        focusTrapOptions={{
-          escapeDeactivates: false,
-          allowOutsideClick: true,
-          initialFocus: false,
+      <DialogContent
+        className="modal country-modal bg-[#131317] border-white/10 text-[#f0ede8]"
+        id="country-modal"
+        onEscapeKeyDown={(e) => {
+          if (!allowCancel) {
+            e.preventDefault();
+            return;
+          }
+          onCancel?.();
+        }}
+        onInteractOutside={(e) => {
+          if (!allowCancel) {
+            e.preventDefault();
+            return;
+          }
+          onCancel?.();
         }}
       >
-        <div
-          className="modal country-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-hidden="false"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="modal-header">
-            <span className="modal-title">Where are you watching from?</span>
-          </div>
-          <div className="country-modal-body">
-            <div className="country-picker-wrap">
-              <input
-                type="text"
-                id="country-search"
-                className="country-search"
-                placeholder="Search countries..."
-                autoComplete="off"
-                aria-haspopup="listbox"
-                aria-expanded={dropdownOpen}
-                aria-controls="country-dropdown-list"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setDropdownOpen(true);
-                }}
-                onFocus={() => setDropdownOpen(true)}
-                autoFocus
-              />
-              <div
-                className={`country-dropdown${dropdownOpen ? " open" : ""}`}
-                id="country-dropdown"
-                role="listbox"
-                aria-hidden={!dropdownOpen}
-              >
-                <div className="country-dropdown-list" id="country-dropdown-list">
-                  {list.map((c) => (
-                    <button
-                      key={c.code}
-                      type="button"
-                      className="country-dropdown-item"
-                      role="option"
-                      data-code={c.code}
-                      aria-selected={c.code === selected.code}
-                      onClick={() => {
-                        setSelected(c);
-                        setSearch(c.name);
-                        setDropdownOpen(true);
-                      }}
-                    >
-                      {c.flag} {c.name}
-                    </button>
-                  ))}
-                </div>
+        <DialogHeader className="modal-header">
+          <DialogTitle className="modal-title font-title tracking-widest">
+            Where are you watching from?
+          </DialogTitle>
+        </DialogHeader>
+        <div className="country-modal-body">
+          <div className="country-picker-wrap">
+            <Input
+              type="text"
+              id="country-search"
+              className="country-search"
+              placeholder="Search countries..."
+              autoComplete="off"
+              aria-haspopup="listbox"
+              aria-expanded={dropdownOpen}
+              aria-controls="country-dropdown-list"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setDropdownOpen(true);
+              }}
+              onFocus={() => setDropdownOpen(true)}
+              autoFocus
+            />
+            <div
+              className={`country-dropdown${dropdownOpen ? " open" : ""}`}
+              id="country-dropdown"
+              role="listbox"
+              aria-hidden={!dropdownOpen}
+            >
+              <div className="country-dropdown-list" id="country-dropdown-list">
+                {list.map((c) => (
+                  <Button
+                    key={c.code}
+                    type="button"
+                    variant="ghost"
+                    className="country-dropdown-item"
+                    role="option"
+                    data-code={c.code}
+                    aria-selected={c.code === selected.code}
+                    onClick={() => {
+                      setSelected(c);
+                      setSearch(c.name);
+                      setDropdownOpen(true);
+                    }}
+                  >
+                    {c.flag} {c.name}
+                  </Button>
+                ))}
               </div>
             </div>
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              {allowCancel ? (
-                <button
-                  type="button"
-                  className="country-save-btn list-name-secondary-btn"
-                  onClick={() => onCancel?.()}
-                >
-                  Cancel
-                </button>
-              ) : null}
-              <button type="button" className="country-save-btn" id="country-save-btn" onClick={handleSave}>
-                Save
-              </button>
-            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            {allowCancel ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="country-save-btn list-name-secondary-btn"
+                onClick={() => onCancel?.()}
+              >
+                Cancel
+              </Button>
+            ) : null}
+            <Button type="button" className="country-save-btn" id="country-save-btn" onClick={handleSave}>
+              Save
+            </Button>
           </div>
         </div>
-      </FocusTrap>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

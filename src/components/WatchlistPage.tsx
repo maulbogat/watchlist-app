@@ -42,7 +42,7 @@ export function WatchlistPage() {
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [onboardingCountry, setOnboardingCountry] = useState(false);
   const [onboardingListName, setOnboardingListName] = useState(false);
-
+  
   const authWrapRef = useRef<HTMLDivElement>(null);
 
   const listsReady = personalQ.isFetched && sharedQ.isFetched;

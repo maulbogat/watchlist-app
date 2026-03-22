@@ -1,5 +1,6 @@
 import { useState } from "react";
-import FocusTrap from "focus-trap-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export interface SharedCreatedModalProps {
   open: boolean;
@@ -13,63 +14,57 @@ export function SharedCreatedModal({ open, shareUrl, onClose }: SharedCreatedMod
   if (!open) return null;
 
   return (
-    <div
-      className="modal-bg open"
-      id="shared-modal"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
     >
-      <FocusTrap
-        active={open}
-        focusTrapOptions={{
-          escapeDeactivates: false,
-          allowOutsideClick: true,
-          initialFocus: false,
+      <DialogContent
+        className="modal shared-modal bg-[#131317] border-white/10 text-[#f0ede8]"
+        id="shared-modal"
+        onEscapeKeyDown={(e) => {
+          e.preventDefault();
+          onClose();
+        }}
+        onInteractOutside={() => {
+          onClose();
         }}
       >
-        <div
-          className="modal shared-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-hidden="false"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="modal-header">
-            <span className="modal-title" id="shared-modal-title">
-              Shared list created
-            </span>
-            <button type="button" className="modal-close" aria-label="Close" onClick={onClose}>
-              &#x2715;
-            </button>
-          </div>
-          <div className="shared-modal-body" id="shared-modal-body">
-            <p>Share this link for others to join:</p>
-            <p className="share-link" id="share-link-text">
-              {shareUrl}
-            </p>
-            <button
-              type="button"
-              className="auth-btn"
-              id="copy-share-link-btn"
-              style={{ marginTop: "0.75rem" }}
-              disabled={copied}
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(shareUrl);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                } catch {
-                  window.alert("Could not copy. Select and copy the link above.");
-                }
-              }}
-            >
-              {copied ? "Copied!" : "Copy link"}
-            </button>
-            <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--muted)" }}>
-              Anyone with the link can join. They must be signed in.
-            </p>
-          </div>
+        <DialogHeader className="modal-header">
+          <DialogTitle className="modal-title font-title tracking-widest" id="shared-modal-title">
+            Shared list created
+          </DialogTitle>
+        </DialogHeader>
+        <div className="shared-modal-body" id="shared-modal-body">
+          <p>Share this link for others to join:</p>
+          <p className="share-link" id="share-link-text">
+            {shareUrl}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="auth-btn"
+            id="copy-share-link-btn"
+            style={{ marginTop: "0.75rem" }}
+            disabled={copied}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(shareUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              } catch {
+                window.alert("Could not copy. Select and copy the link above.");
+              }
+            }}
+          >
+            {copied ? "Copied!" : "Copy link"}
+          </Button>
+          <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--muted)" }}>
+            Anyone with the link can join. They must be signed in.
+          </p>
         </div>
-      </FocusTrap>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

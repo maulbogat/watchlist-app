@@ -5,6 +5,7 @@ import { WatchlistPage } from "./components/WatchlistPage.js";
 import { JoinPage } from "./pages/JoinPage.js";
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAppStore } from "./store/useAppStore.js";
+import { Toaster } from "@/components/ui/toaster";
 
 function isAuthError(err: unknown): err is { code?: string; message?: string } {
   return typeof err === "object" && err !== null;
@@ -93,11 +94,14 @@ export default function App() {
   }, [joinId, navigate, location.pathname]);
 
   return (
-    <Routes>
-      <Route path="/" element={<WatchlistAuthGate />} />
-      <Route path="/list/:listId" element={<WatchlistAuthGate />} />
-      <Route path="/join/:listId" element={<JoinPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<WatchlistAuthGate />} />
+        <Route path="/list/:listId" element={<WatchlistAuthGate />} />
+        <Route path="/join/:listId" element={<JoinPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <Toaster />
+    </>
   );
 }

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import FocusTrap from "focus-trap-react";
 import type { StatusKey } from "../types/index.js";
 import { useAppStore, STATUS_ORDER, STATUS_LABELS, CHECK_SVG } from "../store/useAppStore.js";
 import { hasPlayableTrailerYoutubeId, renderServiceChips, servicesForMovie } from "../lib/movieDisplay.js";
@@ -170,14 +169,6 @@ export function TrailerModal() {
         if (e.target === e.currentTarget) close();
       }}
     >
-      <FocusTrap
-        active={Boolean(movie)}
-        focusTrapOptions={{
-          escapeDeactivates: false,
-          allowOutsideClick: true,
-          initialFocus: false,
-        }}
-      >
       <div className="modal" role="dialog" aria-modal="true">
         <div className="modal-header">
           <span
@@ -401,7 +392,6 @@ export function TrailerModal() {
           </div>
         </div>
       </div>
-      </FocusTrap>
     </div>
   );
 }

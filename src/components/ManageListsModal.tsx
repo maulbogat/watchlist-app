@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import FocusTrap from "focus-trap-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import type { ListMode, PersonalList, SharedList } from "../types/index.js";
 import {
   createPersonalList,
@@ -114,33 +116,27 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
   return (
     <>
       {open ? (
-      <div
-        className="modal-bg open"
-        id="lists-modal"
-        onClick={(e) => e.target === e.currentTarget && onClose()}
-      >
-        <FocusTrap
-          active={open}
-          focusTrapOptions={{
-            escapeDeactivates: false,
-            allowOutsideClick: true,
-            initialFocus: false,
+        <Dialog
+          open={open}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) onClose();
           }}
         >
-        <div
-          className="modal lists-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-hidden="false"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="modal-header">
-            <span className="modal-title">Manage lists</span>
-            <button type="button" className="modal-close" aria-label="Close" onClick={onClose}>
-              &#x2715;
-            </button>
-          </div>
-          <div className="lists-modal-body">
+          <DialogContent
+                  className="lists-modal z-[1201] max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8] sm:max-w-[520px]"
+            id="lists-modal"
+            onEscapeKeyDown={(e) => {
+              e.preventDefault();
+              onClose();
+            }}
+          >
+            <DialogHeader className="modal-header">
+              <DialogTitle className="modal-title font-title tracking-widest">Manage lists</DialogTitle>
+              <DialogDescription className="sr-only">
+                Manage personal and shared lists, join by invite link, or create new lists.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="lists-modal-body">
             <section className="lists-modal-section">
               <h3 className="lists-modal-section-title">Your lists</h3>
               <ul className="lists-modal-list" id="lists-modal-list">
@@ -155,7 +151,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                     <span className="lists-modal-list-item-name">
                       {iconPerson}
                       {editing?.type === "personal" && editing.id === l.id ? (
-                        <input
+                        <Input
                           type="text"
                           className="lists-modal-list-item-edit"
                           value={editing.draft}
@@ -195,8 +191,9 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                       )}
                     </span>
                     <div className="lists-modal-list-item-actions">
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         className="lists-modal-list-item-action lists-modal-rename-btn"
                         data-list-id={l.id}
                         data-type="personal"
@@ -210,9 +207,10 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                         }
                       >
                         Rename
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="destructive"
                         className="lists-modal-list-item-action lists-modal-list-item-action--delete lists-modal-delete-btn"
                         data-list-id={l.id}
                         data-type="personal"
@@ -231,7 +229,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                         }}
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </li>
                 ))}
@@ -249,7 +247,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                       <span className="lists-modal-list-item-name">
                         {iconGroup}
                         {editing?.type === "shared" && editing.id === l.id ? (
-                          <input
+                          <Input
                             type="text"
                             className="lists-modal-list-item-edit"
                             value={editing.draft}
@@ -290,8 +288,9 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                         )}
                       </span>
                       <div className="lists-modal-list-item-actions">
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
                           className="lists-modal-list-item-action lists-modal-rename-btn"
                           data-list-id={l.id}
                           data-type="shared"
@@ -305,10 +304,11 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                           }
                         >
                           Rename
-                        </button>
+                        </Button>
                         {isOwner ? (
-                          <button
+                          <Button
                             type="button"
+                            variant="destructive"
                             className="lists-modal-list-item-action lists-modal-list-item-action--delete lists-modal-delete-btn"
                             data-list-id={l.id}
                             data-type="shared"
@@ -324,10 +324,11 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                             }
                           >
                             Delete
-                          </button>
+                          </Button>
                         ) : (
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
                             className="lists-modal-list-item-leave lists-modal-leave-btn"
                             data-list-id={l.id}
                             onClick={() =>
@@ -341,7 +342,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                             }
                           >
                             Leave
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </li>
@@ -349,28 +350,30 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                 })}
               </ul>
               <div className="lists-modal-create-buttons">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   className="lists-modal-new-personal"
                   id="lists-new-personal-btn"
                   onClick={() => setListNameKind("personal")}
                 >
                   + New personal list
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
                   className="lists-modal-btn"
                   id="lists-create-btn"
                   onClick={() => setListNameKind("shared")}
                 >
                   + Create new shared list
-                </button>
+                </Button>
               </div>
             </section>
             <section className="lists-modal-section">
               <h3 className="lists-modal-section-title">Join with link</h3>
               <div className="lists-modal-join">
-                <input
+                <Input
                   type="text"
                   id="lists-join-input"
                   className="lists-modal-input"
@@ -378,8 +381,9 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                   value={joinInput}
                   onChange={(e) => setJoinInput(e.target.value)}
                 />
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   className="lists-modal-btn"
                   id="lists-join-btn"
                   onClick={async () => {
@@ -433,7 +437,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                   }}
                 >
                   Join
-                </button>
+                </Button>
               </div>
             </section>
             <section className="lists-modal-section">
@@ -451,10 +455,9 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                 Add to Watchlist
               </a>
             </section>
-          </div>
-        </div>
-        </FocusTrap>
-      </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       ) : null}
 
       <ListNameModal

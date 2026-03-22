@@ -5,8 +5,7 @@ import { useRemoveTitle, useSetTitleStatus } from "../hooks/useMutations.js";
 import { movieKey } from "../firebase.js";
 import type { StatusKey, WatchlistItem } from "../types/index.js";
 import { errorMessage } from "../lib/utils.js";
-
-type ToastState = { id: string; title: string; undo: () => void } | null;
+import { toast } from "@/components/ui/use-toast";
 
 interface TitleGridProps {
   visibleMovies: WatchlistItem[];
@@ -27,7 +26,6 @@ export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGr
   const removeTitleMutation = useRemoveTitle();
 
   const [statusOpenKey, setStatusOpenKey] = useState<string | null>(null);
-  const [toast, setToast] = useState<ToastState>(null);
 
   useEffect(() => {
     function onDocClick() {
@@ -60,11 +58,9 @@ export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGr
       if (!currentUser?.uid) return;
       const title = String(movie.title || "").trim() || "Title";
       let removed = false;
-      const id = `rm-${Date.now()}`;
       const timer = window.setTimeout(async () => {
         if (removed) return;
         removed = true;
-        setToast((t) => (t?.id === id ? null : t));
         try {
           await removeTitleMutation.mutateAsync({
             uid: currentUser.uid,
@@ -77,13 +73,14 @@ export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGr
         }
       }, 4000);
 
-      setToast({
-        id,
-        title,
-        undo: () => {
-          removed = true;
-          window.clearTimeout(timer);
-          setToast(null);
+      toast(`Removed ${title}`, {
+        duration: 4000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            removed = true;
+            window.clearTimeout(timer);
+          },
         },
       });
     },
@@ -117,7 +114,6 @@ export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGr
         <div className="grid" id="grid">
           <div className="empty-state">{withImdb}</div>
         </div>
-        <ToastMount toast={toast} />
       </>
     );
   }
@@ -138,29 +134,6 @@ export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGr
           />
         ))}
       </div>
-      <ToastMount toast={toast} />
     </>
-  );
-}
-
-interface ToastMountProps {
-  toast: ToastState;
-}
-
-function ToastMount({ toast }: ToastMountProps) {
-  if (!toast) return null;
-  return (
-    <div id="toast-container" className="toast-container" aria-live="polite">
-      <div className="toast">
-        <span>
-          Removed {toast.title}
-        </span>
-        {toast.undo ? (
-          <button type="button" className="toast-undo-btn" onClick={toast.undo}>
-            Undo
-          </button>
-        ) : null}
-      </div>
-    </div>
   );
 }
