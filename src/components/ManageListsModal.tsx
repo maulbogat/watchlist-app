@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -84,13 +84,22 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
     const scriptUrl = `${window.location.origin}/bookmarklet.js?v=10`;
     return `javascript:(function(){var s=document.createElement('script');s.src='${scriptUrl}';document.body.appendChild(s);})();`;
   }, []);
+  const bookmarkletLabel = "Add to Watchlist";
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = bookmarkletRef.current;
     if (!node) return;
     // React 19 blocks javascript: URLs in JSX props; set directly for drag-to-bookmarks support.
     node.setAttribute("href", bookmarkletHref);
-  });
+    node.setAttribute("title", bookmarkletLabel);
+  }, [bookmarkletHref, bookmarkletLabel]);
+
+  function ensureBookmarkletHref() {
+    const node = bookmarkletRef.current;
+    if (!node) return;
+    node.setAttribute("href", bookmarkletHref);
+    node.setAttribute("title", bookmarkletLabel);
+  }
 
   if (!currentUser?.uid) return null;
   const signedInUser = currentUser;
@@ -458,6 +467,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                 id="lists-bookmarklet-btn"
                 className="lists-modal-bookmarklet-btn"
                 draggable="true"
+                onMouseDown={ensureBookmarkletHref}
                 onClick={(e) => e.preventDefault()}
               >
                 Add to Watchlist
