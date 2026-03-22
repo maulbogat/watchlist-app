@@ -84,7 +84,6 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
     const scriptUrl = `${window.location.origin}/bookmarklet.js?v=10`;
     return `javascript:(function(){var s=document.createElement('script');s.src='${scriptUrl}';document.body.appendChild(s);})();`;
   }, []);
-  const bookmarkletLabel = "Add to Watchlist";
 
   useEffect(() => {
     const node = bookmarkletRef.current;
@@ -92,17 +91,6 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
     // React 19 blocks javascript: URLs in JSX props; set directly for drag-to-bookmarks support.
     node.setAttribute("href", bookmarkletHref);
   });
-
-  function onBookmarkletDragStart(e: React.DragEvent<HTMLAnchorElement>) {
-    // Make bookmark creation reliable and preserve a readable bookmark title.
-    e.dataTransfer.setData("text/uri-list", bookmarkletHref);
-    e.dataTransfer.setData("text/plain", bookmarkletHref);
-    e.dataTransfer.setData("text/x-moz-url", `${bookmarkletHref}\n${bookmarkletLabel}`);
-    e.dataTransfer.setData("text/html", `<a href="${bookmarkletHref}">${bookmarkletLabel}</a>`);
-    e.dataTransfer.effectAllowed = "copy";
-    const node = bookmarkletRef.current;
-    if (node) node.setAttribute("href", bookmarkletHref);
-  }
 
   if (!currentUser?.uid) return null;
   const signedInUser = currentUser;
@@ -470,7 +458,6 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                 id="lists-bookmarklet-btn"
                 className="lists-modal-bookmarklet-btn"
                 draggable="true"
-                onDragStart={onBookmarkletDragStart}
                 onClick={(e) => e.preventDefault()}
               >
                 Add to Watchlist
