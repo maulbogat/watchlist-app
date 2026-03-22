@@ -2544,6 +2544,15 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   background: rgba(255, 255, 255, 0.04);
 }
 
+/* Keep account menu above alerts/content so all items remain clickable. */
+.auth-ui {
+  position: relative;
+  z-index: 120;
+}
+.auth-avatar-wrap .auth-dropdown {
+  z-index: 220;
+}
+
 @media (max-width: 640px) {
   .upcoming-alerts-pills > .upcoming-alert-pill {
     flex: 1 1 100%;

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -78,11 +78,28 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [editing, setEditing] = useState<EditingRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const bookmarkletRef = useRef<HTMLAnchorElement | null>(null);
 
   const bookmarkletHref = useMemo(() => {
     const scriptUrl = `${window.location.origin}/bookmarklet.js?v=9`;
     return `javascript:(function(){var s=document.createElement('script');s.src='${scriptUrl}';document.body.appendChild(s);})();`;
   }, []);
+
+  useEffect(() => {
+    const node = bookmarkletRef.current;
+    if (!node) return;
+    // React 19 blocks javascript: URLs in JSX props; set directly for drag-to-bookmarks support.
+    node.setAttribute("href", bookmarkletHref);
+  });
+
+  function onBookmarkletDragStart(e: React.DragEvent<HTMLAnchorElement>) {
+    // Make bookmark creation reliable in browsers that prefer explicit drag payload data.
+    e.dataTransfer.setData("text/uri-list", bookmarkletHref);
+    e.dataTransfer.setData("text/plain", bookmarkletHref);
+    e.dataTransfer.effectAllowed = "copy";
+    const node = bookmarkletRef.current;
+    if (node) node.setAttribute("href", bookmarkletHref);
+  }
 
   if (!currentUser?.uid) return null;
   const signedInUser = currentUser;
@@ -446,10 +463,11 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                 Drag this button to your bookmarks bar to add titles directly from any IMDb page.
               </p>
               <a
-                href={bookmarkletHref}
+                ref={bookmarkletRef}
                 id="lists-bookmarklet-btn"
                 className="lists-modal-bookmarklet-btn"
                 draggable="true"
+                onDragStart={onBookmarkletDragStart}
                 onClick={(e) => e.preventDefault()}
               >
                 Add to Watchlist
