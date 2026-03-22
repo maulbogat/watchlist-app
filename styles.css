@@ -246,7 +246,7 @@ header h1 span {
   gap: 0.5rem;
   min-width: 140px;
   height: 36px;
-  padding: 0 0.75rem;
+  padding: 0 1.65rem 0 0.75rem;
   font-family: var(--font-title);
   font-size: 0.95rem;
   letter-spacing: 0.08em;
@@ -257,6 +257,28 @@ header h1 span {
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s, color 0.2s;
   white-space: nowrap;
+  position: relative;
+}
+.custom-dropdown-trigger > svg {
+  display: none;
+}
+.custom-dropdown-trigger::after {
+  content: "";
+  position: absolute;
+  right: 0.72rem;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-62%) rotate(45deg);
+  opacity: 0.85;
+  pointer-events: none;
+}
+.custom-dropdown-value {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
 }
 
 .custom-dropdown-trigger:hover {
@@ -271,6 +293,12 @@ header h1 span {
   color: var(--accent);
 }
 
+.custom-dropdown-content {
+  padding: 0.25rem;
+}
+#list-selector-panel [data-slot="select-item"] > span.pointer-events-none.absolute {
+  display: none;
+}
 
 .custom-dropdown-item {
   display: flex;
@@ -285,6 +313,15 @@ header h1 span {
   border-radius: 6px;
   transition: background 0.15s, color 0.15s;
   white-space: nowrap;
+}
+.custom-dropdown-item-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.custom-dropdown-item-text {
+  display: inline-block;
+  line-height: 1;
 }
 .custom-dropdown-icon {
   flex-shrink: 0;
@@ -329,6 +366,44 @@ header h1 span {
 
 .lists-modal-body {
   padding: 0.5rem 0 1rem;
+}
+#lists-modal {
+  width: min(360px, calc(100vw - 2rem));
+  max-width: 360px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem;
+}
+#lists-modal .modal-header {
+  margin-bottom: 0.45rem;
+  padding: 0;
+}
+#lists-modal .modal-title {
+  font-size: 1.8rem;
+  letter-spacing: 0.065em;
+}
+#lists-modal button[data-slot="dialog-close"] {
+  top: 0.55rem;
+  right: 0.55rem;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  padding: 0;
+}
+#lists-modal button[data-slot="dialog-close"]:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+#lists-modal button[data-slot="dialog-close"] svg {
+  width: 13px;
+  height: 13px;
+}
+body:has(#lists-modal[data-state="open"]) [data-slot="dialog-overlay"] {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: none;
 }
 .lists-modal-section {
   margin-bottom: 1.25rem;

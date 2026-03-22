@@ -78,8 +78,13 @@ export function ListSelector({ personalLists, sharedLists, onManageLists }: List
             </SelectValue>
           </SelectTrigger>
           <SelectContent
-            className="min-w-[180px] border border-[var(--border)] bg-[var(--surface2)] text-[var(--text)]"
+            className="custom-dropdown-content min-w-[180px] border border-[var(--border)] bg-[var(--surface2)] text-[var(--text)]"
             id="list-selector-panel"
+            position="popper"
+            side="bottom"
+            align="start"
+            sideOffset={6}
+            avoidCollisions={false}
           >
             {items.map(({ value, label: itemLabel, icon }) => (
               <SelectItem key={value} value={value} className="custom-dropdown-item">
