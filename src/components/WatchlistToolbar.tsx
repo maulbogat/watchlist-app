@@ -1,16 +1,15 @@
-import type { User } from "firebase/auth";
 import { useAppStore, STATUS_LABELS } from "../store/useAppStore.js";
 import { persistFilterPreferences } from "../lib/storage.js";
 import { getUniqueGenresFromMovies } from "../lib/watchlistFilters.js";
 import type { FilterType, WatchlistItem } from "../types/index.js";
 
 interface WatchlistToolbarProps {
-  user: User;
   allMovies: WatchlistItem[];
   visibleCount: number;
 }
 
-export function WatchlistToolbar({ user, allMovies, visibleCount }: WatchlistToolbarProps) {
+export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarProps) {
+  const currentUser = useAppStore((s) => s.currentUser);
   const currentFilter = useAppStore((s) => s.currentFilter);
   const setCurrentFilter = useAppStore((s) => s.setCurrentFilter);
   const currentGenre = useAppStore((s) => s.currentGenre);
@@ -21,7 +20,7 @@ export function WatchlistToolbar({ user, allMovies, visibleCount }: WatchlistToo
   const genres = getUniqueGenresFromMovies(allMovies);
 
   function persistFilters() {
-    persistFilterPreferences(user, {
+    persistFilterPreferences(currentUser, {
       currentFilter: useAppStore.getState().currentFilter,
       currentGenre: useAppStore.getState().currentGenre,
       currentStatus: useAppStore.getState().currentStatus,

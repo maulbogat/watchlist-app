@@ -20,20 +20,16 @@ import { ManageListsModal } from "./ManageListsModal.js";
 import { CountryModal } from "./CountryModal.js";
 import { ListNameModal } from "./modals/ListNameModal.js";
 import { UpcomingAlertsBar } from "./UpcomingAlertsBar.js";
-import { useQueryClient } from "@tanstack/react-query";
-import type { User } from "firebase/auth";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 
-interface WatchlistPageProps {
-  user: User;
-}
-
-export function WatchlistPage({ user }: WatchlistPageProps) {
+export function WatchlistPage() {
   const navigate = useNavigate();
   const { listId } = useParams<{ listId?: string }>();
   const queryClient = useQueryClient();
-  const personalQ = usePersonalLists(user.uid, { enabled: true });
-  const sharedQ = useSharedLists(user.uid, { enabled: true });
+  const user = useAppStore((s) => s.currentUser);
+  const personalQ = usePersonalLists(user?.uid, { enabled: Boolean(user?.uid) });
+  const sharedQ = useSharedLists(user?.uid, { enabled: Boolean(user?.uid) });
   const currentListMode = useAppStore((s) => s.currentListMode);
   const currentFilter = useAppStore((s) => s.currentFilter);
   const currentGenre = useAppStore((s) => s.currentGenre);
@@ -54,9 +50,18 @@ export function WatchlistPage({ user }: WatchlistPageProps) {
 
   const onboardingDone = useRef(false);
   const routeSyncReadyRef = useRef(false);
+  const refreshListsMutation = useMutation({
+    mutationFn: async (targetUid: string) => targetUid,
+    onSuccess: async (_, targetUid) => {
+      await invalidateUserListQueries(queryClient, targetUid);
+    },
+  });
+
+  if (!user?.uid) return null;
+  const uid = user.uid;
 
   async function continueProfileOnboarding() {
-    const p = await getUserProfile(user.uid);
+    const p = await getUserProfile(uid);
     if (p?.country) setUserCountryCode(p.country);
     if (!String(p.listName || "").trim()) {
       setOnboardingListName(true);
@@ -89,9 +94,9 @@ export function WatchlistPage({ user }: WatchlistPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [user.uid, listsReady, personalQ.isSuccess, setUserCountryCode]);
+  }, [user?.uid, listsReady, personalQ.isSuccess, setUserCountryCode]);
 
-  const moviesQ = useWatchlistMovies(user.uid, currentListMode, {
+  const moviesQ = useWatchlistMovies(user?.uid, currentListMode, {
     enabled: listsReady,
   });
 
@@ -172,7 +177,6 @@ export function WatchlistPage({ user }: WatchlistPageProps) {
                 {listsReady ? (
                   <>
                     <ListSelector
-                      user={user}
                       personalLists={personalLists}
                       sharedLists={sharedLists}
                       onManageLists={() => setManageListsOpen(true)}
@@ -268,7 +272,7 @@ export function WatchlistPage({ user }: WatchlistPageProps) {
       </header>
 
       {!mainLoading && !moviesQ.isError ? (
-        <UpcomingAlertsBar user={user} movies={allMovies} />
+        <UpcomingAlertsBar movies={allMovies} />
       ) : null}
 
       <main className="content">
@@ -284,13 +288,11 @@ export function WatchlistPage({ user }: WatchlistPageProps) {
           <>
             {allMovies.length > 0 ? (
               <WatchlistToolbar
-                user={user}
                 allMovies={allMovies}
                 visibleCount={visibleMovies.length}
               />
             ) : null}
             <TitleGrid
-              user={user}
               visibleMovies={visibleMovies}
               currentStatus={currentStatus}
               totalLoaded={allMovies.length}
@@ -299,11 +301,10 @@ export function WatchlistPage({ user }: WatchlistPageProps) {
         )}
       </main>
 
-      <TrailerModal user={user} />
+      <TrailerModal />
 
       {listsReady ? (
         <ManageListsModal
-          user={user}
           open={manageListsOpen}
           onClose={() => setManageListsOpen(false)}
           personalLists={personalLists}
@@ -320,7 +321,7 @@ export function WatchlistPage({ user }: WatchlistPageProps) {
           await setUserCountry(user.uid, code, name);
           setUserCountryCode(code);
           setCountryPickerOpen(false);
-          await invalidateUserListQueries(queryClient, user.uid);
+          await refreshListsMutation.mutateAsync(user.uid);
         }}
       />
 
@@ -347,7 +348,7 @@ export function WatchlistPage({ user }: WatchlistPageProps) {
             await renamePersonalList(user.uid, "personal", name);
             setOnboardingListName(false);
             onboardingDone.current = true;
-            await invalidateUserListQueries(queryClient, user.uid);
+            await refreshListsMutation.mutateAsync(user.uid);
           } catch (e: unknown) {
             window.alert(errorMessage(e) || "Could not save your main list name. Reload and try again.");
           }

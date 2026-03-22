@@ -4,13 +4,15 @@ import { useAuthUser } from "./hooks/useAuthUser.js";
 import { WatchlistPage } from "./components/WatchlistPage.js";
 import { JoinPage } from "./pages/JoinPage.js";
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useAppStore } from "./store/useAppStore.js";
 
 function isAuthError(err: unknown): err is { code?: string; message?: string } {
   return typeof err === "object" && err !== null;
 }
 
 function WatchlistAuthGate() {
-  const { user, loading: authLoading } = useAuthUser();
+  const { loading: authLoading } = useAuthUser();
+  const user = useAppStore((s) => s.currentUser);
   const [signingIn, setSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
 
@@ -75,7 +77,7 @@ function WatchlistAuthGate() {
     );
   }
 
-  return <WatchlistPage user={user} />;
+  return <WatchlistPage />;
 }
 
 export default function App() {

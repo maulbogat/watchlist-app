@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
-import type { User } from "firebase/auth";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import FocusTrap from "focus-trap-react";
 import type { ListMode, PersonalList, SharedList } from "../types/index.js";
 import {
   createPersonalList,
@@ -58,16 +58,16 @@ type DeleteTarget = {
 };
 
 interface ManageListsModalProps {
-  user: User;
   open: boolean;
   onClose: () => void;
   personalLists: PersonalList[];
   sharedLists: SharedList[];
 }
 
-export function ManageListsModal({ user, open, onClose, personalLists, sharedLists }: ManageListsModalProps) {
+export function ManageListsModal({ open, onClose, personalLists, sharedLists }: ManageListsModalProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const currentUser = useAppStore((s) => s.currentUser);
   const currentListMode = useAppStore((s) => s.currentListMode);
   const setCurrentListMode = useAppStore((s) => s.setCurrentListMode);
 
@@ -82,9 +82,19 @@ export function ManageListsModal({ user, open, onClose, personalLists, sharedLis
     return `javascript:(function(){var s=document.createElement('script');s.src='${scriptUrl}';document.body.appendChild(s);})();`;
   }, []);
 
+  if (!currentUser?.uid) return null;
+  const signedInUser = currentUser;
+  const uid = signedInUser.uid;
+  const syncListsMutation = useMutation({
+    mutationFn: async (): Promise<void> => {},
+    onSuccess: async () => {
+      await invalidateUserListQueries(queryClient, uid);
+      await setBookmarkletCookieWithMode(signedInUser, useAppStore.getState().currentListMode);
+    },
+  });
+
   async function refreshListsAndCookie() {
-    await invalidateUserListQueries(queryClient, user.uid);
-    await setBookmarkletCookieWithMode(user, useAppStore.getState().currentListMode);
+    await syncListsMutation.mutateAsync();
   }
 
   function sameListId(mode: ListMode, listId: string): boolean {
@@ -96,9 +106,8 @@ export function ManageListsModal({ user, open, onClose, personalLists, sharedLis
     const mode = useAppStore.getState().currentListMode;
     if (maybeResetListId && sameListId(mode, maybeResetListId)) {
       setCurrentListMode("personal");
-      saveLastList(user, "personal");
-      await invalidateUserListQueries(queryClient, user.uid);
-      await setBookmarkletCookieWithMode(user, useAppStore.getState().currentListMode);
+      saveLastList(signedInUser, "personal");
+      await syncListsMutation.mutateAsync();
     }
   }
 
@@ -108,12 +117,23 @@ export function ManageListsModal({ user, open, onClose, personalLists, sharedLis
       <div
         className="modal-bg open"
         id="lists-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-hidden="false"
         onClick={(e) => e.target === e.currentTarget && onClose()}
       >
-        <div className="modal lists-modal" onClick={(e) => e.stopPropagation()}>
+        <FocusTrap
+          active={open}
+          focusTrapOptions={{
+            escapeDeactivates: false,
+            allowOutsideClick: true,
+            initialFocus: false,
+          }}
+        >
+        <div
+          className="modal lists-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-hidden="false"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="modal-header">
             <span className="modal-title">Manage lists</span>
             <button type="button" className="modal-close" aria-label="Close" onClick={onClose}>
@@ -147,7 +167,7 @@ export function ManageListsModal({ user, open, onClose, personalLists, sharedLis
                             const newName = draft.trim();
                             if (!newName || newName === original) return;
                             try {
-                              await renamePersonalList(user.uid, l.id, newName);
+                              await renamePersonalList(currentUser.uid, l.id, newName);
                               await refreshListsAndCookie();
                               if (sameListId(useAppStore.getState().currentListMode, l.id)) {
                                 setCurrentListMode({
@@ -216,7 +236,7 @@ export function ManageListsModal({ user, open, onClose, personalLists, sharedLis
                   </li>
                 ))}
                 {sharedLists.map((l) => {
-                  const isOwner = !!(user && l.ownerId && String(l.ownerId) === String(user.uid));
+                  const isOwner = !!(l.ownerId && String(l.ownerId) === String(currentUser.uid));
                   const count = Array.isArray(l.items) ? l.items.length : 0;
                   return (
                     <li
@@ -401,7 +421,7 @@ export function ManageListsModal({ user, open, onClose, personalLists, sharedLis
                         setJoinInput("");
                         const mode = { type: "shared", listId, name: data.name || "" };
                         setCurrentListMode(mode);
-                        saveLastList(user, mode);
+                        saveLastList(currentUser, mode);
                         await refreshListsAndCookie();
                         navigate(`/list/${listId}`, { replace: true });
                       } else {
@@ -433,6 +453,7 @@ export function ManageListsModal({ user, open, onClose, personalLists, sharedLis
             </section>
           </div>
         </div>
+        </FocusTrap>
       </div>
       ) : null}
 
@@ -448,16 +469,16 @@ export function ManageListsModal({ user, open, onClose, personalLists, sharedLis
           if (!kind) return;
           try {
             if (kind === "personal") {
-              const listId = await createPersonalList(user.uid, name);
+              const listId = await createPersonalList(currentUser.uid, name);
               const mode = { type: "personal", listId, name };
               setCurrentListMode(mode);
-              saveLastList(user, mode);
+              saveLastList(currentUser, mode);
               await refreshListsAndCookie();
             } else {
-              const listId = await createSharedList(user.uid, name);
+              const listId = await createSharedList(currentUser.uid, name);
               const mode = { type: "shared", listId, name };
               setCurrentListMode(mode);
-              saveLastList(user, mode);
+              saveLastList(currentUser, mode);
               await refreshListsAndCookie();
               setShareUrl(`${window.location.origin}/join/${listId}`);
             }
@@ -489,9 +510,9 @@ export function ManageListsModal({ user, open, onClose, personalLists, sharedLis
           if (!t) return;
           try {
             if (t.isLeave) {
-              await leaveSharedList(user.uid, t.id);
+              await leaveSharedList(currentUser.uid, t.id);
             } else if (t.type === "personal") {
-              await deletePersonalList(user.uid, t.id);
+              await deletePersonalList(currentUser.uid, t.id);
             } else {
               await deleteSharedList(t.id);
             }

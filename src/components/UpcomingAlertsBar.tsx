@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { User } from "firebase/auth";
 import type { UpcomingAlert, WatchlistItem } from "../types/index.js";
 import { auth, fetchUpcomingAlertsForItems, movieKey } from "../firebase.js";
 import { getStatusData, updateDismissals } from "../data/user.js";
@@ -18,7 +17,7 @@ import {
 
 type UpcomingBarData = { active: UpcomingAlert[] };
 
-function useUpcomingAlertsQuery(user: User | null | undefined, movies: WatchlistItem[] | undefined) {
+function useUpcomingAlertsQuery(uid: string | undefined, movies: WatchlistItem[] | undefined) {
   const ids = useMemo(() => {
     const keys = (movies || []).map((m) => movieKey(m)).filter(Boolean);
     keys.sort();
@@ -26,9 +25,8 @@ function useUpcomingAlertsQuery(user: User | null | undefined, movies: Watchlist
   }, [movies]);
 
   return useQuery<UpcomingBarData>({
-    queryKey: ["upcomingBar", user?.uid, ids],
+    queryKey: ["upcomingBar", uid, ids],
     queryFn: async () => {
-      const uid = user?.uid;
       if (!uid) return { active: [] };
       const data = await getStatusData(uid);
       const dismissals = data.upcomingDismissals || {};
@@ -44,7 +42,7 @@ function useUpcomingAlertsQuery(user: User | null | undefined, movies: Watchlist
       });
       return { active };
     },
-    enabled: !!user?.uid,
+    enabled: !!uid,
     staleTime: 30_000,
   });
 }
@@ -131,16 +129,16 @@ function UpcomingPill({ a, userUid }: UpcomingPillProps) {
 }
 
 interface UpcomingAlertsBarProps {
-  user: User;
   movies: WatchlistItem[];
 }
 
-export function UpcomingAlertsBar({ user, movies }: UpcomingAlertsBarProps) {
+export function UpcomingAlertsBar({ movies }: UpcomingAlertsBarProps) {
+  const currentUser = useAppStore((s) => s.currentUser);
   const expanded = useAppStore((s) => s.upcomingAlertsExpanded);
   const setExpanded = useAppStore((s) => s.setUpcomingAlertsExpanded);
-  const { data, isSuccess } = useUpcomingAlertsQuery(user, movies);
+  const { data, isSuccess } = useUpcomingAlertsQuery(currentUser?.uid, movies);
 
-  if (!user?.uid || !isSuccess) return null;
+  if (!currentUser?.uid || !isSuccess) return null;
 
   const active = data?.active ?? [];
   if (active.length === 0) return null;
@@ -154,7 +152,7 @@ export function UpcomingAlertsBar({ user, movies }: UpcomingAlertsBarProps) {
   let lessRow: ReactNode = null;
 
   if (expanded && restCount > 0) {
-    pillsRow = active.map((a) => <UpcomingPill key={a.fingerprint} a={a} userUid={user.uid} />);
+    pillsRow = active.map((a) => <UpcomingPill key={a.fingerprint} a={a} userUid={currentUser.uid} />);
     lessRow = (
       <div className="upcoming-alerts-toggle-row">
         <button type="button" className="upcoming-alerts-less-btn" onClick={() => setExpanded(false)}>
@@ -166,7 +164,7 @@ export function UpcomingAlertsBar({ user, movies }: UpcomingAlertsBarProps) {
     pillsRow = (
       <>
         {firstSlice.map((a) => (
-          <UpcomingPill key={a.fingerprint} a={a} userUid={user.uid} />
+          <UpcomingPill key={a.fingerprint} a={a} userUid={currentUser.uid} />
         ))}
         <button
           type="button"
@@ -177,13 +175,13 @@ export function UpcomingAlertsBar({ user, movies }: UpcomingAlertsBarProps) {
         </button>
         <div className="upcoming-alerts-extras">
           {extraSlice.map((a) => (
-            <UpcomingPill key={a.fingerprint} a={a} userUid={user.uid} />
+            <UpcomingPill key={a.fingerprint} a={a} userUid={currentUser.uid} />
           ))}
         </div>
       </>
     );
   } else {
-    pillsRow = active.map((a) => <UpcomingPill key={a.fingerprint} a={a} userUid={user.uid} />);
+    pillsRow = active.map((a) => <UpcomingPill key={a.fingerprint} a={a} userUid={currentUser.uid} />);
   }
 
   return (

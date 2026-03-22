@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
-import type { SharedList } from "../types/index.js";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { auth, getSharedList, GoogleAuthProvider, signInWithPopup } from "../firebase.js";
 import { useAuthUser } from "../hooks/useAuthUser.js";
 import { useAppStore } from "../store/useAppStore.js";
@@ -15,106 +14,70 @@ export function JoinPage() {
   const { listId } = useParams<{ listId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, loading: authLoading } = useAuthUser();
-
-  const [list, setList] = useState<SharedList | null>(null);
-  const [loadingList, setLoadingList] = useState(true);
-  const [joining, setJoining] = useState(false);
+  const { loading: authLoading } = useAuthUser();
+  const user = useAppStore((s) => s.currentUser);
   const [pendingJoinAfterSignIn, setPendingJoinAfterSignIn] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const sharedListQuery = useQuery({
+    queryKey: ["sharedList", listId],
+    queryFn: () => getSharedList(listId!),
+    enabled: !!listId,
+  });
+  const sharedList = sharedListQuery.data ?? null;
+  const loadingList = sharedListQuery.isLoading;
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!listId) {
-      setLoadingList(false);
-      setErr("Invalid invite link.");
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setLoadingList(true);
-    setErr(null);
-    void getSharedList(listId)
-      .then((res) => {
-        if (cancelled) return;
-        if (!res) {
-          setErr("Shared list not found.");
-          setList(null);
-          return;
-        }
-        setList(res);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setErr(errorMessage(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingList(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [listId]);
-
-  const joinNow = useCallback(async () => {
-    if (!listId || !user?.uid) return;
-    setJoining(true);
-    setErr(null);
-    try {
-      const res = await fetch("/.netlify/functions/join-shared-list", {
+  const joinMutation = useMutation({
+    mutationFn: async (): Promise<JoinResponse> => {
+      if (!listId) throw new Error("Invalid invite link.");
+      const response = await fetch("/.netlify/functions/join-shared-list", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ listId }),
       });
-      const data = (await res.json()) as JoinResponse;
-      if (!data.ok) {
-        setErr(data.error || "Failed to join list.");
-        return;
-      }
-
+      const data = (await response.json()) as JoinResponse;
+      if (!data.ok) throw new Error(data.error || "Failed to join list.");
+      return data;
+    },
+    onSuccess: async (data) => {
+      if (!listId || !user?.uid) return;
       const mode = {
         type: "shared" as const,
         listId,
-        name: data.name || list?.name || "",
+        name: data.name || sharedList?.name || "",
       };
       useAppStore.getState().setCurrentListMode(mode);
       saveLastList(user, mode);
       await invalidateUserListQueries(queryClient, user.uid);
       navigate(`/list/${listId}`, { replace: true });
-    } catch (e: unknown) {
-      setErr(errorMessage(e));
-    } finally {
-      setJoining(false);
-    }
-  }, [listId, list?.name, navigate, queryClient, user]);
+    },
+  });
 
   useEffect(() => {
-    if (!pendingJoinAfterSignIn || !user?.uid || joining) return;
+    if (!pendingJoinAfterSignIn || !user?.uid || joinMutation.isPending) return;
     setPendingJoinAfterSignIn(false);
-    void joinNow();
-  }, [pendingJoinAfterSignIn, user, joining, joinNow]);
+    joinMutation.mutate();
+  }, [pendingJoinAfterSignIn, user, joinMutation]);
 
   async function handleSignInThenJoin() {
-    setErr(null);
     setPendingJoinAfterSignIn(true);
-    setJoining(true);
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
       await signInWithPopup(auth, provider);
     } catch (e: unknown) {
       setPendingJoinAfterSignIn(false);
-      setJoining(false);
       const code =
         e && typeof e === "object" && "code" in e ? String((e as { code: unknown }).code) : "";
       if (code === "auth/cancelled-popup-request" || code === "auth/popup-closed-by-user") return;
-      setErr(errorMessage(e));
-    } finally {
-      if (!pendingJoinAfterSignIn) setJoining(false);
+      window.alert(errorMessage(e));
     }
   }
+
+  const joinErrorMessage = joinMutation.error ? errorMessage(joinMutation.error) : null;
+  const listLoadErrorMessage = sharedListQuery.error ? errorMessage(sharedListQuery.error) : null;
+  const notFoundMessage =
+    !loadingList && listId && sharedListQuery.isSuccess && sharedList == null ? "Shared list not found." : null;
+  const err = !listId ? "Invalid invite link." : joinErrorMessage || listLoadErrorMessage || notFoundMessage;
 
   if (!listId) {
     return (
@@ -135,7 +98,7 @@ export function JoinPage() {
         <p className="react-migration-meta">Loading invite…</p>
       ) : (
         <p className="react-migration-meta">
-          You were invited to join <strong>{list?.name || "this shared list"}</strong>.
+          You were invited to join <strong>{sharedList?.name || "this shared list"}</strong>.
         </p>
       )}
 
@@ -152,19 +115,19 @@ export function JoinPage() {
         <button
           type="button"
           className="auth-btn react-migration-signin-btn"
-          disabled={joining}
+          disabled={joinMutation.isPending}
           onClick={handleSignInThenJoin}
         >
-          {joining ? "Signing in…" : "Sign in with Google to join"}
+          {joinMutation.isPending ? "Signing in…" : "Sign in with Google to join"}
         </button>
       ) : (
         <button
           type="button"
           className="auth-btn react-migration-signin-btn"
-          disabled={joining}
-          onClick={() => void joinNow()}
+          disabled={joinMutation.isPending}
+          onClick={() => joinMutation.mutate()}
         >
-          {joining ? "Joining…" : "Join List"}
+          {joinMutation.isPending ? "Joining…" : "Join List"}
         </button>
       )}
     </div>

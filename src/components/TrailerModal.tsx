@@ -1,29 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import type { User } from "firebase/auth";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import FocusTrap from "focus-trap-react";
 import type { StatusKey } from "../types/index.js";
 import { useAppStore, STATUS_ORDER, STATUS_LABELS, CHECK_SVG } from "../store/useAppStore.js";
 import { hasPlayableTrailerYoutubeId, renderServiceChips, servicesForMovie } from "../lib/movieDisplay.js";
-import { invalidateUserListQueries, usePersonalLists, useSharedLists } from "../hooks/useWatchlist.js";
+import { usePersonalLists, useSharedLists } from "../hooks/useWatchlist.js";
+import {
+  useAddTitleToList,
+  useRemoveTitleFromList,
+  useSetTitleStatus,
+} from "../hooks/useMutations.js";
 import { getCurrentListLabel, getListsContainingMovie } from "../data/lists.js";
-import { addTitleToList, removeTitleFromList, setTitleStatusForMovie } from "../data/titles.js";
 import { displayListName, errorMessage } from "../lib/utils.js";
 import { movieKey } from "../firebase.js";
 
-export interface TrailerModalProps {
-  user: User | null;
-}
-
-export function TrailerModal({ user }: TrailerModalProps) {
-  const queryClient = useQueryClient();
+export function TrailerModal() {
+  const currentUser = useAppStore((s) => s.currentUser);
   const movie = useAppStore((s) => s.currentModalMovie);
   const setCurrentModalMovie = useAppStore((s) => s.setCurrentModalMovie);
   const userCountryCode = useAppStore((s) => s.userCountryCode);
   const currentListMode = useAppStore((s) => s.currentListMode);
+  const setTitleStatusMutation = useSetTitleStatus();
+  const addTitleMutation = useAddTitleToList();
+  const removeTitleFromListMutation = useRemoveTitleFromList();
 
-  const personalQ = usePersonalLists(user?.uid, { enabled: Boolean(user?.uid) });
-  const sharedQ = useSharedLists(user?.uid, { enabled: Boolean(user?.uid) });
+  const personalQ = usePersonalLists(currentUser?.uid, { enabled: Boolean(currentUser?.uid) });
+  const sharedQ = useSharedLists(currentUser?.uid, { enabled: Boolean(currentUser?.uid) });
   /** Stable when `data` is undefined — a bare `?? []` creates a new array every render and retriggers effects. */
   const personalLists = useMemo(() => personalQ.data ?? [], [personalQ.data]);
   const sharedLists = useMemo(() => sharedQ.data ?? [], [sharedQ.data]);
@@ -33,49 +36,23 @@ export function TrailerModal({ user }: TrailerModalProps) {
 
   const [statusOpen, setStatusOpen] = useState(false);
   const [addListOpen, setAddListOpen] = useState(false);
-  const [containingLoading, setContainingLoading] = useState(false);
-  const [containingIds, setContainingIds] = useState<Set<string>>(() => new Set());
-  const [listActionBusy, setListActionBusy] = useState(false);
-
+  const uid = currentUser?.uid;
   const listsFetched = personalQ.isFetched && sharedQ.isFetched;
+  const listActionBusy = addTitleMutation.isPending || removeTitleFromListMutation.isPending;
+
+  const { data: containingLists = new Set<string>(), isLoading: containingLoading } = useQuery({
+    queryKey: ["listsContaining", movieStableKey, uid, personalQ.dataUpdatedAt, sharedQ.dataUpdatedAt],
+    queryFn: async () => {
+      if (!movie || !uid) return new Set<string>();
+      return getListsContainingMovie(movie, personalLists, sharedLists, uid);
+    },
+    enabled: Boolean(movie && uid),
+  });
 
   useEffect(() => {
     setStatusOpen(false);
     setAddListOpen(false);
-    setContainingLoading(false);
-    setContainingIds(new Set());
   }, [movieStableKey]);
-
-  useEffect(() => {
-    if (!addListOpen || movieStableKey == null || !user?.uid) {
-      if (!addListOpen) setContainingLoading(false);
-      return;
-    }
-    if (!listsFetched) {
-      setContainingLoading(true);
-      return;
-    }
-    const currentMovie = useAppStore.getState().currentModalMovie;
-    if (!currentMovie || movieKey(currentMovie) !== movieStableKey) {
-      setContainingLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setContainingLoading(true);
-    void getListsContainingMovie(currentMovie, personalLists, sharedLists, user.uid)
-      .then((set) => {
-        if (!cancelled) setContainingIds(set);
-      })
-      .catch(() => {
-        if (!cancelled) setContainingIds(new Set());
-      })
-      .finally(() => {
-        if (!cancelled) setContainingLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [addListOpen, movieStableKey, user?.uid, listsFetched, personalLists, sharedLists]);
 
   useEffect(() => {
     if (!movie) return;
@@ -123,7 +100,7 @@ export function TrailerModal({ user }: TrailerModalProps) {
   const imdbUrl = m.imdbId ? `https://www.imdb.com/title/${m.imdbId}/` : null;
 
   async function onPickStatus(st: StatusKey) {
-    if (!user?.uid) return;
+    if (!currentUser?.uid) return;
     const current =
       raw === "watched" ? "watched" : raw === "archive" ? "archive" : "to-watch";
     if (st === current) {
@@ -131,9 +108,13 @@ export function TrailerModal({ user }: TrailerModalProps) {
       return;
     }
     try {
-      await setTitleStatusForMovie(user.uid, currentListMode, m, st);
+      await setTitleStatusMutation.mutateAsync({
+        uid: currentUser.uid,
+        listMode: currentListMode,
+        key: movieKey(m),
+        status: st,
+      });
       setCurrentModalMovie({ ...m, status: st });
-      invalidateUserListQueries(queryClient, user.uid);
     } catch (err: unknown) {
       console.error(err);
       window.alert(errorMessage(err) || "Failed to update.");
@@ -152,30 +133,22 @@ export function TrailerModal({ user }: TrailerModalProps) {
     listId: string,
     currentlyInList: boolean
   ) {
-    if (!user?.uid) return;
+    if (!currentUser?.uid) return;
     if (listActionBusy) return;
-    setListActionBusy(true);
     try {
       const key = movieKey(m);
       if (currentlyInList) {
-        if (type === "personal") await removeTitleFromList(user.uid, { type: "personal", listId }, key);
-        else await removeTitleFromList(user.uid, { type: "shared", listId, name: "" }, key);
+        await removeTitleFromListMutation.mutateAsync({ uid: currentUser.uid, listId, key, type });
       } else {
-        if (type === "personal") await addTitleToList(user.uid, { type: "personal", listId }, m);
-        else await addTitleToList(user.uid, { type: "shared", listId, name: "" }, m);
+        await addTitleMutation.mutateAsync({
+          uid: currentUser.uid,
+          listMode: type === "personal" ? { type: "personal", listId } : { type: "shared", listId, name: "" },
+          item: m,
+        });
       }
-      setContainingIds((prev) => {
-        const next = new Set(prev);
-        if (currentlyInList) next.delete(listId);
-        else next.add(listId);
-        return next;
-      });
-      invalidateUserListQueries(queryClient, user.uid);
     } catch (err: unknown) {
       console.error(err);
       window.alert(errorMessage(err) || "Failed to update list.");
-    } finally {
-      setListActionBusy(false);
     }
   }
 
@@ -193,13 +166,19 @@ export function TrailerModal({ user }: TrailerModalProps) {
     <div
       className="modal-bg open"
       id="modal"
-      role="dialog"
-      aria-modal="true"
       onClick={(e) => {
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="modal">
+      <FocusTrap
+        active={Boolean(movie)}
+        focusTrapOptions={{
+          escapeDeactivates: false,
+          allowOutsideClick: true,
+          initialFocus: false,
+        }}
+      >
+      <div className="modal" role="dialog" aria-modal="true">
         <div className="modal-header">
           <span
             className="modal-title"
@@ -333,16 +312,16 @@ export function TrailerModal({ user }: TrailerModalProps) {
                 className={`modal-action-dropdown-panel modal-add-to-list-panel${addListOpen ? " open" : ""}`}
                 role="menu"
               >
-                {addListOpen && containingLoading ? (
+                {addListOpen && containingLoading && listsFetched ? (
                   <span className="modal-add-to-list-loading">Loading…</span>
                 ) : null}
-                {addListOpen && !containingLoading && !user?.uid ? (
+                {addListOpen && !containingLoading && !currentUser?.uid ? (
                   <span className="modal-add-to-list-empty">Sign in to manage lists</span>
                 ) : null}
-                {addListOpen && !containingLoading && user?.uid
+                {addListOpen && !containingLoading && currentUser?.uid
                   ? personalLists.map((l) => {
                       const listId = l.id;
-                      const inList = containingIds.has(listId);
+                      const inList = containingLists.has(listId);
                       const label = displayListName(l.name);
                       return (
                         <button
@@ -364,10 +343,10 @@ export function TrailerModal({ user }: TrailerModalProps) {
                       );
                     })
                   : null}
-                {addListOpen && !containingLoading && user?.uid
+                {addListOpen && !containingLoading && currentUser?.uid
                   ? sharedLists.map((l) => {
                       const listId = l.id;
-                      const inList = containingIds.has(listId);
+                      const inList = containingLists.has(listId);
                       const label = displayListName(l.name);
                       return (
                         <button
@@ -391,7 +370,7 @@ export function TrailerModal({ user }: TrailerModalProps) {
                   : null}
                 {addListOpen &&
                 !containingLoading &&
-                user?.uid &&
+                currentUser?.uid &&
                 listsFetched &&
                 personalLists.length === 0 &&
                 sharedLists.length === 0 ? (
@@ -422,6 +401,7 @@ export function TrailerModal({ user }: TrailerModalProps) {
           </div>
         </div>
       </div>
+      </FocusTrap>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import FocusTrap from "focus-trap-react";
 import { COUNTRIES } from "../countries.js";
 import type { Country } from "../types/index.js";
 
@@ -64,73 +65,89 @@ export function CountryModal({
     <div
       className="modal-bg country-modal-bg open"
       id="country-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-hidden="false"
       onClick={(e) => allowCancel && e.target === e.currentTarget && onCancel?.()}
     >
-      <div className="modal country-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <span className="modal-title">Where are you watching from?</span>
-        </div>
-        <div className="country-modal-body">
-          <div className="country-picker-wrap">
-            <input
-              type="text"
-              id="country-search"
-              className="country-search"
-              placeholder="Search countries..."
-              autoComplete="off"
-              aria-haspopup="listbox"
-              aria-expanded={dropdownOpen}
-              aria-controls="country-dropdown-list"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setDropdownOpen(true);
-              }}
-              onFocus={() => setDropdownOpen(true)}
-              autoFocus
-            />
-            <div
-              className={`country-dropdown${dropdownOpen ? " open" : ""}`}
-              id="country-dropdown"
-              role="listbox"
-              aria-hidden={!dropdownOpen}
-            >
-              <div className="country-dropdown-list" id="country-dropdown-list">
-                {list.map((c) => (
-                  <button
-                    key={c.code}
-                    type="button"
-                    className="country-dropdown-item"
-                    role="option"
-                    data-code={c.code}
-                    aria-selected={c.code === selected.code}
-                    onClick={() => {
-                      setSelected(c);
-                      setSearch(c.name);
-                      setDropdownOpen(true);
-                    }}
-                  >
-                    {c.flag} {c.name}
-                  </button>
-                ))}
+      <FocusTrap
+        active={open}
+        focusTrapOptions={{
+          escapeDeactivates: false,
+          allowOutsideClick: true,
+          initialFocus: false,
+        }}
+      >
+        <div
+          className="modal country-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-hidden="false"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="modal-header">
+            <span className="modal-title">Where are you watching from?</span>
+          </div>
+          <div className="country-modal-body">
+            <div className="country-picker-wrap">
+              <input
+                type="text"
+                id="country-search"
+                className="country-search"
+                placeholder="Search countries..."
+                autoComplete="off"
+                aria-haspopup="listbox"
+                aria-expanded={dropdownOpen}
+                aria-controls="country-dropdown-list"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setDropdownOpen(true);
+                }}
+                onFocus={() => setDropdownOpen(true)}
+                autoFocus
+              />
+              <div
+                className={`country-dropdown${dropdownOpen ? " open" : ""}`}
+                id="country-dropdown"
+                role="listbox"
+                aria-hidden={!dropdownOpen}
+              >
+                <div className="country-dropdown-list" id="country-dropdown-list">
+                  {list.map((c) => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      className="country-dropdown-item"
+                      role="option"
+                      data-code={c.code}
+                      aria-selected={c.code === selected.code}
+                      onClick={() => {
+                        setSelected(c);
+                        setSearch(c.name);
+                        setDropdownOpen(true);
+                      }}
+                    >
+                      {c.flag} {c.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            {allowCancel ? (
-              <button type="button" className="country-save-btn list-name-secondary-btn" onClick={() => onCancel?.()}>
-                Cancel
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              {allowCancel ? (
+                <button
+                  type="button"
+                  className="country-save-btn list-name-secondary-btn"
+                  onClick={() => onCancel?.()}
+                >
+                  Cancel
+                </button>
+              ) : null}
+              <button type="button" className="country-save-btn" id="country-save-btn" onClick={handleSave}>
+                Save
               </button>
-            ) : null}
-            <button type="button" className="country-save-btn" id="country-save-btn" onClick={handleSave}>
-              Save
-            </button>
+            </div>
           </div>
         </div>
-      </div>
+      </FocusTrap>
     </div>
   );
 }

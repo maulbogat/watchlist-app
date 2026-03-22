@@ -1,10 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import type { User } from "firebase/auth";
 import { TitleCard } from "./TitleCard.js";
 import { useAppStore } from "../store/useAppStore.js";
-import { removeTitleFromListForMovie, setTitleStatusForMovie } from "../data/titles.js";
-import { invalidateUserListQueries } from "../hooks/useWatchlist.js";
-import { useQueryClient } from "@tanstack/react-query";
+import { useRemoveTitle, useSetTitleStatus } from "../hooks/useMutations.js";
 import { movieKey } from "../firebase.js";
 import type { StatusKey, WatchlistItem } from "../types/index.js";
 import { errorMessage } from "../lib/utils.js";
@@ -12,14 +9,13 @@ import { errorMessage } from "../lib/utils.js";
 type ToastState = { id: string; title: string; undo: () => void } | null;
 
 interface TitleGridProps {
-  user: User;
   visibleMovies: WatchlistItem[];
   currentStatus: string;
   totalLoaded: number;
 }
 
-export function TitleGrid({ user, visibleMovies, currentStatus, totalLoaded }: TitleGridProps) {
-  const queryClient = useQueryClient();
+export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGridProps) {
+  const currentUser = useAppStore((s) => s.currentUser);
   const currentListMode = useAppStore((s) => s.currentListMode);
   const isShared =
     currentListMode &&
@@ -27,6 +23,8 @@ export function TitleGrid({ user, visibleMovies, currentStatus, totalLoaded }: T
     currentListMode.type === "shared";
   const userCountryCode = useAppStore((s) => s.userCountryCode);
   const setCurrentModalMovie = useAppStore((s) => s.setCurrentModalMovie);
+  const setTitleStatusMutation = useSetTitleStatus();
+  const removeTitleMutation = useRemoveTitle();
 
   const [statusOpenKey, setStatusOpenKey] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
@@ -39,25 +37,27 @@ export function TitleGrid({ user, visibleMovies, currentStatus, totalLoaded }: T
     return () => document.removeEventListener("click", onDocClick);
   }, []);
 
-  const invalidate = useCallback(() => {
-    invalidateUserListQueries(queryClient, user.uid);
-  }, [queryClient, user.uid]);
-
   const handleStatusChange = useCallback(
     async (movie: WatchlistItem, status: StatusKey) => {
+      if (!currentUser?.uid) return;
       try {
-        await setTitleStatusForMovie(user.uid, currentListMode, movie, status);
-        invalidate();
+        await setTitleStatusMutation.mutateAsync({
+          uid: currentUser.uid,
+          listMode: currentListMode,
+          key: movieKey(movie),
+          status,
+        });
       } catch (err: unknown) {
         console.error(err);
         window.alert(errorMessage(err) || "Failed to update.");
       }
     },
-    [user.uid, currentListMode, invalidate]
+    [currentUser?.uid, currentListMode, setTitleStatusMutation]
   );
 
   const scheduleRemove = useCallback(
     (movie: WatchlistItem) => {
+      if (!currentUser?.uid) return;
       const title = String(movie.title || "").trim() || "Title";
       let removed = false;
       const id = `rm-${Date.now()}`;
@@ -66,8 +66,11 @@ export function TitleGrid({ user, visibleMovies, currentStatus, totalLoaded }: T
         removed = true;
         setToast((t) => (t?.id === id ? null : t));
         try {
-          await removeTitleFromListForMovie(user.uid, currentListMode, movie);
-          invalidate();
+          await removeTitleMutation.mutateAsync({
+            uid: currentUser.uid,
+            listMode: currentListMode,
+            key: movieKey(movie),
+          });
         } catch (err: unknown) {
           console.error(err);
           window.alert(errorMessage(err) || "Failed to remove.");
@@ -84,7 +87,7 @@ export function TitleGrid({ user, visibleMovies, currentStatus, totalLoaded }: T
         },
       });
     },
-    [user.uid, currentListMode, invalidate]
+    [currentUser?.uid, currentListMode, removeTitleMutation]
   );
 
   if (!visibleMovies.length) {

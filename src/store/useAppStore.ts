@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { User } from "firebase/auth";
 import type { FilterType, ListMode, WatchlistItem } from "../types/index.js";
 import {
   STATUS_ORDER,
@@ -12,6 +13,9 @@ import type { SharedList } from "../types/index.js";
 import type { PersonalList } from "../types/index.js";
 
 export interface AppState {
+  currentUser: User | null;
+  setCurrentUser: (user: User | null) => void;
+
   movies: WatchlistItem[];
   setMovies: (movies: WatchlistItem[]) => void;
 
@@ -44,6 +48,9 @@ export interface AppState {
 }
 
 export const useAppStore = create<AppState>()((set) => ({
+  currentUser: null,
+  setCurrentUser: (currentUser) => set({ currentUser }),
+
   movies: [],
   setMovies: (movies) => set({ movies }),
 

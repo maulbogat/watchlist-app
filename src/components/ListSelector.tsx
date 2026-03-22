@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import type { User } from "firebase/auth";
 import { saveLastList } from "../lib/storage.js";
 import { displayListName } from "../lib/utils.js";
 import { useAppStore } from "../store/useAppStore.js";
@@ -25,17 +24,19 @@ const iconGroup = (
 );
 
 interface ListSelectorProps {
-  user: User;
   personalLists: PersonalList[];
   sharedLists: SharedList[];
   onManageLists?: () => void;
 }
 
-export function ListSelector({ user, personalLists, sharedLists, onManageLists }: ListSelectorProps) {
+export function ListSelector({ personalLists, sharedLists, onManageLists }: ListSelectorProps) {
+  const currentUser = useAppStore((s) => s.currentUser);
   const currentListMode = useAppStore((s) => s.currentListMode);
   const setCurrentListMode = useAppStore((s) => s.setCurrentListMode);
   const [open, setOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   const currentVal = getCurrentListValue(currentListMode, personalLists);
   const label = getCurrentListLabel(currentListMode, personalLists, sharedLists);
@@ -50,15 +51,6 @@ export function ListSelector({ user, personalLists, sharedLists, onManageLists }
     return () => document.removeEventListener("click", onDocClick);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
   const items = [
     ...personalLists.map((l) => ({
       value: l.id,
@@ -71,6 +63,56 @@ export function ListSelector({ user, personalLists, sharedLists, onManageLists }
       icon: iconGroup,
     })),
   ];
+
+  useEffect(() => {
+    if (!open) return;
+    const currentIndex = items.findIndex((item) => item.value === currentVal);
+    setFocusedIndex(currentIndex >= 0 ? currentIndex : items.length > 0 ? 0 : -1);
+  }, [open, items, currentVal]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+      if (!items.length) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedIndex((idx) => (idx < 0 ? 0 : (idx + 1) % items.length));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedIndex((idx) => (idx < 0 ? items.length - 1 : (idx - 1 + items.length) % items.length));
+        return;
+      }
+      if (e.key === "Home") {
+        e.preventDefault();
+        setFocusedIndex(0);
+        return;
+      }
+      if (e.key === "End") {
+        e.preventDefault();
+        setFocusedIndex(items.length - 1);
+        return;
+      }
+      if (e.key === "Enter" || e.key === " ") {
+        if (focusedIndex < 0) return;
+        e.preventDefault();
+        const item = items[focusedIndex];
+        if (item) selectValue(item.value);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, items, focusedIndex]);
+
+  useEffect(() => {
+    if (!open || focusedIndex < 0) return;
+    itemRefs.current[focusedIndex]?.focus();
+  }, [open, focusedIndex]);
 
   function selectValue(val: string) {
     setOpen(false);
@@ -86,7 +128,7 @@ export function ListSelector({ user, personalLists, sharedLists, onManageLists }
       mode = { type: "shared", listId: sharedList.id, name: sharedList.name };
     }
     setCurrentListMode(mode);
-    saveLastList(user, mode);
+    saveLastList(currentUser, mode);
   }
 
   return (
@@ -147,6 +189,15 @@ export function ListSelector({ user, personalLists, sharedLists, onManageLists }
             role="option"
             data-value={value}
             aria-selected={value === currentVal}
+            tabIndex={focusedIndex >= 0 && items[focusedIndex]?.value === value ? 0 : -1}
+            ref={(el) => {
+              const idx = items.findIndex((item) => item.value === value);
+              if (idx >= 0) itemRefs.current[idx] = el;
+            }}
+            onFocus={() => {
+              const idx = items.findIndex((item) => item.value === value);
+              if (idx >= 0) setFocusedIndex(idx);
+            }}
             onClick={(e) => {
               e.stopPropagation();
               selectValue(value);
