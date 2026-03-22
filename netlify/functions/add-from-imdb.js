@@ -117,6 +117,25 @@ function jsonRes(status, body, event) {
 }
 
 /**
+ * Convert backend errors to user-facing messages.
+ * @param {unknown} err
+ * @returns {string}
+ */
+function presentableErrorMessage(err) {
+  const raw =
+    err && typeof err === "object" && "message" in err
+      ? String(err.message || "")
+      : String(err || "");
+  if (/RESOURCE_EXHAUSTED|quota exceeded/i.test(raw)) {
+    return "Firestore quota exceeded for this project. Please try again later or increase Firebase quota/billing.";
+  }
+  if (/deadline exceeded|timed out/i.test(raw)) {
+    return "Request timed out while updating watchlist. Please try again.";
+  }
+  return raw || "Unexpected error";
+}
+
+/**
  * @param {string} imdbId
  * @returns {Promise<Record<string, unknown>>}
  */
@@ -655,7 +674,7 @@ exports.handler = async (event, context) => {
 
   return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to To Watch` }, event);
   } catch (err) {
-    const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Unexpected error";
+    const msg = presentableErrorMessage(err);
     console.error("add-from-imdb fatal:", err);
     return jsonRes(500, { ok: false, error: msg }, event);
   }
