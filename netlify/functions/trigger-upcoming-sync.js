@@ -49,7 +49,7 @@ exports.handler = async (event) => {
   console.log("trigger-upcoming-sync: start", JSON.stringify({ method: event.httpMethod }));
 
   try {
-    const result = await runUpcomingSyncCore(20000);
+    const result = await runUpcomingSyncCore(21000);
     console.log("trigger-upcoming-sync: done", JSON.stringify(result));
     return {
       statusCode: 200,

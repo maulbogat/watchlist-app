@@ -17,7 +17,8 @@ exports.handler = async (event) => {
   }
 
   try {
-    const result = await runUpcomingSyncCore(20000);
+    // Stay under Netlify's 30s wall; paginated registry + completion (prune) need headroom.
+    const result = await runUpcomingSyncCore(21000);
     console.log("check-upcoming: done", JSON.stringify(result));
 
     return {

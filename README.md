@@ -68,6 +68,8 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
    Repeat until the JSON shows `"completed":true` (same chunked sync as the scheduler). Optional: set **`UPCOMING_SYNC_TRIGGER_SECRET`** in Netlify and send `Authorization: Bearer <that-value>` so random people can’t trigger TMDB/Firestore work.
 
+   **Firestore `RESOURCE_EXHAUSTED` / “Quota exceeded”** in function logs usually means the **Spark (free) plan daily read/write budget** was hit, or two runs overlapped and doubled traffic. The sync now **pages through `titleRegistry`** (instead of downloading the whole collection every run) and **retries** quota errors with backoff. If errors persist: upgrade to **Blaze (pay-as-you-go)** in Firebase, reduce how often you manually trigger sync, or run **`node scripts/sync-upcoming-alerts.mjs`** locally when the registry is large.
+
    **One-shot full sync on your machine** (no 30s limit):
 
    ```bash

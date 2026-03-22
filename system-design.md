@@ -121,7 +121,7 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 
 ### `syncState` / `upcomingAlerts` (single doc)
 
-**Writes:** Admin SDK only. Holds **`nextIndex`** and **`registryDocCount`** so `check-upcoming` can sync `titleRegistry` → `upcomingAlerts` in **multiple Netlify invocations** (each capped at ~30s). Clients cannot read or write (`firestore.rules`).
+**Writes:** Admin SDK only. Holds **`lastRegistryDocId`** (cursor into `titleRegistry` ordered by document id), **`registryDocCount`** (from Firestore `count()` — invalidates cursor when the registry size changes), and timestamps so `check-upcoming` can sync in **multiple Netlify invocations** (each capped at ~30s). Legacy **`nextIndex`** may still exist in old docs until the next sync clears it. Clients cannot read or write (`firestore.rules`).
 
 ### `upcomingAlerts` / `{docId}`
 
