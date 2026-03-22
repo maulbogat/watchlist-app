@@ -1,0 +1,85 @@
+import { create } from "zustand";
+import type { FilterType, ListMode, WatchlistItem } from "../types/index.js";
+import {
+  STATUS_ORDER,
+  GENRE_LIMIT,
+  STATUS_LABELS,
+  CHECK_SVG,
+  UPCOMING_CAL_ICON_SVG,
+  UPCOMING_ADD_CAL_ICON_SVG,
+} from "./watchlistConstants.js";
+import type { SharedList } from "../types/index.js";
+import type { PersonalList } from "../types/index.js";
+
+export interface AppState {
+  movies: WatchlistItem[];
+  setMovies: (movies: WatchlistItem[]) => void;
+
+  currentFilter: FilterType;
+  setCurrentFilter: (currentFilter: FilterType) => void;
+
+  currentGenre: string;
+  setCurrentGenre: (currentGenre: string) => void;
+
+  currentStatus: string;
+  setCurrentStatus: (currentStatus: string) => void;
+
+  currentModalMovie: WatchlistItem | null;
+  setCurrentModalMovie: (currentModalMovie: WatchlistItem | null) => void;
+
+  currentListMode: ListMode;
+  setCurrentListMode: (currentListMode: ListMode) => void;
+
+  sharedLists: SharedList[];
+  setSharedLists: (sharedLists: SharedList[]) => void;
+
+  personalLists: PersonalList[];
+  setPersonalLists: (personalLists: PersonalList[]) => void;
+
+  upcomingAlertsExpanded: boolean;
+  setUpcomingAlertsExpanded: (upcomingAlertsExpanded: boolean) => void;
+
+  userCountryCode: string;
+  setUserCountryCode: (userCountryCode: string) => void;
+}
+
+export const useAppStore = create<AppState>()((set) => ({
+  movies: [],
+  setMovies: (movies) => set({ movies }),
+
+  currentFilter: "both",
+  setCurrentFilter: (currentFilter) => set({ currentFilter }),
+
+  currentGenre: "",
+  setCurrentGenre: (currentGenre) => set({ currentGenre }),
+
+  currentStatus: "to-watch",
+  setCurrentStatus: (currentStatus) => set({ currentStatus }),
+
+  currentModalMovie: null,
+  setCurrentModalMovie: (currentModalMovie) => set({ currentModalMovie }),
+
+  currentListMode: "personal",
+  setCurrentListMode: (currentListMode) => set({ currentListMode }),
+
+  sharedLists: [],
+  setSharedLists: (sharedLists) => set({ sharedLists }),
+
+  personalLists: [],
+  setPersonalLists: (personalLists) => set({ personalLists }),
+
+  upcomingAlertsExpanded: false,
+  setUpcomingAlertsExpanded: (upcomingAlertsExpanded) => set({ upcomingAlertsExpanded }),
+
+  userCountryCode: "IL",
+  setUserCountryCode: (userCountryCode) => set({ userCountryCode }),
+}));
+
+export {
+  STATUS_ORDER,
+  GENRE_LIMIT,
+  STATUS_LABELS,
+  CHECK_SVG,
+  UPCOMING_CAL_ICON_SVG,
+  UPCOMING_ADD_CAL_ICON_SVG,
+};

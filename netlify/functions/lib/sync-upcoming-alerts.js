@@ -1,5 +1,45 @@
 /**
- * Firestore sync for upcomingAlerts + shared TMDB logic entry points.
+ * Firestore sync for **`upcomingAlerts`** + shared TMDB entry points (`buildAlertsForCatalogRow`).
+ *
+ * **Collections:**
+ * - **`titleRegistry`** — read-only source of catalog rows (`tmdbId`, `tmdbMedia` / `type`).
+ * - **`upcomingAlerts`** — upsert/delete alert documents keyed by deterministic `docId`.
+ * - **`syncState/upcomingAlerts`** — resumable batch cursor for Netlify time limits.
+ *
+ * @module netlify/functions/lib/sync-upcoming-alerts
+ */
+
+/**
+ * Client/shared TypeScript shape (subset enforced at write time).
+ * @typedef {import('../../../src/types/index.js').UpcomingAlert} UpcomingAlert
+ *
+ * Firestore document fields for **`upcomingAlerts/{docId}`** (plus `detectedAt` server timestamp on write).
+ * Aligns with {@link UpcomingAlert}; `airDate` stored as `YYYY-MM-DD` string; `expiresAt` ISO date string.
+ *
+ * @typedef {{
+ *   fingerprint: string,
+ *   catalogTmdbId: number,
+ *   media: 'tv' | 'movie',
+ *   tmdbId?: number,
+ *   type?: 'tv' | 'movie',
+ *   alertType: 'new_episode' | 'new_season' | 'upcoming_movie' | 'sequel',
+ *   title: string,
+ *   detail: string,
+ *   airDate: string | null,
+ *   confirmed: boolean,
+ *   expiresAt?: string,
+ *   sequelTmdbId?: number | null,
+ *   detectedAt?: import('firebase-admin/firestore').FieldValue
+ * }} UpcomingAlertFirestoreDoc
+ *
+ * Batch / cursor state at **`syncState/upcomingAlerts`** (document id `upcomingAlerts`).
+ * @typedef {{
+ *   lastRegistryDocId: string | null,
+ *   registryDocCount?: number,
+ *   nextIndex?: number,
+ *   updatedAt?: import('firebase-admin/firestore').Timestamp,
+ *   lastCompletedAt?: import('firebase-admin/firestore').Timestamp
+ * }} UpcomingAlertsSyncStateDoc
  */
 
 const { FieldPath, FieldValue } = require("firebase-admin/firestore");
@@ -12,10 +52,18 @@ const SYNC_STATE_DOC_ID = "upcomingAlerts";
 /** Registry docs per Firestore query — avoids reading entire titleRegistry on every Netlify tick. */
 const REGISTRY_PAGE_SIZE = 64;
 
+/**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * @param {unknown} e
+ * @returns {boolean}
+ */
 function isFirestoreQuotaError(e) {
   if (!e) return false;
   const code = e.code;
@@ -26,6 +74,12 @@ function isFirestoreQuotaError(e) {
 
 /**
  * RESOURCE_EXHAUSTED (gRPC 8) often clears after a short wait — helps scheduled + overlapping runs.
+ */
+/**
+ * @template T
+ * @param {() => Promise<T>} fn
+ * @param {string} [label]
+ * @returns {Promise<T>}
  */
 async function firestoreOpWithRetry(fn, label = "firestore") {
   const retries = 5;
@@ -48,7 +102,10 @@ async function firestoreOpWithRetry(fn, label = "firestore") {
   throw lastErr;
 }
 
-/** @param {FirebaseFirestore.DocumentData} data */
+/**
+ * @param {FirebaseFirestore.DocumentData} data
+ * @returns {{ tmdbId: number, isTv: boolean, title: string } | null}
+ */
 function registryDocToRow(data) {
   if (!data || typeof data !== "object") return null;
   const t = data.tmdbId;
@@ -64,6 +121,12 @@ function registryDocToRow(data) {
  * @param {string | null} afterDocId
  * @param {number} pageSize
  */
+/**
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {string | null} afterDocId
+ * @param {number} pageSize
+ * @returns {Promise<FirebaseFirestore.QuerySnapshot>}
+ */
 async function fetchTitleRegistryPage(db, afterDocId, pageSize) {
   let q = db.collection("titleRegistry").orderBy(FieldPath.documentId()).limit(pageSize);
   if (afterDocId) {
@@ -73,7 +136,11 @@ async function fetchTitleRegistryPage(db, afterDocId, pageSize) {
   return q.get();
 }
 
-/** Paginate titleRegistry and collect tmdb|media keys (for prune). */
+/**
+ * Paginate `titleRegistry` and collect `tmdbId|media` keys (for prune).
+ * @param {FirebaseFirestore.Firestore} db
+ * @returns {Promise<Set<string>>}
+ */
 async function collectRegistryTmdbKeys(db) {
   const valid = new Set();
   let lastId = null;
@@ -95,7 +162,8 @@ async function collectRegistryTmdbKeys(db) {
 
 /**
  * @param {FirebaseFirestore.Firestore} db
- * @param {object[]} alertPayloads - from buildAlertsForCatalogRow + finalizeAlert
+ * @param {Array<UpcomingAlertFirestoreDoc & { docId: string }>} alertPayloads - from `buildAlertsForCatalogRow` (`docId` stripped before set)
+ * @returns {Promise<void>}
  */
 async function upsertAlerts(db, alertPayloads) {
   if (alertPayloads.length === 0) return;
@@ -123,7 +191,12 @@ async function upsertAlerts(db, alertPayloads) {
 }
 
 /**
- * Remove alert docs for this catalog row that are no longer generated.
+ * Remove `upcomingAlerts` docs for this catalog row that are no longer generated.
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {number} catalogTmdbId
+ * @param {'tv'|'movie'} media
+ * @param {string[]} activeDocIds
+ * @returns {Promise<void>}
  */
 async function deleteStaleAlertsForRow(db, catalogTmdbId, media, activeDocIds) {
   const snap = await db
@@ -148,7 +221,9 @@ async function deleteStaleAlertsForRow(db, catalogTmdbId, media, activeDocIds) {
 }
 
 /**
- * Delete expired alerts (expiresAt < today UTC date).
+ * Delete expired alerts (`expiresAt` &lt; today UTC date).
+ * @param {FirebaseFirestore.Firestore} db
+ * @returns {Promise<number>} deleted count
  */
 async function deleteExpiredAlerts(db) {
   const today = new Date().toISOString().slice(0, 10);
@@ -174,6 +249,7 @@ async function deleteExpiredAlerts(db) {
 /**
  * @param {FirebaseFirestore.Firestore} db
  * @param {object[] | Set<string>} rowsOrSet - deduped catalog rows or precomputed `tmdbId|media` keys
+ * @returns {Promise<number>} removed count
  */
 async function pruneAlertsOutsideCatalog(db, rowsOrSet) {
   const valid =
@@ -207,6 +283,12 @@ async function pruneAlertsOutsideCatalog(db, rowsOrSet) {
   return removed;
 }
 
+/**
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {string} apiKey
+ * @param {unknown[]} catalogItems
+ * @returns {Promise<{ rowsChecked: number, alertsUpserted: number, pruned: number, expiredRemoved: number }>}
+ */
 async function runFullCatalogSync(db, apiKey, catalogItems) {
   const rows = dedupeCatalogByTmdb(Array.isArray(catalogItems) ? catalogItems : []);
   let upserted = 0;
@@ -226,6 +308,11 @@ async function runFullCatalogSync(db, apiKey, catalogItems) {
  * Full sync from titleRegistry only (catalog/movies is deprecated).
  * Prefer **runRegistrySyncWithTimeBudget** on Netlify (30s limit).
  */
+/**
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {string} apiKey
+ * @returns {Promise<{ rowsChecked: number, alertsUpserted: number, pruned: number, expiredRemoved: number }>}
+ */
 async function runFullRegistrySync(db, apiKey) {
   const regSnap = await db.collection("titleRegistry").get();
   const regItems = regSnap.docs.map((d) => d.data());
@@ -239,7 +326,10 @@ async function runFullRegistrySync(db, apiKey) {
  * to reduce Firestore reads and avoid RESOURCE_EXHAUSTED on Spark/free quotas.
  * Legacy `nextIndex` in syncState is ignored/cleared on first run after deploy.
  *
- * @param {number} maxMs stop starting new registry rows / TMDB work after this elapsed wall time
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {string} apiKey
+ * @param {number} [maxMs] - Stop starting new registry rows / TMDB work after this elapsed wall time
+ * @returns {Promise<Record<string, unknown>>} Partial or completed sync stats (`completed`, `rowsChecked`, …)
  */
 async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
   const t0 = Date.now();
@@ -283,6 +373,10 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
     expiredRemoved = await firestoreOpWithRetry(() => deleteExpiredAlerts(db), "deleteExpiredAlerts");
   }
 
+  /**
+   * @param {string | null} cursor
+   * @returns {Promise<void>}
+   */
   async function savePartial(cursor) {
     await firestoreOpWithRetry(
       () =>
@@ -438,8 +532,13 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
 }
 
 /**
- * After adding one title with known TMDB id and media.
+ * After adding one title with known TMDB id and media (bookmarklet path).
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {string} apiKey
+ * @param {number|string} tmdbId
  * @param {'tv'|'movie'} media
+ * @param {string} [titleHint]
+ * @returns {Promise<{ ok: boolean, error?: string, count?: number, docIds?: string[] }>}
  */
 async function runSingleTitleSync(db, apiKey, tmdbId, media, titleHint) {
   const n = Number(tmdbId);

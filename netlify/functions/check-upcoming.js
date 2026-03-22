@@ -1,14 +1,46 @@
 /**
- * Scheduled: daily TMDB sync → Firestore upcomingAlerts (titleRegistry only).
- * Netlify cron 3:00 UTC. Requires TMDB_API_KEY + FIREBASE_SERVICE_ACCOUNT.
+ * Netlify serverless function: **check-upcoming**
  *
- * Do not rely on curling this URL — Netlify often rejects HTTP calls to **scheduled** functions quickly.
- * Use `trigger-upcoming-sync` for manual/curl runs instead.
+ * **Trigger:** Netlify **scheduled** cron (e.g. daily ~03:00 UTC) and ad-hoc HTTP (GET/POST/OPTIONS).
+ * Runs the same core as `trigger-upcoming-sync` via `runUpcomingSyncCore`.
+ *
+ * **Firestore writes (via `lib/sync-upcoming-alerts.js`):**
+ * - **`upcomingAlerts/{docId}`** — merge upserts for TV/movie/sequel alerts (see `UpcomingAlertDoc` typedef in `sync-upcoming-alerts.js`).
+ * - **`syncState/upcomingAlerts`** — cursor `lastRegistryDocId`, counts, `lastCompletedAt` / `updatedAt` for paginated registry sync.
+ * - Deletes stale/expired/orphaned `upcomingAlerts` docs during full completion passes.
+ *
+ * Do not rely on curling the **scheduled** function URL — use `trigger-upcoming-sync` for manual runs.
+ *
+ * @module netlify/functions/check-upcoming
+ */
+
+/**
+ * @typedef {import('../../src/types/index.js').UpcomingAlert} UpcomingAlert
+ *
+ * Partial sync result JSON returned in the HTTP body (`ok: true` branch).
+ * @typedef {{
+ *   ok: true,
+ *   rowsChecked?: number,
+ *   alertsUpserted?: number,
+ *   pruned?: number,
+ *   expiredRemoved?: number,
+ *   completed: boolean,
+ *   lastRegistryDocId?: string | null,
+ *   totalRows?: number | null,
+ *   budgetMs?: number,
+ *   elapsedMs?: number,
+ *   message?: string
+ * }} CheckUpcomingSyncResultBody
  */
 
 const { runUpcomingSyncCore } = require("./lib/execute-upcoming-sync");
 
-exports.handler = async (event) => {
+/**
+ * @param {import('@netlify/functions').HandlerEvent} event
+ * @param {import('@netlify/functions').HandlerContext} [context]
+ * @returns {Promise<import('@netlify/functions').HandlerResponse>}
+ */
+exports.handler = async (event, context) => {
   const trigger = event?.headers?.["x-netlify-event"] || event?.httpMethod || "unknown";
   console.log("check-upcoming: start", JSON.stringify({ trigger }));
 

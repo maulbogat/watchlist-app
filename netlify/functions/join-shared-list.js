@@ -1,7 +1,39 @@
+/**
+ * Netlify serverless function: **join-shared-list**
+ *
+ * **Trigger:** HTTP `POST` (and `OPTIONS`). Authenticated user joins a shared list via invite.
+ * Token from `bookmarklet_token` cookie or `Authorization: Bearer`.
+ *
+ * **Firestore writes:**
+ * - **`sharedLists/{listId}`** — `update` with `members: arrayUnion(uid)` when the list exists, has a name,
+ *   and the user is not already a member.
+ *
+ * @module netlify/functions/join-shared-list
+ */
+
+/**
+ * @typedef {import('../../src/types/index.js').SharedList} SharedList
+ *
+ * POST JSON body.
+ * @typedef {{ listId: string }} JoinSharedListBody
+ *
+ * Success — already a member.
+ * @typedef {{ ok: true, joined: false, message: string, name: string }} JoinSharedListAlreadyMember
+ *
+ * Success — newly joined.
+ * @typedef {{ ok: true, joined: true, message: string, name: string }} JoinSharedListJoined
+ * @typedef {JoinSharedListAlreadyMember | JoinSharedListJoined} JoinSharedListSuccess
+ *
+ * @typedef {{ ok: false, error: string }} JoinSharedListError
+ */
+
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 
+/**
+ * @returns {import('firebase-admin/app').App}
+ */
 function getApp() {
   if (global.__fbAdmin) return global.__fbAdmin;
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -12,6 +44,10 @@ function getApp() {
   return app;
 }
 
+/**
+ * @param {import('@netlify/functions').HandlerEvent} event
+ * @returns {Record<string, string>}
+ */
 function corsHeaders(event) {
   const origin = event.headers?.origin || event.headers?.Origin || "*";
   return {
@@ -23,6 +59,12 @@ function corsHeaders(event) {
   };
 }
 
+/**
+ * @param {number} status
+ * @param {JoinSharedListSuccess | JoinSharedListError} body
+ * @param {import('@netlify/functions').HandlerEvent} event
+ * @returns {import('@netlify/functions').HandlerResponse}
+ */
 function jsonRes(status, body, event) {
   return {
     statusCode: status,
@@ -31,6 +73,11 @@ function jsonRes(status, body, event) {
   };
 }
 
+/**
+ * @param {import('@netlify/functions').HandlerEvent} event
+ * @param {import('@netlify/functions').HandlerContext} context
+ * @returns {Promise<import('@netlify/functions').HandlerResponse>}
+ */
 exports.handler = async (event, context) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(event) };

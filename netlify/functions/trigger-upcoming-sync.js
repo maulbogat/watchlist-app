@@ -1,17 +1,29 @@
 /**
- * HTTP-invokable upcoming sync (same work as check-upcoming).
+ * Netlify serverless function: **trigger-upcoming-sync**
  *
- * Netlify **scheduled** functions are not reliably invokable via `curl` to their URL (fast failure / Internal Error).
- * Use this function instead:
+ * **Trigger:** HTTP `GET` or `POST` (and `OPTIONS`). Same Firestore work as **`check-upcoming`**
+ * (`runUpcomingSyncCore` → `lib/sync-upcoming-alerts.js`).
+ *
+ * Netlify **scheduled** functions are not reliably invokable via `curl`; use this URL for manual runs:
  *
  *   curl -X POST "https://YOUR-SITE.netlify.app/.netlify/functions/trigger-upcoming-sync"
  *
- * Optional: set UPCOMING_SYNC_TRIGGER_SECRET in Netlify env, then:
- *   curl -X POST -H "Authorization: Bearer YOUR_SECRET" "https://..."
+ * Optional: `UPCOMING_SYNC_TRIGGER_SECRET` — require header `Authorization: Bearer <secret>`.
+ *
+ * **Firestore writes:** `upcomingAlerts/*`, `syncState/upcomingAlerts` (see `check-upcoming` module doc).
+ *
+ * @module netlify/functions/trigger-upcoming-sync
+ */
+
+/**
+ * @typedef {import('../../src/types/index.js').UpcomingAlert} UpcomingAlert
  */
 
 const { runUpcomingSyncCore } = require("./lib/execute-upcoming-sync");
 
+/**
+ * @returns {Record<string, string>}
+ */
 function corsHeaders() {
   return {
     "Content-Type": "application/json",
@@ -21,7 +33,12 @@ function corsHeaders() {
   };
 }
 
-exports.handler = async (event) => {
+/**
+ * @param {import('@netlify/functions').HandlerEvent} event
+ * @param {import('@netlify/functions').HandlerContext} [context]
+ * @returns {Promise<import('@netlify/functions').HandlerResponse>}
+ */
+exports.handler = async (event, context) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders() };
   }

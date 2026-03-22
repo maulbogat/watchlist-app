@@ -1,7 +1,20 @@
 /**
- * CommonJS copy of lib/registry-id.js for Netlify functions.
+ * CommonJS copy of `src/lib/registry-id.ts` for Netlify functions.
+ *
+ * Derives stable **`titleRegistry` document ids** and list status keys from IMDb / TMDB / legacy title+year.
+ * Pure string logic — **no Firestore I/O**.
+ *
+ * @module netlify/functions/lib/registry-id
  */
 
+/**
+ * @typedef {import('../../../src/types/index.js').WatchlistItem} WatchlistItem
+ */
+
+/**
+ * @param {unknown} v
+ * @returns {string | null}
+ */
 function normalizeImdbId(v) {
   if (v == null || v === "") return null;
   const s = String(v).trim();
@@ -9,6 +22,10 @@ function normalizeImdbId(v) {
   return s.startsWith("tt") ? s : `tt${s.replace(/^tt/i, "")}`;
 }
 
+/**
+ * @param {Record<string, unknown>} m
+ * @returns {string}
+ */
 function legacyKeyFromTitleYear(m) {
   const title = String(m?.title ?? "unknown").trim() || "unknown";
   const year = m?.year != null && m.year !== "" ? String(m.year) : "";
@@ -18,6 +35,10 @@ function legacyKeyFromTitleYear(m) {
   return `legacy-${Math.abs(h).toString(36)}`;
 }
 
+/**
+ * @param {WatchlistItem | Record<string, unknown> | null | undefined} item
+ * @returns {string}
+ */
 function registryDocIdFromItem(item) {
   if (!item || typeof item !== "object") return legacyKeyFromTitleYear({});
   if (item.registryId && typeof item.registryId === "string") return item.registryId;
@@ -34,12 +55,22 @@ function registryDocIdFromItem(item) {
   return legacyKeyFromTitleYear(item);
 }
 
+/**
+ * Strip client-only fields before merging into `titleRegistry`.
+ * @param {Record<string, unknown>} full
+ * @returns {Record<string, unknown>}
+ */
 function payloadForRegistry(full) {
   if (!full || typeof full !== "object") return {};
   const { status, registryId, ...rest } = full;
   return { ...rest };
 }
 
+/**
+ * Status-array key for a list row (`registryId` or legacy `title|year`).
+ * @param {WatchlistItem | Record<string, unknown> | null | undefined} m
+ * @returns {string}
+ */
 function listKey(m) {
   if (m?.registryId) return m.registryId;
   return `${m.title}|${m.year ?? ""}`;

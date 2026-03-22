@@ -1,6 +1,14 @@
 /**
- * TMDB fetch helpers for upcoming alerts (Netlify functions).
- * 250ms between calls; on 429 wait 10s and retry once.
+ * TMDB HTTPS helpers for **upcoming alert** generation (Netlify functions).
+ * Serializes requests (~250ms apart); on HTTP 429 waits 10s and retries once.
+ *
+ * **Outputs:** Plain objects merged into **`upcomingAlerts`** docs (see `UpcomingAlertFirestoreDoc` in `sync-upcoming-alerts.js`).
+ *
+ * @module netlify/functions/lib/tmdb-upcoming-fetch
+ */
+
+/**
+ * @typedef {import('../../../src/types/index.js').UpcomingAlert} UpcomingAlert
  */
 
 const https = require("https");
@@ -10,15 +18,28 @@ const RATE_MS = 250;
 
 let chain = Promise.resolve();
 
+/**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * @template T
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
 function enqueue(fn) {
   chain = chain.then(fn, fn);
   return chain;
 }
 
+/**
+ * @param {string} url
+ * @returns {Promise<{ status: number, data: unknown }>}
+ */
 function httpsGetJson(url) {
   return new Promise((resolve, reject) => {
     https
@@ -40,8 +61,9 @@ function httpsGetJson(url) {
 }
 
 /**
- * @param {string} path - e.g. /tv/136311
+ * @param {string} path - e.g. `/tv/136311`
  * @param {string} apiKey
+ * @returns {Promise<{ ok: boolean, status: number, error?: string, data?: unknown }>}
  */
 async function tmdbGet(path, apiKey) {
   const run = async () => {
@@ -63,18 +85,30 @@ async function tmdbGet(path, apiKey) {
   return enqueue(run);
 }
 
+/**
+ * @param {string | null | undefined} str
+ * @returns {Date | null}
+ */
 function parseIsoDate(str) {
   if (!str || String(str).trim() === "") return null;
   const d = new Date(String(str).includes("T") ? str : `${str}T12:00:00Z`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/**
+ * @param {Date} date
+ * @param {number} days
+ * @returns {string} `YYYY-MM-DD`
+ */
 function addDaysIso(date, days) {
   const d = new Date(date.getTime());
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * @returns {string}
+ */
 function nowIso() {
   return new Date().toISOString();
 }
@@ -83,7 +117,7 @@ function nowIso() {
  * Build alert payloads for one catalog row (TMDB only).
  * @param {string} apiKey
  * @param {{ tmdbId: number, isTv: boolean, title?: string }} row
- * @returns {Promise<object[]>} alert objects (not yet with detectedAt)
+ * @returns {Promise<object[]>} Each object includes `docId` plus fields aligned with {@link UpcomingAlert} / `UpcomingAlertFirestoreDoc` in `sync-upcoming-alerts.js`. Caller strips `docId` before `set`; `detectedAt` is added in `upsertAlerts`.
  */
 async function buildAlertsForCatalogRow(apiKey, row) {
   const { tmdbId, isTv, title: hintTitle } = row;
@@ -192,8 +226,9 @@ async function buildAlertsForCatalogRow(apiKey, row) {
 }
 
 /**
- * Deduplicate catalog items by TMDB id + tv/movie (same as check-upcoming.mjs).
+ * Deduplicate catalog items by TMDB id + tv/movie (same as `check-upcoming.mjs`).
  * @param {object[]} items
+ * @returns {{ tmdbId: number, isTv: boolean, title: string }[]}
  */
 function dedupeCatalogByTmdb(items) {
   const map = new Map();

@@ -4,18 +4,26 @@
   "scripts": {
     "dev:react": "vite --host",
     "build:react": "vite build",
+    "typecheck": "tsc --noEmit",
     "preview:react": "vite preview"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",
     "dotenv": "^16.4.5",
+    "firebase": "^10.14.1",
     "firebase-admin": "^12.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-router-dom": "^7.13.1",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@types/node": "^22.19.15",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-router-dom": "^5.3.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "5.6",
     "vite": "^6.0.0"
   }
 }

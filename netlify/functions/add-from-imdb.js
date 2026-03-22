@@ -1,3 +1,47 @@
+/**
+ * Netlify serverless function: **add-from-imdb**
+ *
+ * **Trigger:** HTTP `POST` (CORS + `OPTIONS`). Called from the bookmarklet and `/add` flow.
+ * Authenticates via Firebase ID token in the `bookmarklet_token` cookie or `Authorization: Bearer`.
+ *
+ * **Firestore writes:**
+ * - **`titleRegistry/{registryId}`** — `set(merge)` with TMDB/OMDb-enriched fields (via `payloadForRegistry`).
+ * - **`sharedLists/{listId}`** — when `listId` is present and user is a member: updates `items`, `watched`,
+ *   `maybeLater`, `archive` (registry ref rows + status keys).
+ * - **`users/{uid}`** + **`users/{uid}/personalLists/{id}`** — default path: may run legacy migration on `users/{uid}`,
+ *   then merges the target personal list subdocument.
+ * - **`upcomingAlerts`** — optional upsert via `runSingleTitleSync` when a TMDB id is available.
+ *
+ * @module netlify/functions/add-from-imdb
+ */
+
+/**
+ * Shared domain types (client/Firestore shapes). Netlify functions are plain JS; these imports are for JSDoc only.
+ *
+ * @typedef {import('../../src/types/index.js').WatchlistItem} WatchlistItem
+ * @typedef {import('../../src/types/index.js').SharedList} SharedList
+ * @typedef {import('../../src/types/index.js').UserProfile} UserProfile
+ *
+ * POST JSON body (also reads cookies: `bookmarklet_token`, `bookmarklet_list_id`, `bookmarklet_personal_list_id`).
+ * @typedef {{
+ *   imdbId: string,
+ *   listId?: string,
+ *   personalListId?: string,
+ *   watch_region?: string,
+ *   watchRegion?: string
+ * }} AddFromImdbBody
+ *
+ * Success when the title was added or merged into the list.
+ * @typedef {{ ok: true, added: true, message: string }} AddFromImdbAdded
+ *
+ * Success when the title is already on the list (non–to-watch status).
+ * @typedef {{ ok: true, added: false, message: string }} AddFromImdbDuplicate
+ * @typedef {AddFromImdbAdded | AddFromImdbDuplicate} AddFromImdbSuccess
+ *
+ * Error response (4xx/5xx).
+ * @typedef {{ ok: false, error: string }} AddFromImdbError
+ */
+
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
@@ -8,6 +52,10 @@ const { registryDocIdFromItem, payloadForRegistry, listKey } = require("./lib/re
 /** Same rule as lib/youtube-trailer-id.js (YouTube video id from TMDB). */
 const YOUTUBE_VIDEO_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
 
+/**
+ * @param {unknown} v
+ * @returns {string | null}
+ */
 function normalizeStoredYoutubeTrailerId(v) {
   if (v == null || v === "") return null;
   const s = String(v).trim();
@@ -15,11 +63,19 @@ function normalizeStoredYoutubeTrailerId(v) {
   return s;
 }
 
+/**
+ * @param {unknown} v
+ * @returns {boolean}
+ */
 function isPlayableYoutubeTrailerId(v) {
   if (v == null || typeof v !== "string") return false;
   return YOUTUBE_VIDEO_ID_RE.test(v.trim());
 }
 
+/**
+ * Lazily initializes Firebase Admin (service account from `FIREBASE_SERVICE_ACCOUNT` base64 JSON).
+ * @returns {import('firebase-admin/app').App}
+ */
 function getApp() {
   if (global.__fbAdmin) return global.__fbAdmin;
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -30,6 +86,11 @@ function getApp() {
   return app;
 }
 
+/**
+ * CORS headers reflecting the request `Origin`.
+ * @param {import('@netlify/functions').HandlerEvent} event
+ * @returns {Record<string, string>}
+ */
 function corsHeaders(event) {
   const origin = event.headers?.origin || event.headers?.Origin || "*";
   return {
@@ -41,6 +102,12 @@ function corsHeaders(event) {
   };
 }
 
+/**
+ * @param {number} status
+ * @param {AddFromImdbSuccess | AddFromImdbError | Record<string, unknown>} body
+ * @param {import('@netlify/functions').HandlerEvent} event
+ * @returns {import('@netlify/functions').HandlerResponse}
+ */
 function jsonRes(status, body, event) {
   return {
     statusCode: status,
@@ -49,6 +116,10 @@ function jsonRes(status, body, event) {
   };
 }
 
+/**
+ * @param {string} imdbId
+ * @returns {Promise<Record<string, unknown>>}
+ */
 function fetchOMDb(imdbId) {
   const apiKey = process.env.OMDB_API_KEY;
   if (!apiKey) return Promise.reject(new Error("OMDB_API_KEY not set in Netlify environment"));
@@ -73,6 +144,10 @@ function fetchOMDb(imdbId) {
   });
 }
 
+/**
+ * @param {string} url
+ * @returns {Promise<unknown>}
+ */
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
     https.get(url, (res) => {
@@ -91,6 +166,10 @@ function fetchJson(url) {
 
 const TMDB_IMG = "https://image.tmdb.org/t/p/w500";
 
+/**
+ * @param {unknown} results
+ * @returns {string | null}
+ */
 function pickYoutubeTrailerKey(results) {
   const r = results || [];
   const preferred = (t) =>
@@ -108,7 +187,9 @@ function pickYoutubeTrailerKey(results) {
  * Bugfix: `movie?.id ?? tv?.id` always preferred movie — wrong for TV miniseries (e.g. Cecil Hotel
  * could get another title's trailer/thumb/genres). Use OMDb Type when available; else prefer TV
  * when both exist (miniseries/docuseries are usually TV on TMDB).
- * @param {object|null} omdbHint - OMDb row { Type, Title } if already fetched
+ * @param {Record<string, unknown>} find - TMDB `/find` JSON
+ * @param {object | null} omdbHint - OMDb row `{ Type, Title }` if already fetched
+ * @returns {{ mediaType: 'tv' | 'movie' | null, id: number | null }}
  */
 function pickTmdbFindEntry(find, omdbHint) {
   const movie = find.movie_results?.[0];
@@ -127,6 +208,21 @@ function pickTmdbFindEntry(find, omdbHint) {
 /**
  * Full TMDB enrichment from IMDb id: type, title, year, poster, genres, trailer key, watch providers.
  * Returns null if TMDB has no match for this IMDb id.
+ *
+ * @param {string} imdbId
+ * @param {string} apiKey
+ * @param {string} watchRegion - ISO 3166-1 alpha-2 region for watch providers
+ * @param {object | null} omdbHint
+ * @returns {Promise<{
+ *   tmdbId: number,
+ *   type: 'movie' | 'show',
+ *   title: string,
+ *   year: number | null,
+ *   thumb: string | null,
+ *   genre: string,
+ *   youtubeId: string | null,
+ *   services: string[]
+ * } | null>}
  */
 async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint) {
   const findUrl = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?external_source=imdb_id&api_key=${apiKey}`;
@@ -188,11 +284,19 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint) {
   };
 }
 
+/**
+ * @returns {string}
+ */
 function adminRandomListId() {
   return Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 12);
 }
 
-/** Mirror client migrate: move legacy users/{uid}.items → users/{uid}/personalLists/{id}. */
+/**
+ * Mirror client migrate: move legacy `users/{uid}.items` → `users/{uid}/personalLists/{id}`.
+ * @param {import('firebase-admin/firestore').Firestore} db
+ * @param {string} uid
+ * @returns {Promise<void>}
+ */
 async function migrateLegacyPersonalListAdmin(db, uid) {
   const userRef = db.collection("users").doc(uid);
   const userSnap = await userRef.get();
@@ -247,6 +351,11 @@ async function migrateLegacyPersonalListAdmin(db, uid) {
   });
 }
 
+/**
+ * @param {import('@netlify/functions').HandlerEvent} event
+ * @param {import('@netlify/functions').HandlerContext} context
+ * @returns {Promise<import('@netlify/functions').HandlerResponse>}
+ */
 exports.handler = async (event, context) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(event) };
@@ -367,11 +476,19 @@ exports.handler = async (event, context) => {
   const db = getFirestore(getApp());
   const regDoc = db.collection("titleRegistry").doc(registryId);
 
+  /**
+   * @param {Record<string, unknown>} mergedMovie
+   * @returns {Promise<void>}
+   */
   async function writeRegistryMerge(mergedMovie) {
     const payload = payloadForRegistry({ ...mergedMovie, registryId });
     await regDoc.set(payload, { merge: true });
   }
 
+  /**
+   * @param {Record<string, unknown>} m
+   * @returns {Promise<void>}
+   */
   async function syncUpcomingForAddedTitle(m) {
     if (!m || m.tmdbId == null || m.tmdbId === "" || !tmdbKey) return;
     try {
@@ -382,6 +499,10 @@ exports.handler = async (event, context) => {
     }
   }
 
+  /**
+   * @param {unknown[]} items
+   * @returns {number}
+   */
   function findItemIndex(items) {
     const byRid = items.findIndex((m) => m && m.registryId === registryId);
     if (byRid >= 0) return byRid;
@@ -396,6 +517,12 @@ exports.handler = async (event, context) => {
     );
   }
 
+  /**
+   * @param {unknown} arr
+   * @param {string | null | undefined} fromKey
+   * @param {string | null | undefined} toKey
+   * @returns {unknown[]}
+   */
   function remapStatusKeys(arr, fromKey, toKey) {
     if (fromKey == null || toKey == null || fromKey === toKey || !Array.isArray(arr)) return arr || [];
     const s = new Set(arr);
