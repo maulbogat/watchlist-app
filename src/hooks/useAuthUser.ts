@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { auth, onAuthStateChanged } from "../firebase.js";
+import { setBookmarkletCookieWithMode } from "../lib/bookmarkletCookie.js";
 import { useAppStore } from "../store/useAppStore.js";
 
 export function useAuthUser(): { loading: boolean } {
   const [loading, setLoading] = useState(true);
+  const currentUser = useAppStore((s) => s.currentUser);
+  const currentListMode = useAppStore((s) => s.currentListMode);
 
   useEffect(() => {
     const setCurrentUser = useAppStore.getState().setCurrentUser;
@@ -13,6 +16,20 @@ export function useAuthUser(): { loading: boolean } {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    // Keep bookmarklet cookies in sync after sign-in/sign-out and list changes.
+    void setBookmarkletCookieWithMode(currentUser, currentListMode);
+  }, [currentUser, currentListMode]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    // Firebase ID tokens expire; refresh cookie periodically while app is open.
+    const id = window.setInterval(() => {
+      void setBookmarkletCookieWithMode(currentUser, useAppStore.getState().currentListMode);
+    }, 15 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [currentUser]);
 
   return { loading };
 }
