@@ -74,17 +74,31 @@ if (!imdbId || !/^tt\d+$/.test(nImdb ?? "") || !statusEl || !backLink) {
         body: JSON.stringify(body),
       });
 
-      const data = (await res.json()) as { ok?: boolean; message?: string; error?: string };
+      let data: {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+        errorMessage?: string;
+      } = {};
+      try {
+        data = (await res.json()) as typeof data;
+      } catch {
+        // Non-JSON function failures should still surface a useful status message.
+      }
+      const backendError =
+        data.error ||
+        data.errorMessage ||
+        (!res.ok ? `Request failed (${res.status}${res.statusText ? ` ${res.statusText}` : ""})` : "");
 
       if (window.self !== window.top) {
         window.parent.postMessage(
-          { type: "add-result", ok: data.ok, message: data.message, error: data.error },
+          { type: "add-result", ok: data.ok, message: data.message, error: backendError },
           "*"
         );
       }
       if (window.opener) {
         window.opener.postMessage(
-          { type: "add-result", ok: data.ok, message: data.message, error: data.error },
+          { type: "add-result", ok: data.ok, message: data.message, error: backendError },
           "*"
         );
         setTimeout(() => {
@@ -94,7 +108,7 @@ if (!imdbId || !/^tt\d+$/.test(nImdb ?? "") || !statusEl || !backLink) {
       if (data.ok) {
         setStatus(data.message || "Added to watchlist!");
       } else {
-        setStatus(data.error || "Failed to add.", true);
+        setStatus(backendError || "Failed to add.", true);
       }
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : "Could not reach the server.";

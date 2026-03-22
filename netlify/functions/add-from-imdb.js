@@ -357,6 +357,7 @@ async function migrateLegacyPersonalListAdmin(db, uid) {
  * @returns {Promise<import('@netlify/functions').HandlerResponse>}
  */
 exports.handler = async (event, context) => {
+  try {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(event) };
   }
@@ -653,4 +654,9 @@ exports.handler = async (event, context) => {
   }
 
   return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to To Watch` }, event);
+  } catch (err) {
+    const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Unexpected error";
+    console.error("add-from-imdb fatal:", err);
+    return jsonRes(500, { ok: false, error: msg }, event);
+  }
 };
