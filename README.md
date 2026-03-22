@@ -4,11 +4,27 @@ A personal movie/show watchlist with YouTube trailers, filters, and Firestore. E
 
 ## Run locally
 
+The watchlist is **React** (`src/`) served by **Vite**. Root **`index.html`** is the Vite entry (`#root` + `/src/main.jsx`). **`npm run build:react`** outputs **`dist/`**, which Netlify publishes.
+
+**Requirements:** [Node.js](https://nodejs.org/) **18+** and npm.
+
 ```bash
-python3 -m http.server 5173
+npm install
+npm run dev:react
 ```
 
-Then open `http://localhost:5173`. (YouTube embeds can fail when opened via `file://`.)
+Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--host` so LAN devices can reach it if needed.
+
+- **Firebase Auth:** Add your dev host (e.g. `localhost` and the port you use) under Firebase Console → Authentication → Settings → **Authorized domains**.
+- **Netlify functions locally:** `vite.config.js` proxies `/.netlify/functions/*` to `http://localhost:8888`. To exercise the bookmarklet add flow against real functions, run **`netlify dev`** in another terminal (or start the functions server on `8888` per Netlify docs) while using the Vite app.
+
+**Other commands**
+
+| Command | Purpose |
+|--------|---------|
+| `npm run dev:react` | Dev server (HMR) |
+| `npm run build:react` | Production bundle → `dist/` |
+| `npm run preview:react` | Serve `dist/` locally |
 
 ## Firebase setup
 
@@ -23,6 +39,8 @@ Then open `http://localhost:5173`. (YouTube embeds can fail when opened via `fil
 4. **Movie lists** are stored per user in `users/{uid}`. Users add titles via the bookmarklet; no shared catalog is needed for new users.
 
 ## Netlify deployment (bookmarklet)
+
+**Build:** `netlify.toml` runs **`npm run build:react`** and publishes **`dist/`** (includes `index.html` + hashed assets). The live site is the **React** watchlist.
 
 For the IMDb bookmarklet to add titles from imdb.com:
 

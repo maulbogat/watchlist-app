@@ -1,5 +1,4 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-analytics.js";
 import {
   getAuth,
   signInWithPopup,
@@ -28,7 +27,39 @@ import { firebaseConfig } from "./config/firebase.js";
 import { listKey as movieKey } from "./lib/registry-id.js";
 
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+
+/** Set only when web Analytics loads (skipped in Vite dev and when offline). */
+let analytics = null;
+
+function shouldLoadWebAnalytics() {
+  if (typeof window === "undefined") return false;
+  if (!firebaseConfig.measurementId) return false;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+  try {
+    if (import.meta.env?.DEV) return false;
+  } catch {
+    /* no import.meta (non-bundled edge case) */
+  }
+  return true;
+}
+
+if (shouldLoadWebAnalytics()) {
+  import("https://www.gstatic.com/firebasejs/10.7.0/firebase-analytics.js")
+    .then(({ getAnalytics, isSupported }) =>
+      isSupported().then((ok) => {
+        if (!ok) return;
+        try {
+          analytics = getAnalytics(app);
+        } catch (e) {
+          console.warn("Firebase Analytics disabled:", e?.message || e);
+        }
+      })
+    )
+    .catch(() => {
+      /* blocked script, offline, or import failure */
+    });
+}
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 

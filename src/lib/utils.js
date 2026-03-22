@@ -1,3 +1,15 @@
+/**
+ * Poster/thumb URLs (e.g. m.media-amazon.com) must not contain stray whitespace —
+ * a line break or space in the middle yields 404s.
+ * @param {unknown} url
+ * @returns {string}
+ */
+export function sanitizePosterUrl(url) {
+  if (url == null) return "";
+  const s = String(url).trim();
+  return s.replace(/\s+/g, "");
+}
+
 /** Shown in UI when Firestore has no persisted name yet (legacy). Not a stored default. */
 export function displayListName(name) {
   const n = String(name ?? "").trim();

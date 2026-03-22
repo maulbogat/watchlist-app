@@ -1,4 +1,6 @@
 [build]
+  publish = "dist"
+  command = "npm run build:react"
   functions = "netlify/functions"
 
 # Daily TMDB → Firestore upcomingAlerts (3:00 UTC)

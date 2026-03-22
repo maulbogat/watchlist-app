@@ -2638,3 +2638,51 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
     max-width: 48%;
   }
 }
+
+/* --- React (Vite) migration shell (index.vite.html) --- */
+.react-migration-shell {
+  max-width: 36rem;
+  margin: 3rem auto;
+  padding: 0 1.25rem;
+  font-family: "DM Sans", system-ui, sans-serif;
+  color: var(--text, #e8e8e8);
+}
+
+.react-migration-title {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.75rem;
+}
+
+.react-migration-meta,
+.react-migration-hint {
+  font-size: 0.9rem;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+.react-migration-stats {
+  margin: 1rem 0;
+  padding-left: 1.25rem;
+  line-height: 1.6;
+}
+
+.react-migration-signin-note {
+  margin-bottom: 1rem;
+}
+
+.react-migration-signin-btn {
+  margin-top: 0.5rem;
+}
+
+.react-migration-signout-btn {
+  margin-top: 0.25rem;
+}
+
+.react-migration-error {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #f5a0a0;
+  line-height: 1.4;
+}

@@ -1,12 +1,3 @@
-import {
-  currentFilter,
-  currentGenre,
-  currentStatus,
-  setCurrentFilter,
-  setCurrentStatus,
-  setCurrentGenre,
-} from "../store/state.js";
-
 const FILTER_STORAGE_PREFIX = "watchlist_filters_";
 
 export function getListFromUrl() {
@@ -45,36 +36,25 @@ export function getFilterStorageKey(uid) {
   return `${FILTER_STORAGE_PREFIX}${uid}`;
 }
 
-/** Restore type / status / genre filters from localStorage (per signed-in user). */
-export function loadFilterPreferences(user) {
-  if (!user) return;
+/** Read saved type / status / genre filters from localStorage (per signed-in user). */
+export function readFilterPreferences(user) {
+  if (!user) return null;
   try {
     const raw = localStorage.getItem(getFilterStorageKey(user.uid));
-    if (!raw) return;
-    const p = JSON.parse(raw);
-    if (p.currentFilter === "both" || p.currentFilter === "movie" || p.currentFilter === "show") {
-      setCurrentFilter(p.currentFilter);
-    }
-    if (
-      p.currentStatus === "to-watch" ||
-      p.currentStatus === "watched" ||
-      p.currentStatus === "archive" ||
-      p.currentStatus === "recently-added"
-    ) {
-      setCurrentStatus(p.currentStatus);
-    }
-    if (typeof p.currentGenre === "string") {
-      setCurrentGenre(p.currentGenre);
-    }
-  } catch (e) {}
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
-export function saveFilterPreferences(user) {
+/** Persist filters from an explicit snapshot (React). */
+export function persistFilterPreferences(user, { currentFilter, currentGenre, currentStatus }) {
   if (!user) return;
   try {
     localStorage.setItem(
       getFilterStorageKey(user.uid),
       JSON.stringify({ currentFilter, currentGenre, currentStatus })
     );
-  } catch (e) {}
+  } catch {}
 }

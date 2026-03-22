@@ -10,8 +10,8 @@ This document describes **only what exists in this repository** as of the last f
 |--------------|---------|-------------------|----------------|----------------------|
 | **Firebase (Firestore)** | Persist watchlists, shared lists, **`titleRegistry`**, user profile (country, list name). | **Client:** Firebase JS SDK v10.7 from `gstatic` CDN in `firebase.js` (`getFirestore`, `doc`, `getDoc`, `setDoc`, etc.). **Server:** `firebase-admin` in Netlify functions and Node scripts. | **Client:** Firebase Auth user JWT (SDK attaches to requests per Firestore rules). **Server:** Service account JSON (base64) for Admin SDK. | **Client:** None — public web config lives in `config/firebase.js` (imported by `firebase.js`; see Section 7). **Server/scripts:** `FIREBASE_SERVICE_ACCOUNT` (base64 JSON). Scripts may also use `serviceAccountKey.json` in project root (per README / `check-upcoming.mjs`). |
 | **Firebase Auth** | Google Sign-In for end users. | **Client:** `firebase-auth.js` from CDN — `signInWithPopup`, `GoogleAuthProvider`, `onAuthStateChanged`. | OAuth via Google; Firebase-issued ID tokens. | Same as Firebase — `config/firebase.js`. |
-| **Firebase Analytics** | Analytics instance created on app init. | **Client:** `getAnalytics(app)` in `firebase.js`. | Inherits Firebase web app setup. | Defined in `config/firebase.js`. |
-| **The Movie Database (TMDB)** | Resolve IMDb id → TMDB id; poster; genres/year; **YouTube trailer key** from appended `videos`; **watch providers** by region. | **REST:** `https://api.themoviedb.org/3/...` via Node `https.get` in `netlify/functions/add-from-imdb.js`. Same pattern in maintenance scripts (e.g. `scripts/sync-services-from-tmdb.js`, `check-upcoming.mjs` uses `fetch`). **Not** called from the browser in `app.js`. | API key query parameter `api_key`. | `TMDB_API_KEY` in Netlify env; `.env` for local scripts / `check-upcoming.mjs`. |
+| **Firebase Analytics** | Optional; skipped when **offline**, in **Vite dev** (`import.meta.env.DEV`), or when blocked. | **Client:** `firebase.js` dynamically imports Analytics only if `shouldLoadWebAnalytics()` passes, then `isSupported()` + `getAnalytics(app)` (avoids Installations `app-offline` noise locally). | Inherits Firebase web app setup. | Defined in `config/firebase.js`. |
+| **The Movie Database (TMDB)** | Resolve IMDb id → TMDB id; poster; genres/year; **YouTube trailer key** from appended `videos`; **watch providers** by region. | **REST:** `https://api.themoviedb.org/3/...` via Node `https.get` in `netlify/functions/add-from-imdb.js`. Same pattern in maintenance scripts (e.g. `scripts/sync-services-from-tmdb.js`, `check-upcoming.mjs` uses `fetch`). **Not** called from the browser watchlist UI. | API key query parameter `api_key`. | `TMDB_API_KEY` in Netlify env; `.env` for local scripts / `check-upcoming.mjs`. |
 | **OMDb** | Title metadata by IMDb id; disambiguate movie vs TV when TMDB returns both; fallback row when TMDB has no match. | **REST:** `https://www.omdbapi.com/?i=...&apikey=...` in `add-from-imdb.js` and various scripts. | API key query parameter. | `OMDB_API_KEY` (Netlify + local scripts per README / `.env.example`). |
 | **YouTube** | Trailer playback in modal via iframe embed. | **Browser:** `https://www.youtube-nocookie.com/embed/{youtubeId}?...` and link to `youtube.com/watch`. | None for embed (public video ids). | None. |
 | **Google Fonts** | UI typography (Bebas Neue, DM Sans). | `<link href="https://fonts.googleapis.com/...">` in HTML. | None. | None. |
@@ -24,12 +24,10 @@ This document describes **only what exists in this repository** as of the last f
 ## Section 2: Architecture Overview
 
 **Browser (client-side)**  
-- Serves as a mostly static “single page” experience: `index.html` loads `app.js` (ES module), `styles.css`, and Google Fonts.  
-- `firebase.js` initializes Firebase App, Auth, Firestore, and Analytics using CDN modules.  
-- `app.js` drives the watchlist UI: list selector, filters, cards, modal with YouTube iframe, sign-in UI, list management modals, country picker (data from `countries.js`).  
-- All Firestore reads/writes for normal usage happen **from the client** with the end user’s Firebase Auth session, subject to `firestore.rules`.  
-- `add.html` + `add.js` run a small flow for bookmarklet/embed: wait for auth, POST to `/.netlify/functions/add-from-imdb` with `Authorization: Bearer <idToken>`, show result; optionally `postMessage` to opener/parent.  
-- `bookmarklet.js` (hosted on the site) is injected on **imdb.com**; it opens the hosted `add.html` in a popup and listens for `postMessage` results. Hardcodes production origin `https://watchlist-trailers.netlify.app` for the add URL and message origin checks.
+- **Watchlist UI — React + Vite:** Root **`index.html`** loads **`#root`** and **`/src/main.jsx`**. **`npm run dev:react`** / **`npm run build:react`**; Netlify publishes **`dist/`** from **`npm run build:react`** (`netlify.toml`). **`firebase.js`** (CDN SDK) initializes App, Auth, Firestore, optional Analytics; list CRUD uses the same module. **`src/store/useAppStore.js`** (Zustand) + **`src/store/watchlistConstants.js`** (status labels, SVG snippets). **`src/hooks/useWatchlist.js`** (TanStack Query) loads lists; **`useAuthUser.js`** → **`onAuthStateChanged`**. **`WatchlistPage.jsx`**: list selector, **`ManageListsModal`**, auth menu, **`CountryModal`** / **`ListNameModal`**, **`UpcomingAlertsBar`**, filters, **`TitleGrid`** / **`TitleCard`**, **`TrailerModal`** (incl. **`src/lib/listsContainingMovie.js`**). Session restore **`useWatchlistSessionRestore.js`**; **`src/lib/watchlistFilters.js`**, **`titleListActions.js`**, **`bookmarkletCookie.js`**, **`storage.js`**, **`movieDisplay.js`** (service chips + trailer id helpers for cards/modal). **`src/main.jsx`** warns if **`#root`** is missing.
+- All routine Firestore access uses the **signed-in user’s** Firebase session and **`firestore.rules`**.  
+- **`add.html`** + **`add.js`** — bookmarklet popup: auth, POST **`/.netlify/functions/add-from-imdb`**, `postMessage` handshake.  
+- **`bookmarklet.js`** on **imdb.com** opens hosted **`add.html`**. Production origin is hardcoded in **`bookmarklet.js`** (see file).
 
 **Netlify**  
 - **Static hosting** for HTML, CSS, JS, SVG assets.  
@@ -45,9 +43,9 @@ This document describes **only what exists in this repository** as of the last f
 - **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: **`titleRegistry` read for signed-in users, no client writes**; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`); `upcomingAlerts` read for any signed-in user, no client writes. (Legacy **`catalog`** is removed from rules; delete leftover docs with `scripts/delete-legacy-catalog.mjs`.)
 
 **External APIs — where invoked**  
-- **TMDB / OMDb:** from **`netlify/functions/add-from-imdb.js`** (POST) and from **local Node scripts**, not from the deployed SPA.  
+- **TMDB / OMDb:** from **`netlify/functions/add-from-imdb.js`** (POST) and from **local Node scripts**, not from the deployed watchlist client.  
 - **YouTube:** browser loads embed URLs; no YouTube Data API key in repo.  
-- **No** TMDB calls from `app.js` for watch providers or enrichment at runtime; chips use data already on each item (`services`, `servicesByRegion`).
+- **No** TMDB calls from the watchlist UI for watch providers or enrichment at runtime; chips use data already on each item (`services`, `servicesByRegion`).
 
 ---
 
@@ -145,7 +143,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `sequelTmdbId` | `number` or null | For `sequel` alerts. |
 | `detectedAt` | `timestamp` | Server time on upsert. |
 
-**Client:** `firebase.js` → `fetchUpcomingAlertsForItems` (chunks `catalogTmdbId` / `sequelTmdbId` `in` queries), `dismissUpcomingAlert` merges into `users/{uid}.upcomingDismissals`. `app.js` shows pills for the **currently loaded list** only, max 3 + expand, sorted by `airDate`. Sync never writes undated/TBA rows; the client drops any alert without a parseable date (legacy junk). Each pill includes **Add to calendar** (all-day **`.ics`**) when `airDate` is a normal `YYYY-MM-DD`.
+**Client:** `firebase.js` → `fetchUpcomingAlertsForItems` (chunks `catalogTmdbId` / `sequelTmdbId` `in` queries), `dismissUpcomingAlert` merges into `users/{uid}.upcomingDismissals`. **`UpcomingAlertsBar.jsx`** shows pills for the **currently loaded list** only, max 3 + expand, sorted by `airDate`. Sync never writes undated/TBA rows; the client drops any alert without a parseable date (legacy junk). Each pill includes **Add to calendar** (all-day **`.ics`**) when `airDate` is a normal `YYYY-MM-DD`.
 
 **Admin queries:** Composite `(catalogTmdbId, media)` may be required for `deleteStaleAlertsForRow`; Firebase console may prompt to create an index on first scheduled run.
 
@@ -182,13 +180,13 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
 ### 1. Sign in flow
 
-1. User opens `index.html` on the deployed or local origin.  
+1. User opens the site (**deployed `dist/` from Netlify**, or **`npm run dev:react`** locally).  
 2. User clicks “Sign in with Google”.  
-3. `app.js` calls `signInWithPopup(auth, GoogleAuthProvider)` (custom parameter `prompt: "select_account"`).  
+3. **`src/App.jsx`** calls `signInWithPopup(auth, GoogleAuthProvider)` (custom parameter `prompt: "select_account"`).  
 4. Firebase Auth completes Google OAuth; `onAuthStateChanged` fires with a user.  
-5. `updateAuthUI` shows avatar UI; `init()` handler continues: loads `getUserProfile`, may force **country modal** if `country` missing, loads `getSharedListsForUser`, `getPersonalLists`, resolves `?join=` or last list from URL/localStorage.  
-6. `loadList` reads personal or shared list from Firestore via `getPersonalListMovies` / `getSharedListMovies`.  
-7. `buildCards()` renders grid; filters restored from `localStorage` per uid.
+5. **`WatchlistPage`** loads profile / lists via React Query and **`useWatchlistSessionRestore`** (`?join=`, last list, filter prefs from **`storage.js`**).  
+6. List data: `getPersonalListMovies` / `getSharedListMovies` via **`firebase.js`**.  
+7. **`TitleGrid`** / **`TitleCard`** render the grid; filters persisted per uid in **`localStorage`**.
 
 ### 2. Add title via IMDb bookmarklet flow
 
@@ -228,7 +226,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
 **Join via link:**  
 1. User opens site with `?join={listId}` while signed in.  
-2. `app.js` `POST`s `/.netlify/functions/join-shared-list` with JSON `{ listId }`, `credentials: "include"` (cookie `bookmarklet_token` may be sent, or logic also supports Bearer — join function reads cookie or `Authorization` header).  
+2. Client `POST`s `/.netlify/functions/join-shared-list` with JSON `{ listId }`, `credentials: "include"` — **`useWatchlistSessionRestore.js`** (`?join=` on load) or **`ManageListsModal.jsx`** (paste URL). Function reads Firebase ID token from cookie and/or `Authorization` header.  
 3. Function verifies Firebase ID token, `arrayUnion(uid)` on `members` if not already present (fails with **400** if the list document has no non-empty `name` and the user was not already a member).  
 4. Client refreshes shared lists, switches `currentListMode` to that shared list.
 
@@ -242,8 +240,8 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
 1. **At add time:** User’s `country` on `users/{uid}` is read in `add.js` as `watch_region` and sent to `add-from-imdb`.  
 2. **Server:** `enrichFromTmdb` fetches TMDB watch providers for that region and stores provider **names** on the new/merged item as `services` (array of strings).  
-3. **At display time:** `app.js` `servicesForMovie(m, userCountryCode)` prefers `m.servicesByRegion[countryCode]`, else falls back to `m.services`.  
-4. **Persisting region-specific cache:** There is no client helper in the SPA; `services` / `servicesByRegion` are set at add time (Netlify) or by scripts, not by `app.js`.
+3. **At display time:** **`servicesForMovie(m, userCountryCode)`** in **`src/lib/movieDisplay.js`** (used by **`TitleCard`** / **`TrailerModal`**) prefers `m.servicesByRegion[countryCode]`, else `m.services`.  
+4. **Persisting region-specific cache:** no watchlist client helper; `services` / `servicesByRegion` are set at add time (Netlify) or by scripts.
 
 ---
 
@@ -251,8 +249,10 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
 | Name / file | Responsibility | Reads Firestore | Writes Firestore | External APIs |
 |-------------|----------------|-----------------|------------------|---------------|
-| `index.html` | Shell markup, modals, header, grid container. | — | — | Google Fonts |
-| `app.js` | Watchlist UI, auth chrome, list switching, modal, filters, invite copy/join, bookmarklet link builder. | Via `firebase.js` helpers (`getPersonalListMovies`, `getSharedListMovies`, `setStatus`, etc.) | Same | `fetch` → `join-shared-list`; YouTube embed URLs; clipboard API |
+| `index.html` / `src/main.jsx` | Vite entry; mounts React (`App` → `WatchlistPage`). | — | — | Google Fonts (from HTML) |
+| `src/components/*.jsx`, `src/hooks/*` | React watchlist UI (see Architecture). | Via `firebase.js` | Via `firebase.js` | `fetch` → `join-shared-list` where used; YouTube embeds; clipboard |
+| `src/store/watchlistConstants.js` | Status labels, checkmark/upcoming SVG snippets, `GENRE_LIMIT`. | — | — | — |
+| `src/lib/movieDisplay.js` | `servicesForMovie`, `renderServiceChips`, `hasPlayableTrailerYoutubeId`. | — | — | — |
 | `config/firebase.js` | Public Firebase Web SDK config object (`firebaseConfig`). | — | — | — |
 | `firebase.js` | Imports config, initializes App/Auth/Firestore/Analytics; **`titleRegistry`** hydration, user/shared/personal list CRUD, status keys. | `titleRegistry`, `users/*`, `sharedLists/*`, `personalLists/*` | Same | Firebase SDK only (Gstatic CDN) |
 | `countries.js` | Static ISO country list + flags for country modal. | — | — | — |
@@ -276,7 +276,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 ```mermaid
 flowchart LR
   subgraph Browser["Browser (user)"]
-    SPA["index.html + app.js"]
+    SPA["Watchlist UI (React dist / Vite dev)"]
     ADD["add.html + add.js"]
     BM["bookmarklet on imdb.com"]
   end
@@ -355,7 +355,7 @@ sequenceDiagram
   User->>SPA: Open / refresh watchlist
   SPA->>FS: getPersonalListMovies / getSharedListMovies
   FS-->>SPA: items with thumb, youtubeId, services...
-  SPA-->>User: buildCards (grid)
+  SPA-->>User: TitleGrid / list render
 ```
 
 ### Sign in → watchlist load (sequence diagram)
@@ -363,7 +363,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   participant User
-  participant App as app.js
+  participant App as Watchlist UI
   participant Auth as Firebase Auth Google
   participant FS as Firestore
 
@@ -382,7 +382,7 @@ sequenceDiagram
   App->>FS: getPersonalListMovies or getSharedListMovies
   FS-A->>FS: getDoc titleRegistry/* (hydrate list rows)
   FS-->>App: items + status keys applied in memory
-  App->>User: buildCards + filters
+  App->>User: Grid + filters UI
 ```
 
 ### Firestore ER (entity relationship)
@@ -462,7 +462,7 @@ flowchart TD
 
 ## Section 7: Open Questions & Gaps
 
-1. **Web app config:** Public Firebase web SDK settings live in **`config/firebase.js`** and are imported by `firebase.js`. They are not loaded from `.env` (static site, no build step).
+1. **Web app config:** Public Firebase web SDK settings live in **`config/firebase.js`** and are imported by `firebase.js`. They are not loaded from `.env` at build time (values are committed for the client bundle).
 
 2. **Secrets in repository:** Full Firebase web config (including `apiKey`) is committed. This is normal for Firebase client apps but means the document is not “secret-free”; `FIREBASE_SERVICE_ACCOUNT` correctly stays out of git.
 
@@ -474,13 +474,11 @@ flowchart TD
 
 6. **Shared list join token:** Join uses the same `bookmarklet_token` cookie / Bearer token as add; there is **no separate invite secret** — anyone with a valid account and a `listId` could join if they guess/obtain the id (predictability of random ids should be considered).
 
-7. **`join-shared-list` CORS headers:** Response includes `Access-Control-Allow-Origin` reflecting request origin; **POST from browser** with credentials is how `app.js` uses it; behavior depends on Netlify origin alignment.
+7. **`join-shared-list` CORS headers:** Response includes `Access-Control-Allow-Origin` reflecting request origin; **POST from browser** with credentials is how the watchlist client calls it; behavior depends on Netlify origin alignment.
 
 8. **Composite indexes:** `array-contains` query on `sharedLists` has **no committed `firestore.indexes.json`**; if Firebase ever requires a composite index for an expanded query, it would be created in console only.
 
-9. **`hideCountryModal` / `countryModalResolve`:** `app.js` contains `hideCountryModal` assigning `countryModalResolve = null` — small dead/legacy fragment next to `showCountryModal` Promise flow (Country save uses `saveBtn.onclick` path).
-
-10. **“Recently Added” tab:** Driven by **order of items in the loaded array** (last N in array), not a server-side `addedAt` field — reordering or merge logic can change meaning without a timestamp.
+9. **“Recently Added” tab:** Driven by **order of items in the loaded array** (last N in array), not a server-side `addedAt` field — reordering or merge logic can change meaning without a timestamp.
 
 ---
 

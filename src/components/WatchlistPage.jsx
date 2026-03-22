@@ -1,0 +1,334 @@
+import { useMemo, useEffect, useState, useRef } from "react";
+import {
+  auth,
+  fbSignOut,
+  getUserProfile,
+  GoogleAuthProvider,
+  renamePersonalList,
+  setUserCountry,
+  signInWithPopup,
+} from "../../firebase.js";
+import { COUNTRIES } from "../../countries.js";
+import { useAppStore } from "../store/useAppStore.js";
+import {
+  usePersonalLists,
+  useSharedLists,
+  useWatchlistMovies,
+  invalidateUserListQueries,
+} from "../hooks/useWatchlist.js";
+import { useWatchlistSessionRestore } from "../hooks/useWatchlistSessionRestore.js";
+import { filterTitles, isGenrePresentInMovies } from "../lib/watchlistFilters.js";
+import { ListSelector, CopyInviteButton } from "./ListSelector.jsx";
+import { WatchlistToolbar } from "./WatchlistToolbar.jsx";
+import { TitleGrid } from "./TitleGrid.jsx";
+import { TrailerModal } from "./TrailerModal.jsx";
+import { ManageListsModal } from "./ManageListsModal.jsx";
+import { CountryModal } from "./CountryModal.jsx";
+import { ListNameModal } from "./modals/ListNameModal.jsx";
+import { UpcomingAlertsBar } from "./UpcomingAlertsBar.jsx";
+import { useQueryClient } from "@tanstack/react-query";
+
+/** @param {{ user: { uid: string, email?: string, displayName?: string, photoURL?: string } }} props */
+export function WatchlistPage({ user }) {
+  const queryClient = useQueryClient();
+  const personalQ = usePersonalLists(user.uid, { enabled: true });
+  const sharedQ = useSharedLists(user.uid, { enabled: true });
+  const currentListMode = useAppStore((s) => s.currentListMode);
+  const currentFilter = useAppStore((s) => s.currentFilter);
+  const currentGenre = useAppStore((s) => s.currentGenre);
+  const currentStatus = useAppStore((s) => s.currentStatus);
+  const userCountryCode = useAppStore((s) => s.userCountryCode);
+  const setUserCountryCode = useAppStore((s) => s.setUserCountryCode);
+
+  const [manageListsOpen, setManageListsOpen] = useState(false);
+  const [authMenuOpen, setAuthMenuOpen] = useState(false);
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+  const [onboardingCountry, setOnboardingCountry] = useState(false);
+  const [onboardingListName, setOnboardingListName] = useState(false);
+
+  const authWrapRef = useRef(null);
+
+  const listsReady = personalQ.isFetched && sharedQ.isFetched;
+  useWatchlistSessionRestore(user, personalQ.data ?? [], sharedQ.data ?? [], listsReady);
+
+  const onboardingDone = useRef(false);
+
+  async function continueProfileOnboarding() {
+    const p = await getUserProfile(user.uid);
+    if (p?.country) setUserCountryCode(p.country);
+    if (!String(p.listName || "").trim()) {
+      setOnboardingListName(true);
+    } else {
+      onboardingDone.current = true;
+    }
+  }
+
+  useEffect(() => {
+    if (!user?.uid || !listsReady || !personalQ.isSuccess || onboardingDone.current) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const p = await getUserProfile(user.uid);
+        if (cancelled) return;
+        if (p?.country) setUserCountryCode(p.country);
+        if (!p?.country) {
+          setOnboardingCountry(true);
+          return;
+        }
+        if (!String(p.listName || "").trim()) {
+          setOnboardingListName(true);
+          return;
+        }
+        onboardingDone.current = true;
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user.uid, listsReady, personalQ.isSuccess, setUserCountryCode]);
+
+  const moviesQ = useWatchlistMovies(user.uid, currentListMode, {
+    enabled: listsReady,
+  });
+
+  const allMovies = moviesQ.data ?? [];
+
+  useEffect(() => {
+    if (!currentGenre) return;
+    if (!isGenrePresentInMovies(allMovies, currentGenre)) {
+      useAppStore.getState().setCurrentGenre("");
+    }
+  }, [allMovies, currentGenre]);
+
+  const visibleMovies = useMemo(
+    () => filterTitles(allMovies, { currentFilter, currentGenre, currentStatus }),
+    [allMovies, currentFilter, currentGenre, currentStatus]
+  );
+
+  const personalLists = personalQ.data ?? [];
+  const sharedLists = sharedQ.data ?? [];
+
+  const initial = (user.displayName || user.email || "?").charAt(0).toUpperCase();
+  const mainLoading = !listsReady || moviesQ.isPending;
+
+  const countryLabelRow = useMemo(() => {
+    const c = COUNTRIES.find((x) => x.code === userCountryCode);
+    return c ? `${c.flag} ${c.name}` : userCountryCode;
+  }, [userCountryCode]);
+
+  useEffect(() => {
+    if (!authMenuOpen) return;
+    function onDoc(e) {
+      if (!authWrapRef.current?.contains(e.target)) setAuthMenuOpen(false);
+    }
+    document.addEventListener("click", onDoc);
+    return () => document.removeEventListener("click", onDoc);
+  }, [authMenuOpen]);
+
+  useEffect(() => {
+    if (!authMenuOpen) return;
+    function onKey(e) {
+      if (e.key === "Escape") setAuthMenuOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [authMenuOpen]);
+
+  return (
+    <>
+      <header>
+        <h1>
+          <span id="header-title">My</span> <span>Watchlist</span>
+        </h1>
+        <div className="header-filters">
+          <div className="filters">
+            <div className="header-left">
+              <div className="list-selector-wrap" id="list-selector-wrap" style={{ display: "flex" }}>
+                {listsReady ? (
+                  <>
+                    <ListSelector
+                      user={user}
+                      personalLists={personalLists}
+                      sharedLists={sharedLists}
+                      onManageLists={() => setManageListsOpen(true)}
+                    />
+                    <CopyInviteButton currentListMode={currentListMode} />
+                  </>
+                ) : (
+                  <span className="custom-dropdown-value" style={{ opacity: 0.6 }}>
+                    Loading lists…
+                  </span>
+                )}
+              </div>
+            </div>
+            <div id="auth-ui" className="auth-ui" ref={authWrapRef}>
+              <div id="signed-in" className="auth-avatar-wrap" style={{ display: "flex" }}>
+                <button
+                  type="button"
+                  className="auth-avatar"
+                  id="auth-avatar-btn"
+                  aria-haspopup="menu"
+                  aria-expanded={authMenuOpen}
+                  title={user.email || user.displayName || "Signed in"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAuthMenuOpen((o) => !o);
+                  }}
+                >
+                  {user.photoURL ? (
+                    <img className="auth-avatar-img" id="auth-avatar-img" src={user.photoURL} alt="" />
+                  ) : (
+                    <span className="auth-avatar-initial" id="auth-avatar-initial">
+                      {initial}
+                    </span>
+                  )}
+                </button>
+                <div
+                  className="auth-dropdown"
+                  id="auth-dropdown"
+                  role="menu"
+                  aria-hidden={authMenuOpen ? "false" : "true"}
+                >
+                  <button
+                    type="button"
+                    className="auth-dropdown-item"
+                    role="menuitem"
+                    id="auth-country-btn"
+                    onClick={() => {
+                      setAuthMenuOpen(false);
+                      setCountryPickerOpen(true);
+                    }}
+                  >
+                    Country: {countryLabelRow}
+                  </button>
+                  <button
+                    type="button"
+                    className="auth-dropdown-item"
+                    role="menuitem"
+                    id="auth-switch-btn"
+                    onClick={async () => {
+                      setAuthMenuOpen(false);
+                      await fbSignOut(auth);
+                      try {
+                        const provider = new GoogleAuthProvider();
+                        provider.setCustomParameters({ prompt: "select_account" });
+                        await signInWithPopup(auth, provider);
+                      } catch (err) {
+                        if (
+                          err?.code !== "auth/cancelled-popup-request" &&
+                          err?.code !== "auth/popup-closed-by-user"
+                        ) {
+                          console.error(err);
+                        }
+                      }
+                    }}
+                  >
+                    Switch account
+                  </button>
+                  <button
+                    type="button"
+                    className="auth-dropdown-item"
+                    role="menuitem"
+                    id="auth-signout-btn"
+                    onClick={() => fbSignOut(auth)}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {!mainLoading && !moviesQ.isError ? (
+        <UpcomingAlertsBar user={user} movies={allMovies} />
+      ) : null}
+
+      <main className="content">
+        {mainLoading ? (
+          <div className="grid" id="grid">
+            <div className="empty-state">Loading…</div>
+          </div>
+        ) : moviesQ.isError ? (
+          <div className="grid" id="grid">
+            <div className="empty-state">Could not load your list.</div>
+          </div>
+        ) : (
+          <>
+            {allMovies.length > 0 ? (
+              <WatchlistToolbar
+                user={user}
+                allMovies={allMovies}
+                visibleCount={visibleMovies.length}
+              />
+            ) : null}
+            <TitleGrid
+              user={user}
+              visibleMovies={visibleMovies}
+              currentStatus={currentStatus}
+              totalLoaded={allMovies.length}
+            />
+          </>
+        )}
+      </main>
+
+      <TrailerModal user={user} />
+
+      {listsReady ? (
+        <ManageListsModal
+          user={user}
+          open={manageListsOpen}
+          onClose={() => setManageListsOpen(false)}
+          personalLists={personalLists}
+          sharedLists={sharedLists}
+        />
+      ) : null}
+
+      <CountryModal
+        open={countryPickerOpen}
+        initialCode={userCountryCode}
+        allowCancel
+        onCancel={() => setCountryPickerOpen(false)}
+        onSave={async (code, name) => {
+          await setUserCountry(user.uid, code, name);
+          setUserCountryCode(code);
+          setCountryPickerOpen(false);
+          await invalidateUserListQueries(queryClient, user.uid);
+        }}
+      />
+
+      <CountryModal
+        open={onboardingCountry}
+        initialCode="IL"
+        allowCancel={false}
+        onSave={async (code, name) => {
+          await setUserCountry(user.uid, code, name);
+          setUserCountryCode(code);
+          setOnboardingCountry(false);
+          await continueProfileOnboarding();
+        }}
+      />
+
+      <ListNameModal
+        open={onboardingListName}
+        title="Name your main list"
+        placeholder="e.g. My weekend watchlist"
+        allowCancel={false}
+        onCancel={() => setOnboardingListName(false)}
+        onSave={async (name) => {
+          try {
+            await renamePersonalList(user.uid, "personal", name);
+            setOnboardingListName(false);
+            onboardingDone.current = true;
+            await invalidateUserListQueries(queryClient, user.uid);
+          } catch (e) {
+            window.alert(e?.message || "Could not save your main list name. Reload and try again.");
+          }
+        }}
+      />
+    </>
+  );
+}
