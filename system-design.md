@@ -460,7 +460,7 @@ flowchart TD
   M -->|yes| N{uid in members?}
   N -->|no| X403[403]
   N -->|yes| P[Dedupe by imdb or title+year append items]
-  M -->|no| Q[users/uid/personalLists/{id} items merge or append]
+  M -->|no| Q[personalLists doc under users/uid — merge or append items]
   OMDbOnly --> Q
   P --> R[200 success]
   Q --> R
