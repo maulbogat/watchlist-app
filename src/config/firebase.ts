@@ -3,18 +3,15 @@
  */
 import type { FirebaseOptions } from "firebase/app";
 
-const required = [
-  "VITE_FIREBASE_API_KEY",
-  "VITE_FIREBASE_AUTH_DOMAIN",
-  "VITE_FIREBASE_PROJECT_ID",
-  "VITE_FIREBASE_APP_ID",
-] as const;
-
-for (const key of required) {
-  if (!import.meta.env[key]) {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-}
+const DEFAULT_FIREBASE_WEB_CONFIG = {
+  apiKey: "AIzaSyDKnQufhinuv-jKXNOyVM_mQDmRpdOD0VA",
+  authDomain: "movie-trailer-site.firebaseapp.com",
+  projectId: "movie-trailer-site",
+  storageBucket: "movie-trailer-site.firebasestorage.app",
+  messagingSenderId: "760692399711",
+  appId: "1:760692399711:web:322f98f5fe127aa5f2c5ea",
+  measurementId: "G-4799K3WXK4",
+} as const;
 
 function cleanEnv(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -35,13 +32,22 @@ function normalizeAuthDomain(value: unknown): string {
   return v;
 }
 
+function isMaskedOrInvalid(value: string): boolean {
+  return !value || value.includes("*");
+}
+
+function resolveString(raw: unknown, fallback: string): string {
+  const v = cleanEnv(raw);
+  return isMaskedOrInvalid(v) ? fallback : v;
+}
+
 function resolveAuthDomain(rawAuthDomain: unknown, rawProjectId: unknown): string {
-  const projectId = cleanEnv(rawProjectId);
+  const projectId = resolveString(rawProjectId, DEFAULT_FIREBASE_WEB_CONFIG.projectId);
   const authDomain = normalizeAuthDomain(rawAuthDomain);
   const safeProjectId =
     projectId && !projectId.includes("*") && /^[a-z0-9-]+$/i.test(projectId)
       ? projectId
-      : "movie-trailer-site";
+      : DEFAULT_FIREBASE_WEB_CONFIG.projectId;
   const fallback = `${safeProjectId}.firebaseapp.com`;
   // Prefer deterministic project-based authDomain in production to avoid bad env values.
   if (import.meta.env.PROD) return fallback;
@@ -50,14 +56,17 @@ function resolveAuthDomain(rawAuthDomain: unknown, rawProjectId: unknown): strin
   return authDomain;
 }
 
-const projectId = cleanEnv(import.meta.env.VITE_FIREBASE_PROJECT_ID);
+const projectId = resolveString(import.meta.env.VITE_FIREBASE_PROJECT_ID, DEFAULT_FIREBASE_WEB_CONFIG.projectId);
 
 export const firebaseConfig: FirebaseOptions = {
-  apiKey: cleanEnv(import.meta.env.VITE_FIREBASE_API_KEY),
+  apiKey: resolveString(import.meta.env.VITE_FIREBASE_API_KEY, DEFAULT_FIREBASE_WEB_CONFIG.apiKey),
   authDomain: resolveAuthDomain(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, projectId),
   projectId,
-  storageBucket: cleanEnv(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET),
-  messagingSenderId: cleanEnv(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID),
-  appId: cleanEnv(import.meta.env.VITE_FIREBASE_APP_ID),
-  measurementId: cleanEnv(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID),
+  storageBucket: resolveString(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, DEFAULT_FIREBASE_WEB_CONFIG.storageBucket),
+  messagingSenderId: resolveString(
+    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    DEFAULT_FIREBASE_WEB_CONFIG.messagingSenderId
+  ),
+  appId: resolveString(import.meta.env.VITE_FIREBASE_APP_ID, DEFAULT_FIREBASE_WEB_CONFIG.appId),
+  measurementId: resolveString(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, DEFAULT_FIREBASE_WEB_CONFIG.measurementId),
 };
