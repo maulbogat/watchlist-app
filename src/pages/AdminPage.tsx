@@ -101,6 +101,10 @@ type ServerEnvResponse = {
   error?: string;
 };
 
+type MaybeSelectable<T> = T & {
+  select?: (...fields: string[]) => T;
+};
+
 function toEpochMs(value: unknown): number | null {
   if (value == null) return null;
   if (value instanceof Date) return value.getTime();
@@ -150,7 +154,10 @@ export function AdminPage() {
         const totalTitlesSnap = await getCountFromServer(titleRegistryRef);
         base.totalTitles = totalTitlesSnap.data().count;
 
-        const registrySnap = await getDocs(titleRegistryRef);
+        const projectedRegistryRef =
+          (titleRegistryRef as MaybeSelectable<typeof titleRegistryRef>).select?.("tmdbId", "youtubeId") ??
+          titleRegistryRef;
+        const registrySnap = await getDocs(projectedRegistryRef);
         let missingTmdbId = 0;
         let missingYoutubeId = 0;
         registrySnap.forEach((d) => {
@@ -174,7 +181,10 @@ export function AdminPage() {
     enabled: !authLoading && userIsAdmin,
     queryFn: async () => {
       const db = getFirestore();
-      const snap = await getDocs(collection(db, "upcomingAlerts"));
+      const upcomingRef = collection(db, "upcomingAlerts");
+      const projectedUpcomingRef =
+        (upcomingRef as MaybeSelectable<typeof upcomingRef>).select?.("expiresAt", "detectedAt") ?? upcomingRef;
+      const snap = await getDocs(projectedUpcomingRef);
       const now = Date.now();
       let activeAlerts = 0;
       let latestDetectedAt: number | null = null;

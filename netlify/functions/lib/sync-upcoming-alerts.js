@@ -127,7 +127,11 @@ function registryDocToRow(data) {
  * @returns {Promise<FirebaseFirestore.QuerySnapshot>}
  */
 async function fetchTitleRegistryPage(db, afterDocId, pageSize) {
-  let q = db.collection("titleRegistry").orderBy("__name__").limit(pageSize);
+  let q = db
+    .collection("titleRegistry")
+    .select("tmdbId", "tmdbMedia", "type", "title")
+    .orderBy("__name__")
+    .limit(pageSize);
   if (afterDocId) {
     const afterSnap = await db.collection("titleRegistry").doc(afterDocId).get();
     if (afterSnap.exists) q = q.startAfter(afterSnap);
@@ -258,7 +262,7 @@ async function deleteStaleAlertsForRow(db, catalogTmdbId, media, activeDocIds) {
  */
 async function deleteExpiredAlerts(db) {
   const today = new Date().toISOString().slice(0, 10);
-  const snap = await db.collection(COLLECTION).where("expiresAt", "<", today).get();
+  const snap = await db.collection(COLLECTION).select("expiresAt").where("expiresAt", "<", today).get();
   if (snap.empty) return 0;
   let deleted = 0;
   let batch = db.batch();
@@ -289,7 +293,7 @@ async function pruneAlertsOutsideCatalog(db, rowsOrSet) {
       : new Set(
           (Array.isArray(rowsOrSet) ? rowsOrSet : []).map((r) => `${r.tmdbId}|${r.isTv ? "tv" : "movie"}`)
         );
-  const snap = await db.collection(COLLECTION).get();
+  const snap = await db.collection(COLLECTION).select("catalogTmdbId", "media").get();
   if (snap.empty) return 0;
   let removed = 0;
   let batch = db.batch();
