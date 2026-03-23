@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { saveLastList } from "../lib/storage.js";
 import { displayListName } from "../lib/utils.js";
+import { logEvent } from "../lib/axiom-logger.js";
 import { useAppStore } from "../store/useAppStore.js";
 import { getCurrentListLabel, getCurrentListValue } from "../data/lists.js";
 import type { ListMode, PersonalList, SharedList } from "../types/index.js";
@@ -66,6 +67,13 @@ export function ListSelector({ personalLists, sharedLists, onManageLists }: List
     }
     setCurrentListMode(mode);
     saveLastList(currentUser, mode);
+    void logEvent({
+      type: "user.action",
+      action: "list.switch",
+      listType: typeof mode === "object" ? mode.type : "personal",
+      listId: typeof mode === "object" ? mode.listId : "personal",
+      uid: currentUser?.uid ?? null,
+    }).catch(() => {});
   }
 
   return (

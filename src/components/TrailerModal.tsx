@@ -12,6 +12,7 @@ import {
 } from "../hooks/useMutations.js";
 import { getCurrentListLabel } from "../data/lists.js";
 import { displayListName, errorMessage } from "../lib/utils.js";
+import { logEvent } from "../lib/axiom-logger.js";
 import { getPersonalListMovies, movieKey } from "../firebase.js";
 
 export function TrailerModal() {
@@ -139,6 +140,13 @@ export function TrailerModal() {
         status: st,
       });
       setCurrentModalMovie({ ...m, status: st });
+      void logEvent({
+        type: "user.action",
+        action: "status.change",
+        tmdbId: m.tmdbId ?? null,
+        status: st,
+        uid: currentUser.uid,
+      }).catch(() => {});
     } catch (err: unknown) {
       console.error(err);
       window.alert(errorMessage(err) || "Failed to update.");

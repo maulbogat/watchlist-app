@@ -82,6 +82,10 @@ const SERVICE_LINKS = [
     sublabel: "Chat Thread",
     url: "https://claude.ai/chat/4e4012e1-2d55-45a2-9eba-0876d2ff2d4d",
   },
+  { label: 'Axiom',
+     sublabel: 'Logs & Monitoring', 
+     url: 'https://app.axiom.co' 
+  },
 ] as const;
 
 const ENV_VARS = [
@@ -90,9 +94,11 @@ const ENV_VARS = [
   "VITE_FIREBASE_PROJECT_ID",
   "VITE_FIREBASE_APP_ID",
   "VITE_FIREBASE_MEASUREMENT_ID",
+  'VITE_AXIOM_TOKEN',
+  'VITE_AXIOM_DATASET',
 ] as const;
 
-const SERVER_ENV_VARS = ["TMDB_API_KEY", "OMDB_API_KEY", "FIREBASE_SERVICE_ACCOUNT"] as const;
+const SERVER_ENV_VARS = ["TMDB_API_KEY", "OMDB_API_KEY", "FIREBASE_SERVICE_ACCOUNT", "AXIOM_TOKEN", "AXIOM_DATASET"] as const;
 type ServerEnvVar = (typeof SERVER_ENV_VARS)[number];
 
 type ServerEnvResponse = {
@@ -221,6 +227,8 @@ export function AdminPage() {
         TMDB_API_KEY: Boolean(data.status.TMDB_API_KEY),
         OMDB_API_KEY: Boolean(data.status.OMDB_API_KEY),
         FIREBASE_SERVICE_ACCOUNT: Boolean(data.status.FIREBASE_SERVICE_ACCOUNT),
+        AXIOM_TOKEN: Boolean(data.status.AXIOM_TOKEN),
+        AXIOM_DATASET: Boolean(data.status.AXIOM_DATASET),
       };
     },
   });

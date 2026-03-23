@@ -28,6 +28,7 @@ import type { DocumentData, Firestore } from "firebase/firestore";
 
 import { firebaseConfig } from "./config/firebase.js";
 import { listKey as movieKey } from "./lib/registry-id.js";
+import { logEvent } from "./lib/axiom-logger.js";
 import type {
   FirestoreListRow,
   MediaType,
@@ -465,22 +466,48 @@ async function getSharedList(listId: string): Promise<SharedList | null> {
 }
 
 async function getSharedListsForUser(uid: string): Promise<SharedList[]> {
+  const startedAt = Date.now();
   const q = query(
     collection(db, "sharedLists"),
     where("members", "array-contains", uid)
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => sharedListFromFirestoreDoc(d.id, d.data()));
+  const lists = snap.docs.map((d) => sharedListFromFirestoreDoc(d.id, d.data()));
+  void logEvent({
+    type: "firestore.read",
+    collection: "sharedLists",
+    operation: "list",
+    documentCount: lists.length,
+    durationMs: Date.now() - startedAt,
+    uid,
+  }).catch(() => {});
+  return lists;
 }
 
 async function getSharedListMovies(listId: string): Promise<WatchlistItem[]> {
+  const startedAt = Date.now();
   const data = await getSharedList(listId);
-  if (!data) return [];
+  if (!data) {
+    void logEvent({
+      type: "firestore.read",
+      collection: "sharedLists",
+      documentCount: 0,
+      durationMs: Date.now() - startedAt,
+    }).catch(() => {});
+    return [];
+  }
   const items = Array.isArray(data.items) ? data.items : [];
   const watchedSet = new Set((data.watched ?? []).map((k) => String(k)));
   const maybeLaterSet = new Set((data.maybeLater ?? []).map((k) => String(k)));
   const archiveSet = new Set((data.archive ?? []).map((k) => String(k)));
-  return hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
+  const movies = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
+  void logEvent({
+    type: "firestore.read",
+    collection: "sharedLists",
+    documentCount: movies.length,
+    durationMs: Date.now() - startedAt,
+  }).catch(() => {});
+  return movies;
 }
 
 async function setSharedListStatus(listId: string, key: string, status: string): Promise<void> {
@@ -595,6 +622,7 @@ async function createPersonalList(uid: string, name: string): Promise<string> {
  * Get all personal lists. Never throws - returns default list (virtual id "personal") plus other subcollection lists.
  */
 async function getPersonalLists(uid: string): Promise<PersonalList[]> {
+  const startedAt = Date.now();
   try {
     await migrateLegacyPersonalListIfNeeded(uid);
     const userSnap = await getDoc(doc(db, "users", uid));
@@ -627,9 +655,25 @@ async function getPersonalLists(uid: string): Promise<PersonalList[]> {
     } catch (subErr) {
       console.warn("getPersonalLists subcollection read failed:", subErr);
     }
+    void logEvent({
+      type: "firestore.read",
+      collection: "personalLists",
+      operation: "list",
+      documentCount: lists.length,
+      durationMs: Date.now() - startedAt,
+      uid,
+    }).catch(() => {});
     return lists;
   } catch (e: unknown) {
     console.warn("getPersonalLists failed:", e);
+    void logEvent({
+      type: "firestore.read",
+      collection: "personalLists",
+      operation: "list",
+      documentCount: 1,
+      durationMs: Date.now() - startedAt,
+      uid,
+    }).catch(() => {});
     return [{ id: "personal", name: "", count: 0, isDefault: true }];
   }
 }
@@ -638,10 +682,20 @@ async function getPersonalLists(uid: string): Promise<PersonalList[]> {
  * Get movies for a personal list.
  */
 async function getPersonalListMovies(uid: string, listId: string): Promise<WatchlistItem[]> {
+  const startedAt = Date.now();
   let targetId = listId;
   if (listId === "personal") {
     targetId = await resolveDefaultPersonalListId(uid);
-    if (!targetId) return [];
+    if (!targetId) {
+      void logEvent({
+        type: "firestore.read",
+        collection: "personalLists",
+        documentCount: 0,
+        durationMs: Date.now() - startedAt,
+        uid,
+      }).catch(() => {});
+      return [];
+    }
   }
   try {
     const ref = doc(db, "users", uid, "personalLists", targetId);
@@ -653,9 +707,24 @@ async function getPersonalListMovies(uid: string, listId: string): Promise<Watch
     const watchedSet = new Set((Array.isArray(data.watched) ? data.watched : []).map((k) => String(k)));
     const maybeLaterSet = new Set((Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k)));
     const archiveSet = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
-    return hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
+    const movies = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
+    void logEvent({
+      type: "firestore.read",
+      collection: "personalLists",
+      documentCount: movies.length,
+      durationMs: Date.now() - startedAt,
+      uid,
+    }).catch(() => {});
+    return movies;
   } catch (e: unknown) {
     console.warn("getPersonalListMovies failed:", e);
+    void logEvent({
+      type: "firestore.read",
+      collection: "personalLists",
+      documentCount: 0,
+      durationMs: Date.now() - startedAt,
+      uid,
+    }).catch(() => {});
     return [];
   }
 }
@@ -781,6 +850,7 @@ function listItemToUpcomingPair(
 async function fetchUpcomingAlertsForItems(
   items: readonly WatchlistItem[] | WatchlistItem[] | undefined | null
 ): Promise<UpcomingAlert[]> {
+  const startedAt = Date.now();
   const pairKeys = new Set<string>();
   const tmdbIds = new Set<number>();
   for (const m of items || []) {
@@ -789,7 +859,15 @@ async function fetchUpcomingAlertsForItems(
     pairKeys.add(`${p.tmdbId}|${p.media}`);
     tmdbIds.add(p.tmdbId);
   }
-  if (tmdbIds.size === 0) return [];
+  if (tmdbIds.size === 0) {
+    void logEvent({
+      type: "firestore.read",
+      collection: "upcomingAlerts",
+      documentCount: 0,
+      durationMs: Date.now() - startedAt,
+    }).catch(() => {});
+    return [];
+  }
 
   const ids = [...tmdbIds];
   const CHUNK = 10;
@@ -813,6 +891,12 @@ async function fetchUpcomingAlertsForItems(
     if (a.expiresAt && String(a.expiresAt) < today) continue;
     out.push(upcomingAlertFromMergedDoc(a));
   }
+  void logEvent({
+    type: "firestore.read",
+    collection: "upcomingAlerts",
+    documentCount: out.length,
+    durationMs: Date.now() - startedAt,
+  }).catch(() => {});
   return out;
 }
 

@@ -48,6 +48,9 @@ const { getAuth } = require("firebase-admin/auth");
 const https = require("https");
 const { runSingleTitleSync } = require("./lib/sync-upcoming-alerts");
 const { registryDocIdFromItem, payloadForRegistry, listKey } = require("./lib/registry-id.cjs");
+const { createFunctionLogger } = require("./lib/logger");
+
+const logEvent = createFunctionLogger("add-from-imdb");
 
 /** Same rule as lib/youtube-trailer-id.js (YouTube video id from TMDB). */
 const YOUTUBE_VIDEO_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
@@ -243,9 +246,23 @@ function pickTmdbFindEntry(find, omdbHint) {
  *   services: string[]
  * } | null>}
  */
-async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint) {
+async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint, options = {}) {
+  const onApiCall = typeof options.onApiCall === "function" ? options.onApiCall : null;
   const findUrl = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?external_source=imdb_id&api_key=${apiKey}`;
+  const findStart = Date.now();
   const find = await fetchJson(findUrl);
+  if (onApiCall) {
+    try {
+      onApiCall({
+        endpoint: "/find",
+        imdbId,
+        durationMs: Date.now() - findStart,
+        status: 200,
+      });
+    } catch {
+      // observability must never break flow
+    }
+  }
   const { mediaType, id } = pickTmdbFindEntry(find, omdbHint);
   if (id == null || !mediaType) return null;
 
@@ -377,6 +394,7 @@ async function migrateLegacyPersonalListAdmin(db, uid) {
  */
 exports.handler = async (event, context) => {
   try {
+  logEvent({ type: "function.invoked", trigger: "bookmarklet" });
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(event) };
   }
@@ -426,8 +444,23 @@ exports.handler = async (event, context) => {
 
   let omdbForTmdb = null;
   try {
+    const omdbStart = Date.now();
     omdbForTmdb = await fetchOMDb(nImdb);
+    logEvent({
+      type: "api.call",
+      service: "omdb",
+      imdbId: nImdb,
+      durationMs: Date.now() - omdbStart,
+      status: 200,
+    });
   } catch (e) {
+    logEvent({
+      type: "api.call",
+      service: "omdb",
+      imdbId: nImdb,
+      durationMs: 0,
+      status: 500,
+    });
     omdbForTmdb = null;
   }
 
@@ -437,7 +470,17 @@ exports.handler = async (event, context) => {
   // 1) TMDB from IMDb id: type, poster, genres, year, providers, trailer key
   if (tmdbKey) {
     try {
-      const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion, omdbForTmdb);
+      const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion, omdbForTmdb, {
+        onApiCall: ({ endpoint, imdbId, durationMs, status }) =>
+          logEvent({
+            type: "api.call",
+            service: "tmdb",
+            endpoint,
+            imdbId,
+            durationMs,
+            status,
+          }),
+      });
       if (e) {
         const yt = e.youtubeId;
         movie = {
@@ -460,8 +503,23 @@ exports.handler = async (event, context) => {
   if (!movie) {
     let omdb;
     try {
+      const omdbStart = Date.now();
       omdb = omdbForTmdb || (await fetchOMDb(nImdb));
+      logEvent({
+        type: "api.call",
+        service: "omdb",
+        imdbId: nImdb,
+        durationMs: Date.now() - omdbStart,
+        status: 200,
+      });
     } catch (e) {
+      logEvent({
+        type: "api.call",
+        service: "omdb",
+        imdbId: nImdb,
+        durationMs: 0,
+        status: 500,
+      });
       return jsonRes(502, { ok: false, error: e.message || "Title not found in TMDB or OMDb" }, event);
     }
 
@@ -502,7 +560,14 @@ exports.handler = async (event, context) => {
    */
   async function writeRegistryMerge(mergedMovie) {
     const payload = payloadForRegistry({ ...mergedMovie, registryId });
+    const startedAt = Date.now();
     await regDoc.set(payload, { merge: true });
+    logEvent({
+      type: "firestore.write",
+      collection: "titleRegistry",
+      operation: "set",
+      durationMs: Date.now() - startedAt,
+    });
   }
 
   /**
@@ -593,6 +658,13 @@ exports.handler = async (event, context) => {
     const regSnap = await regDoc.get();
     const mergedRow = { ...(regSnap.exists ? regSnap.data() : {}), ...movie, registryId };
     await syncUpcomingForAddedTitle(mergedRow);
+    logEvent({
+      type: "title.added",
+      imdbId: nImdb,
+      tmdbId: movie.tmdbId ?? null,
+      title: movie.title,
+      listType: "shared",
+    });
     return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to shared list` }, event);
   }
 
@@ -671,11 +743,19 @@ exports.handler = async (event, context) => {
     const mergedRow = { ...(regSnap.exists ? regSnap.data() : {}), ...movie, registryId };
     await syncUpcomingForAddedTitle(mergedRow);
   }
+  logEvent({
+    type: "title.added",
+    imdbId: nImdb,
+    tmdbId: movie.tmdbId ?? null,
+    title: movie.title,
+    listType: "personal",
+  });
 
   return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to To Watch` }, event);
   } catch (err) {
     const msg = presentableErrorMessage(err);
     console.error("add-from-imdb fatal:", err);
+    logEvent({ type: "function.error", error: msg });
     return jsonRes(500, { ok: false, error: msg }, event);
   }
 };

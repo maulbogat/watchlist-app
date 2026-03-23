@@ -37,6 +37,9 @@
 const { getFirestore } = require("firebase-admin/firestore");
 const { getAdminApp, runUpcomingSyncCore } = require("./lib/execute-upcoming-sync");
 const { readJobConfig, writeCheckUpcomingRunResult } = require("./lib/job-config");
+const { createFunctionLogger } = require("./lib/logger");
+
+const logEvent = createFunctionLogger("check-upcoming");
 
 /**
  * @param {import('@netlify/functions').HandlerEvent} event
@@ -44,8 +47,10 @@ const { readJobConfig, writeCheckUpcomingRunResult } = require("./lib/job-config
  * @returns {Promise<import('@netlify/functions').HandlerResponse>}
  */
 exports.handler = async (event, context) => {
+  const startedAt = Date.now();
   const trigger = event?.headers?.["x-netlify-event"] || event?.httpMethod || "unknown";
   console.log("check-upcoming: start", JSON.stringify({ trigger }));
+  logEvent({ type: "function.invoked", trigger });
 
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: { "Access-Control-Allow-Origin": "*" } };
@@ -71,6 +76,7 @@ exports.handler = async (event, context) => {
     };
     await writeCheckUpcomingRunResult(db, skipPayload);
     console.log("check-upcoming: skipped", JSON.stringify(skipPayload));
+    logEvent({ type: "job.skipped", reason: "disabled" });
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
@@ -95,6 +101,14 @@ exports.handler = async (event, context) => {
       trigger,
       result,
     });
+    logEvent({
+      type: "job.completed",
+      titlesChecked: typeof result?.rowsChecked === "number" ? result.rowsChecked : 0,
+      titlesSkipped: typeof result?.rowsSkipped === "number" ? result.rowsSkipped : 0,
+      alertsWritten: typeof result?.alertsUpserted === "number" ? result.alertsUpserted : 0,
+      alertsSkippedUnchanged: typeof result?.writesSkipped === "number" ? result.writesSkipped : 0,
+      durationMs: Date.now() - startedAt,
+    });
 
     return {
       statusCode: 200,
@@ -103,17 +117,23 @@ exports.handler = async (event, context) => {
     };
   } catch (e) {
     console.error("check-upcoming:", e);
+    const message = e instanceof Error ? e.message : String(e);
     await writeCheckUpcomingRunResult(db, {
       status: "error",
-      message: e.message || String(e),
+      message,
       trigger,
       result: { completed: false },
+    });
+    logEvent({
+      type: "job.failed",
+      error: message,
+      durationMs: Date.now() - startedAt,
     });
     const code = e.statusCode || 500;
     return {
       statusCode: code,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ok: false, error: e.message || String(e) }),
+      body: JSON.stringify({ ok: false, error: message }),
     };
   }
 };

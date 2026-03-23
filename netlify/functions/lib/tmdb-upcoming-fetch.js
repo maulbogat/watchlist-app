@@ -126,14 +126,34 @@ function nowIso() {
  * Build alert payloads for one catalog row (TMDB only).
  * @param {string} apiKey
  * @param {{ tmdbId: number, isTv: boolean, title?: string }} row
+ * @param {{ onApiCall?: (event: { endpoint: string, tmdbId: number, status: number, durationMs: number }) => void }} [options]
  * @returns {Promise<{ alerts: object[], movieCheckMeta?: MovieCheckMeta }>} `alerts` items include `docId` plus fields aligned with {@link UpcomingAlert} / `UpcomingAlertFirestoreDoc` in `sync-upcoming-alerts.js`. Caller strips `docId` before `set`; `detectedAt` is added in `upsertAlerts`.
  */
-async function buildAlertsForCatalogRow(apiKey, row) {
+async function buildAlertsForCatalogRow(apiKey, row, options = {}) {
   const { tmdbId, isTv, title: hintTitle } = row;
   const alerts = [];
+  const onApiCall = typeof options.onApiCall === "function" ? options.onApiCall : null;
+
+  async function tmdbGetWithLog(endpoint) {
+    const t0 = Date.now();
+    const response = await tmdbGet(endpoint, apiKey);
+    if (onApiCall) {
+      try {
+        onApiCall({
+          endpoint,
+          tmdbId,
+          status: Number(response?.status || 0),
+          durationMs: Date.now() - t0,
+        });
+      } catch {
+        // observability must never break sync
+      }
+    }
+    return response;
+  }
 
   if (isTv) {
-    const tv = await tmdbGet(`/tv/${tmdbId}`, apiKey);
+    const tv = await tmdbGetWithLog(`/tv/${tmdbId}`);
     if (!tv.ok || !tv.data) return { alerts };
 
     const data = tv.data;
@@ -173,7 +193,7 @@ async function buildAlertsForCatalogRow(apiKey, row) {
     return { alerts };
   }
 
-  const mv = await tmdbGet(`/movie/${tmdbId}`, apiKey);
+  const mv = await tmdbGetWithLog(`/movie/${tmdbId}`);
   if (!mv.ok || !mv.data) return { alerts };
   const data = mv.data;
   const name = data.title || hintTitle || "Movie";
@@ -216,7 +236,7 @@ async function buildAlertsForCatalogRow(apiKey, row) {
 
   const col = data.belongs_to_collection;
   if (col && col.id != null) {
-    const coll = await tmdbGet(`/collection/${col.id}`, apiKey);
+    const coll = await tmdbGetWithLog(`/collection/${col.id}`);
     if (!coll.ok || !coll.data?.parts) return { alerts, movieCheckMeta };
     for (const part of coll.data.parts) {
       if (!part || part.id === tmdbId) continue;

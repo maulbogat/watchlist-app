@@ -3,6 +3,7 @@ import { auth, fbSignOut, GoogleAuthProvider, renamePersonalList, signInWithPopu
 import { getUserProfile, setUserCountry } from "../data/user.js";
 import { COUNTRIES } from "../countries.js";
 import { errorMessage } from "../lib/utils.js";
+import { logEvent } from "../lib/axiom-logger.js";
 import { useAppStore } from "../store/useAppStore.js";
 import {
   usePersonalLists,
@@ -238,10 +239,20 @@ export function WatchlistPage() {
                     onClick={async () => {
                       setAuthMenuOpen(false);
                       await fbSignOut(auth);
+                      void logEvent({
+                        type: "user.action",
+                        action: "auth.signout",
+                        uid: user.uid,
+                      }).catch(() => {});
                       try {
                         const provider = new GoogleAuthProvider();
                         provider.setCustomParameters({ prompt: "select_account" });
-                        await signInWithPopup(auth, provider);
+                        const cred = await signInWithPopup(auth, provider);
+                        void logEvent({
+                          type: "user.action",
+                          action: "auth.signin",
+                          uid: cred?.user?.uid ?? null,
+                        }).catch(() => {});
                       } catch (err: unknown) {
                         const code =
                           err && typeof err === "object" && "code" in err
@@ -260,7 +271,14 @@ export function WatchlistPage() {
                     className="auth-dropdown-item"
                     role="menuitem"
                     id="auth-signout-btn"
-                    onClick={() => fbSignOut(auth)}
+                    onClick={async () => {
+                      await fbSignOut(auth);
+                      void logEvent({
+                        type: "user.action",
+                        action: "auth.signout",
+                        uid: user.uid,
+                      }).catch(() => {});
+                    }}
                   >
                     Sign out
                   </button>

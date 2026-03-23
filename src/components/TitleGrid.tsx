@@ -5,6 +5,7 @@ import { useRemoveTitle, useSetTitleStatus } from "../hooks/useMutations.js";
 import { movieKey } from "../firebase.js";
 import type { StatusKey, WatchlistItem } from "../types/index.js";
 import { errorMessage } from "../lib/utils.js";
+import { logEvent } from "../lib/axiom-logger.js";
 import { toast } from "@/components/ui/use-toast";
 
 interface TitleGridProps {
@@ -45,6 +46,13 @@ export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGr
           key: movieKey(movie),
           status,
         });
+        void logEvent({
+          type: "user.action",
+          action: "status.change",
+          tmdbId: movie.tmdbId ?? null,
+          status,
+          uid: currentUser.uid,
+        }).catch(() => {});
       } catch (err: unknown) {
         console.error(err);
         window.alert(errorMessage(err) || "Failed to update.");
@@ -57,6 +65,13 @@ export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGr
     (movie: WatchlistItem) => {
       if (!currentUser?.uid) return;
       const title = String(movie.title || "").trim() || "Title";
+      void logEvent({
+        type: "user.action",
+        action: "title.remove",
+        tmdbId: movie.tmdbId ?? null,
+        title,
+        uid: currentUser.uid,
+      }).catch(() => {});
       let removed = false;
       const timer = window.setTimeout(async () => {
         if (removed) return;
@@ -129,7 +144,16 @@ export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGr
             statusOpenKey={statusOpenKey}
             onSetStatusOpenKey={setStatusOpenKey}
             onStatusChange={handleStatusChange}
-            onOpenModal={(movie: WatchlistItem) => setCurrentModalMovie(movie)}
+            onOpenModal={(movie: WatchlistItem) => {
+              void logEvent({
+                type: "user.action",
+                action: "trailer.open",
+                tmdbId: movie.tmdbId ?? null,
+                title: movie.title,
+                uid: currentUser?.uid ?? null,
+              }).catch(() => {});
+              setCurrentModalMovie(movie);
+            }}
             onRequestRemove={scheduleRemove}
           />
         ))}

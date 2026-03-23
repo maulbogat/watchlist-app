@@ -4,6 +4,7 @@ import { useAuthUser } from "./hooks/useAuthUser.js";
 import { WatchlistPage } from "./components/WatchlistPage.js";
 import { JoinPage } from "./pages/JoinPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
+import { logEvent } from "./lib/axiom-logger.js";
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAppStore } from "./store/useAppStore.js";
 import { Toaster } from "@/components/ui/toaster";
@@ -24,7 +25,12 @@ function WatchlistAuthGate() {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      await signInWithPopup(auth, provider);
+      const cred = await signInWithPopup(auth, provider);
+      void logEvent({
+        type: "user.action",
+        action: "auth.signin",
+        uid: cred?.user?.uid ?? null,
+      }).catch(() => {});
     } catch (err: unknown) {
       if (
         isAuthError(err) &&

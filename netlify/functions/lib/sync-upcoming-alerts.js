@@ -43,6 +43,9 @@
  */
 
 const { buildAlertsForCatalogRow, dedupeCatalogByTmdb } = require("./tmdb-upcoming-fetch");
+const { createFunctionLogger } = require("./logger");
+
+const logEvent = createFunctionLogger("sync-upcoming-alerts");
 
 const COLLECTION = "upcomingAlerts";
 /** Admin-only cursor so Netlify can finish within ~30s per invocation. */
@@ -341,6 +344,7 @@ async function collectRegistryTmdbKeys(db) {
  * @returns {Promise<{ written: number, skipped: number }>}
  */
 async function upsertAlerts(db, alertPayloads) {
+  const startedAt = Date.now();
   if (alertPayloads.length === 0) return { written: 0, skipped: 0 };
   function normalizeForCompare(raw) {
     return {
@@ -394,6 +398,14 @@ async function upsertAlerts(db, alertPayloads) {
     }
   }
   if (n > 0) await batch.commit();
+  logEvent({
+    type: "firestore.write",
+    collection: COLLECTION,
+    operation: "batch",
+    written,
+    skipped,
+    durationMs: Date.now() - startedAt,
+  });
   return { written, skipped };
 }
 
@@ -501,7 +513,18 @@ async function runFullCatalogSync(db, apiKey, catalogItems) {
   let upserted = 0;
   let writesSkipped = 0;
   for (const row of rows) {
-    const builtResult = await buildAlertsForCatalogRow(apiKey, row);
+    const builtResult = await buildAlertsForCatalogRow(apiKey, row, {
+      onApiCall: ({ endpoint, tmdbId, status, durationMs }) => {
+        logEvent({
+          type: "api.call",
+          service: "tmdb",
+          endpoint,
+          tmdbId,
+          durationMs,
+          status,
+        });
+      },
+    });
     const built = builtResult.alerts;
     const ids = built.map((a) => a.docId);
     await deleteStaleAlertsForRow(db, row.tmdbId, row.isTv ? "tv" : "movie", ids);
@@ -606,6 +629,7 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
 
   let upserted = 0;
   let writesSkipped = 0;
+  let rowsSkipped = 0;
   let persistCursor = lastRegistryDocId;
   let rowsVisited = 0;
   let scanComplete = false;
@@ -656,6 +680,7 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
           rowsChecked: rowsVisited,
           alertsUpserted: upserted,
           writesSkipped,
+          rowsSkipped,
           pruned: 0,
           expiredRemoved,
           completed: false,
@@ -683,6 +708,13 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
             "sync-upcoming-alerts: skipped recently checked row",
             JSON.stringify({ tmdbId: row.tmdbId, media: rowMedia })
           );
+          rowsSkipped++;
+          logEvent({
+            type: "title.checked",
+            tmdbId: row.tmdbId,
+            media: rowMedia,
+            skippedReason: "7d",
+          });
           persistCursor = doc.id;
           continue;
         }
@@ -701,11 +733,35 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
               collectionId: checkState.collectionId,
             })
           );
+          rowsSkipped++;
+          const skippedReason =
+            decision.caseLabel === "case2_released_with_collection"
+              ? "30d"
+              : decision.caseLabel === "case3_released_no_collection"
+                ? "no-collection"
+                : null;
+          logEvent({
+            type: "title.checked",
+            tmdbId: row.tmdbId,
+            media: rowMedia,
+            skippedReason,
+          });
           persistCursor = doc.id;
           continue;
         }
       }
-      const builtResult = await buildAlertsForCatalogRow(apiKey, row);
+      const builtResult = await buildAlertsForCatalogRow(apiKey, row, {
+        onApiCall: ({ endpoint, tmdbId, status, durationMs }) => {
+          logEvent({
+            type: "api.call",
+            service: "tmdb",
+            endpoint,
+            tmdbId,
+            durationMs,
+            status,
+          });
+        },
+      });
       const built = builtResult.alerts;
       const ids = built.map((a) => a.docId);
       await firestoreOpWithRetry(
@@ -719,6 +775,12 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
         () => writeUpcomingCheckState(db, row.tmdbId, rowMedia, builtResult.movieCheckMeta),
         "upcomingChecks.set"
       );
+      logEvent({
+        type: "title.checked",
+        tmdbId: row.tmdbId,
+        media: rowMedia,
+        skippedReason: null,
+      });
       persistCursor = doc.id;
     }
 
@@ -734,6 +796,7 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
       rowsChecked: rowsVisited,
       alertsUpserted: upserted,
       writesSkipped,
+      rowsSkipped,
       pruned: 0,
       expiredRemoved,
       completed: false,
@@ -748,22 +811,36 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
   let pruned = 0;
   const shouldRunPrune = lastPruneAtMs == null || Date.now() - lastPruneAtMs >= SEVEN_DAYS_MS;
   if (shouldRunPrune) {
+    const pruneStartedAt = Date.now();
     const validKeys = await collectRegistryTmdbKeys(db);
     if (validKeys.size > 0 || regCount === 0) {
       pruned = await firestoreOpWithRetry(
         () => pruneAlertsOutsideCatalog(db, validKeys),
         "pruneAlertsOutsideCatalog"
       );
+      logEvent({
+        type: "prune.run",
+        deleted: pruned,
+        durationMs: Date.now() - pruneStartedAt,
+      });
     } else {
       console.warn(
         "sync-upcoming-alerts: skipping prune — titleRegistry has docs but none with tmdbId (would clear all alerts)"
       );
+      logEvent({
+        type: "prune.skipped",
+        lastPruneAt: st.lastPruneAt || null,
+      });
     }
   } else {
     console.info(
       "sync-upcoming-alerts: skipping weekly prune",
       JSON.stringify({ lastPruneAt: st.lastPruneAt || null })
     );
+    logEvent({
+      type: "prune.skipped",
+      lastPruneAt: st.lastPruneAt || null,
+    });
   }
 
   const nowIso = new Date().toISOString();
@@ -787,6 +864,7 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
     rowsChecked: rowsVisited,
     alertsUpserted: upserted,
     writesSkipped,
+    rowsSkipped,
     pruned,
     expiredRemoved,
     completed: true,
@@ -810,7 +888,18 @@ async function runSingleTitleSync(db, apiKey, tmdbId, media, titleHint) {
   if (Number.isNaN(n) || !apiKey) return { ok: false, error: "bad args" };
   const isTv = media === "tv";
   const row = { tmdbId: n, isTv, title: titleHint || "" };
-  const builtResult = await buildAlertsForCatalogRow(apiKey, row);
+  const builtResult = await buildAlertsForCatalogRow(apiKey, row, {
+    onApiCall: ({ endpoint, tmdbId, status, durationMs }) => {
+      logEvent({
+        type: "api.call",
+        service: "tmdb",
+        endpoint,
+        tmdbId,
+        durationMs,
+        status,
+      });
+    },
+  });
   const built = builtResult.alerts;
   const ids = built.map((a) => a.docId);
   await deleteStaleAlertsForRow(db, n, isTv ? "tv" : "movie", ids);

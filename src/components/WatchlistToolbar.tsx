@@ -1,6 +1,7 @@
 import { useAppStore, STATUS_LABELS } from "../store/useAppStore.js";
 import { persistFilterPreferences } from "../lib/storage.js";
 import { getUniqueGenresFromMovies } from "../lib/watchlistFilters.js";
+import { logEvent } from "../lib/axiom-logger.js";
 import type { FilterType, WatchlistItem } from "../types/index.js";
 
 interface WatchlistToolbarProps {
@@ -51,6 +52,13 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
                 onClick={() => {
                   setCurrentStatus(status);
                   persistFilters();
+                  void logEvent({
+                    type: "user.action",
+                    action: "filter.change",
+                    filterType: "status",
+                    value: status,
+                    uid: currentUser?.uid ?? null,
+                  }).catch(() => {});
                 }}
               >
                 {label}
@@ -80,6 +88,13 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
               onChange={() => {
                 setCurrentFilter(value as FilterType);
                 persistFilters();
+                void logEvent({
+                  type: "user.action",
+                  action: "filter.change",
+                  filterType: "type",
+                  value,
+                  uid: currentUser?.uid ?? null,
+                }).catch(() => {});
               }}
             />
             <label htmlFor={id}>{label}</label>
@@ -96,6 +111,13 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
             onClick={() => {
               setCurrentGenre("");
               persistFilters();
+              void logEvent({
+                type: "user.action",
+                action: "filter.change",
+                filterType: "genre",
+                value: "all",
+                uid: currentUser?.uid ?? null,
+              }).catch(() => {});
             }}
           >
             All
@@ -112,6 +134,13 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
                 onClick={() => {
                   setCurrentGenre(g);
                   persistFilters();
+                  void logEvent({
+                    type: "user.action",
+                    action: "filter.change",
+                    filterType: "genre",
+                    value: g,
+                    uid: currentUser?.uid ?? null,
+                  }).catch(() => {});
                 }}
               >
                 {g}
