@@ -271,14 +271,24 @@ export function AdminPage() {
 
   const runNowMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/.netlify/functions/trigger-upcoming-sync", {
+      const res = await fetch("/.netlify/functions/check-upcoming", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trigger: "manual" }),
       });
-      const data = (await res.json()) as RunNowResponse;
+      const raw = await res.text();
+      let data: RunNowResponse = {};
+      let textFallback = "";
+      try {
+        data = raw ? (JSON.parse(raw) as RunNowResponse) : {};
+      } catch {
+        textFallback = raw;
+      }
       if (!res.ok || data.ok === false) {
-        throw new Error(data.error || `Request failed (${res.status})`);
+        throw new Error(textFallback || data.error || `Request failed (${res.status})`);
+      }
+      if (textFallback) {
+        return { ok: true, reason: textFallback };
       }
       return data;
     },
@@ -286,6 +296,11 @@ export function AdminPage() {
       if (data.skipped) {
         showRunNowResult(data.reason || "Skipped");
       } else {
+        if (typeof data.reason === "string" && data.reason.trim()) {
+          showRunNowResult(data.reason);
+          void jobConfigQ.refetch();
+          return;
+        }
         const written = typeof data.alertsUpserted === "number" ? data.alertsUpserted : null;
         const skipped = typeof data.writesSkipped === "number" ? data.writesSkipped : null;
         if (written != null || skipped != null) {

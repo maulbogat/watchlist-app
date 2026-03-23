@@ -8,7 +8,7 @@ type LogEventPayload = {
 
 const token = import.meta.env.VITE_AXIOM_TOKEN as string | undefined;
 const dataset = import.meta.env.VITE_AXIOM_DATASET as string | undefined;
-const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) || "unknown";
+const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) || "1.0.0";
 const environment = import.meta.env.MODE || "unknown";
 
 let axiomClient: Axiom | null = null;
@@ -45,11 +45,13 @@ function devConsoleFallback(event: Record<string, unknown>) {
 
 export async function logEvent(payload: LogEventPayload): Promise<void> {
   try {
+    const { type, ...rest } = payload;
     const event = {
       timestamp: new Date().toISOString(),
       environment,
       appVersion,
-      ...payload,
+      type: type || "unknown",
+      ...rest,
     };
 
     if (!axiomClient || !dataset) {
