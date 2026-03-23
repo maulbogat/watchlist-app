@@ -114,10 +114,19 @@ function nowIso() {
 }
 
 /**
+ * Metadata persisted in `upcomingChecks/{tmdbId_media}` for movie-only skip decisions.
+ * @typedef {{
+ *   releaseDate: string | null,
+ *   hasCollection: boolean,
+ *   collectionId: number | null
+ * }} MovieCheckMeta
+ */
+
+/**
  * Build alert payloads for one catalog row (TMDB only).
  * @param {string} apiKey
  * @param {{ tmdbId: number, isTv: boolean, title?: string }} row
- * @returns {Promise<object[]>} Each object includes `docId` plus fields aligned with {@link UpcomingAlert} / `UpcomingAlertFirestoreDoc` in `sync-upcoming-alerts.js`. Caller strips `docId` before `set`; `detectedAt` is added in `upsertAlerts`.
+ * @returns {Promise<{ alerts: object[], movieCheckMeta?: MovieCheckMeta }>} `alerts` items include `docId` plus fields aligned with {@link UpcomingAlert} / `UpcomingAlertFirestoreDoc` in `sync-upcoming-alerts.js`. Caller strips `docId` before `set`; `detectedAt` is added in `upsertAlerts`.
  */
 async function buildAlertsForCatalogRow(apiKey, row) {
   const { tmdbId, isTv, title: hintTitle } = row;
@@ -125,7 +134,7 @@ async function buildAlertsForCatalogRow(apiKey, row) {
 
   if (isTv) {
     const tv = await tmdbGet(`/tv/${tmdbId}`, apiKey);
-    if (!tv.ok || !tv.data) return alerts;
+    if (!tv.ok || !tv.data) return { alerts };
 
     const data = tv.data;
     const name = data.name || hintTitle || "TV show";
@@ -157,17 +166,30 @@ async function buildAlertsForCatalogRow(apiKey, row) {
         expiresAt,
         sequelTmdbId: null,
       });
-      return alerts;
+      return { alerts };
     }
 
     // No dated next episode: skip "Returning / TBA" placeholders — only surface alerts with a real air date.
-    return alerts;
+    return { alerts };
   }
 
   const mv = await tmdbGet(`/movie/${tmdbId}`, apiKey);
-  if (!mv.ok || !mv.data) return alerts;
+  if (!mv.ok || !mv.data) return { alerts };
   const data = mv.data;
   const name = data.title || hintTitle || "Movie";
+  const releaseDate =
+    typeof data.release_date === "string" && String(data.release_date).trim()
+      ? String(data.release_date).slice(0, 10)
+      : null;
+  const collectionRaw = data.belongs_to_collection;
+  const hasCollection = Boolean(collectionRaw && collectionRaw.id != null);
+  const collectionId = hasCollection ? Number(collectionRaw.id) : null;
+  /** @type {MovieCheckMeta} */
+  const movieCheckMeta = {
+    releaseDate,
+    hasCollection,
+    collectionId: collectionId != null && !Number.isNaN(collectionId) ? collectionId : null,
+  };
 
   const rd = data.release_date ? parseIsoDate(data.release_date) : null;
   const today = new Date();
@@ -195,7 +217,7 @@ async function buildAlertsForCatalogRow(apiKey, row) {
   const col = data.belongs_to_collection;
   if (col && col.id != null) {
     const coll = await tmdbGet(`/collection/${col.id}`, apiKey);
-    if (!coll.ok || !coll.data?.parts) return alerts;
+    if (!coll.ok || !coll.data?.parts) return { alerts, movieCheckMeta };
     for (const part of coll.data.parts) {
       if (!part || part.id === tmdbId) continue;
       const prd = part.release_date ? parseIsoDate(part.release_date) : null;
@@ -222,7 +244,7 @@ async function buildAlertsForCatalogRow(apiKey, row) {
     }
   }
 
-  return alerts;
+  return { alerts, movieCheckMeta };
 }
 
 /**

@@ -48,8 +48,11 @@ const COLLECTION = "upcomingAlerts";
 /** Admin-only cursor so Netlify can finish within ~30s per invocation. */
 const SYNC_STATE_COLLECTION = "syncState";
 const SYNC_STATE_DOC_ID = "upcomingAlerts";
+const UPCOMING_CHECKS_COLLECTION = "upcomingChecks";
 /** Registry docs per Firestore query — avoids reading entire titleRegistry on every Netlify tick. */
 const REGISTRY_PAGE_SIZE = 64;
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * @param {number} ms
@@ -69,6 +72,175 @@ function isFirestoreQuotaError(e) {
   if (code === 8 || code === "RESOURCE_EXHAUSTED") return true;
   const msg = String(e.message || e.details || "");
   return msg.includes("RESOURCE_EXHAUSTED") || msg.includes("Quota exceeded");
+}
+
+/**
+ * @param {number} tmdbId
+ * @param {'tv'|'movie'} media
+ * @returns {string}
+ */
+function upcomingCheckDocId(tmdbId, media) {
+  return `${tmdbId}_${media}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function toEpochMs(value) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? null : t;
+}
+
+/**
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {number} tmdbId
+ * @param {'tv'|'movie'} media
+ * @returns {Promise<number | null>}
+ */
+async function readUpcomingLastCheckedAtMs(db, tmdbId, media) {
+  const docId = upcomingCheckDocId(tmdbId, media);
+  const snap = await db
+    .collection(UPCOMING_CHECKS_COLLECTION)
+    .where("__name__", "==", docId)
+    .select("lastCheckedAt")
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  const data = snap.docs[0]?.data() || {};
+  return toEpochMs(data.lastCheckedAt);
+}
+
+/**
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {number} tmdbId
+ * @param {'tv'|'movie'} media
+ * @returns {Promise<{
+ *   lastCheckedAt: string | null,
+ *   lastCheckedAtMs: number | null,
+ *   releaseDate: string | null,
+ *   hasCollection: boolean | null,
+ *   collectionId: number | null
+ * }>}
+ */
+async function readUpcomingCheckState(db, tmdbId, media) {
+  const docId = upcomingCheckDocId(tmdbId, media);
+  const snap = await db
+    .collection(UPCOMING_CHECKS_COLLECTION)
+    .where("__name__", "==", docId)
+    .select("lastCheckedAt", "releaseDate", "hasCollection", "collectionId")
+    .limit(1)
+    .get();
+  if (snap.empty) {
+    return {
+      lastCheckedAt: null,
+      lastCheckedAtMs: null,
+      releaseDate: null,
+      hasCollection: null,
+      collectionId: null,
+    };
+  }
+  const data = snap.docs[0]?.data() || {};
+  const lastCheckedAt = typeof data.lastCheckedAt === "string" ? data.lastCheckedAt : null;
+  const releaseDate = typeof data.releaseDate === "string" ? data.releaseDate : null;
+  const hasCollection = typeof data.hasCollection === "boolean" ? data.hasCollection : null;
+  const rawCollectionId = data.collectionId;
+  const collectionId =
+    rawCollectionId == null || rawCollectionId === "" || Number.isNaN(Number(rawCollectionId))
+      ? null
+      : Number(rawCollectionId);
+  return {
+    lastCheckedAt,
+    lastCheckedAtMs: toEpochMs(lastCheckedAt),
+    releaseDate,
+    hasCollection,
+    collectionId,
+  };
+}
+
+/**
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {number} tmdbId
+ * @param {'tv'|'movie'} media
+ * @returns {Promise<void>}
+ */
+async function writeUpcomingLastCheckedAt(db, tmdbId, media) {
+  const ref = db.collection(UPCOMING_CHECKS_COLLECTION).doc(upcomingCheckDocId(tmdbId, media));
+  await ref.set(
+    {
+      tmdbId,
+      media,
+      lastCheckedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {number} tmdbId
+ * @param {'tv'|'movie'} media
+ * @param {{ releaseDate: string | null, hasCollection: boolean, collectionId: number | null } | null | undefined} movieMeta
+ * @returns {Promise<void>}
+ */
+async function writeUpcomingCheckState(db, tmdbId, media, movieMeta) {
+  const nowIso = new Date().toISOString();
+  const payload = {
+    tmdbId,
+    media,
+    lastCheckedAt: nowIso,
+    updatedAt: nowIso,
+    ...(media === "movie" && movieMeta
+      ? {
+          releaseDate: movieMeta.releaseDate ?? null,
+          hasCollection: Boolean(movieMeta.hasCollection),
+          collectionId: movieMeta.collectionId ?? null,
+        }
+      : {}),
+  };
+  const ref = db.collection(UPCOMING_CHECKS_COLLECTION).doc(upcomingCheckDocId(tmdbId, media));
+  await ref.set(payload, { merge: true });
+}
+
+/**
+ * @param {{
+ *   lastCheckedAt: string | null,
+ *   lastCheckedAtMs: number | null,
+ *   releaseDate: string | null,
+ *   hasCollection: boolean | null,
+ *   collectionId: number | null
+ * }} checkState
+ * @returns {{ skip: boolean, caseLabel?: string, reason?: string }}
+ */
+function movieSkipDecision(checkState) {
+  if (!checkState || !checkState.releaseDate || checkState.hasCollection == null) {
+    return { skip: false };
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  // Case 1: unreleased movies are always checked.
+  if (checkState.releaseDate > today) {
+    return { skip: false };
+  }
+  if (checkState.hasCollection) {
+    if (checkState.lastCheckedAtMs != null && Date.now() - checkState.lastCheckedAtMs < THIRTY_DAYS_MS) {
+      return {
+        skip: true,
+        caseLabel: "case2_released_with_collection",
+        reason: "checked within last 30 days",
+      };
+    }
+    return { skip: false };
+  }
+  if (checkState.lastCheckedAtMs != null) {
+    return {
+      skip: true,
+      caseLabel: "case3_released_no_collection",
+      reason: "already checked once after release",
+    };
+  }
+  return { skip: false };
 }
 
 /**
@@ -329,7 +501,8 @@ async function runFullCatalogSync(db, apiKey, catalogItems) {
   let upserted = 0;
   let writesSkipped = 0;
   for (const row of rows) {
-    const built = await buildAlertsForCatalogRow(apiKey, row);
+    const builtResult = await buildAlertsForCatalogRow(apiKey, row);
+    const built = builtResult.alerts;
     const ids = built.map((a) => a.docId);
     await deleteStaleAlertsForRow(db, row.tmdbId, row.isTv ? "tv" : "movie", ids);
     const upsertResult = await upsertAlerts(db, built);
@@ -351,7 +524,7 @@ async function runFullCatalogSync(db, apiKey, catalogItems) {
  * @returns {Promise<{ rowsChecked: number, alertsUpserted: number, pruned: number, expiredRemoved: number }>}
  */
 async function runFullRegistrySync(db, apiKey) {
-  const regSnap = await db.collection("titleRegistry").get();
+  const regSnap = await db.collection("titleRegistry").select("tmdbId", "tmdbMedia", "type", "title").get();
   const regItems = regSnap.docs.map((d) => d.data());
   return runFullCatalogSync(db, apiKey, regItems);
 }
@@ -385,6 +558,7 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
   }
 
   const st = stateSnap.exists ? stateSnap.data() : {};
+  const lastPruneAtMs = toEpochMs(st.lastPruneAt);
   let lastRegistryDocId =
     typeof st.lastRegistryDocId === "string" && st.lastRegistryDocId.trim()
       ? st.lastRegistryDocId.trim()
@@ -498,15 +672,53 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
         persistCursor = doc.id;
         continue;
       }
-      const built = await buildAlertsForCatalogRow(apiKey, row);
+      const rowMedia = row.isTv ? "tv" : "movie";
+      const checkState = await firestoreOpWithRetry(
+        () => readUpcomingCheckState(db, row.tmdbId, rowMedia),
+        "upcomingChecks.get"
+      );
+      if (rowMedia === "tv") {
+        if (checkState.lastCheckedAtMs != null && Date.now() - checkState.lastCheckedAtMs < SEVEN_DAYS_MS) {
+          console.info(
+            "sync-upcoming-alerts: skipped recently checked row",
+            JSON.stringify({ tmdbId: row.tmdbId, media: rowMedia })
+          );
+          persistCursor = doc.id;
+          continue;
+        }
+      } else {
+        const decision = movieSkipDecision(checkState);
+        if (decision.skip) {
+          console.info(
+            "sync-upcoming-alerts: skipped movie row",
+            JSON.stringify({
+              tmdbId: row.tmdbId,
+              media: rowMedia,
+              case: decision.caseLabel || "unknown",
+              reason: decision.reason || "skipped",
+              releaseDate: checkState.releaseDate,
+              hasCollection: checkState.hasCollection,
+              collectionId: checkState.collectionId,
+            })
+          );
+          persistCursor = doc.id;
+          continue;
+        }
+      }
+      const builtResult = await buildAlertsForCatalogRow(apiKey, row);
+      const built = builtResult.alerts;
       const ids = built.map((a) => a.docId);
       await firestoreOpWithRetry(
-        () => deleteStaleAlertsForRow(db, row.tmdbId, row.isTv ? "tv" : "movie", ids),
+        () => deleteStaleAlertsForRow(db, row.tmdbId, rowMedia, ids),
         "deleteStaleAlertsForRow"
       );
       const upsertResult = await firestoreOpWithRetry(() => upsertAlerts(db, built), "upsertAlerts");
       upserted += upsertResult.written;
       writesSkipped += upsertResult.skipped;
+      await firestoreOpWithRetry(
+        () => writeUpcomingCheckState(db, row.tmdbId, rowMedia, builtResult.movieCheckMeta),
+        "upcomingChecks.set"
+      );
       persistCursor = doc.id;
     }
 
@@ -533,19 +745,28 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
     };
   }
 
-  const validKeys = await collectRegistryTmdbKeys(db);
   let pruned = 0;
-  if (validKeys.size > 0 || regCount === 0) {
-    pruned = await firestoreOpWithRetry(
-      () => pruneAlertsOutsideCatalog(db, validKeys),
-      "pruneAlertsOutsideCatalog"
-    );
+  const shouldRunPrune = lastPruneAtMs == null || Date.now() - lastPruneAtMs >= SEVEN_DAYS_MS;
+  if (shouldRunPrune) {
+    const validKeys = await collectRegistryTmdbKeys(db);
+    if (validKeys.size > 0 || regCount === 0) {
+      pruned = await firestoreOpWithRetry(
+        () => pruneAlertsOutsideCatalog(db, validKeys),
+        "pruneAlertsOutsideCatalog"
+      );
+    } else {
+      console.warn(
+        "sync-upcoming-alerts: skipping prune — titleRegistry has docs but none with tmdbId (would clear all alerts)"
+      );
+    }
   } else {
-    console.warn(
-      "sync-upcoming-alerts: skipping prune — titleRegistry has docs but none with tmdbId (would clear all alerts)"
+    console.info(
+      "sync-upcoming-alerts: skipping weekly prune",
+      JSON.stringify({ lastPruneAt: st.lastPruneAt || null })
     );
   }
 
+  const nowIso = new Date().toISOString();
   await firestoreOpWithRetry(
     () =>
       stateRef.set(
@@ -553,8 +774,9 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
           lastRegistryDocId: null,
           ...(regCount !== null ? { registryDocCount: regCount } : {}),
           nextIndex: null,
-          lastCompletedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          ...(shouldRunPrune ? { lastPruneAt: nowIso } : {}),
+          lastCompletedAt: nowIso,
+          updatedAt: nowIso,
         },
         { merge: true }
       ),
@@ -588,7 +810,8 @@ async function runSingleTitleSync(db, apiKey, tmdbId, media, titleHint) {
   if (Number.isNaN(n) || !apiKey) return { ok: false, error: "bad args" };
   const isTv = media === "tv";
   const row = { tmdbId: n, isTv, title: titleHint || "" };
-  const built = await buildAlertsForCatalogRow(apiKey, row);
+  const builtResult = await buildAlertsForCatalogRow(apiKey, row);
+  const built = builtResult.alerts;
   const ids = built.map((a) => a.docId);
   await deleteStaleAlertsForRow(db, n, isTv ? "tv" : "movie", ids);
   const upsertResult = await upsertAlerts(db, built);
