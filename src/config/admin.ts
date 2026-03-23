@@ -1,3 +1,4 @@
+/** Keep in sync with `netlify/functions/lib/admin-uids.js`. */
 export const ADMIN_UIDS: string[] = [
   'fSyHdUXB56fBTeKlNFXPiAq1Lip2'
 ];

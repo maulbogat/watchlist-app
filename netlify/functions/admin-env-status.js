@@ -5,6 +5,8 @@ const SERVER_ENV_KEYS = [
   "AXIOM_TOKEN",
   "AXIOM_DATASET",
   "UPCOMING_SYNC_TRIGGER_SECRET",
+  "NETLIFY_API_TOKEN",
+  "NETLIFY_SITE_ID",
 ];
 
 function corsHeaders() {

@@ -14,7 +14,9 @@ cp .env.example .env
 Then set values in:
 
 - `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional `AXIOM_*`, optional script toggles)
-- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional `VITE_APP_VERSION`)
+- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional `VITE_APP_VERSION`, optional `VITE_NETLIFY_*`)
+
+**Netlify production:** mirror the same keys in the dashboard — see **[`docs/netlify-environment.md`](./docs/netlify-environment.md)** (delete **`VITE_AXIOM_*`**, scope **`VITE_*`** for builds, server vars for functions).
 
 ## Run locally
 
@@ -55,6 +57,8 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
 - Optional client variables:
   - `VITE_FIREBASE_MEASUREMENT_ID` (Analytics)
   - `VITE_APP_VERSION` (defaults to `1.0.0` when missing)
+  - `VITE_NETLIFY_SITE_ID` — Netlify **Site ID** (General → Site details) for the **Admin → Last deployment** status badge; optional
+  - `VITE_NETLIFY_PROJECT_SLUG` — defaults to `watchlist-trailers` if your Netlify project URL slug differs
 - **Axiom (client events):** do **not** use `VITE_AXIOM_*`. The app POSTs to **`/.netlify/functions/log-client-event`** with a Firebase ID token; **`AXIOM_TOKEN`** and **`AXIOM_DATASET`** are server-only (Netlify **Environment variables** + local `.env` when running functions).
 - `src/config/firebase.ts` normalizes/sanitizes client config values and falls back to project defaults when values are missing or malformed.
 
@@ -95,27 +99,14 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 3. Set `TMDB_API_KEY` in Netlify → Site settings → Environment variables (for trailer lookup and **upcoming** sync). Get a free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
 
-4. Set all `VITE_FIREBASE_*` variables in Netlify → Site settings → Environment variables so production `vite build` can initialize Firebase:
-   - `VITE_FIREBASE_API_KEY`
-   - `VITE_FIREBASE_AUTH_DOMAIN`
-   - `VITE_FIREBASE_PROJECT_ID`
-   - `VITE_FIREBASE_STORAGE_BUCKET`
-   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
-   - `VITE_FIREBASE_APP_ID`
-   - Optional: `VITE_FIREBASE_MEASUREMENT_ID`
-   - Optional: `VITE_APP_VERSION`
+4. Set all **`VITE_*`** variables for production builds and all **server** variables for functions — full checklist, scopes, and **mandatory deletion of `VITE_AXIOM_*`** are in **[`docs/netlify-environment.md`](./docs/netlify-environment.md)**.
 
-5. **Server-only observability & jobs** (set in Netlify **Environment variables**; same keys in local `.env` when running functions):
+5. **Summary (details in `docs/netlify-environment.md`):**
+   - **Delete** `VITE_AXIOM_TOKEN` and `VITE_AXIOM_DATASET` in Netlify (unused; breaks [secret scanning](https://docs.netlify.com/manage/security/secret-scanning/) if values overlap server `AXIOM_*`).
+   - **`VITE_*` (Firebase, `VITE_APP_VERSION`, `VITE_NETLIFY_*`)** — must be available at **build** time (All scopes / includes Builds).
+   - **Server-only** (`FIREBASE_SERVICE_ACCOUNT`, `TMDB_API_KEY`, `OMDB_API_KEY`, `AXIOM_*`, `NETLIFY_API_TOKEN`, `NETLIFY_SITE_ID`, optional `UPCOMING_SYNC_TRIGGER_SECRET`) — for **functions**; prefer scoping to Functions without Builds when Netlify allows it.
 
-   | Variable | Used for |
-   |----------|----------|
-   | `AXIOM_TOKEN`, `AXIOM_DATASET` | All function logs (`lib/logger.js`), **`log-client-event`** (browser analytics), scheduled **`check-upcoming`**, bookmarklet, etc. |
-   | `TMDB_API_KEY` | **`check-upcoming`**, **`trigger-upcoming-sync`**, **`add-from-imdb`**, scripts |
-   | `FIREBASE_SERVICE_ACCOUNT` | Admin SDK in functions (required for **`log-client-event`** token verify, Firestore writes, etc.) |
-   | `OMDB_API_KEY` | **`add-from-imdb`** (bookmarklet) |
-   | `UPCOMING_SYNC_TRIGGER_SECRET` | Optional auth on **`trigger-upcoming-sync`** manual runs |
-
-   **Remove any old `VITE_AXIOM_TOKEN` / `VITE_AXIOM_DATASET`** from Netlify — they are no longer used and previously **inlined tokens into `dist/`**, which triggered [secret scanning](https://docs.netlify.com/manage/security/secret-scanning/) failures. Client events use **`log-client-event`** only.
+   **Do not** put real **`AXIOM_DATASET`** values in **`.env.example`** or client code; Netlify compares the repo and `dist/` to secrets.
 
 ### Netlify: “Potentially exposed secrets” / failed build
 

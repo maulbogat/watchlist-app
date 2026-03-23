@@ -2114,6 +2114,18 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   color: var(--accent);
 }
 
+/* Tight block: heading + deploy badge don’t span the full admin content width */
+.admin-section--deployment {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.admin-section--deployment h2 {
+  margin-bottom: 0;
+}
+
 .admin-grid {
   display: grid;
   gap: 0.75rem;
@@ -2165,6 +2177,135 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   top: 0.5rem;
   right: 0.65rem;
   color: var(--accent);
+}
+
+.admin-deploy-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: min(100%, 42rem);
+}
+
+.admin-deploy-card {
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  max-width: min(100%, 26rem);
+}
+
+.admin-deploy-link {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  border-radius: 6px;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.admin-deploy-link:hover {
+  filter: brightness(1.06);
+  opacity: 0.95;
+}
+
+.admin-deploy-badge {
+  height: 20px;
+  width: auto;
+  max-width: min(100%, 180px);
+  display: block;
+}
+
+.admin-deploy-fallback {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.admin-deploy-text-link {
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: var(--accent);
+}
+
+.admin-deploy-text-link:hover {
+  filter: brightness(1.08);
+}
+
+.admin-deploy-hint {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.admin-deploy-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85em;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.admin-deploy-api-line {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.admin-deploy-api-line--warn {
+  color: #e8a090;
+}
+
+.admin-deploy-failure {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(232, 201, 106, 0.28);
+  background: rgba(0, 0, 0, 0.22);
+  box-sizing: border-box;
+}
+
+.admin-deploy-failure-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+}
+
+.admin-deploy-failure-body {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-deploy-failure-secondary {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-deploy-failure-link {
+  display: inline-block;
+  margin-top: 0.55rem;
+  font-family: var(--font-title);
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.admin-deploy-failure-link:hover {
+  filter: brightness(1.08);
 }
 
 .admin-stat-card {

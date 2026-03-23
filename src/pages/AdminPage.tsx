@@ -7,6 +7,7 @@ import { isAdmin } from "../config/admin.js";
 import { useAuthUser } from "../hooks/useAuthUser.js";
 import { getJobConfigState, setCheckUpcomingEnabledState } from "../firebase.js";
 import { getFirestore, collection, getCountFromServer, getDocs } from "firebase/firestore";
+import { auth } from "../firebase.js";
 
 type CatalogStats = {
   totalTitles: number | "Error";
@@ -85,9 +86,21 @@ const SERVICE_LINKS = [
   {
     label: "Axiom",
     sublabel: "Logs & Monitoring",
-    url: "https://app.axiom.co/maulbogat-riv8/stream/watchlist-prod",
+    /* Avoid embedding the real dataset slug — it may match Netlify secret AXIOM_DATASET and fail the build. */
+    url: "https://app.axiom.co/",
   },
 ] as const;
+
+/** Netlify dashboard URL uses this slug (`/projects/<slug>/…`). */
+const NETLIFY_PROJECT_SLUG =
+  (import.meta.env.VITE_NETLIFY_PROJECT_SLUG as string | undefined)?.trim() || "watchlist-trailers";
+
+const NETLIFY_DEPLOYS_URL = `https://app.netlify.com/projects/${NETLIFY_PROJECT_SLUG}/deploys`;
+
+const netlifySiteId = (import.meta.env.VITE_NETLIFY_SITE_ID as string | undefined)?.trim();
+const NETLIFY_DEPLOY_BADGE_URL = netlifySiteId
+  ? `https://api.netlify.com/api/v1/badges/${encodeURIComponent(netlifySiteId)}/deploy-status`
+  : null;
 
 const ENV_VARS = [
   "VITE_FIREBASE_API_KEY",
@@ -98,6 +111,8 @@ const ENV_VARS = [
   "VITE_FIREBASE_APP_ID",
   "VITE_FIREBASE_MEASUREMENT_ID",
   "VITE_APP_VERSION",
+  "VITE_NETLIFY_SITE_ID",
+  "VITE_NETLIFY_PROJECT_SLUG",
 ] as const;
 
 const SERVER_ENV_VARS = [
@@ -107,6 +122,8 @@ const SERVER_ENV_VARS = [
   "AXIOM_TOKEN",
   "AXIOM_DATASET",
   "UPCOMING_SYNC_TRIGGER_SECRET",
+  "NETLIFY_API_TOKEN",
+  "NETLIFY_SITE_ID",
 ] as const;
 type ServerEnvVar = (typeof SERVER_ENV_VARS)[number];
 
@@ -116,9 +133,54 @@ type ServerEnvResponse = {
   error?: string;
 };
 
+type LatestDeployPayload = {
+  state: string;
+  error_message: string | null;
+  summary: string | null;
+  branch: string | null;
+  deploy_ssl_url: string | null;
+  admin_url: string | null;
+  title: string | null;
+};
+
+type LatestDeployStatusResponse =
+  | { ok: true; deploy: LatestDeployPayload | null }
+  | { ok: false; error: string; message?: string; status?: number };
+
 type MaybeSelectable<T> = T & {
   select?: (...fields: string[]) => T;
 };
+
+/** Static `import.meta.env.VITE_*` reads only — avoids dynamic `env[name]` which can pull unrelated vars into the bundle. */
+function clientViteVarIsSet(name: (typeof ENV_VARS)[number]): boolean {
+  switch (name) {
+    case "VITE_FIREBASE_API_KEY":
+      return Boolean(import.meta.env.VITE_FIREBASE_API_KEY);
+    case "VITE_FIREBASE_AUTH_DOMAIN":
+      return Boolean(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
+    case "VITE_FIREBASE_PROJECT_ID":
+      return Boolean(import.meta.env.VITE_FIREBASE_PROJECT_ID);
+    case "VITE_FIREBASE_STORAGE_BUCKET":
+      return Boolean(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET);
+    case "VITE_FIREBASE_MESSAGING_SENDER_ID":
+      return Boolean(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID);
+    case "VITE_FIREBASE_APP_ID":
+      return Boolean(import.meta.env.VITE_FIREBASE_APP_ID);
+    case "VITE_FIREBASE_MEASUREMENT_ID":
+      return Boolean(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID);
+    case "VITE_APP_VERSION":
+      return Boolean(import.meta.env.VITE_APP_VERSION);
+    case "VITE_NETLIFY_SITE_ID":
+      return Boolean(import.meta.env.VITE_NETLIFY_SITE_ID);
+    case "VITE_NETLIFY_PROJECT_SLUG":
+      return Boolean(import.meta.env.VITE_NETLIFY_PROJECT_SLUG);
+    default: {
+      const _never: never = name;
+      void _never;
+      return false;
+    }
+  }
+}
 
 function toEpochMs(value: unknown): number | null {
   if (value == null) return null;
@@ -244,7 +306,30 @@ export function AdminPage() {
         AXIOM_TOKEN: Boolean(data.status.AXIOM_TOKEN),
         AXIOM_DATASET: Boolean(data.status.AXIOM_DATASET),
         UPCOMING_SYNC_TRIGGER_SECRET: Boolean(data.status.UPCOMING_SYNC_TRIGGER_SECRET),
+        NETLIFY_API_TOKEN: Boolean(data.status.NETLIFY_API_TOKEN),
+        NETLIFY_SITE_ID: Boolean(data.status.NETLIFY_SITE_ID),
       };
+    },
+  });
+
+  const latestDeployQ = useQuery<LatestDeployStatusResponse>({
+    queryKey: ["admin", "latest-deploy-status"],
+    staleTime: 45_000,
+    refetchOnWindowFocus: true,
+    enabled: !authLoading && userIsAdmin,
+    queryFn: async () => {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error("Not signed in");
+      }
+      const res = await fetch("/.netlify/functions/latest-deploy-status", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = (await res.json()) as LatestDeployStatusResponse;
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("Not allowed");
+      }
+      return data;
     },
   });
 
@@ -340,10 +425,9 @@ export function AdminPage() {
   })();
 
   const envRows = useMemo(() => {
-    const env = import.meta.env as Record<string, string | boolean | undefined>;
     const clientRows = ENV_VARS.map((name) => ({
       name,
-      state: Boolean(env[name]) ? "set" : "unset",
+      state: clientViteVarIsSet(name) ? "set" : "unset",
     }));
     const serverRows = SERVER_ENV_VARS.map((name) => {
       if (serverEnvQ.isPending) return { name, state: "unknown" as const };
@@ -367,6 +451,100 @@ export function AdminPage() {
         <h1>Admin</h1>
         <p className="admin-subtitle">{currentUser?.email || "Unknown email"}</p>
       </header>
+
+      <section className="admin-section admin-section--deployment">
+        <h2>Last deployment</h2>
+        <div className="admin-deploy-stack">
+          <div className="admin-card admin-deploy-card">
+            {NETLIFY_DEPLOY_BADGE_URL ? (
+              <a
+                className="admin-deploy-link"
+                href={NETLIFY_DEPLOYS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open Netlify deploys and build logs"
+              >
+                <img
+                  className="admin-deploy-badge"
+                  src={NETLIFY_DEPLOY_BADGE_URL}
+                  alt=""
+                  decoding="async"
+                />
+              </a>
+            ) : (
+              <p className="admin-deploy-fallback">
+                <a
+                  className="admin-deploy-text-link"
+                  href={NETLIFY_DEPLOYS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Netlify deploys
+                  <span aria-hidden="true"> ↗</span>
+                </a>
+                <span className="admin-deploy-hint">
+                  {" "}
+                  · set <code className="admin-deploy-code">VITE_NETLIFY_SITE_ID</code> for the status badge
+                </span>
+              </p>
+            )}
+          </div>
+
+          {latestDeployQ.isPending ? (
+            <p className="admin-deploy-api-line">Loading deploy details…</p>
+          ) : null}
+          {latestDeployQ.isError ? (
+            <p className="admin-deploy-api-line admin-deploy-api-line--warn">
+              Could not load deploy details
+              {latestDeployQ.error instanceof Error ? `: ${latestDeployQ.error.message}` : "."}
+            </p>
+          ) : null}
+
+          {latestDeployQ.data?.ok === false && latestDeployQ.data.error === "not_configured" ? (
+            <p className="admin-deploy-api-line">
+              Set <code className="admin-deploy-code">NETLIFY_API_TOKEN</code> and{" "}
+              <code className="admin-deploy-code">NETLIFY_SITE_ID</code> in Netlify environment variables (and{" "}
+              <code className="admin-deploy-code">.env</code> for local functions) to show failure reasons here.{" "}
+              <code className="admin-deploy-code">NETLIFY_SITE_ID</code> should match{" "}
+              <code className="admin-deploy-code">VITE_NETLIFY_SITE_ID</code>.
+            </p>
+          ) : null}
+
+          {latestDeployQ.data?.ok === false &&
+          latestDeployQ.data.error &&
+          latestDeployQ.data.error !== "not_configured" ? (
+            <p className="admin-deploy-api-line admin-deploy-api-line--warn">
+              {latestDeployQ.data.message || latestDeployQ.data.error}
+            </p>
+          ) : null}
+
+          {latestDeployQ.data?.ok === true &&
+          latestDeployQ.data.deploy &&
+          latestDeployQ.data.deploy.state === "error" ? (
+            <div className="admin-deploy-failure" role="status">
+              <div className="admin-deploy-failure-label">Failure reason</div>
+              <div className="admin-deploy-failure-body">
+                {latestDeployQ.data.deploy.error_message ||
+                  latestDeployQ.data.deploy.summary ||
+                  "Netlify reported a failed deploy (no message in API response)."}
+              </div>
+              {latestDeployQ.data.deploy.error_message &&
+              latestDeployQ.data.deploy.summary &&
+              latestDeployQ.data.deploy.summary !== latestDeployQ.data.deploy.error_message ? (
+                <div className="admin-deploy-failure-secondary">{latestDeployQ.data.deploy.summary}</div>
+              ) : null}
+              <a
+                className="admin-deploy-failure-link"
+                href={latestDeployQ.data.deploy.admin_url || NETLIFY_DEPLOYS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open in Netlify ↗
+              </a>
+            </div>
+          ) : null}
+        </div>
+      </section>
 
       <section className="admin-section">
         <h2>Service Links</h2>

@@ -1,3 +1,6 @@
+# Environment variable checklist (Netlify UI + local .env): docs/netlify-environment.md
+# Delete VITE_AXIOM_TOKEN and VITE_AXIOM_DATASET in Netlify — they are not used and break secret scanning.
+
 [build]
   publish = "dist"
   command = "npm run build:react"

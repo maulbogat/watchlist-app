@@ -1,6 +1,9 @@
 {
   "name": "movie-trailer-site",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev:react": "vite --host",
     "build:react": "vite build",
