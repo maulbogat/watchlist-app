@@ -150,6 +150,17 @@ function titleYearKey(m: ListRowForHydrate | null | undefined): string {
   return `${rec.title ?? ""}|${rec.year ?? ""}`;
 }
 
+function normalizeAddedAt(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return null;
+  return new Date(ms).toISOString();
+}
+
+function ensureAddedAt(value: unknown): string {
+  return normalizeAddedAt(value) ?? new Date().toISOString();
+}
+
 const REGISTRY_READ_BATCH = 30;
 
 async function bulkGetTitleRegistryDocData(ids: readonly string[]): Promise<Map<string, DocumentData>> {
@@ -210,6 +221,7 @@ async function hydrateListItemsFromRegistry(
     out.push({
       ...meta,
       registryId: rid,
+      addedAt: normalizeAddedAt(meta.addedAt),
       title: typeof meta.title === "string" ? meta.title : "Unknown",
       year: (() => {
         if (meta.year == null || meta.year === "") return null;
@@ -243,7 +255,8 @@ async function hydrateListItemsFromRegistry(
     else if (maybeLaterSet.has(k)) status = "maybe-later";
     else if (archiveSet.has(k)) status = "archive";
     // Legacy embedded rows: shape varies; runtime matches historical Firestore embeds.
-    out.push({ ...(m as Record<string, unknown>), status } as WatchlistItem);
+    const legacyMeta = m as Record<string, unknown>;
+    out.push({ ...legacyMeta, addedAt: normalizeAddedAt(legacyMeta.addedAt), status } as WatchlistItem);
   }
 
   const rawCount = (items || []).filter((m) => m != null).length;
@@ -261,9 +274,10 @@ async function hydrateListItemsFromRegistry(
 /** Persisted list row: reference only when registryId is known; else legacy embedded doc. */
 function rowToStore(movie: WatchlistItem | FirestoreListRow | null | undefined): FirestoreListRow {
   if (!movie || typeof movie !== "object") return {};
-  if (movie.registryId) return { registryId: movie.registryId };
+  const rec = movie as Record<string, unknown>;
+  if (movie.registryId) return { registryId: movie.registryId, addedAt: ensureAddedAt(rec.addedAt) };
   const { status: _status, ...clean } = movie as FirestoreListRow & { status?: unknown };
-  return clean;
+  return { ...clean, addedAt: ensureAddedAt((clean as Record<string, unknown>).addedAt) };
 }
 
 function randomId(): string {

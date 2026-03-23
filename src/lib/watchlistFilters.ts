@@ -36,6 +36,11 @@ export interface FilterState {
 /** Pure filter pipeline for the grid (type, status, genre, recently-added). */
 export function filterTitles(movies: WatchlistItem[] | undefined, filters: FilterState): WatchlistItem[] {
   const listMovies = movies || [];
+  function toEpochOrNegInf(value: unknown): number {
+    if (typeof value !== "string" || !value.trim()) return Number.NEGATIVE_INFINITY;
+    const ms = Date.parse(value);
+    return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
+  }
 
   function sortVisibleTitles(list: WatchlistItem[]): WatchlistItem[] {
     if (filters.currentSort === "release-desc") {
@@ -52,8 +57,8 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
   }
 
   if (filters.currentStatus === "recently-added") {
-    const recent: WatchlistItem[] = [];
-    for (let i = listMovies.length - 1; i >= 0 && recent.length < 10; i--) {
+    const recentCandidates: Array<{ movie: WatchlistItem; index: number; addedAtMs: number }> = [];
+    for (let i = listMovies.length - 1; i >= 0; i--) {
       const m = listMovies[i];
       if (!m) continue;
       const s = m.status || "to-watch";
@@ -67,9 +72,13 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
           continue;
         }
       }
-      recent.push(m);
+      recentCandidates.push({ movie: m, index: i, addedAtMs: toEpochOrNegInf(m.addedAt) });
     }
-    return sortVisibleTitles(recent);
+    recentCandidates.sort((a, b) => {
+      if (b.addedAtMs !== a.addedAtMs) return b.addedAtMs - a.addedAtMs;
+      return b.index - a.index;
+    });
+    return recentCandidates.slice(0, 10).map((entry) => entry.movie);
   }
 
   let list =

@@ -328,6 +328,30 @@ function adminRandomListId() {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizeAddedAt(value) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const t = Date.parse(value);
+  if (Number.isNaN(t)) return null;
+  return new Date(t).toISOString();
+}
+
+/**
+ * @param {string} registryId
+ * @param {Record<string, unknown> | null | undefined} existingRow
+ * @returns {{ registryId: string, addedAt: string }}
+ */
+function toStoredRegistryRef(registryId, existingRow) {
+  const keepExisting = normalizeAddedAt(existingRow?.addedAt);
+  return {
+    registryId,
+    addedAt: keepExisting || new Date().toISOString(),
+  };
+}
+
+/**
  * Mirror client migrate: move legacy `users/{uid}.items` → `users/{uid}/personalLists/{id}`.
  * @param {import('firebase-admin/firestore').Firestore} db
  * @param {string} uid
@@ -645,13 +669,13 @@ exports.handler = async (event, context) => {
       const merged = { ...existing, ...movie };
       await writeRegistryMerge(merged);
       const oldKey = listKey(existing);
-      items[idx] = { registryId };
+      items[idx] = toStoredRegistryRef(registryId, existing);
       watched = remapStatusKeys(watched, oldKey, registryId);
       maybeLater = remapStatusKeys(maybeLater, oldKey, registryId);
       archive = remapStatusKeys(archive, oldKey, registryId);
     } else {
       await writeRegistryMerge(movie);
-      items.push({ registryId });
+      items.push(toStoredRegistryRef(registryId));
     }
 
     await listRef.set({ items, watched, maybeLater, archive }, { merge: true });
@@ -726,13 +750,13 @@ exports.handler = async (event, context) => {
 
     await writeRegistryMerge(merged);
     const oldKey = listKey(existing);
-    items[idx] = { registryId };
+    items[idx] = toStoredRegistryRef(registryId, existing);
     watched = remapStatusKeys(watched, oldKey, registryId);
     maybeLater = remapStatusKeys(maybeLater, oldKey, registryId);
     archive = remapStatusKeys(archive, oldKey, registryId);
   } else {
     await writeRegistryMerge(movie);
-    items.push({ registryId });
+    items.push(toStoredRegistryRef(registryId));
     if (movie.tmdbId != null && movie.tmdbId !== "") shouldSyncUpcoming = true;
   }
 

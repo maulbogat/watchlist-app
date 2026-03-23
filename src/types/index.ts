@@ -12,6 +12,7 @@ export type ServicesByRegion = Record<string, string[]>;
 /** Hydrated list row (titleRegistry merge + runtime `status`). */
 export interface WatchlistItem {
   registryId?: string;
+  addedAt?: string | null;
   title: string;
   year: number | null;
   type: MediaType;
