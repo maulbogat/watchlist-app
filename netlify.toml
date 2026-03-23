@@ -5,6 +5,15 @@
   publish = "dist"
   command = "npm run build:react"
   functions = "netlify/functions"
+  # No [build.environment] subsection — avoids duplicating env in this file (which can
+  # contribute to AWS Lambda’s 4KB env limit when vars are also injected into functions).
+  # Configure variables in Netlify UI with Build vs Functions scopes; see docs/netlify-environment.md.
+  # Do NOT add these here (local Node scripts / not required in this repo’s Netlify config):
+  #   WATCH_REGION, DEFAULT_WATCH_REGION, REGISTRY_WATCH_REGION, CATALOG_WATCH_REGION,
+  #   USER_UID, TRAKT_CLIENT_ID, NETLIFY_API_TOKEN.
+  # Also do not duplicate under [build.environment]: VITE_NETLIFY_SITE_ID,
+  # UPCOMING_SYNC_TRIGGER_SECRET — when needed in production, set them in the Netlify UI
+  # (Builds and/or Functions scope), not in netlify.toml.
 
 # Daily TMDB → Firestore upcomingAlerts (3:00 UTC)
 [functions."check-upcoming"]
