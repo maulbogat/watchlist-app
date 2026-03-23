@@ -56,6 +56,8 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
     for (let i = listMovies.length - 1; i >= 0 && recent.length < 10; i--) {
       const m = listMovies[i];
       if (!m) continue;
+      const s = m.status || "to-watch";
+      if (s !== "to-watch") continue;
       if (filters.currentFilter !== "both" && m.type !== filters.currentFilter) continue;
       if (filters.currentGenre) {
         const g = String(m.genre || "");
