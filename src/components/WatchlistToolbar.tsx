@@ -2,7 +2,7 @@ import { useAppStore, STATUS_LABELS } from "../store/useAppStore.js";
 import { persistFilterPreferences } from "../lib/storage.js";
 import { getUniqueGenresFromMovies } from "../lib/watchlistFilters.js";
 import { logEvent } from "../lib/axiom-logger.js";
-import type { FilterType, WatchlistItem } from "../types/index.js";
+import type { FilterType, SortType, WatchlistItem } from "../types/index.js";
 
 interface WatchlistToolbarProps {
   allMovies: WatchlistItem[];
@@ -17,6 +17,8 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
   const setCurrentGenre = useAppStore((s) => s.setCurrentGenre);
   const currentStatus = useAppStore((s) => s.currentStatus);
   const setCurrentStatus = useAppStore((s) => s.setCurrentStatus);
+  const currentSort = useAppStore((s) => s.currentSort);
+  const setCurrentSort = useAppStore((s) => s.setCurrentSort);
 
   const genres = getUniqueGenresFromMovies(allMovies);
 
@@ -25,6 +27,7 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
       currentFilter: useAppStore.getState().currentFilter,
       currentGenre: useAppStore.getState().currentGenre,
       currentStatus: useAppStore.getState().currentStatus,
+      currentSort: useAppStore.getState().currentSort,
     });
   }
 
@@ -100,6 +103,29 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
             <label htmlFor={id}>{label}</label>
           </span>
         ))}
+      </div>
+      <div className="sort-wrap">
+        <label htmlFor="sort-select">Sort</label>
+        <select
+          id="sort-select"
+          className="sort-select"
+          value={currentSort}
+          onChange={(e) => {
+            const nextSort = e.target.value as SortType;
+            setCurrentSort(nextSort);
+            persistFilters();
+            void logEvent({
+              type: "user.action",
+              action: "filter.change",
+              filterType: "sort",
+              value: nextSort,
+              uid: currentUser?.uid ?? null,
+            }).catch(() => {});
+          }}
+        >
+          <option value="title-asc">Title (A-Z)</option>
+          <option value="release-desc">Release Date (New-Old)</option>
+        </select>
       </div>
       {genres.length ? (
         <div id="genre-filter-wrap" className="genre-filter-wrap" style={{ display: "flex" }}>

@@ -37,6 +37,7 @@ export interface FilterPrefsSnapshot {
   currentFilter: string;
   currentGenre: string;
   currentStatus: string;
+  currentSort: string;
 }
 
 /** Read saved type / status / genre filters from localStorage (per signed-in user). */
@@ -52,6 +53,7 @@ export function readFilterPreferences(user: User | null): FilterPrefsSnapshot | 
       currentFilter: typeof o.currentFilter === "string" ? o.currentFilter : "both",
       currentGenre: typeof o.currentGenre === "string" ? o.currentGenre : "",
       currentStatus: typeof o.currentStatus === "string" ? o.currentStatus : "to-watch",
+      currentSort: typeof o.currentSort === "string" ? o.currentSort : "title-asc",
     };
   } catch {
     return null;
@@ -68,6 +70,7 @@ export function persistFilterPreferences(user: User | null, prefs: FilterPrefsSn
         currentFilter: prefs.currentFilter,
         currentGenre: prefs.currentGenre,
         currentStatus: prefs.currentStatus,
+        currentSort: prefs.currentSort,
       })
     );
   } catch {

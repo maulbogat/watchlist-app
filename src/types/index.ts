@@ -5,6 +5,7 @@ export type MediaType = "movie" | "show";
 export type StatusKey = "to-watch" | "watched" | "maybe-later" | "archive";
 
 export type FilterType = "both" | "movie" | "show";
+export type SortType = "title-asc" | "release-desc";
 
 export type ServicesByRegion = Record<string, string[]>;
 

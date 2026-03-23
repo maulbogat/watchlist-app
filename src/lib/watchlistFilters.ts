@@ -30,11 +30,26 @@ export interface FilterState {
   currentFilter: string;
   currentGenre: string;
   currentStatus: string;
+  currentSort: string;
 }
 
 /** Pure filter pipeline for the grid (type, status, genre, recently-added). */
 export function filterTitles(movies: WatchlistItem[] | undefined, filters: FilterState): WatchlistItem[] {
   const listMovies = movies || [];
+
+  function sortVisibleTitles(list: WatchlistItem[]): WatchlistItem[] {
+    if (filters.currentSort === "release-desc") {
+      return [...list].sort((a, b) => {
+        const aYear = typeof a.year === "number" ? a.year : -Infinity;
+        const bYear = typeof b.year === "number" ? b.year : -Infinity;
+        if (bYear !== aYear) return bYear - aYear;
+        return String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" });
+      });
+    }
+    return [...list].sort((a, b) =>
+      String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" })
+    );
+  }
 
   if (filters.currentStatus === "recently-added") {
     const recent: WatchlistItem[] = [];
@@ -52,7 +67,7 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
       }
       recent.push(m);
     }
-    return recent;
+    return sortVisibleTitles(recent);
   }
 
   let list =
@@ -70,7 +85,5 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
     });
   }
 
-  return [...list].sort((a, b) =>
-    String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" })
-  );
+  return sortVisibleTitles(list);
 }

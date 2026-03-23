@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { User } from "firebase/auth";
-import type { FilterType, ListMode, WatchlistItem } from "../types/index.js";
+import type { FilterType, ListMode, SortType, WatchlistItem } from "../types/index.js";
 import {
   STATUS_ORDER,
   GENRE_LIMIT,
@@ -21,6 +21,9 @@ export interface AppState {
 
   currentFilter: FilterType;
   setCurrentFilter: (currentFilter: FilterType) => void;
+
+  currentSort: SortType;
+  setCurrentSort: (currentSort: SortType) => void;
 
   currentGenre: string;
   setCurrentGenre: (currentGenre: string) => void;
@@ -56,6 +59,9 @@ export const useAppStore = create<AppState>()((set) => ({
 
   currentFilter: "both",
   setCurrentFilter: (currentFilter) => set({ currentFilter }),
+
+  currentSort: "title-asc",
+  setCurrentSort: (currentSort) => set({ currentSort }),
 
   currentGenre: "",
   setCurrentGenre: (currentGenre) => set({ currentGenre }),

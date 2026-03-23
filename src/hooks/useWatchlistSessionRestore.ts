@@ -56,6 +56,10 @@ export function useWatchlistSessionRestore(
               ? prefs.currentStatus
               : s.currentStatus,
           currentGenre: typeof prefs.currentGenre === "string" ? prefs.currentGenre : s.currentGenre,
+          currentSort:
+            prefs.currentSort === "title-asc" || prefs.currentSort === "release-desc"
+              ? prefs.currentSort
+              : s.currentSort,
         }));
       }
 
