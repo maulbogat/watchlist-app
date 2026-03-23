@@ -13,8 +13,8 @@ cp .env.example .env
 
 Then set values in:
 
-- `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional script toggles)
-- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional `VITE_AXIOM_*`, optional `VITE_APP_VERSION`)
+- `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional `AXIOM_*`, optional script toggles)
+- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional `VITE_APP_VERSION`)
 
 ## Run locally
 
@@ -30,7 +30,7 @@ npm run dev:react
 Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--host` so LAN devices can reach it if needed.
 
 - **Firebase Auth:** Add your dev host (e.g. `localhost` and the port you use) under Firebase Console → Authentication → Settings → **Authorized domains**.
-- **Netlify functions locally:** `vite.config.ts` proxies `/.netlify/functions/*` to `http://localhost:8888`. To exercise the bookmarklet add flow against real functions, run **`netlify dev`** in another terminal (or start the functions server on `8888` per Netlify docs) while using the Vite app.
+- **Netlify functions locally:** `vite.config.ts` proxies `/.netlify/functions/*` to `http://localhost:8888`. For **bookmarklet**, **shared-list join**, **`log-client-event`** (browser → Axiom), and **upcoming jobs**, load the same vars as production into `.env` / `.env.local` and run **`netlify dev`** (all-in-one) **or** run **`netlify functions:serve`** / **`netlify dev`** on port **8888** in another terminal while **`npm run dev:react`** is running.
 
 **Other commands**
 
@@ -54,9 +54,8 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
   - `VITE_FIREBASE_APP_ID`
 - Optional client variables:
   - `VITE_FIREBASE_MEASUREMENT_ID` (Analytics)
-  - `VITE_AXIOM_TOKEN`
-  - `VITE_AXIOM_DATASET`
   - `VITE_APP_VERSION` (defaults to `1.0.0` when missing)
+- **Axiom (client events):** do **not** use `VITE_AXIOM_*`. The app POSTs to **`/.netlify/functions/log-client-event`** with a Firebase ID token; **`AXIOM_TOKEN`** and **`AXIOM_DATASET`** are server-only (Netlify **Environment variables** + local `.env` when running functions).
 - `src/config/firebase.ts` normalizes/sanitizes client config values and falls back to project defaults when values are missing or malformed.
 
 ## Firebase setup
@@ -74,6 +73,15 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
 ## Netlify deployment (bookmarklet)
 
 **Build:** `netlify.toml` runs **`npm run build:react`** and publishes **`dist/`** (includes `index.html` + hashed assets). The live site is the **React** watchlist.
+
+### Production missing new UI after a Git push?
+
+GitHub alone does not update the live site — **Netlify must build and publish** that commit.
+
+1. **Netlify → Deploys:** Open the latest deploy. It should be **Published** and show the **same commit** you pushed. If it’s missing or **Failed**, open **Deploy log** and fix the error (often a build or env var issue).
+2. **Branch:** **Site configuration → Build & deploy → Continuous deployment → Production branch** must match the branch you push (e.g. `main`). Pushes to another branch only create **Deploy Previews**, not production.
+3. **Clear cache:** **Deploys → … menu → Clear cache and deploy site** if assets look stuck on an old bundle.
+4. **Browser:** Hard refresh (e.g. Cmd+Shift+R) or try a private window — rare, but a cached `index.html` can point at old hashed JS until refreshed.
 
 For the IMDb bookmarklet to add titles from imdb.com:
 
@@ -95,11 +103,23 @@ For the IMDb bookmarklet to add titles from imdb.com:
    - `VITE_FIREBASE_MESSAGING_SENDER_ID`
    - `VITE_FIREBASE_APP_ID`
    - Optional: `VITE_FIREBASE_MEASUREMENT_ID`
-   - Optional: `VITE_AXIOM_TOKEN`, `VITE_AXIOM_DATASET`, `VITE_APP_VERSION`
+   - Optional: `VITE_APP_VERSION`
 
-5. Optional server observability vars for Netlify functions:
-   - `AXIOM_TOKEN`
-   - `AXIOM_DATASET`
+5. **Server-only observability & jobs** (set in Netlify **Environment variables**; same keys in local `.env` when running functions):
+
+   | Variable | Used for |
+   |----------|----------|
+   | `AXIOM_TOKEN`, `AXIOM_DATASET` | All function logs (`lib/logger.js`), **`log-client-event`** (browser analytics), scheduled **`check-upcoming`**, bookmarklet, etc. |
+   | `TMDB_API_KEY` | **`check-upcoming`**, **`trigger-upcoming-sync`**, **`add-from-imdb`**, scripts |
+   | `FIREBASE_SERVICE_ACCOUNT` | Admin SDK in functions (required for **`log-client-event`** token verify, Firestore writes, etc.) |
+   | `OMDB_API_KEY` | **`add-from-imdb`** (bookmarklet) |
+   | `UPCOMING_SYNC_TRIGGER_SECRET` | Optional auth on **`trigger-upcoming-sync`** manual runs |
+
+   **Remove any old `VITE_AXIOM_TOKEN` / `VITE_AXIOM_DATASET`** from Netlify — they are no longer used and previously **inlined tokens into `dist/`**, which triggered [secret scanning](https://docs.netlify.com/manage/security/secret-scanning/) failures. Client events use **`log-client-event`** only.
+
+### Netlify: “Potentially exposed secrets” / failed build
+
+Builds fail if Netlify’s scanner finds secret-like strings in **published `dist/` assets** or **logs**. This project keeps **`AXIOM_*` on the server** only; do not reintroduce **`VITE_AXIOM_*`**. If something else is flagged, use the deploy log location and Netlify’s **`SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES`** [safelist](https://docs.netlify.com/manage/security/secret-scanning/#manage-false-positives) for false positives.
 
 6. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
 

@@ -1,4 +1,7 @@
-import { Axiom } from "@axiomhq/js";
+import { getApp, getApps, initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+
+import { firebaseConfig } from "../config/firebase.js";
 
 type LogValue = string | number | boolean | null | undefined;
 type LogEventPayload = {
@@ -6,18 +9,14 @@ type LogEventPayload = {
   uid?: string | null;
 } & Record<string, LogValue>;
 
-const token = import.meta.env.VITE_AXIOM_TOKEN as string | undefined;
-const dataset = import.meta.env.VITE_AXIOM_DATASET as string | undefined;
 const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) || "1.0.0";
 const environment = import.meta.env.MODE || "unknown";
 
-let axiomClient: Axiom | null = null;
-if (token && dataset) {
-  try {
-    axiomClient = new Axiom({ token });
-  } catch {
-    axiomClient = null;
-  }
+/** Same-origin Netlify function — token stays on the server (`AXIOM_*`), not in `dist/` bundles. */
+const LOG_CLIENT_EVENT_PATH = "/.netlify/functions/log-client-event";
+
+function getFirebaseApp() {
+  return getApps().length ? getApp() : initializeApp(firebaseConfig);
 }
 
 function devConsoleFallback(event: Record<string, unknown>) {
@@ -26,6 +25,17 @@ function devConsoleFallback(event: Record<string, unknown>) {
     console.log("[axiom]", event);
   } catch {
     // logging must never break flow
+  }
+}
+
+async function getClientIdToken(): Promise<string | null> {
+  try {
+    const auth = getAuth(getFirebaseApp());
+    const user = auth.currentUser;
+    if (!user) return null;
+    return await user.getIdToken();
+  } catch {
+    return null;
   }
 }
 
@@ -40,14 +50,27 @@ export async function logEvent(payload: LogEventPayload): Promise<void> {
       ...rest,
     };
 
-    if (!axiomClient || !dataset) {
+    if (import.meta.env.DEV) {
       devConsoleFallback(event);
+    }
+
+    const idToken = await getClientIdToken();
+    if (!idToken) {
       return;
     }
 
-    Promise.resolve(axiomClient.ingest(dataset, event)).catch(() => {
-      devConsoleFallback(event);
+    const res = await fetch(LOG_CLIENT_EVENT_PATH, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(event),
     });
+
+    if (!res.ok && import.meta.env.DEV) {
+      devConsoleFallback({ ...event, _logClientHttpError: res.status });
+    }
   } catch {
     // logging must never break flow
   }

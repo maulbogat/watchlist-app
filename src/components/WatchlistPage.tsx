@@ -306,12 +306,10 @@ export function WatchlistPage() {
           </div>
         ) : (
           <>
-            {allMovies.length > 0 ? (
-              <WatchlistToolbar
-                allMovies={allMovies}
-                visibleCount={visibleMovies.length}
-              />
-            ) : null}
+            <WatchlistToolbar
+              allMovies={allMovies}
+              visibleCount={visibleMovies.length}
+            />
             <TitleGrid
               visibleMovies={visibleMovies}
               currentStatus={currentStatus}
