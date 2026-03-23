@@ -1,4 +1,10 @@
-const SERVER_ENV_KEYS = ["TMDB_API_KEY", "OMDB_API_KEY", "FIREBASE_SERVICE_ACCOUNT"];
+const SERVER_ENV_KEYS = [
+  "TMDB_API_KEY",
+  "OMDB_API_KEY",
+  "FIREBASE_SERVICE_ACCOUNT",
+  "AXIOM_TOKEN",
+  "AXIOM_DATASET",
+];
 
 function corsHeaders() {
   return {
