@@ -45,6 +45,8 @@
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
+
+const APP_NAME = "watchlist-admin";
 const https = require("https");
 const { runSingleTitleSync } = require("./lib/sync-upcoming-alerts");
 const { registryDocIdFromItem, payloadForRegistry, listKey } = require("./lib/registry-id.cjs");
@@ -80,12 +82,12 @@ function isPlayableYoutubeTrailerId(v) {
  * @returns {import('firebase-admin/app').App}
  */
 function getApp() {
-  if (global.__fbAdmin) return global.__fbAdmin;
+  if (global.__watchlistAdminApp) return global.__watchlistAdminApp;
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT not set");
   const key = JSON.parse(Buffer.from(raw, "base64").toString("utf-8"));
-  const app = initializeApp({ credential: cert(key) });
-  global.__fbAdmin = app;
+  const app = initializeApp({ credential: cert(key), projectId: key.project_id }, APP_NAME);
+  global.__watchlistAdminApp = app;
   return app;
 }
 

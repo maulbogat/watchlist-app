@@ -974,15 +974,6 @@ async function getJobConfigState(): Promise<JobConfigState> {
       // non-json function/proxy error
     }
     if (!res.ok || data.ok === false || !data.config) {
-      if (
-        import.meta.env.DEV &&
-        res.status === 500 &&
-        (!raw || /ECONNREFUSED|proxy|socket|localhost:8888/i.test(raw))
-      ) {
-        throw new Error(
-          "Jobs API is unreachable in local dev. Run Netlify functions (`netlify dev`) so `/.netlify/functions/*` is available."
-        );
-      }
       throw new Error(data.error || `Request failed (${res.status})`);
     }
     return {
@@ -993,12 +984,8 @@ async function getJobConfigState(): Promise<JobConfigState> {
       lastRunResult: (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err || "");
-    const localHint =
-      import.meta.env.DEV && /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)
-        ? "Admin jobs endpoint unavailable. Start Netlify functions (`netlify dev`) for local testing."
-        : msg || "Failed to load job config.";
-    throw new Error(localHint);
+    if (err instanceof Error) throw err;
+    throw new Error(String(err || "Failed to load job config."));
   }
 }
 
@@ -1021,15 +1008,6 @@ async function setCheckUpcomingEnabledState(enabled: boolean): Promise<JobConfig
       // non-json function/proxy error
     }
     if (!res.ok || data.ok === false || !data.config) {
-      if (
-        import.meta.env.DEV &&
-        res.status === 500 &&
-        (!raw || /ECONNREFUSED|proxy|socket|localhost:8888/i.test(raw))
-      ) {
-        throw new Error(
-          "Jobs API is unreachable in local dev. Run Netlify functions (`netlify dev`) so `/.netlify/functions/*` is available."
-        );
-      }
       throw new Error(data.error || `Request failed (${res.status})`);
     }
     return {
@@ -1040,12 +1018,8 @@ async function setCheckUpcomingEnabledState(enabled: boolean): Promise<JobConfig
       lastRunResult: (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err || "");
-    const localHint =
-      import.meta.env.DEV && /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)
-        ? "Admin jobs endpoint unavailable. Start Netlify functions (`netlify dev`) for local testing."
-        : msg || "Failed to update job config.";
-    throw new Error(localHint);
+    if (err instanceof Error) throw err;
+    throw new Error(String(err || "Failed to update job config."));
   }
 }
 
