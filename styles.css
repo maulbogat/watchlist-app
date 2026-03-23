@@ -2277,7 +2277,7 @@ header h1 span {
 }
 
 /* --- Upcoming alerts (TMDB sync → Firestore) --- */
-/* Match space above pills to space below: panel padding (12px) + mount margin (20px) ≈ 32px each side */
+/* Match space above pills to space below: panel padding + mount padding + mount margin to filter tabs */
 body:has(#upcoming-alerts-mount:not([hidden])) header {
   margin-bottom: 20px;
 }
@@ -2287,6 +2287,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   position: relative;
   z-index: 50;
   margin-bottom: 20px;
+  padding-bottom: 12px;
   /* No band: pills sit on the same page background as the rest of the app */
   background: transparent;
 }
