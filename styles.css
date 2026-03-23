@@ -330,21 +330,35 @@ header h1 span {
   flex-shrink: 0;
   opacity: 0.8;
 }
-.custom-dropdown-item:hover .custom-dropdown-icon,
-.custom-dropdown-item[aria-selected="true"] .custom-dropdown-icon {
+
+/*
+ * List selector (Radix Select): use data-highlighted / data-state — not :hover / aria-selected.
+ * Radix only sets aria-selected when the row is both selected AND focused; shadcn’s focus:bg-accent
+ * plus our old rules caused gold-on-gold and muddy contrast.
+ */
+#list-selector-panel [data-slot="select-item"] {
+  color: var(--muted);
+  background: transparent !important;
+}
+#list-selector-panel [data-slot="select-item"] .custom-dropdown-icon {
+  opacity: 0.85;
+  color: inherit;
+}
+#list-selector-panel [data-slot="select-item"][data-state="checked"] {
+  background: rgba(232, 201, 106, 0.12) !important;
+  color: var(--accent) !important;
+}
+#list-selector-panel [data-slot="select-item"][data-highlighted] {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--text) !important;
+}
+#list-selector-panel [data-slot="select-item"][data-state="checked"][data-highlighted] {
+  background: rgba(232, 201, 106, 0.22) !important;
+  color: var(--text) !important;
+}
+#list-selector-panel [data-slot="select-item"][data-highlighted] .custom-dropdown-icon {
   opacity: 1;
 }
-
-.custom-dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
-}
-
-.custom-dropdown-item[aria-selected="true"] {
-  background: rgba(232, 201, 106, 0.14);
-  color: var(--accent);
-}
-
 
 .list-settings-btn {
   display: flex;
@@ -2114,16 +2128,38 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   color: var(--accent);
 }
 
-/* Tight block: heading + deploy badge don’t span the full admin content width */
-.admin-section--deployment {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.45rem;
+/* Jobs + Last deployment side by side (half width each on ≥768px) */
+.admin-section--jobs-deploy .admin-jobs-deploy-grid {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
 }
 
-.admin-section--deployment h2 {
-  margin-bottom: 0;
+@media (min-width: 768px) {
+  .admin-section--jobs-deploy .admin-jobs-deploy-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+}
+
+.admin-jobs-deploy-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-jobs-deploy-col .admin-deploy-stack {
+  max-width: 100%;
+}
+
+.admin-section--jobs-deploy .admin-job-row {
+  flex-wrap: wrap;
+}
+
+.admin-section--jobs-deploy .admin-job-value {
+  min-width: 0;
+  flex: 1 1 8rem;
+  word-break: break-word;
 }
 
 .admin-grid {
@@ -2455,59 +2491,6 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   to {
     transform: rotate(360deg);
   }
-}
-
-.admin-env-card {
-  padding: 0.7rem 0.85rem 0.85rem;
-}
-
-.admin-env-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.admin-env-table th,
-.admin-env-table td {
-  text-align: left;
-  padding: 0.45rem 0.3rem;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.86rem;
-}
-
-.admin-env-table th {
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.72rem;
-}
-
-.admin-env-table th:last-child,
-.admin-env-table td:last-child {
-  width: 105px;
-  text-align: center;
-}
-
-.admin-env-ok {
-  color: #69d48a;
-  font-weight: 700;
-}
-
-.admin-env-bad {
-  color: #ee6e6e;
-  font-weight: 700;
-}
-
-.admin-env-unknown {
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.admin-note {
-  margin-top: 0.6rem;
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.35;
 }
 
 .admin-footer {

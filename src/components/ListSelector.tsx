@@ -86,12 +86,12 @@ export function ListSelector({ personalLists, sharedLists, onManageLists }: List
             </SelectValue>
           </SelectTrigger>
           <SelectContent
-            className="custom-dropdown-content min-w-[180px] border border-[var(--border)] bg-[var(--surface2)] text-[var(--text)]"
+            className="custom-dropdown-content min-w-[180px] border border-[var(--border)] bg-[var(--surface2)] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.08]"
             id="list-selector-panel"
             position="popper"
             side="bottom"
             align="start"
-            sideOffset={6}
+            sideOffset={8}
             avoidCollisions={false}
           >
             {items.map(({ value, label: itemLabel, icon }) => (
