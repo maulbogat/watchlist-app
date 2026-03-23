@@ -25,6 +25,9 @@ export interface AppState {
   currentSort: SortType;
   setCurrentSort: (currentSort: SortType) => void;
 
+  currentSearch: string;
+  setCurrentSearch: (currentSearch: string) => void;
+
   currentGenre: string;
   setCurrentGenre: (currentGenre: string) => void;
 
@@ -62,6 +65,9 @@ export const useAppStore = create<AppState>()((set) => ({
 
   currentSort: "title-asc",
   setCurrentSort: (currentSort) => set({ currentSort }),
+
+  currentSearch: "",
+  setCurrentSearch: (currentSearch) => set({ currentSearch }),
 
   currentGenre: "",
   setCurrentGenre: (currentGenre) => set({ currentGenre }),

@@ -36,6 +36,7 @@ export function WatchlistPage() {
   const currentGenre = useAppStore((s) => s.currentGenre);
   const currentStatus = useAppStore((s) => s.currentStatus);
   const currentSort = useAppStore((s) => s.currentSort);
+  const currentSearch = useAppStore((s) => s.currentSearch);
   const userCountryCode = useAppStore((s) => s.userCountryCode);
   const setUserCountryCode = useAppStore((s) => s.setUserCountryCode);
 
@@ -112,8 +113,8 @@ export function WatchlistPage() {
   }, [allMovies, currentGenre]);
 
   const visibleMovies = useMemo(
-    () => filterTitles(allMovies, { currentFilter, currentGenre, currentStatus, currentSort }),
-    [allMovies, currentFilter, currentGenre, currentStatus, currentSort]
+    () => filterTitles(allMovies, { currentFilter, currentGenre, currentStatus, currentSort, currentSearch }),
+    [allMovies, currentFilter, currentGenre, currentStatus, currentSort, currentSearch]
   );
 
   const personalLists = personalQ.data ?? [];

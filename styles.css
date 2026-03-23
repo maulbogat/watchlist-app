@@ -802,6 +802,39 @@ body:has(#lists-modal[data-state="open"]) [data-slot="dialog-overlay"] {
   border-color: rgba(232,201,106,0.45);
 }
 
+.search-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.search-wrap label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.search-input {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  padding: 8px 12px;
+  min-width: 180px;
+}
+
+.search-input::placeholder {
+  color: var(--muted);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: rgba(232,201,106,0.45);
+}
+
 .content {
   max-width: 1400px;
   margin: 0 auto;

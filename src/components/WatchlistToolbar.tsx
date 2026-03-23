@@ -19,6 +19,8 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
   const setCurrentStatus = useAppStore((s) => s.setCurrentStatus);
   const currentSort = useAppStore((s) => s.currentSort);
   const setCurrentSort = useAppStore((s) => s.setCurrentSort);
+  const currentSearch = useAppStore((s) => s.currentSearch);
+  const setCurrentSearch = useAppStore((s) => s.setCurrentSearch);
 
   const genres = getUniqueGenresFromMovies(allMovies);
 
@@ -28,6 +30,7 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
       currentGenre: useAppStore.getState().currentGenre,
       currentStatus: useAppStore.getState().currentStatus,
       currentSort: useAppStore.getState().currentSort,
+      currentSearch: useAppStore.getState().currentSearch,
     });
   }
 
@@ -126,6 +129,29 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
           <option value="title-asc">Title (A-Z)</option>
           <option value="release-desc">Release Date (New-Old)</option>
         </select>
+      </div>
+      <div className="search-wrap">
+        <label htmlFor="title-search">Search</label>
+        <input
+          id="title-search"
+          type="text"
+          className="search-input"
+          placeholder="Search titles"
+          value={currentSearch}
+          onChange={(e) => {
+            setCurrentSearch(e.target.value);
+            persistFilters();
+          }}
+          onBlur={() => {
+            void logEvent({
+              type: "user.action",
+              action: "filter.change",
+              filterType: "search",
+              value: currentSearch.trim() || "empty",
+              uid: currentUser?.uid ?? null,
+            }).catch(() => {});
+          }}
+        />
       </div>
       {genres.length ? (
         <div id="genre-filter-wrap" className="genre-filter-wrap" style={{ display: "flex" }}>

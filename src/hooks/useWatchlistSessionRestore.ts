@@ -60,6 +60,7 @@ export function useWatchlistSessionRestore(
             prefs.currentSort === "title-asc" || prefs.currentSort === "release-desc"
               ? prefs.currentSort
               : s.currentSort,
+          currentSearch: typeof prefs.currentSearch === "string" ? prefs.currentSearch : s.currentSearch,
         }));
       }
 

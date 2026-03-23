@@ -31,11 +31,19 @@ export interface FilterState {
   currentGenre: string;
   currentStatus: string;
   currentSort: string;
+  currentSearch: string;
 }
 
 /** Pure filter pipeline for the grid (type, status, genre, recently-added). */
 export function filterTitles(movies: WatchlistItem[] | undefined, filters: FilterState): WatchlistItem[] {
   const listMovies = movies || [];
+  const search = filters.currentSearch.trim().toLowerCase();
+
+  function matchesSearch(movie: WatchlistItem): boolean {
+    if (!search) return true;
+    return String(movie.title || "").toLowerCase().includes(search);
+  }
+
   function toEpochOrNegInf(value: unknown): number {
     if (typeof value !== "string" || !value.trim()) return Number.NEGATIVE_INFINITY;
     const ms = Date.parse(value);
@@ -63,6 +71,7 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
       if (!m) continue;
       const s = m.status || "to-watch";
       if (s !== "to-watch") continue;
+      if (!matchesSearch(m)) continue;
       if (filters.currentFilter !== "both" && m.type !== filters.currentFilter) continue;
       if (filters.currentGenre) {
         const g = String(m.genre || "");
@@ -94,6 +103,9 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
       const g = String(m.genre || "");
       return g.split(/\s*\/\s*/).some((s) => s.trim().toLowerCase() === filters.currentGenre.toLowerCase());
     });
+  }
+  if (search) {
+    list = list.filter((m) => matchesSearch(m));
   }
 
   return sortVisibleTitles(list);
