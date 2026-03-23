@@ -3,6 +3,7 @@ import { auth, GoogleAuthProvider, signInWithPopup } from "./firebase.js";
 import { useAuthUser } from "./hooks/useAuthUser.js";
 import { WatchlistPage } from "./components/WatchlistPage.js";
 import { JoinPage } from "./pages/JoinPage.js";
+import { AdminPage } from "./pages/AdminPage.js";
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAppStore } from "./store/useAppStore.js";
 import { Toaster } from "@/components/ui/toaster";
@@ -99,6 +100,7 @@ export default function App() {
         <Route path="/" element={<WatchlistAuthGate />} />
         <Route path="/list/:listId" element={<WatchlistAuthGate />} />
         <Route path="/join/:listId" element={<JoinPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster />
