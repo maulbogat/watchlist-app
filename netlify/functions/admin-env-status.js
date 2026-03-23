@@ -6,7 +6,6 @@ const SERVER_ENV_KEYS = [
   "AXIOM_DATASET",
   "UPCOMING_SYNC_TRIGGER_SECRET",
   "NETLIFY_API_TOKEN",
-  "NETLIFY_SITE_ID",
 ];
 
 function corsHeaders() {
@@ -32,6 +31,11 @@ exports.handler = async (event) => {
 
   const status = Object.fromEntries(
     SERVER_ENV_KEYS.map((key) => [key, Boolean(process.env[key] && String(process.env[key]).trim())])
+  );
+  // Site UUID for latest-deploy-status: prefer VITE_ (one var for build + functions); legacy NETLIFY_SITE_ID ok.
+  status.NETLIFY_SITE_ID = Boolean(
+    (process.env.VITE_NETLIFY_SITE_ID && String(process.env.VITE_NETLIFY_SITE_ID).trim()) ||
+      (process.env.NETLIFY_SITE_ID && String(process.env.NETLIFY_SITE_ID).trim())
   );
 
   return {

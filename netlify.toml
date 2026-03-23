@@ -1,5 +1,5 @@
 # Environment variable checklist (Netlify UI + local .env): docs/netlify-environment.md
-# Delete VITE_AXIOM_TOKEN and VITE_AXIOM_DATASET in Netlify — they are not used and break secret scanning.
+# Delete VITE_AXIOM_* in Netlify. Do not duplicate NETLIFY_SITE_ID (secret) = VITE_NETLIFY_SITE_ID (in dist/) — see docs/netlify-environment.md
 
 [build]
   publish = "dist"

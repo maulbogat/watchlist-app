@@ -2,6 +2,17 @@
 
 Apply these in **Netlify → Site configuration → Environment variables**. The Git repo cannot edit the dashboard; use this file as the source of truth.
 
+## Secret scanning: Site ID vs `dist/`
+
+Netlify compares **values of variables marked “secret”** to your **repo and `dist/`** output.
+
+- **`VITE_NETLIFY_SITE_ID`** is inlined into the client JS (Admin badge URL). The Site ID UUID is **public** (also in Netlify badge URLs).
+- If you **also** set **`NETLIFY_SITE_ID`** to the **same UUID** and mark it **secret**, the build **fails**: that string appears in `dist/assets/main-*.js`.
+
+**Fix:** Use **only `VITE_NETLIFY_SITE_ID`** in Netlify (scope includes **Builds** and **Functions**). **Remove** `NETLIFY_SITE_ID` **or** uncheck “Contains secret values” if you keep it. **`latest-deploy-status`** reads `VITE_NETLIFY_SITE_ID` first, then `NETLIFY_SITE_ID`.
+
+Do **not** mark **`VITE_NETLIFY_SITE_ID`** as a secret (it is always in the bundle).
+
 ## 1. Delete these (required)
 
 | Variable | Reason |
@@ -13,7 +24,7 @@ Apply these in **Netlify → Site configuration → Environment variables**. The
 
 These must be available **during the build** (Vite inlines `VITE_*` into the browser bundle).
 
-**Scopes in Netlify:** use **All scopes** or any option that **includes Builds** and your production / preview contexts.
+**Scopes in Netlify:** use **All scopes** or any option that **includes Builds** and **Functions** (so serverless functions can read the same `VITE_NETLIFY_SITE_ID` for **`latest-deploy-status`**).
 
 | Variable | Required | Notes |
 |----------|----------|--------|
@@ -25,12 +36,12 @@ These must be available **during the build** (Vite inlines `VITE_*` into the bro
 | `VITE_FIREBASE_APP_ID` | Yes | |
 | `VITE_FIREBASE_MEASUREMENT_ID` | No | Analytics |
 | `VITE_APP_VERSION` | No | Shown in client logs |
-| `VITE_NETLIFY_SITE_ID` | No | Admin → **Last deployment** badge; **same UUID** as `NETLIFY_SITE_ID` |
+| `VITE_NETLIFY_SITE_ID` | No | Admin badge + **`latest-deploy-status`** (not a secret — appears in `dist/`) |
 | `VITE_NETLIFY_PROJECT_SLUG` | No | Only if the Netlify project slug ≠ default in code |
 
 ## 3. Server / functions only (never `VITE_*`)
 
-Used by **`netlify/functions/*.js`** (bookmarklet, jobs, `log-client-event`, `latest-deploy-status`, etc.).
+Used by **`netlify/functions/*.js`** (bookmarklet, jobs, `log-client-event`, etc.).
 
 **Scopes:** Prefer **Functions** (+ **Runtime** if your plan lists it) and **omit Builds** if Netlify lets you scope per variable—so secrets are not loaded into the Vite build step. If your UI only offers **Builds, Functions, Runtime** together, that still works; deleting **`VITE_AXIOM_*`** is the critical fix.
 
@@ -44,7 +55,7 @@ Mark sensitive values as **Contains secret values** in Netlify.
 | `AXIOM_TOKEN` | Server-side Axiom ingest (logger, `log-client-event`) |
 | `AXIOM_DATASET` | Dataset name for ingest |
 | `NETLIFY_API_TOKEN` | Personal access token — **`latest-deploy-status`** (Admin deploy details) |
-| `NETLIFY_SITE_ID` | Same UUID as **`VITE_NETLIFY_SITE_ID`** — deploy API (server only) |
+| `NETLIFY_SITE_ID` | **Avoid** if duplicate of `VITE_NETLIFY_SITE_ID` (see § top). Optional legacy fallback only. |
 | `UPCOMING_SYNC_TRIGGER_SECRET` | Optional — auth for `trigger-upcoming-sync` |
 
 ## 4. Local development (parity with prod)
@@ -52,7 +63,9 @@ Mark sensitive values as **Contains secret values** in Netlify.
 | What | File |
 |------|------|
 | **`VITE_*`** (Firebase, `VITE_APP_VERSION`, `VITE_NETLIFY_*`) | **`.env.local`** (Vite) |
-| **Server keys** (`TMDB_*`, `OMDB_*`, `FIREBASE_SERVICE_ACCOUNT`, `AXIOM_*`, `NETLIFY_*`, `UPCOMING_*`) | **`.env`** (Node / `netlify dev` / `netlify functions:serve`) |
+| **Server keys** (`TMDB_*`, `OMDB_*`, `FIREBASE_SERVICE_ACCOUNT`, `AXIOM_*`, `NETLIFY_API_TOKEN`, optional `UPCOMING_*`) | **`.env`** (Node / `netlify dev` / `netlify functions:serve`) |
+
+`VITE_NETLIFY_SITE_ID` lives in **`.env.local`**; **`latest-deploy-status`** uses it when functions load env from the same project.
 
 Copy **the same variable names** as in Netlify; values come from your machine.
 
@@ -67,6 +80,6 @@ Copy **the same variable names** as in Netlify; values come from your machine.
 | **Bookmarklet (`add-from-imdb`)** | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_*` |
 | **Scheduled / manual upcoming sync** | `TMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, Firestore rules |
 | **Client → Axiom logs** | `AXIOM_*` + `FIREBASE_SERVICE_ACCOUNT` (`log-client-event` verifies Firebase ID tokens) |
-| **Admin deploy badge + failure text** | `VITE_NETLIFY_SITE_ID`, `NETLIFY_API_TOKEN`, `NETLIFY_SITE_ID` |
+| **Admin deploy badge + failure text** | `VITE_NETLIFY_SITE_ID`, `NETLIFY_API_TOKEN` |
 
 No code path requires **`VITE_AXIOM_*`**.

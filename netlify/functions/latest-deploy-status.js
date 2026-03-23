@@ -1,7 +1,9 @@
 /**
  * Latest Netlify deploy for the site (for Admin UI), including `error_message` on failure.
  *
- * Requires server env: `NETLIFY_API_TOKEN`, `NETLIFY_SITE_ID` (same UUID as `VITE_NETLIFY_SITE_ID`).
+ * Requires `NETLIFY_API_TOKEN` and a site UUID from `VITE_NETLIFY_SITE_ID` (preferred) or `NETLIFY_SITE_ID`.
+ * Use only **`VITE_NETLIFY_SITE_ID`** in Netlify if possible — do **not** duplicate the same UUID as a
+ * separate secret `NETLIFY_SITE_ID` (secret scanning flags it when that value is also in `dist/`).
  * GET + `Authorization: Bearer <Firebase ID token>`; caller must be an admin UID.
  */
 
@@ -77,7 +79,9 @@ exports.handler = async (event) => {
   }
 
   const apiToken = process.env.NETLIFY_API_TOKEN && String(process.env.NETLIFY_API_TOKEN).trim();
-  const siteId = process.env.NETLIFY_SITE_ID && String(process.env.NETLIFY_SITE_ID).trim();
+  const siteId =
+    (process.env.VITE_NETLIFY_SITE_ID && String(process.env.VITE_NETLIFY_SITE_ID).trim()) ||
+    (process.env.NETLIFY_SITE_ID && String(process.env.NETLIFY_SITE_ID).trim());
 
   if (!apiToken || !siteId) {
     return {

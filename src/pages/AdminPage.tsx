@@ -503,10 +503,11 @@ export function AdminPage() {
           {latestDeployQ.data?.ok === false && latestDeployQ.data.error === "not_configured" ? (
             <p className="admin-deploy-api-line">
               Set <code className="admin-deploy-code">NETLIFY_API_TOKEN</code> and{" "}
-              <code className="admin-deploy-code">NETLIFY_SITE_ID</code> in Netlify environment variables (and{" "}
-              <code className="admin-deploy-code">.env</code> for local functions) to show failure reasons here.{" "}
-              <code className="admin-deploy-code">NETLIFY_SITE_ID</code> should match{" "}
-              <code className="admin-deploy-code">VITE_NETLIFY_SITE_ID</code>.
+              <code className="admin-deploy-code">VITE_NETLIFY_SITE_ID</code> (same Site ID as the badge) in Netlify —
+              scope so <strong>Functions</strong> receive <code className="admin-deploy-code">VITE_NETLIFY_SITE_ID</code>.
+              Do <strong>not</strong> add a duplicate secret <code className="admin-deploy-code">NETLIFY_SITE_ID</code> with
+              the same value (secret scanning fails). See <code className="admin-deploy-code">docs/netlify-environment.md</code>
+              .
             </p>
           ) : null}
 

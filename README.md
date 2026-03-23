@@ -57,7 +57,7 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
 - Optional client variables:
   - `VITE_FIREBASE_MEASUREMENT_ID` (Analytics)
   - `VITE_APP_VERSION` (defaults to `1.0.0` when missing)
-  - `VITE_NETLIFY_SITE_ID` — Netlify **Site ID** (General → Site details) for the **Admin → Last deployment** status badge; optional
+  - `VITE_NETLIFY_SITE_ID` — Netlify **Site ID** (General → Site details) for the **Admin** badge and **`latest-deploy-status`**; scope to **Functions** too; optional; do **not** mark as secret (also in `dist/`)
   - `VITE_NETLIFY_PROJECT_SLUG` — defaults to `watchlist-trailers` if your Netlify project URL slug differs
 - **Axiom (client events):** do **not** use `VITE_AXIOM_*`. The app POSTs to **`/.netlify/functions/log-client-event`** with a Firebase ID token; **`AXIOM_TOKEN`** and **`AXIOM_DATASET`** are server-only (Netlify **Environment variables** + local `.env` when running functions).
 - `src/config/firebase.ts` normalizes/sanitizes client config values and falls back to project defaults when values are missing or malformed.
@@ -104,7 +104,7 @@ For the IMDb bookmarklet to add titles from imdb.com:
 5. **Summary (details in `docs/netlify-environment.md`):**
    - **Delete** `VITE_AXIOM_TOKEN` and `VITE_AXIOM_DATASET` in Netlify (unused; breaks [secret scanning](https://docs.netlify.com/manage/security/secret-scanning/) if values overlap server `AXIOM_*`).
    - **`VITE_*` (Firebase, `VITE_APP_VERSION`, `VITE_NETLIFY_*`)** — must be available at **build** time (All scopes / includes Builds).
-   - **Server-only** (`FIREBASE_SERVICE_ACCOUNT`, `TMDB_API_KEY`, `OMDB_API_KEY`, `AXIOM_*`, `NETLIFY_API_TOKEN`, `NETLIFY_SITE_ID`, optional `UPCOMING_SYNC_TRIGGER_SECRET`) — for **functions**; prefer scoping to Functions without Builds when Netlify allows it.
+   - **Server-only** (`FIREBASE_SERVICE_ACCOUNT`, `TMDB_API_KEY`, `OMDB_API_KEY`, `AXIOM_*`, `NETLIFY_API_TOKEN`, optional `UPCOMING_SYNC_TRIGGER_SECRET`) — for **functions**; prefer scoping to Functions without Builds when Netlify allows it. Use **`VITE_NETLIFY_SITE_ID`** for the site UUID (build + functions); avoid a duplicate secret **`NETLIFY_SITE_ID`** — see **`docs/netlify-environment.md`**.
 
    **Do not** put real **`AXIOM_DATASET`** values in **`.env.example`** or client code; Netlify compares the repo and `dist/` to secrets.
 
