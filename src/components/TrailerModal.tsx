@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { StatusKey } from "../types/index.js";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { StatusKey, WatchlistItem } from "../types/index.js";
 import { useAppStore, STATUS_ORDER, STATUS_LABELS, CHECK_SVG } from "../store/useAppStore.js";
 import { hasPlayableTrailerYoutubeId, renderServiceChips, servicesForMovie } from "../lib/movieDisplay.js";
 import { usePersonalLists, useSharedLists } from "../hooks/useWatchlist.js";
@@ -10,11 +10,12 @@ import {
   useRemoveTitleFromList,
   useSetTitleStatus,
 } from "../hooks/useMutations.js";
-import { getCurrentListLabel, getListsContainingMovie } from "../data/lists.js";
+import { getCurrentListLabel } from "../data/lists.js";
 import { displayListName, errorMessage } from "../lib/utils.js";
-import { movieKey } from "../firebase.js";
+import { getPersonalListMovies, movieKey } from "../firebase.js";
 
 export function TrailerModal() {
+  const queryClient = useQueryClient();
   const currentUser = useAppStore((s) => s.currentUser);
   const movie = useAppStore((s) => s.currentModalMovie);
   const setCurrentModalMovie = useAppStore((s) => s.setCurrentModalMovie);
@@ -43,7 +44,31 @@ export function TrailerModal() {
     queryKey: ["listsContaining", movieStableKey, uid, personalQ.dataUpdatedAt, sharedQ.dataUpdatedAt],
     queryFn: async () => {
       if (!movie || !uid) return new Set<string>();
-      return getListsContainingMovie(movie, personalLists, sharedLists, uid);
+      const key = movieKey(movie);
+      const containing = new Set<string>();
+      for (const l of personalLists) {
+        const listId = l.id;
+        const cacheKey =
+          listId === "personal"
+            ? ["watchlistMovies", uid, "personal"]
+            : ["watchlistMovies", uid, "personal", listId];
+        let listMovies = queryClient.getQueryData<WatchlistItem[]>(cacheKey);
+        if (!listMovies) {
+          try {
+            listMovies = await getPersonalListMovies(uid, listId);
+          } catch {
+            listMovies = [];
+          }
+        }
+        if (listMovies.some((x) => movieKey(x) === key)) {
+          containing.add(listId);
+        }
+      }
+      for (const l of sharedLists) {
+        const items = Array.isArray(l.items) ? l.items : [];
+        if (items.some((row) => movieKey(row) === key)) containing.add(l.id);
+      }
+      return containing;
     },
     enabled: Boolean(movie && uid),
   });

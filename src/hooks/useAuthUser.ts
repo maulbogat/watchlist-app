@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { auth, onAuthStateChanged } from "../firebase.js";
 import { setBookmarkletCookieWithMode } from "../lib/bookmarkletCookie.js";
+import { clearUpcomingAlertsCache } from "../lib/storage.js";
 import { useAppStore } from "../store/useAppStore.js";
 
 export function useAuthUser(): { loading: boolean } {
@@ -20,6 +21,9 @@ export function useAuthUser(): { loading: boolean } {
   useEffect(() => {
     // Keep bookmarklet cookies in sync after sign-in/sign-out and list changes.
     void setBookmarkletCookieWithMode(currentUser, currentListMode);
+    if (!currentUser) {
+      clearUpcomingAlertsCache();
+    }
   }, [currentUser, currentListMode]);
 
   useEffect(() => {

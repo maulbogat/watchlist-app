@@ -42,7 +42,6 @@
  * }} UpcomingAlertsSyncStateDoc
  */
 
-const { FieldPath, FieldValue } = require("firebase-admin/firestore");
 const { buildAlertsForCatalogRow, dedupeCatalogByTmdb } = require("./tmdb-upcoming-fetch");
 
 const COLLECTION = "upcomingAlerts";
@@ -128,7 +127,7 @@ function registryDocToRow(data) {
  * @returns {Promise<FirebaseFirestore.QuerySnapshot>}
  */
 async function fetchTitleRegistryPage(db, afterDocId, pageSize) {
-  let q = db.collection("titleRegistry").orderBy(FieldPath.documentId()).limit(pageSize);
+  let q = db.collection("titleRegistry").orderBy("__name__").limit(pageSize);
   if (afterDocId) {
     const afterSnap = await db.collection("titleRegistry").doc(afterDocId).get();
     if (afterSnap.exists) q = q.startAfter(afterSnap);
@@ -163,24 +162,55 @@ async function collectRegistryTmdbKeys(db) {
 /**
  * @param {FirebaseFirestore.Firestore} db
  * @param {Array<UpcomingAlertFirestoreDoc & { docId: string }>} alertPayloads - from `buildAlertsForCatalogRow` (`docId` stripped before set)
- * @returns {Promise<void>}
+ * @returns {Promise<{ written: number, skipped: number }>}
  */
 async function upsertAlerts(db, alertPayloads) {
-  if (alertPayloads.length === 0) return;
+  if (alertPayloads.length === 0) return { written: 0, skipped: 0 };
+  function normalizeForCompare(raw) {
+    return {
+      fingerprint: raw.fingerprint ?? "",
+      catalogTmdbId: raw.catalogTmdbId ?? null,
+      media: raw.media ?? "",
+      tmdbId: raw.tmdbId ?? null,
+      type: raw.type ?? null,
+      alertType: raw.alertType ?? "",
+      title: raw.title ?? "",
+      detail: raw.detail ?? "",
+      airDate: raw.airDate ?? null,
+      confirmed: Boolean(raw.confirmed),
+      expiresAt: raw.expiresAt ?? null,
+      sequelTmdbId: raw.sequelTmdbId ?? null,
+    };
+  }
+  const refs = alertPayloads.map((raw) => db.collection(COLLECTION).doc(raw.docId));
+  const existingSnaps = refs.length > 0 ? await db.getAll(...refs) : [];
+  const existingById = new Map(existingSnaps.map((s) => [s.id, s]));
   let batch = db.batch();
   let n = 0;
+  let written = 0;
+  let skipped = 0;
   for (const raw of alertPayloads) {
     const { docId, ...rest } = raw;
     const ref = db.collection(COLLECTION).doc(docId);
+    const currentSnap = existingById.get(docId);
+    if (currentSnap?.exists) {
+      const currentComparable = normalizeForCompare(currentSnap.data());
+      const nextComparable = normalizeForCompare(rest);
+      if (JSON.stringify(currentComparable) === JSON.stringify(nextComparable)) {
+        skipped++;
+        continue;
+      }
+    }
     batch.set(
       ref,
       {
         ...rest,
-        detectedAt: FieldValue.serverTimestamp(),
+        detectedAt: new Date().toISOString(),
       },
       { merge: true }
     );
     n++;
+    written++;
     if (n >= 400) {
       await batch.commit();
       batch = db.batch();
@@ -188,6 +218,7 @@ async function upsertAlerts(db, alertPayloads) {
     }
   }
   if (n > 0) await batch.commit();
+  return { written, skipped };
 }
 
 /**
@@ -292,16 +323,18 @@ async function pruneAlertsOutsideCatalog(db, rowsOrSet) {
 async function runFullCatalogSync(db, apiKey, catalogItems) {
   const rows = dedupeCatalogByTmdb(Array.isArray(catalogItems) ? catalogItems : []);
   let upserted = 0;
+  let writesSkipped = 0;
   for (const row of rows) {
     const built = await buildAlertsForCatalogRow(apiKey, row);
     const ids = built.map((a) => a.docId);
     await deleteStaleAlertsForRow(db, row.tmdbId, row.isTv ? "tv" : "movie", ids);
-    await upsertAlerts(db, built);
-    upserted += built.length;
+    const upsertResult = await upsertAlerts(db, built);
+    upserted += upsertResult.written;
+    writesSkipped += upsertResult.skipped;
   }
   const pruned = await pruneAlertsOutsideCatalog(db, rows);
   const expiredRemoved = await deleteExpiredAlerts(db);
-  return { rowsChecked: rows.length, alertsUpserted: upserted, pruned, expiredRemoved };
+  return { rowsChecked: rows.length, alertsUpserted: upserted, writesSkipped, pruned, expiredRemoved };
 }
 
 /**
@@ -384,8 +417,8 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
           {
             lastRegistryDocId: cursor,
             ...(regCount !== null ? { registryDocCount: regCount } : {}),
-            nextIndex: FieldValue.delete(),
-            updatedAt: FieldValue.serverTimestamp(),
+            nextIndex: null,
+            updatedAt: new Date().toISOString(),
           },
           { merge: true }
         ),
@@ -394,6 +427,7 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
   }
 
   let upserted = 0;
+  let writesSkipped = 0;
   let persistCursor = lastRegistryDocId;
   let rowsVisited = 0;
   let scanComplete = false;
@@ -412,9 +446,9 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
               {
                 lastRegistryDocId: null,
                 ...(regCount !== null ? { registryDocCount: regCount } : {}),
-                nextIndex: FieldValue.delete(),
-                updatedAt: FieldValue.serverTimestamp(),
-                lastCompletedAt: FieldValue.serverTimestamp(),
+                nextIndex: null,
+                updatedAt: new Date().toISOString(),
+                lastCompletedAt: new Date().toISOString(),
               },
               { merge: true }
             ),
@@ -423,6 +457,7 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
         return {
           rowsChecked: 0,
           alertsUpserted: 0,
+          writesSkipped: 0,
           pruned: 0,
           expiredRemoved,
           completed: true,
@@ -442,6 +477,7 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
         return {
           rowsChecked: rowsVisited,
           alertsUpserted: upserted,
+          writesSkipped,
           pruned: 0,
           expiredRemoved,
           completed: false,
@@ -464,8 +500,9 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
         () => deleteStaleAlertsForRow(db, row.tmdbId, row.isTv ? "tv" : "movie", ids),
         "deleteStaleAlertsForRow"
       );
-      await firestoreOpWithRetry(() => upsertAlerts(db, built), "upsertAlerts");
-      upserted += built.length;
+      const upsertResult = await firestoreOpWithRetry(() => upsertAlerts(db, built), "upsertAlerts");
+      upserted += upsertResult.written;
+      writesSkipped += upsertResult.skipped;
       persistCursor = doc.id;
     }
 
@@ -480,6 +517,7 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
     return {
       rowsChecked: rowsVisited,
       alertsUpserted: upserted,
+      writesSkipped,
       pruned: 0,
       expiredRemoved,
       completed: false,
@@ -510,9 +548,9 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
         {
           lastRegistryDocId: null,
           ...(regCount !== null ? { registryDocCount: regCount } : {}),
-          nextIndex: FieldValue.delete(),
-          lastCompletedAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
+          nextIndex: null,
+          lastCompletedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
         { merge: true }
       ),
@@ -522,6 +560,7 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
   return {
     rowsChecked: rowsVisited,
     alertsUpserted: upserted,
+    writesSkipped,
     pruned,
     expiredRemoved,
     completed: true,
@@ -548,8 +587,8 @@ async function runSingleTitleSync(db, apiKey, tmdbId, media, titleHint) {
   const built = await buildAlertsForCatalogRow(apiKey, row);
   const ids = built.map((a) => a.docId);
   await deleteStaleAlertsForRow(db, n, isTv ? "tv" : "movie", ids);
-  await upsertAlerts(db, built);
-  return { ok: true, count: built.length, docIds: ids };
+  const upsertResult = await upsertAlerts(db, built);
+  return { ok: true, count: upsertResult.written, skipped: upsertResult.skipped, docIds: ids };
 }
 
 module.exports = {

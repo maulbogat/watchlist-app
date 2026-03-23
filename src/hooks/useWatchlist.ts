@@ -41,6 +41,7 @@ export function useWatchlistMovies(
     queryKey: ["watchlistMovies", uid, ...modeKey],
     queryFn: () => fetchWatchlistMovies(uid, listMode),
     enabled,
+    staleTime: 10 * 60 * 1000,
     ...rest,
   });
 }
@@ -58,6 +59,7 @@ export function usePersonalLists(
     queryKey: ["personalLists", uid],
     queryFn: () => (uid ? getPersonalLists(uid) : Promise.resolve([])),
     enabled: Boolean(uid) && enabledOpt !== false,
+    staleTime: 10 * 60 * 1000,
     ...rest,
   });
 }
@@ -75,6 +77,7 @@ export function useSharedLists(
     queryKey: ["sharedLists", uid],
     queryFn: () => (uid ? getSharedListsForUser(uid) : Promise.resolve([])),
     enabled: Boolean(uid) && enabledOpt !== false,
+    staleTime: 5 * 60 * 1000,
     ...rest,
   });
 }

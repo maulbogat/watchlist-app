@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UpcomingAlert, WatchlistItem } from "../types/index.js";
 import { auth, fetchUpcomingAlertsForItems, movieKey } from "../firebase.js";
 import { getStatusData, updateDismissals } from "../data/user.js";
+import { clearUpcomingAlertsCache, readUpcomingAlertsCache, writeUpcomingAlertsCache } from "../lib/storage.js";
 import { useAppStore, UPCOMING_ADD_CAL_ICON_SVG, UPCOMING_CAL_ICON_SVG } from "../store/useAppStore.js";
 import {
   buildUpcomingIcsDocument,
@@ -30,7 +31,9 @@ function useUpcomingAlertsQuery(uid: string | undefined, movies: WatchlistItem[]
       if (!uid) return { active: [] };
       const data = await getStatusData(uid);
       const dismissals = data.upcomingDismissals || {};
-      const raw = await fetchUpcomingAlertsForItems(movies || []);
+      const cached = readUpcomingAlertsCache(uid, ids);
+      const raw = cached ?? (await fetchUpcomingAlertsForItems(movies || []));
+      if (!cached) writeUpcomingAlertsCache(uid, ids, raw);
       const active = raw.filter(
         (a) => a.fingerprint && !dismissals[a.fingerprint] && upcomingAlertHasRealAirDate(a)
       );
@@ -43,7 +46,7 @@ function useUpcomingAlertsQuery(uid: string | undefined, movies: WatchlistItem[]
       return { active };
     },
     enabled: !!uid,
-    staleTime: 30_000,
+    staleTime: 2 * 60 * 60 * 1000,
   });
 }
 
@@ -113,6 +116,7 @@ function UpcomingPill({ a, userUid }: UpcomingPillProps) {
             try {
               const dismissUid = auth.currentUser?.uid;
               if (dismissUid) await updateDismissals(dismissUid, fp);
+              clearUpcomingAlertsCache(dismissUid || undefined);
             } catch (err) {
               console.warn("dismiss upcoming:", err);
             }

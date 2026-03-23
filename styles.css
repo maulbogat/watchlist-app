@@ -2770,6 +2770,85 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   padding: 0.85rem 0.95rem;
 }
 
+.admin-job-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.admin-job-row:last-child {
+  margin-bottom: 0;
+}
+
+.admin-job-row--actions {
+  margin-top: 0.55rem;
+}
+
+.admin-job-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.admin-job-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  height: 28px;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-job-status--on {
+  border-color: rgba(105, 212, 138, 0.45);
+  color: #69d48a;
+  background: rgba(105, 212, 138, 0.1);
+}
+
+.admin-job-toggle-btn {
+  height: 30px;
+  padding: 0 0.72rem;
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--text);
+}
+
+.admin-job-toggle-btn:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-job-run-btn {
+  min-width: 120px;
+  height: 34px;
+  padding: 0 0.85rem;
+  background: rgba(232, 201, 106, 0.16);
+  border: 1px solid rgba(232, 201, 106, 0.4);
+  color: var(--accent);
+  font-family: var(--font-title);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.admin-job-run-btn:hover {
+  background: rgba(232, 201, 106, 0.22);
+  border-color: rgba(232, 201, 106, 0.55);
+  color: #f0d87a;
+}
+
+.admin-job-value {
+  font-size: 0.88rem;
+  color: var(--text);
+  text-align: right;
+}
+
 .admin-job-result {
   margin-top: 0.65rem;
   font-size: 0.88rem;

@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "../store/useAppStore.js";
 import { isAdmin } from "../config/admin.js";
 import { useAuthUser } from "../hooks/useAuthUser.js";
+import { getJobConfigState, setCheckUpcomingEnabledState } from "../firebase.js";
 import { getFirestore, collection, getCountFromServer, getDocs } from "firebase/firestore";
 
 type CatalogStats = {
@@ -16,6 +17,23 @@ type CatalogStats = {
 type UpcomingStats = {
   activeAlerts: number;
   lastCheckTimestamp: string | null;
+};
+
+type JobConfigState = {
+  checkUpcomingEnabled: boolean;
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+  lastRunMessage: string | null;
+  lastRunResult: Record<string, unknown> | null;
+};
+
+type RunNowResponse = {
+  ok?: boolean;
+  skipped?: boolean;
+  reason?: string;
+  alertsUpserted?: number;
+  writesSkipped?: number;
+  error?: string;
 };
 
 const SERVICE_LINKS = [
@@ -197,6 +215,82 @@ export function AdminPage() {
     },
   });
 
+  const jobConfigQ = useQuery<JobConfigState>({
+    queryKey: ["admin", "job-config"],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    enabled: !authLoading && userIsAdmin,
+    queryFn: () => getJobConfigState(),
+  });
+
+  const [runNowResult, setRunNowResult] = useState<string | null>(null);
+  const runNowTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (runNowTimerRef.current) window.clearTimeout(runNowTimerRef.current);
+    };
+  }, []);
+
+  function showRunNowResult(message: string) {
+    setRunNowResult(message);
+    if (runNowTimerRef.current) window.clearTimeout(runNowTimerRef.current);
+    runNowTimerRef.current = window.setTimeout(() => {
+      setRunNowResult(null);
+      runNowTimerRef.current = null;
+    }, 10_000);
+  }
+
+  const toggleJobMutation = useMutation({
+    mutationFn: async (enabled: boolean) => setCheckUpcomingEnabledState(enabled),
+    onSuccess: () => {
+      void jobConfigQ.refetch();
+    },
+    onError: (err: Error) => {
+      showRunNowResult(err.message || "Failed to update job state");
+    },
+  });
+
+  const runNowMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/.netlify/functions/trigger-upcoming-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trigger: "manual" }),
+      });
+      const data = (await res.json()) as RunNowResponse;
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || `Request failed (${res.status})`);
+      }
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.skipped) {
+        showRunNowResult(data.reason || "Skipped");
+      } else {
+        const written = typeof data.alertsUpserted === "number" ? data.alertsUpserted : null;
+        const skipped = typeof data.writesSkipped === "number" ? data.writesSkipped : null;
+        if (written != null || skipped != null) {
+          showRunNowResult(`Done — wrote ${written ?? 0}, skipped ${skipped ?? 0}`);
+        } else {
+          showRunNowResult("Done");
+        }
+      }
+      void jobConfigQ.refetch();
+    },
+    onError: (err: Error) => {
+      showRunNowResult(err.message || "Failed to run check-upcoming");
+      void jobConfigQ.refetch();
+    },
+  });
+
+  const jobErrorText = (() => {
+    if (!jobConfigQ.isError) return null;
+    const err = jobConfigQ.error;
+    if (err instanceof Error && err.message) return err.message;
+    return "Could not load job config.";
+  })();
+
   const envRows = useMemo(() => {
     const env = import.meta.env as Record<string, string | boolean | undefined>;
     const clientRows = ENV_VARS.map((name) => ({
@@ -289,6 +383,76 @@ export function AdminPage() {
                   {upcomingStatsQ.isError ? "Error" : upcomingStatsQ.data?.lastCheckTimestamp || "N/A"}
                 </div>
               </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="admin-section">
+        <h2>Jobs</h2>
+        <div className="admin-card admin-job-card">
+          {jobConfigQ.isPending ? (
+            <p className="admin-job-result">Loading job config…</p>
+          ) : jobConfigQ.isError ? (
+            <>
+              <p className="admin-job-result">{jobErrorText}</p>
+              <div className="admin-job-row admin-job-row--actions">
+                <Button type="button" variant="outline" onClick={() => void jobConfigQ.refetch()}>
+                  Retry
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="admin-job-row">
+                <span className="admin-stat-label">Upcoming check enabled</span>
+                <div className="admin-job-actions">
+                  <span
+                    className={
+                      jobConfigQ.data?.checkUpcomingEnabled ? "admin-job-status admin-job-status--on" : "admin-job-status"
+                    }
+                  >
+                    {jobConfigQ.data?.checkUpcomingEnabled ? "Enabled" : "Disabled"}
+                  </span>
+                  <Button
+                    type="button"
+                    className="admin-job-toggle-btn"
+                    variant="outline"
+                    disabled={toggleJobMutation.isPending || runNowMutation.isPending}
+                    onClick={() => toggleJobMutation.mutate(!jobConfigQ.data?.checkUpcomingEnabled)}
+                  >
+                    {toggleJobMutation.isPending
+                      ? "Saving…"
+                      : jobConfigQ.data?.checkUpcomingEnabled
+                        ? "Disable"
+                        : "Enable"}
+                  </Button>
+                </div>
+              </div>
+              <div className="admin-job-row">
+                <span className="admin-stat-label">Last run timestamp</span>
+                <span className="admin-job-value">
+                  {formatDateTime(toEpochMs(jobConfigQ.data?.lastRunAt ?? null)) || "N/A"}
+                </span>
+              </div>
+              <div className="admin-job-row">
+                <span className="admin-stat-label">Last run result</span>
+                <span className="admin-job-value">
+                  {jobConfigQ.data?.lastRunStatus || "N/A"}
+                  {jobConfigQ.data?.lastRunMessage ? ` — ${jobConfigQ.data.lastRunMessage}` : ""}
+                </span>
+              </div>
+              <div className="admin-job-row admin-job-row--actions">
+                <Button
+                  type="button"
+                  className="admin-job-run-btn"
+                  disabled={runNowMutation.isPending || toggleJobMutation.isPending}
+                  onClick={() => runNowMutation.mutate()}
+                >
+                  {runNowMutation.isPending ? "Running…" : "Run Now"}
+                </Button>
+              </div>
+              {runNowResult ? <p className="admin-job-result">{runNowResult}</p> : null}
             </>
           )}
         </div>

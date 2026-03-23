@@ -1,7 +1,10 @@
 import type { User } from "firebase/auth";
 import type { ListMode } from "../types/index.js";
+import type { UpcomingAlert } from "../types/index.js";
 
 const FILTER_STORAGE_PREFIX = "watchlist_filters_";
+const UPCOMING_CACHE_PREFIX = "watchlist_upcoming_";
+const UPCOMING_CACHE_TTL_MS = 2 * 60 * 60 * 1000;
 
 export function saveLastList(user: User | null, mode: ListMode): void {
   const val =
@@ -69,5 +72,59 @@ export function persistFilterPreferences(user: User | null, prefs: FilterPrefsSn
     );
   } catch {
     /* quota */
+  }
+}
+
+function upcomingCacheKey(uid: string, ids: string): string {
+  return `${UPCOMING_CACHE_PREFIX}${uid}_${encodeURIComponent(ids)}`;
+}
+
+type UpcomingCachePayload = {
+  expiresAt: number;
+  alerts: UpcomingAlert[];
+};
+
+export function readUpcomingAlertsCache(uid: string, ids: string): UpcomingAlert[] | null {
+  if (!uid || !ids) return null;
+  try {
+    const raw = localStorage.getItem(upcomingCacheKey(uid, ids));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as UpcomingCachePayload;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (typeof parsed.expiresAt !== "number" || parsed.expiresAt <= Date.now()) {
+      localStorage.removeItem(upcomingCacheKey(uid, ids));
+      return null;
+    }
+    return Array.isArray(parsed.alerts) ? parsed.alerts : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeUpcomingAlertsCache(uid: string, ids: string, alerts: UpcomingAlert[]): void {
+  if (!uid || !ids) return;
+  try {
+    const payload: UpcomingCachePayload = {
+      expiresAt: Date.now() + UPCOMING_CACHE_TTL_MS,
+      alerts,
+    };
+    localStorage.setItem(upcomingCacheKey(uid, ids), JSON.stringify(payload));
+  } catch {
+    /* quota */
+  }
+}
+
+export function clearUpcomingAlertsCache(uid?: string): void {
+  try {
+    const prefix = uid ? `${UPCOMING_CACHE_PREFIX}${uid}_` : UPCOMING_CACHE_PREFIX;
+    const toDelete: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith(prefix)) toDelete.push(k);
+    }
+    toDelete.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* private mode / unavailable storage */
   }
 }

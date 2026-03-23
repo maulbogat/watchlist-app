@@ -22,6 +22,7 @@
  *   ok: true,
  *   rowsChecked?: number,
  *   alertsUpserted?: number,
+ *   writesSkipped?: number,
  *   pruned?: number,
  *   expiredRemoved?: number,
  *   completed: boolean,
@@ -33,7 +34,9 @@
  * }} CheckUpcomingSyncResultBody
  */
 
-const { runUpcomingSyncCore } = require("./lib/execute-upcoming-sync");
+const { getFirestore } = require("firebase-admin/firestore");
+const { getAdminApp, runUpcomingSyncCore } = require("./lib/execute-upcoming-sync");
+const { readJobConfig, writeCheckUpcomingRunResult } = require("./lib/job-config");
 
 /**
  * @param {import('@netlify/functions').HandlerEvent} event
@@ -48,10 +51,50 @@ exports.handler = async (event, context) => {
     return { statusCode: 204, headers: { "Access-Control-Allow-Origin": "*" } };
   }
 
+  const body = (() => {
+    try {
+      return event?.body ? JSON.parse(event.body) : {};
+    } catch {
+      return {};
+    }
+  })();
+  const isManual = body?.trigger === "manual" || event?.httpMethod === "POST";
+
+  const db = getFirestore(getAdminApp());
+  const config = await readJobConfig(db);
+  if (!isManual && config.checkUpcomingEnabled === false) {
+    const skipPayload = {
+      status: "skipped",
+      message: "check-upcoming disabled by meta/jobConfig",
+      trigger,
+      result: { completed: true, skippedByConfig: true },
+    };
+    await writeCheckUpcomingRunResult(db, skipPayload);
+    console.log("check-upcoming: skipped", JSON.stringify(skipPayload));
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ok: true, skipped: true, reason: skipPayload.message }),
+    };
+  }
+
   try {
     // Stay under Netlify's 30s wall; paginated registry + completion (prune) need headroom.
     const result = await runUpcomingSyncCore(21000);
+    console.log(
+      "check-upcoming: writes",
+      JSON.stringify({
+        performed: result?.alertsUpserted ?? 0,
+        skipped: result?.writesSkipped ?? 0,
+      })
+    );
     console.log("check-upcoming: done", JSON.stringify(result));
+    await writeCheckUpcomingRunResult(db, {
+      status: "success",
+      message: "check-upcoming completed",
+      trigger,
+      result,
+    });
 
     return {
       statusCode: 200,
@@ -60,6 +103,12 @@ exports.handler = async (event, context) => {
     };
   } catch (e) {
     console.error("check-upcoming:", e);
+    await writeCheckUpcomingRunResult(db, {
+      status: "error",
+      message: e.message || String(e),
+      trigger,
+      result: { completed: false },
+    });
     const code = e.statusCode || 500;
     return {
       statusCode: code,

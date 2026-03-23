@@ -4,8 +4,8 @@
   functions = "netlify/functions"
 
 # Daily TMDB → Firestore upcomingAlerts (3:00 UTC)
-# [functions."check-upcoming"]
-#   schedule = "0 3 * * *"
+[functions."check-upcoming"]
+  schedule = "0 3 * * *"
 
 [[redirects]]
   from = "/*"

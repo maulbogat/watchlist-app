@@ -7,7 +7,10 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import {
+  initializeFirestore,
   getFirestore,
+  memoryLocalCache,
+  persistentLocalCache,
   doc,
   getDoc,
   setDoc,
@@ -35,6 +38,14 @@ import type {
   UserProfile,
   WatchlistItem,
 } from "./types/index.js";
+
+type JobConfigState = {
+  checkUpcomingEnabled: boolean;
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+  lastRunMessage: string | null;
+  lastRunResult: Record<string, unknown> | null;
+};
 
 /**
  * Map a `sharedLists/{id}` snapshot to `SharedList`.
@@ -86,8 +97,29 @@ if (shouldLoadWebAnalytics()) {
     });
 }
 
+function initFirestoreWithLocalCache(): Firestore {
+  try {
+    const persistentDb = initializeFirestore(app, { localCache: persistentLocalCache() });
+    if (import.meta.env.DEV) {
+      console.info("Firestore local cache: indexeddb persistent");
+    }
+    return persistentDb;
+  } catch (err: unknown) {
+    const code =
+      err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code ?? "") : "";
+    if (code !== "failed-precondition" && code !== "unimplemented") {
+      throw err;
+    }
+    const memoryDb = initializeFirestore(app, { localCache: memoryLocalCache() });
+    if (import.meta.env.DEV) {
+      console.info("Firestore local cache: in-memory fallback", code || "fallback");
+    }
+    return memoryDb;
+  }
+}
+
 const auth = getAuth(app);
-const db: Firestore = getFirestore(app);
+const db: Firestore = initFirestoreWithLocalCache();
 
 /** Stored list rows: registry refs, legacy embeds, or hydrated client rows re-saved with the same keys. */
 type ListRowForHydrate = FirestoreListRow | WatchlistItem;
@@ -808,6 +840,99 @@ async function getBookmarkletPersonalListFirestoreId(
   return listIdOrAlias || null;
 }
 
+async function getJobConfigState(): Promise<JobConfigState> {
+  try {
+    const res = await fetch("/.netlify/functions/admin-job-config", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    const raw = await res.text();
+    let data: {
+      ok?: boolean;
+      error?: string;
+      config?: Partial<JobConfigState>;
+    } = {};
+    try {
+      data = raw ? (JSON.parse(raw) as typeof data) : {};
+    } catch {
+      // non-json function/proxy error
+    }
+    if (!res.ok || data.ok === false || !data.config) {
+      if (
+        import.meta.env.DEV &&
+        res.status === 500 &&
+        (!raw || /ECONNREFUSED|proxy|socket|localhost:8888/i.test(raw))
+      ) {
+        throw new Error(
+          "Jobs API is unreachable in local dev. Run Netlify functions (`netlify dev`) so `/.netlify/functions/*` is available."
+        );
+      }
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+    return {
+      checkUpcomingEnabled: data.config.checkUpcomingEnabled !== false,
+      lastRunAt: data.config.lastRunAt ?? null,
+      lastRunStatus: data.config.lastRunStatus ?? null,
+      lastRunMessage: data.config.lastRunMessage ?? null,
+      lastRunResult: (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err || "");
+    const localHint =
+      import.meta.env.DEV && /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)
+        ? "Admin jobs endpoint unavailable. Start Netlify functions (`netlify dev`) for local testing."
+        : msg || "Failed to load job config.";
+    throw new Error(localHint);
+  }
+}
+
+async function setCheckUpcomingEnabledState(enabled: boolean): Promise<JobConfigState> {
+  try {
+    const res = await fetch("/.netlify/functions/admin-job-config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ checkUpcomingEnabled: enabled }),
+    });
+    const raw = await res.text();
+    let data: {
+      ok?: boolean;
+      error?: string;
+      config?: Partial<JobConfigState>;
+    } = {};
+    try {
+      data = raw ? (JSON.parse(raw) as typeof data) : {};
+    } catch {
+      // non-json function/proxy error
+    }
+    if (!res.ok || data.ok === false || !data.config) {
+      if (
+        import.meta.env.DEV &&
+        res.status === 500 &&
+        (!raw || /ECONNREFUSED|proxy|socket|localhost:8888/i.test(raw))
+      ) {
+        throw new Error(
+          "Jobs API is unreachable in local dev. Run Netlify functions (`netlify dev`) so `/.netlify/functions/*` is available."
+        );
+      }
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+    return {
+      checkUpcomingEnabled: data.config.checkUpcomingEnabled !== false,
+      lastRunAt: data.config.lastRunAt ?? null,
+      lastRunStatus: data.config.lastRunStatus ?? null,
+      lastRunMessage: data.config.lastRunMessage ?? null,
+      lastRunResult: (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err || "");
+    const localHint =
+      import.meta.env.DEV && /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)
+        ? "Admin jobs endpoint unavailable. Start Netlify functions (`netlify dev`) for local testing."
+        : msg || "Failed to update job config.";
+    throw new Error(localHint);
+  }
+}
+
 export {
   auth,
   signInWithPopup,
@@ -841,4 +966,6 @@ export {
   fetchUpcomingAlertsForItems,
   dismissUpcomingAlert,
   getBookmarkletPersonalListFirestoreId,
+  getJobConfigState,
+  setCheckUpcomingEnabledState,
 };
