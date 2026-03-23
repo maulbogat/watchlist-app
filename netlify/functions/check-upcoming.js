@@ -50,7 +50,15 @@ exports.handler = async (event, context) => {
   const startedAt = Date.now();
   const trigger = event?.headers?.["x-netlify-event"] || event?.httpMethod || "unknown";
   console.log("check-upcoming: start", JSON.stringify({ trigger }));
-  logEvent({ type: "function.invoked", trigger });
+  try {
+    const firstLogResult = logEvent({ type: "function.invoked", trigger });
+    console.log("check-upcoming: first logger call result", firstLogResult);
+  } catch (firstLogErr) {
+    console.log(
+      "check-upcoming: first logger call error",
+      firstLogErr instanceof Error ? firstLogErr.message : String(firstLogErr || "")
+    );
+  }
 
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: { "Access-Control-Allow-Origin": "*" } };
