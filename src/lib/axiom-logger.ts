@@ -19,15 +19,6 @@ function getFirebaseApp() {
   return getApps().length ? getApp() : initializeApp(firebaseConfig);
 }
 
-function devConsoleFallback(event: Record<string, unknown>) {
-  if (!import.meta.env.DEV) return;
-  try {
-    console.log("[axiom]", event);
-  } catch {
-    // logging must never break flow
-  }
-}
-
 async function getClientIdToken(): Promise<string | null> {
   try {
     const auth = getAuth(getFirebaseApp());
@@ -50,16 +41,12 @@ export async function logEvent(payload: LogEventPayload): Promise<void> {
       ...rest,
     };
 
-    if (import.meta.env.DEV) {
-      devConsoleFallback(event);
-    }
-
     const idToken = await getClientIdToken();
     if (!idToken) {
       return;
     }
 
-    const res = await fetch(LOG_CLIENT_EVENT_PATH, {
+    await fetch(LOG_CLIENT_EVENT_PATH, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -67,10 +54,6 @@ export async function logEvent(payload: LogEventPayload): Promise<void> {
       },
       body: JSON.stringify(event),
     });
-
-    if (!res.ok && import.meta.env.DEV) {
-      devConsoleFallback({ ...event, _logClientHttpError: res.status });
-    }
   } catch {
     // logging must never break flow
   }
