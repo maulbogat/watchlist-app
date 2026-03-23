@@ -8,13 +8,13 @@ A personal movie/show watchlist with YouTube trailers, filters, and Firestore. *
 
 ```bash
 cp .env.example .env
-cp .env.example .env.local
+# create/edit .env.local manually (client-only keys)
 ```
 
-Then fill in:
+Then set values in:
 
-- `VITE_FIREBASE_*` in `.env.local` (required for app startup/build)
-- `TMDB_API_KEY`, `OMDB_API_KEY` (and optional script vars) in `.env`
+- `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional script toggles)
+- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional `VITE_AXIOM_*`, optional `VITE_APP_VERSION`)
 
 ## Run locally
 
@@ -52,8 +52,12 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
   - `VITE_FIREBASE_STORAGE_BUCKET`
   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
   - `VITE_FIREBASE_APP_ID`
-  - `VITE_FIREBASE_MEASUREMENT_ID`
-- `src/config/firebase.ts` validates required Firebase env keys at runtime and throws a clear error when missing.
+- Optional client variables:
+  - `VITE_FIREBASE_MEASUREMENT_ID` (Analytics)
+  - `VITE_AXIOM_TOKEN`
+  - `VITE_AXIOM_DATASET`
+  - `VITE_APP_VERSION` (defaults to `1.0.0` when missing)
+- `src/config/firebase.ts` normalizes/sanitizes client config values and falls back to project defaults when values are missing or malformed.
 
 ## Firebase setup
 
@@ -90,9 +94,16 @@ For the IMDb bookmarklet to add titles from imdb.com:
    - `VITE_FIREBASE_STORAGE_BUCKET`
    - `VITE_FIREBASE_MESSAGING_SENDER_ID`
    - `VITE_FIREBASE_APP_ID`
-   - `VITE_FIREBASE_MEASUREMENT_ID`
+   - Optional: `VITE_FIREBASE_MEASUREMENT_ID`
+   - Optional: `VITE_AXIOM_TOKEN`, `VITE_AXIOM_DATASET`, `VITE_APP_VERSION`
 
-5. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
+5. Optional server observability vars for Netlify functions:
+   - `AXIOM_TOKEN`
+   - `AXIOM_DATASET`
+
+6. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
+
+   Job enable/disable is controlled in Firestore at `meta/jobConfig.checkUpcomingEnabled` (exposed in `/admin` Jobs section). The schedule remains on; when disabled, scheduled runs exit early.
 
    **If `curl …/check-upcoming` returns Netlify “Internal Error”** or logs show **Duration: 30000 ms** with no `check-upcoming: done`: the old “full registry in one run” flow **exceeds Netlify’s ~30s limit**. The deployed function now uses a **time budget + Firestore cursor** (`syncState/upcomingAlerts`, Admin-only — deploy updated **`firestore.rules`**). Use **Netlify → Functions → check-upcoming → Run now** repeatedly until logs show **`completed":true`** (or wait for daily cron). Each run should finish under 30s; **`upcomingAlerts`** appears after the first chunk writes.
 
@@ -118,7 +129,7 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
    **Personal list storage:** Watchlist rows live under `users/{uid}/personalLists/{listId}` (same idea as `sharedLists`). The user doc keeps profile fields and `defaultPersonalListId` only. Legacy `users/{uid}.items` is migrated automatically when users open the app or use the bookmarklet; optional bulk: `node scripts/migrate-personal-items-to-subcollection.mjs --dry-run` then `--write`.
 
-6. Visit `/bookmarklet.html` on your deployed site, drag the button to your bookmarks bar, then sign in with Google. When on an IMDb title page, click the bookmarklet to add it to your watchlist.
+7. Visit `/bookmarklet.html` on your deployed site, drag the button to your bookmarks bar, then sign in with Google. When on an IMDb title page, click the bookmarklet to add it to your watchlist.
 
 ## Multi-user support
 

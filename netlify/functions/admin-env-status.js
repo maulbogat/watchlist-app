@@ -4,6 +4,7 @@ const SERVER_ENV_KEYS = [
   "FIREBASE_SERVICE_ACCOUNT",
   "AXIOM_TOKEN",
   "AXIOM_DATASET",
+  "UPCOMING_SYNC_TRIGGER_SECRET",
 ];
 
 function corsHeaders() {

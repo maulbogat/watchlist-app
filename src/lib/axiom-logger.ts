@@ -20,20 +20,6 @@ if (token && dataset) {
   }
 }
 
-const initMode = axiomClient ? "axiom" : import.meta.env.DEV ? "console-fallback" : "disabled";
-try {
-  console.log(
-    "[axiom:init]",
-    JSON.stringify({
-      hasViteAxiomToken: Boolean(token),
-      hasViteAxiomDataset: Boolean(dataset),
-      mode: initMode,
-    })
-  );
-} catch {
-  // debug logging must never break flow
-}
-
 function devConsoleFallback(event: Record<string, unknown>) {
   if (!import.meta.env.DEV) return;
   try {

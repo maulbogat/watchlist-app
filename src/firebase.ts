@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   getAuth,
   signInWithPopup,
@@ -67,7 +67,7 @@ function upcomingAlertFromMergedDoc(merged: DocumentData & { id: string }): Upco
   return merged as UpcomingAlert;
 }
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 function shouldLoadWebAnalytics(): boolean {
   if (typeof window === "undefined") return false;
@@ -99,23 +99,41 @@ if (shouldLoadWebAnalytics()) {
 }
 
 function initFirestoreWithLocalCache(): Firestore {
+  const globalKey = "__movieTrailerFirestoreDb";
+  const globalObj = globalThis as typeof globalThis & { [globalKey]?: Firestore };
+  if (globalObj[globalKey]) return globalObj[globalKey];
+
+  function useExistingFirestore(): Firestore {
+    const existing = getFirestore(app);
+    globalObj[globalKey] = existing;
+    return existing;
+  }
+
   try {
     const persistentDb = initializeFirestore(app, { localCache: persistentLocalCache() });
-    if (import.meta.env.DEV) {
-      console.info("Firestore local cache: indexeddb persistent");
-    }
+    globalObj[globalKey] = persistentDb;
     return persistentDb;
   } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err ?? "");
+    if (/initializeFirestore\(\) has already been called with different options/i.test(message)) {
+      return useExistingFirestore();
+    }
     const code =
       err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code ?? "") : "";
     if (code !== "failed-precondition" && code !== "unimplemented") {
       throw err;
     }
-    const memoryDb = initializeFirestore(app, { localCache: memoryLocalCache() });
-    if (import.meta.env.DEV) {
-      console.info("Firestore local cache: in-memory fallback", code || "fallback");
+    try {
+      const memoryDb = initializeFirestore(app, { localCache: memoryLocalCache() });
+      globalObj[globalKey] = memoryDb;
+      return memoryDb;
+    } catch (fallbackErr: unknown) {
+      const fallbackMessage = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr ?? "");
+      if (/initializeFirestore\(\) has already been called with different options/i.test(fallbackMessage)) {
+        return useExistingFirestore();
+      }
+      throw fallbackErr;
     }
-    return memoryDb;
   }
 }
 

@@ -15,9 +15,9 @@ This document describes **only what exists in this repository** (static site, Ne
 | **OMDb** | Title metadata by IMDb id; disambiguate movie vs TV when TMDB returns both; fallback row when TMDB has no match. | **REST:** `https://www.omdbapi.com/?i=...&apikey=...` in `add-from-imdb.js` and various scripts. | API key query parameter. | `OMDB_API_KEY` (Netlify + local scripts per README / `.env.example`). |
 | **YouTube** | Trailer playback in modal via iframe embed. | **Browser:** `https://www.youtube-nocookie.com/embed/{youtubeId}?...` and link to `youtube.com/watch`. | None for embed (public video ids). | None. |
 | **Google Fonts** | UI typography (Bebas Neue, DM Sans). | `<link href="https://fonts.googleapis.com/...">` in HTML. | None. | None. |
-| **Netlify** | Host static HTML/CSS/JS; run serverless functions under `/.netlify/functions/*`. | **Browser:** `fetch` to same-origin function paths. **Functions:** Node.js handlers in `netlify/functions/*.js`. | Functions verify Firebase ID token (cookie or `Authorization: Bearer`). | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY` documented in README. |
+| **Netlify** | Host static HTML/CSS/JS; run serverless functions under `/.netlify/functions/*`. | **Browser:** `fetch` to same-origin function paths. **Functions:** Node.js handlers in `netlify/functions/*.js`. | Functions verify Firebase ID token (cookie or `Authorization: Bearer`) where needed. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional `AXIOM_TOKEN`, optional `AXIOM_DATASET`. |
 
-**Note:** `.env.example` includes `WATCH_REGION` for backfill scripts; the **live add flow** uses the signed-in user’s Firestore `country` (via `getUserProfile` in `add.js`), not `WATCH_REGION`, when calling the Netlify function. Client Firebase setup now comes from `VITE_FIREBASE_*` vars.
+**Note:** `.env` is for server/script vars (`process.env`) and `.env.local` is for client Vite vars (`import.meta.env`). The live add flow uses the signed-in user’s Firestore `country` (via `getUserProfile` in `add.js`), not `WATCH_REGION`, when calling the Netlify function.
 
 ---
 
@@ -34,14 +34,14 @@ This document describes **only what exists in this repository** (static site, Ne
 - **Serverless functions** (see `netlify.toml` → `functions = "netlify/functions"`):  
   - `add-from-imdb.js` — verifies token, calls OMDb/TMDB, writes Firestore via Admin SDK; after a successful add with `tmdbId`, runs **upcoming alerts** sync for that title (`lib/sync-upcoming-alerts.js`).  
   - `join-shared-list.js` — verifies token, adds caller’s uid to `sharedLists/{listId}.members`.  
-  - `check-upcoming.js` — **scheduled** (3:00 UTC, `netlify.toml` → `[functions."check-upcoming"]`): reads **`titleRegistry`** only, dedupes by TMDB id + tv/movie, calls TMDB (`/tv`, `/movie`, `/collection`), upserts `upcomingAlerts` via Admin SDK (250ms between TMDB calls, 429 → 10s retry once). Uses shared logic in **`lib/execute-upcoming-sync.js`**.  
+  - `check-upcoming.js` — **scheduled** (3:00 UTC, `netlify.toml` → `[functions."check-upcoming"]`): runs chunked sync (`runRegistrySyncWithTimeBudget`) over **`titleRegistry`**, writes to `upcomingAlerts`, `upcomingChecks`, and `syncState/upcomingAlerts`, and writes latest run status to `meta/jobConfig`. Uses shared logic in **`lib/execute-upcoming-sync.js`** and respects `meta/jobConfig.checkUpcomingEnabled` for scheduled runs (manual runs still proceed).  
   - `trigger-upcoming-sync.js` — **HTTP** (GET/POST) manual trigger for the same upcoming sync as `check-upcoming` (preferred over curling the scheduled function URL). Optional env **`UPCOMING_SYNC_TRIGGER_SECRET`** + `Authorization: Bearer …`.  
 - Functions use **Firebase Admin** with `FIREBASE_SERVICE_ACCOUNT`; they bypass Firestore security rules by design.
 - **`netlify/functions/package.json`** sets `"type": "commonjs"` so handlers stay CommonJS while the repo root `package.json` is `"type": "module"`.
 
 **Firebase**  
 - **Authentication:** Google provider; users identified by `uid`.  
-- **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: **`titleRegistry` read for signed-in users, no client writes**; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`); `upcomingAlerts` read for any signed-in user, no client writes. (Legacy **`catalog`** is removed from rules; delete leftover docs with `scripts/delete-legacy-catalog.mjs`.)
+- **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: **`titleRegistry` read for signed-in users, no client writes**; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`); `upcomingAlerts` read for any signed-in user, no client writes; `syncState` denied to clients. Collections not explicitly matched (for example `upcomingChecks`, `meta`) are also denied to clients by default. (Legacy **`catalog`** is removed from rules; delete leftover docs with `scripts/delete-legacy-catalog.mjs`.)
 
 **External APIs — where invoked**  
 - **TMDB / OMDb:** from **`netlify/functions/add-from-imdb.js`** (POST) and from **local Node scripts**, not from the deployed watchlist client.  
@@ -121,7 +121,35 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 
 ### `syncState` / `upcomingAlerts` (single doc)
 
-**Writes:** Admin SDK only. Holds **`lastRegistryDocId`** (cursor into `titleRegistry` ordered by document id), **`registryDocCount`** (from Firestore `count()` — invalidates cursor when the registry size changes), and timestamps so `check-upcoming` can sync in **multiple Netlify invocations** (each capped at ~30s). Legacy **`nextIndex`** may still exist in old docs until the next sync clears it. Clients cannot read or write (`firestore.rules`).
+**Writes:** Admin SDK only. Holds **`lastRegistryDocId`** (cursor into `titleRegistry` ordered by document id), **`registryDocCount`** (from Firestore `count()` — invalidates cursor when the registry size changes), **`lastPruneAt`**, and timestamps so `check-upcoming` can sync in **multiple Netlify invocations** (each capped at ~30s). Legacy **`nextIndex`** may still exist in old docs until the next sync clears it. Clients cannot read or write (`firestore.rules`).
+
+### `upcomingChecks` / `{tmdbId_media}`
+
+Admin-only per-title state used by upcoming sync skip logic.
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `tmdbId` | `number` | TMDB id for the title row. |
+| `media` | `"tv"` \| `"movie"` | Media kind used by sync logic. |
+| `lastCheckedAt` | `string` (ISO) | Last successful check timestamp. |
+| `releaseDate` | `string` or null | Movie release date from TMDB (`YYYY-MM-DD`) when known. |
+| `hasCollection` | `boolean` or null | Movie `belongs_to_collection != null` snapshot. |
+| `collectionId` | `number` or null | TMDB collection id when present. |
+| `updatedAt` | `string` (ISO) | Last state write timestamp. |
+
+### `meta` / `jobConfig`
+
+Admin-only runtime config + status for scheduled jobs.
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `checkUpcomingEnabled` | `boolean` | Controls whether scheduled `check-upcoming` runs execute or skip. |
+| `lastRunAt` | `string` (ISO) | Last run attempt timestamp. |
+| `lastRunStatus` | `string` or null | `success`, `error`, or `skipped`. |
+| `lastRunMessage` | `string` or null | Human-readable summary/error. |
+| `lastRunResult` | `map` or null | Last payload from sync result. |
+| `lastRunTrigger` | `string` or null | Trigger source (`POST`, cron header, etc.). |
+| `updatedAt` | `string` (ISO) | Last config/status write timestamp. |
 
 ### `upcomingAlerts` / `{docId}`
 
@@ -254,7 +282,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `src/components/*.jsx`, `src/components/modals/*.jsx`, `src/hooks/*` | React watchlist UI (see Architecture). | Via `firebase.js` | Via `firebase.js` | `fetch` → `join-shared-list` where used; YouTube embeds; clipboard |
 | `src/store/watchlistConstants.js` | Status labels, checkmark/upcoming SVG snippets, `GENRE_LIMIT`. | — | — | — |
 | `src/lib/movieDisplay.js` | `servicesForMovie`, `renderServiceChips`, `hasPlayableTrailerYoutubeId`. | — | — | — |
-| `src/config/firebase.ts` | Firebase Web SDK config from `import.meta.env` (`VITE_FIREBASE_*`) with required-var guard. | — | — | — |
+| `src/config/firebase.ts` | Firebase Web SDK config from `import.meta.env` (`VITE_FIREBASE_*`) with normalization/sanitization and safe defaults. | — | — | — |
 | `firebase.js` | Imports config, initializes App/Auth/Firestore, optional Analytics (`getAnalytics(app)` when allowed — not exported); **`titleRegistry`** hydration, user/shared/personal list CRUD, status keys. | `titleRegistry`, `users/*`, `sharedLists/*`, `personalLists/*` | Same | Firebase SDK only (Gstatic CDN) |
 | `countries.js` | Static ISO country list + flags for country modal. | — | — | — |
 | `lib/youtube-trailer-id.js` | Validate/normalize TMDB YouTube key strings. | — | — | — |

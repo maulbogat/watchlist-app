@@ -82,9 +82,10 @@ const SERVICE_LINKS = [
     sublabel: "Chat Thread",
     url: "https://claude.ai/chat/4e4012e1-2d55-45a2-9eba-0876d2ff2d4d",
   },
-  { label: 'Axiom',
-     sublabel: 'Logs & Monitoring', 
-     url: 'https://app.axiom.co' 
+  {
+    label: "Axiom",
+    sublabel: "Logs & Monitoring",
+    url: "https://app.axiom.co/maulbogat-riv8/stream/watchlist-prod",
   },
 ] as const;
 
@@ -92,13 +93,23 @@ const ENV_VARS = [
   "VITE_FIREBASE_API_KEY",
   "VITE_FIREBASE_AUTH_DOMAIN",
   "VITE_FIREBASE_PROJECT_ID",
+  "VITE_FIREBASE_STORAGE_BUCKET",
+  "VITE_FIREBASE_MESSAGING_SENDER_ID",
   "VITE_FIREBASE_APP_ID",
   "VITE_FIREBASE_MEASUREMENT_ID",
-  'VITE_AXIOM_TOKEN',
-  'VITE_AXIOM_DATASET',
+  "VITE_AXIOM_TOKEN",
+  "VITE_AXIOM_DATASET",
+  "VITE_APP_VERSION",
 ] as const;
 
-const SERVER_ENV_VARS = ["TMDB_API_KEY", "OMDB_API_KEY", "FIREBASE_SERVICE_ACCOUNT", "AXIOM_TOKEN", "AXIOM_DATASET"] as const;
+const SERVER_ENV_VARS = [
+  "TMDB_API_KEY",
+  "OMDB_API_KEY",
+  "FIREBASE_SERVICE_ACCOUNT",
+  "AXIOM_TOKEN",
+  "AXIOM_DATASET",
+  "UPCOMING_SYNC_TRIGGER_SECRET",
+] as const;
 type ServerEnvVar = (typeof SERVER_ENV_VARS)[number];
 
 type ServerEnvResponse = {
@@ -229,6 +240,7 @@ export function AdminPage() {
         FIREBASE_SERVICE_ACCOUNT: Boolean(data.status.FIREBASE_SERVICE_ACCOUNT),
         AXIOM_TOKEN: Boolean(data.status.AXIOM_TOKEN),
         AXIOM_DATASET: Boolean(data.status.AXIOM_DATASET),
+        UPCOMING_SYNC_TRIGGER_SECRET: Boolean(data.status.UPCOMING_SYNC_TRIGGER_SECRET),
       };
     },
   });
@@ -519,7 +531,8 @@ export function AdminPage() {
             </tbody>
           </table>
           <p className="admin-note">
-            Server-side variables are shown via a Netlify function as configured/not-configured status only.
+            Server-side variables are shown via a Netlify function as configured/not-configured status only. Some server
+            vars are optional and may be intentionally unset.
           </p>
         </div>
       </section>
