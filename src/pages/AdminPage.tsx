@@ -144,7 +144,12 @@ function formatDateTime(ms: number | null): string | null {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const year = String(date.getFullYear());
-  const time = date.toLocaleTimeString();
+  const time = date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
   return `${day}/${month}/${year}, ${time}`;
 }
 
