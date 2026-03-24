@@ -249,6 +249,7 @@ export function TitleCard({
                   alt=""
                   className="card-added-by-avatar-img"
                   loading="lazy"
+                  referrerPolicy="no-referrer"
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
                   }}

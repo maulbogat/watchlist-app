@@ -245,7 +245,13 @@ export function WatchlistPage() {
                   }}
                 >
                   {user.photoURL ? (
-                    <img className="auth-avatar-img" id="auth-avatar-img" src={user.photoURL} alt="" />
+                    <img
+                      className="auth-avatar-img"
+                      id="auth-avatar-img"
+                      src={user.photoURL}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                    />
                   ) : (
                     <span className="auth-avatar-initial" id="auth-avatar-initial">
                       {initial}

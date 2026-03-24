@@ -151,6 +151,13 @@ function titleYearKey(m: ListRowForHydrate | null | undefined): string {
   return `${rec.title ?? ""}|${rec.year ?? ""}`;
 }
 
+/** Firestore list row only — must survive hydrate `out.push` (spread + explicit fields). */
+function addedByUidFromListRow(r: ListRowForHydrate): string | undefined {
+  const v = (r as Record<string, unknown>).addedByUid;
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return undefined;
+}
+
 function normalizeAddedAt(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
   const ms = Date.parse(value);
@@ -224,6 +231,7 @@ async function hydrateListItemsFromRegistry(
     else if (maybeLaterSet.has(rid)) status = "maybe-later";
     else if (archiveSet.has(rid)) status = "archive";
     const mediaType: MediaType = meta.type === "show" ? "show" : "movie";
+    const rowAddedBy = addedByUidFromListRow(r);
     out.push({
       ...meta,
       registryId: rid,
@@ -250,6 +258,7 @@ async function hydrateListItemsFromRegistry(
           ? (meta.servicesByRegion as WatchlistItem["servicesByRegion"])
           : null,
       status,
+      ...(rowAddedBy ? { addedByUid: rowAddedBy } : {}),
     });
   }
 
