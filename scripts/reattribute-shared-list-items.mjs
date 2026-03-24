@@ -4,7 +4,8 @@
  *
  * Usage:
  *   node scripts/reattribute-shared-list-items.mjs --dry-run --listId <id> --addedByUid <firebaseAuthUid> --title "Will Trent" --title "Loot"
- *   node scripts/reattribute-shared-list-items.mjs --write --listId <id> --addedByUid <uid> --title "..."
+ *   node scripts/reattribute-shared-list-items.mjs --write --listId <id> --addedByUid <uid> --registryId tt123 --registryId tt456
+ *   (Use --title and/or --registryId; at least one required.)
  *
  * Requires: serviceAccountKey.json (or FIREBASE_SERVICE_ACCOUNT), same as other admin scripts.
  */
@@ -15,6 +16,14 @@ import { loadAllRegistryMap } from "./lib/registry-query.mjs";
 const db = getDb();
 const auth = getAuth();
 
+function normalizeRegistryId(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (s.startsWith("tt")) return s;
+  if (/^\d+$/.test(s)) return `tt${s}`;
+  return s;
+}
+
 function parseArgs(argv) {
   const dryRun = !argv.includes("--write");
   const listIdx = argv.indexOf("--listId");
@@ -22,13 +31,19 @@ function parseArgs(argv) {
   const listId = listIdx !== -1 && argv[listIdx + 1] ? String(argv[listIdx + 1]).trim() : "";
   const addedByUid = uidIdx !== -1 && argv[uidIdx + 1] ? String(argv[uidIdx + 1]).trim() : "";
   const titles = [];
+  const registryIds = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--title" && argv[i + 1]) {
       titles.push(String(argv[i + 1]).trim());
       i++;
     }
+    if (argv[i] === "--registryId" && argv[i + 1]) {
+      const id = normalizeRegistryId(argv[i + 1]);
+      if (id) registryIds.push(id);
+      i++;
+    }
   }
-  return { dryRun, listId, addedByUid, titles };
+  return { dryRun, listId, addedByUid, titles, registryIds };
 }
 
 function normTitle(s) {
@@ -130,10 +145,10 @@ async function profileForUid(uid) {
 }
 
 async function main() {
-  const { dryRun, listId, addedByUid, titles } = parseArgs(process.argv.slice(2));
-  if (!listId || !addedByUid || titles.length === 0) {
+  const { dryRun, listId, addedByUid, titles, registryIds } = parseArgs(process.argv.slice(2));
+  if (!listId || !addedByUid || (titles.length === 0 && registryIds.length === 0)) {
     console.error(
-      "Usage: node scripts/reattribute-shared-list-items.mjs [--dry-run|--write] --listId <id> --addedByUid <firebaseAuthUid> --title \"Title One\" --title \"Title Two\" ..."
+      "Usage: node scripts/reattribute-shared-list-items.mjs [--dry-run|--write] --listId <id> --addedByUid <firebaseAuthUid> (--title \"...\" | --registryId tt...) ..."
     );
     process.exit(1);
   }
@@ -153,6 +168,11 @@ async function main() {
   for (const q of titles) {
     const hit = resolveRegistryId(regMap, q);
     if (hit) wantedRegistryIds.set(hit.registryId, { query: q, canonical: hit.title });
+  }
+  for (const rid of registryIds) {
+    const reg = regMap.get(rid);
+    const canonical = reg && typeof reg.title === "string" ? reg.title : rid;
+    wantedRegistryIds.set(rid, { query: rid, canonical });
   }
 
   const { displayName, photoURL } = await profileForUid(addedByUid);
