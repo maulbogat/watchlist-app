@@ -224,6 +224,15 @@ async function hydrateListItemsFromRegistry(
     /** List row only — `addedByUid` lives on the item; display name is on `users/{uid}`. */
     if (typeof inline.addedByUid === "string") meta.addedByUid = inline.addedByUid;
     else delete meta.addedByUid;
+    /** Optional denormalized attribution on the list row (backfill script); prefer over registry noise. */
+    const embeddedDisplay =
+      typeof inline.addedByDisplayName === "string" && inline.addedByDisplayName.trim()
+        ? inline.addedByDisplayName.trim()
+        : "";
+    const embeddedPhoto =
+      typeof inline.addedByPhotoUrl === "string" && inline.addedByPhotoUrl.trim()
+        ? inline.addedByPhotoUrl.trim()
+        : "";
     delete meta.addedByDisplayName;
     delete meta.addedByPhotoUrl;
     let status: WatchlistItem["status"] = "to-watch";
@@ -259,6 +268,8 @@ async function hydrateListItemsFromRegistry(
           : null,
       status,
       ...(rowAddedBy ? { addedByUid: rowAddedBy } : {}),
+      ...(embeddedDisplay ? { addedByDisplayName: embeddedDisplay } : {}),
+      ...(embeddedPhoto ? { addedByPhotoUrl: embeddedPhoto } : {}),
     });
   }
 
@@ -511,10 +522,18 @@ async function mergeAddedByDisplayNamesFromUsers(items: WatchlistItem[]): Promis
   return items.map((m) => {
     if (!m.addedByUid) return m;
     const u = nameMap.get(m.addedByUid);
-    if (!u) return m;
     const next: WatchlistItem = { ...m };
-    if (u.displayName) next.addedByDisplayName = u.displayName;
-    if (u.photoURL) next.addedByPhotoUrl = u.photoURL;
+    if (u) {
+      if (u.displayName) next.addedByDisplayName = u.displayName;
+      if (u.photoURL) next.addedByPhotoUrl = u.photoURL;
+    }
+    /** Denormalized list row (backfill) when client user doc read fails or cache is stale. */
+    if (!next.addedByDisplayName?.trim() && m.addedByDisplayName?.trim()) {
+      next.addedByDisplayName = m.addedByDisplayName.trim();
+    }
+    if (!next.addedByPhotoUrl?.trim() && m.addedByPhotoUrl?.trim()) {
+      next.addedByPhotoUrl = m.addedByPhotoUrl.trim();
+    }
     return next;
   });
 }

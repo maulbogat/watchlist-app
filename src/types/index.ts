@@ -15,9 +15,9 @@ export interface WatchlistItem {
   addedAt?: string | null;
   /** Shared list only: Firebase Auth uid of who added the row (`sharedLists.items[]`). */
   addedByUid?: string | null;
-  /** Hydrated from `users/{addedByUid}.displayName` (not stored on the list item). */
+  /** Hydrated from `users/{addedByUid}`; optional denormalized copy on list rows for offline/cache resilience. */
   addedByDisplayName?: string | null;
-  /** Hydrated from `users/{addedByUid}.photoURL` (not stored on the list item). */
+  /** Hydrated from `users/{addedByUid}.photoURL`; optional denormalized copy on list rows. */
   addedByPhotoUrl?: string | null;
   title: string;
   year: number | null;
