@@ -15,9 +15,9 @@ export interface WatchlistItem {
   addedAt?: string | null;
   /** Shared list only: Firebase Auth uid of who added the row (`sharedLists.items[]`). */
   addedByUid?: string | null;
-  /** Hydrated from `users/{addedByUid}.displayName` (not stored on the list item). */
+  /** Shared list: denormalized on the list row at write time; merge fills gaps from `users/{uid}`. */
   addedByDisplayName?: string | null;
-  /** Hydrated from `users/{addedByUid}.photoURL` (not stored on the list item). */
+  /** Shared list: denormalized on the list row at write time; merge fills gaps from `users/{uid}`. */
   addedByPhotoUrl?: string | null;
   title: string;
   year: number | null;

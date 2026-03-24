@@ -343,7 +343,11 @@ function normalizeAddedAt(value) {
 /**
  * @param {string} registryId
  * @param {Record<string, unknown> | null | undefined} existingRow
- * @param {{ addedByUid?: string } | null | undefined} addedBy
+ * @param {{
+ *   addedByUid?: string;
+ *   addedByDisplayName?: string | null;
+ *   addedByPhotoUrl?: string | null;
+ * } | null | undefined} addedBy
  * @returns {{ registryId: string, addedAt: string } & Record<string, unknown>}
  */
 function toStoredRegistryRef(registryId, existingRow, addedBy) {
@@ -356,8 +360,16 @@ function toStoredRegistryRef(registryId, existingRow, addedBy) {
     existingRow && typeof existingRow.addedByUid === "string" ? existingRow.addedByUid : null;
   if (prevUid) {
     out.addedByUid = prevUid;
-  } else if (addedBy?.addedByUid) {
+    const prevDn = existingRow && typeof existingRow.addedByDisplayName === "string" ? existingRow.addedByDisplayName.trim() : "";
+    if (prevDn) out.addedByDisplayName = prevDn;
+    const prevPhoto = existingRow && typeof existingRow.addedByPhotoUrl === "string" ? existingRow.addedByPhotoUrl.trim() : "";
+    if (prevPhoto) out.addedByPhotoUrl = prevPhoto;
+  } else if (addedBy && typeof addedBy.addedByUid === "string") {
     out.addedByUid = addedBy.addedByUid;
+    const dn = typeof addedBy.addedByDisplayName === "string" ? addedBy.addedByDisplayName.trim() : "";
+    if (dn) out.addedByDisplayName = dn;
+    const photo = typeof addedBy.addedByPhotoUrl === "string" ? addedBy.addedByPhotoUrl.trim() : "";
+    if (photo) out.addedByPhotoUrl = photo;
   }
   return out;
 }
@@ -660,14 +672,21 @@ exports.handler = async (event, context) => {
       return jsonRes(404, { ok: false, error: "Shared list not found" }, event);
     }
     const authAdmin = getAuth(getApp());
+    /** Denormalized onto list rows + `users/{uid}` (same as client `addToSharedList`). */
+    let rowAddedByDisplayName = null;
+    let rowAddedByPhotoUrl = null;
     try {
       const u = await authAdmin.getUser(uid);
-      const dn =
+      rowAddedByDisplayName =
         (u.displayName && String(u.displayName).trim()) ||
         (u.email ? String(u.email).split("@")[0] : null) ||
         null;
-      if (dn) {
-        await db.collection("users").doc(uid).set({ displayName: dn }, { merge: true });
+      rowAddedByPhotoUrl = u.photoURL && String(u.photoURL).trim();
+      const payload = {};
+      if (rowAddedByDisplayName) payload.displayName = rowAddedByDisplayName;
+      if (rowAddedByPhotoUrl) payload.photoURL = rowAddedByPhotoUrl;
+      if (Object.keys(payload).length > 0) {
+        await db.collection("users").doc(uid).set(payload, { merge: true });
       }
     } catch {
       /* ignore profile sync */
@@ -699,7 +718,13 @@ exports.handler = async (event, context) => {
       archive = remapStatusKeys(archive, oldKey, registryId);
     } else {
       await writeRegistryMerge(movie);
-      items.push(toStoredRegistryRef(registryId, null, { addedByUid: uid }));
+      items.push(
+        toStoredRegistryRef(registryId, null, {
+          addedByUid: uid,
+          addedByDisplayName: rowAddedByDisplayName,
+          addedByPhotoUrl: rowAddedByPhotoUrl,
+        })
+      );
     }
 
     await listRef.set({ items, watched, maybeLater, archive }, { merge: true });

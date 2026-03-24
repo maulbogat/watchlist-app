@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { invalidateUserListQueries, listModeQueryKey } from "./useWatchlist.js";
 import { addTitleToList, removeTitleFromList, setTitleStatus } from "../data/titles.js";
-import { movieKey, removeFromPersonalList, removeFromSharedList } from "../firebase.js";
+import { auth, movieKey, removeFromPersonalList, removeFromSharedList } from "../firebase.js";
 import type { ListMode, PersonalList, SharedList, StatusKey, WatchlistItem } from "../types/index.js";
 
 interface SetTitleStatusVars {
@@ -38,7 +38,8 @@ type MutationSnapshot = {
   sharedLists: SharedList[] | undefined;
 };
 
-const SHARED_SYNC_DEBOUNCE_MS = 5 * 60 * 1000;
+/** Debounce invalidation so rapid shared-list actions coalesce (was 5min, which hid merged avatars). */
+const SHARED_SYNC_DEBOUNCE_MS = 400;
 const sharedSyncTimers = new Map<string, number>();
 
 function isSharedMode(listMode: ListMode): boolean {
@@ -176,7 +177,16 @@ export function useRemoveTitle() {
 
 function enrichItemForSharedAdd(uid: string, listMode: ListMode, item: WatchlistItem): WatchlistItem {
   if (!isSharedMode(listMode)) return item;
-  return { ...item, addedByUid: uid };
+  const u = auth.currentUser;
+  if (u?.uid !== uid) return { ...item, addedByUid: uid };
+  const dn = u.displayName?.trim() || (u.email ? u.email.split("@")[0] : "") || "";
+  const photo = u.photoURL?.trim() || "";
+  return {
+    ...item,
+    addedByUid: uid,
+    ...(dn ? { addedByDisplayName: dn } : {}),
+    ...(photo ? { addedByPhotoUrl: photo } : {}),
+  };
 }
 
 export function useAddTitleToList() {

@@ -158,6 +158,18 @@ function addedByUidFromListRow(r: ListRowForHydrate): string | undefined {
   return undefined;
 }
 
+function addedByDisplayNameFromListRow(r: ListRowForHydrate): string | undefined {
+  const v = (r as Record<string, unknown>).addedByDisplayName;
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return undefined;
+}
+
+function addedByPhotoUrlFromListRow(r: ListRowForHydrate): string | undefined {
+  const v = (r as Record<string, unknown>).addedByPhotoUrl;
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return undefined;
+}
+
 function normalizeAddedAt(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
   const ms = Date.parse(value);
@@ -221,11 +233,15 @@ async function hydrateListItemsFromRegistry(
       status?: unknown;
     };
     const meta: Record<string, unknown> = { ...inline, ...fromRegistry };
-    /** List row only — `addedByUid` lives on the item; display name is on `users/{uid}`. */
-    if (typeof inline.addedByUid === "string") meta.addedByUid = inline.addedByUid;
+    /** List row: `addedBy*` denormalized on shared list items; titleRegistry must not override. */
+    if (typeof inline.addedByUid === "string" && inline.addedByUid.trim()) meta.addedByUid = inline.addedByUid.trim();
     else delete meta.addedByUid;
-    delete meta.addedByDisplayName;
-    delete meta.addedByPhotoUrl;
+    const rowAddedByName = addedByDisplayNameFromListRow(r);
+    const rowAddedByPhoto = addedByPhotoUrlFromListRow(r);
+    if (rowAddedByName) meta.addedByDisplayName = rowAddedByName;
+    else delete meta.addedByDisplayName;
+    if (rowAddedByPhoto) meta.addedByPhotoUrl = rowAddedByPhoto;
+    else delete meta.addedByPhotoUrl;
     let status: WatchlistItem["status"] = "to-watch";
     if (watchedSet.has(rid)) status = "watched";
     else if (maybeLaterSet.has(rid)) status = "maybe-later";
@@ -259,6 +275,8 @@ async function hydrateListItemsFromRegistry(
           : null,
       status,
       ...(rowAddedBy ? { addedByUid: rowAddedBy } : {}),
+      ...(rowAddedByName ? { addedByDisplayName: rowAddedByName } : {}),
+      ...(rowAddedByPhoto ? { addedByPhotoUrl: rowAddedByPhoto } : {}),
     });
   }
 
@@ -493,10 +511,16 @@ function photoUrlFromUserDoc(d: DocumentData | undefined): string | null {
 }
 
 /**
- * Prefer server read for `users/{uid}` (fresh). Retries when `getDocFromServer` throws.
- * If the server has no doc yet, fall back to persistence cache (offline / pending writes).
+ * Read `users/{uid}` for attribution: `getDoc` first (local persistence sees pending sync writes),
+ * then server if missing, then cache again (offline).
  */
 async function readUserDocForAddedBy(ref: DocumentReference): Promise<DocumentSnapshot | null> {
+  try {
+    const local = await getDoc(ref);
+    if (local.exists()) return local;
+  } catch {
+    /* fall through */
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 200 * attempt));
     try {
@@ -515,7 +539,7 @@ async function readUserDocForAddedBy(ref: DocumentReference): Promise<DocumentSn
   }
 }
 
-/** One read per distinct `addedByUid` (parallel); profile data lives only on `users/{uid}`. */
+/** One read per distinct `addedByUid` (parallel); fills gaps when list rows lack denormalized fields. */
 async function bulkGetAddedByUserFieldsForUids(uids: string[]): Promise<Map<string, AddedByUserFields>> {
   const uniq = [...new Set(uids.filter((id) => typeof id === "string" && id.length > 0))];
   const map = new Map<string, AddedByUserFields>();
@@ -529,6 +553,13 @@ async function bulkGetAddedByUserFieldsForUids(uids: string[]): Promise<Map<stri
         const n = displayNameFromUserDoc(d);
         const p = photoUrlFromUserDoc(d);
         if (n || p) map.set(id, { displayName: n, photoURL: p });
+        else if (
+          import.meta.env.DEV &&
+          typeof localStorage !== "undefined" &&
+          localStorage.getItem("DEBUG_AVATARS") === "1"
+        ) {
+          console.debug("[DEBUG_AVATARS] users/{uid} exists but displayName and photoURL are empty", id);
+        }
       } catch {
         /* rules / offline */
       }
@@ -539,17 +570,47 @@ async function bulkGetAddedByUserFieldsForUids(uids: string[]): Promise<Map<stri
 
 async function mergeAddedByDisplayNamesFromUsers(items: WatchlistItem[]): Promise<WatchlistItem[]> {
   const uids = items
+    .filter(
+      (m) =>
+        m.addedByUid &&
+        (!m.addedByDisplayName?.trim() || !m.addedByPhotoUrl?.trim())
+    )
     .map((m) => m.addedByUid)
     .filter((x): x is string => typeof x === "string" && x.length > 0);
   if (uids.length === 0) return items;
   const nameMap = await bulkGetAddedByUserFieldsForUids(uids);
+  if (
+    import.meta.env.DEV &&
+    typeof localStorage !== "undefined" &&
+    localStorage.getItem("DEBUG_AVATARS") === "1"
+  ) {
+    for (const m of items) {
+      const id = m.addedByUid;
+      if (!id) continue;
+      const u = nameMap.get(id);
+      if (!u) {
+        console.debug("[DEBUG_AVATARS] merge: no users/{uid} row or empty displayName+photoURL", {
+          addedByUid: id,
+          title: m.title,
+          key: movieKey(m),
+        });
+      } else {
+        console.debug("[DEBUG_AVATARS] merge: ok", {
+          addedByUid: id,
+          hasName: Boolean(u.displayName),
+          hasPhoto: Boolean(u.photoURL),
+          key: movieKey(m),
+        });
+      }
+    }
+  }
   return items.map((m) => {
     if (!m.addedByUid) return m;
     const u = nameMap.get(m.addedByUid);
     if (!u) return m;
     const next: WatchlistItem = { ...m };
-    if (u.displayName) next.addedByDisplayName = u.displayName;
-    if (u.photoURL) next.addedByPhotoUrl = u.photoURL;
+    if (!m.addedByDisplayName?.trim() && u.displayName) next.addedByDisplayName = u.displayName;
+    if (!m.addedByPhotoUrl?.trim() && u.photoURL) next.addedByPhotoUrl = u.photoURL;
     return next;
   });
 }
@@ -671,6 +732,22 @@ async function getSharedListMovies(listId: string): Promise<WatchlistItem[]> {
   const archiveSet = new Set((data.archive ?? []).map((k) => String(k)));
   const hydrated = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
   const movies = await mergeAddedByDisplayNamesFromUsers(hydrated);
+  if (
+    import.meta.env.DEV &&
+    typeof localStorage !== "undefined" &&
+    localStorage.getItem("DEBUG_AVATARS") === "1"
+  ) {
+    console.debug("[DEBUG_AVATARS] getSharedListMovies summary", {
+      listId,
+      rowsWithoutAddedByUid: hydrated.filter((m) => !m.addedByUid).length,
+      sample: movies.slice(0, 6).map((x) => ({
+        title: x.title,
+        addedByUid: x.addedByUid ?? null,
+        addedByDisplayName: x.addedByDisplayName ?? null,
+        hasAddedByPhotoUrl: Boolean(x.addedByPhotoUrl),
+      })),
+    });
+  }
   void logEvent({
     type: "firestore.read",
     collection: "sharedLists",
@@ -723,7 +800,17 @@ async function addToSharedList(listId: string, movie: WatchlistItem, addedByUid:
   const exists = items.some((m) => movieKey(m) === key);
   if (exists) return;
   const base = rowToStore(movie);
+  const cur = auth.currentUser;
   const row: FirestoreListRow = { ...base, addedByUid };
+  if (cur?.uid === addedByUid) {
+    const dn = cur.displayName?.trim() || (cur.email ? cur.email.split("@")[0] : "") || "";
+    const photo = cur.photoURL?.trim() || "";
+    if (dn) row.addedByDisplayName = dn;
+    if (photo) row.addedByPhotoUrl = photo;
+  } else {
+    if (movie.addedByDisplayName?.trim()) row.addedByDisplayName = movie.addedByDisplayName.trim();
+    if (movie.addedByPhotoUrl?.trim()) row.addedByPhotoUrl = movie.addedByPhotoUrl.trim();
+  }
   items.push(row);
   const watched = new Set((Array.isArray(data.watched) ? data.watched : []).map((k) => String(k)));
   const maybeLater = new Set((Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k)));
@@ -733,6 +820,12 @@ async function addToSharedList(listId: string, movie: WatchlistItem, addedByUid:
   else if (s === "maybe-later") maybeLater.add(key);
   else if (s === "archive") archive.add(key);
   await setDoc(ref, { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] }, { merge: true });
+  // Keep `users/{uid}` in sync for other features; list rows carry denormalized attribution.
+  if (cur && cur.uid === addedByUid) {
+    const label =
+      cur.displayName?.trim() || (cur.email ? cur.email.split("@")[0] : "") || "";
+    void syncUserDisplayNameToFirestore(addedByUid, label || null, cur.photoURL ?? null);
+  }
 }
 
 async function addToPersonalList(uid: string, listId: string, movie: WatchlistItem): Promise<void> {

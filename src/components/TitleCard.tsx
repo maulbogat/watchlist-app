@@ -94,8 +94,10 @@ export function TitleCard({
   function addedByAvatar(): { src: string; initial: string } | null {
     if (!showAddedBy) return null;
     if (m.addedByUid && viewerUid && m.addedByUid === viewerUid) {
-      const src = sanitizePosterUrl(viewerPhotoUrl ?? "");
-      return { src, initial: (viewerDisplayName|| "?").charAt(0).toUpperCase() };
+      // Prefer Auth photo; fall back to merged `users/{uid}` (e.g. Auth missing photoURL in session).
+      const src = sanitizePosterUrl(viewerPhotoUrl ?? m.addedByPhotoUrl ?? "");
+      const label = viewerDisplayName?.trim() || m.addedByDisplayName?.trim() || "";
+      return { src, initial: (label || "?").charAt(0).toUpperCase() };
     }
     if (m.addedByUid) {
       const src = sanitizePosterUrl(m.addedByPhotoUrl ?? "");
