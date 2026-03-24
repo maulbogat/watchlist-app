@@ -1,6 +1,6 @@
 import { useAppStore, STATUS_LABELS } from "../store/useAppStore.js";
 import { persistFilterPreferences } from "../lib/storage.js";
-import { getUniqueGenresFromMovies } from "../lib/watchlistFilters.js";
+import { getUniqueAddersFromMovies, getUniqueGenresFromMovies } from "../lib/watchlistFilters.js";
 import { logEvent } from "../lib/axiom-logger.js";
 import type { FilterType, SortType, WatchlistItem } from "../types/index.js";
 
@@ -21,8 +21,15 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
   const setCurrentSort = useAppStore((s) => s.setCurrentSort);
   const currentSearch = useAppStore((s) => s.currentSearch);
   const setCurrentSearch = useAppStore((s) => s.setCurrentSearch);
+  const currentAddedByUid = useAppStore((s) => s.currentAddedByUid);
+  const setCurrentAddedByUid = useAppStore((s) => s.setCurrentAddedByUid);
+  const currentListMode = useAppStore((s) => s.currentListMode);
+
+  const isSharedList =
+    currentListMode && typeof currentListMode === "object" && currentListMode.type === "shared";
 
   const genres = getUniqueGenresFromMovies(allMovies);
+  const adders = isSharedList ? getUniqueAddersFromMovies(allMovies, currentUser?.uid ?? null) : [];
 
   function persistFilters() {
     persistFilterPreferences(currentUser, {
@@ -31,6 +38,7 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
       currentStatus: useAppStore.getState().currentStatus,
       currentSort: useAppStore.getState().currentSort,
       currentSearch: useAppStore.getState().currentSearch,
+      currentAddedByUid: useAppStore.getState().currentAddedByUid,
     });
   }
 
@@ -153,6 +161,61 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
           }}
         />
       </div>
+      {adders.length > 1 ? (
+        <div
+          id="added-by-filter-wrap"
+          className="genre-filter-wrap added-by-filter-wrap"
+          style={{ display: "flex" }}
+          role="group"
+          aria-label="Filter by who added the title"
+        >
+          <span className="filter-subrow-label">Added by</span>
+          <button
+            type="button"
+            className={`genre-chip${!currentAddedByUid ? " active" : ""}`}
+            data-added-by=""
+            aria-pressed={!currentAddedByUid}
+            onClick={() => {
+              setCurrentAddedByUid("");
+              persistFilters();
+              void logEvent({
+                type: "user.action",
+                action: "filter.change",
+                filterType: "addedBy",
+                value: "all",
+                uid: currentUser?.uid ?? null,
+              }).catch(() => {});
+            }}
+          >
+            All
+          </button>
+          {adders.map(({ uid, label }) => {
+            const active = currentAddedByUid === uid;
+            return (
+              <button
+                key={uid}
+                type="button"
+                className={`genre-chip${active ? " active" : ""}`}
+                data-added-by={uid}
+                aria-pressed={active}
+                onClick={() => {
+                  setCurrentAddedByUid(uid);
+                  persistFilters();
+                  void logEvent({
+                    type: "user.action",
+                    action: "filter.change",
+                    filterType: "addedBy",
+                    value: uid,
+                    uid: currentUser?.uid ?? null,
+                  }).catch(() => {});
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
       {genres.length ? (
         <div id="genre-filter-wrap" className="genre-filter-wrap" style={{ display: "flex" }}>
           <button

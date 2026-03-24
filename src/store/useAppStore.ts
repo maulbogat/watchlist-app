@@ -31,6 +31,10 @@ export interface AppState {
   currentGenre: string;
   setCurrentGenre: (currentGenre: string) => void;
 
+  /** Shared lists only: filter by `addedByUid`; empty string = all members. */
+  currentAddedByUid: string;
+  setCurrentAddedByUid: (uid: string) => void;
+
   currentStatus: string;
   setCurrentStatus: (currentStatus: string) => void;
 
@@ -71,6 +75,9 @@ export const useAppStore = create<AppState>()((set) => ({
 
   currentGenre: "",
   setCurrentGenre: (currentGenre) => set({ currentGenre }),
+
+  currentAddedByUid: "",
+  setCurrentAddedByUid: (currentAddedByUid) => set({ currentAddedByUid }),
 
   currentStatus: "to-watch",
   setCurrentStatus: (currentStatus) => set({ currentStatus }),

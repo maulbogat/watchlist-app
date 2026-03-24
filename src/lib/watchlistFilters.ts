@@ -10,6 +10,35 @@ export function isGenrePresentInMovies(movies: WatchlistItem[] | undefined, genr
   });
 }
 
+export interface AddedByFilterOption {
+  uid: string;
+  label: string;
+}
+
+/** Distinct adders on a shared list (for filter chips). */
+export function getUniqueAddersFromMovies(
+  movies: WatchlistItem[] | undefined,
+  viewerUid: string | null | undefined
+): AddedByFilterOption[] {
+  const seen = new Map<string, string>();
+  for (const m of movies || []) {
+    const uid = typeof m.addedByUid === "string" && m.addedByUid.trim() ? m.addedByUid.trim() : "";
+    if (!uid || seen.has(uid)) continue;
+    const dn = m.addedByDisplayName?.trim();
+    if (viewerUid && uid === viewerUid) seen.set(uid, "You");
+    else if (dn) seen.set(uid, dn);
+    else seen.set(uid, "Member");
+  }
+  return [...seen.entries()]
+    .map(([uid, label]) => ({ uid, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+}
+
+export function isAddedByPresentInMovies(movies: WatchlistItem[] | undefined, addedByUid: string): boolean {
+  if (!addedByUid.trim()) return true;
+  return (movies || []).some((m) => m.addedByUid === addedByUid);
+}
+
 export function getUniqueGenresFromMovies(movies: WatchlistItem[] | undefined): string[] {
   const count = new Map<string, number>();
   (movies || []).forEach((m) => {
@@ -32,16 +61,24 @@ export interface FilterState {
   currentStatus: string;
   currentSort: string;
   currentSearch: string;
+  /** Shared lists: restrict to this `addedByUid`; empty = all. */
+  currentAddedByUid?: string;
 }
 
-/** Pure filter pipeline for the grid (type, status, genre, recently-added). */
+/** Pure filter pipeline for the grid (type, status, genre, added-by on shared lists, recently-added). */
 export function filterTitles(movies: WatchlistItem[] | undefined, filters: FilterState): WatchlistItem[] {
   const listMovies = movies || [];
   const search = filters.currentSearch.trim().toLowerCase();
+  const addedBy = (filters.currentAddedByUid ?? "").trim();
 
   function matchesSearch(movie: WatchlistItem): boolean {
     if (!search) return true;
     return String(movie.title || "").toLowerCase().includes(search);
+  }
+
+  function matchesAddedBy(movie: WatchlistItem): boolean {
+    if (!addedBy) return true;
+    return movie.addedByUid === addedBy;
   }
 
   function toEpochOrNegInf(value: unknown): number {
@@ -72,6 +109,7 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
       const s = m.status || "to-watch";
       if (s !== "to-watch") continue;
       if (!matchesSearch(m)) continue;
+      if (!matchesAddedBy(m)) continue;
       if (filters.currentFilter !== "both" && m.type !== filters.currentFilter) continue;
       if (filters.currentGenre) {
         const g = String(m.genre || "");
@@ -92,6 +130,7 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
 
   let list =
     filters.currentFilter === "both" ? listMovies : listMovies.filter((m) => m.type === filters.currentFilter);
+  list = list.filter((m) => matchesAddedBy(m));
   list = list.filter((m) => {
     const s = m.status || "to-watch";
     if (filters.currentStatus === "to-watch") return s === "to-watch" || s === "maybe-later";

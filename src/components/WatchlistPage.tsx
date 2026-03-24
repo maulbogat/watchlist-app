@@ -19,7 +19,11 @@ import {
   invalidateUserListQueries,
 } from "../hooks/useWatchlist.js";
 import { useWatchlistSessionRestore } from "../hooks/useWatchlistSessionRestore.js";
-import { filterTitles, isGenrePresentInMovies } from "../lib/watchlistFilters.js";
+import {
+  filterTitles,
+  isAddedByPresentInMovies,
+  isGenrePresentInMovies,
+} from "../lib/watchlistFilters.js";
 import { ListSelector, CopyInviteButton } from "./ListSelector.js";
 import { WatchlistToolbar } from "./WatchlistToolbar.js";
 import { TitleGrid } from "./TitleGrid.js";
@@ -41,6 +45,7 @@ export function WatchlistPage() {
   const currentListMode = useAppStore((s) => s.currentListMode);
   const currentFilter = useAppStore((s) => s.currentFilter);
   const currentGenre = useAppStore((s) => s.currentGenre);
+  const currentAddedByUid = useAppStore((s) => s.currentAddedByUid);
   const currentStatus = useAppStore((s) => s.currentStatus);
   const currentSort = useAppStore((s) => s.currentSort);
   const currentSearch = useAppStore((s) => s.currentSearch);
@@ -119,9 +124,36 @@ export function WatchlistPage() {
     }
   }, [allMovies, currentGenre]);
 
+  useEffect(() => {
+    if (!currentAddedByUid) return;
+    if (!isAddedByPresentInMovies(allMovies, currentAddedByUid)) {
+      useAppStore.getState().setCurrentAddedByUid("");
+    }
+  }, [allMovies, currentAddedByUid]);
+
+  const prevSharedListIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const sid =
+      currentListMode && typeof currentListMode === "object" && currentListMode.type === "shared"
+        ? currentListMode.listId
+        : null;
+    if (prevSharedListIdRef.current !== null && sid !== prevSharedListIdRef.current) {
+      useAppStore.getState().setCurrentAddedByUid("");
+    }
+    prevSharedListIdRef.current = sid;
+  }, [currentListMode]);
+
   const visibleMovies = useMemo(
-    () => filterTitles(allMovies, { currentFilter, currentGenre, currentStatus, currentSort, currentSearch }),
-    [allMovies, currentFilter, currentGenre, currentStatus, currentSort, currentSearch]
+    () =>
+      filterTitles(allMovies, {
+        currentFilter,
+        currentGenre,
+        currentStatus,
+        currentSort,
+        currentSearch,
+        currentAddedByUid,
+      }),
+    [allMovies, currentFilter, currentGenre, currentStatus, currentSort, currentSearch, currentAddedByUid]
   );
 
   const personalLists = personalQ.data ?? [];

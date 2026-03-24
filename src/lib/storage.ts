@@ -39,6 +39,8 @@ export interface FilterPrefsSnapshot {
   currentStatus: string;
   currentSort: string;
   currentSearch: string;
+  /** Shared list filter; omitted in older stored prefs. */
+  currentAddedByUid?: string;
 }
 
 /** Read saved type / status / genre filters from localStorage (per signed-in user). */
@@ -56,6 +58,7 @@ export function readFilterPreferences(user: User | null): FilterPrefsSnapshot | 
       currentStatus: typeof o.currentStatus === "string" ? o.currentStatus : "to-watch",
       currentSort: typeof o.currentSort === "string" ? o.currentSort : "title-asc",
       currentSearch: typeof o.currentSearch === "string" ? o.currentSearch : "",
+      currentAddedByUid: typeof o.currentAddedByUid === "string" ? o.currentAddedByUid : "",
     };
   } catch {
     return null;
@@ -74,6 +77,7 @@ export function persistFilterPreferences(user: User | null, prefs: FilterPrefsSn
         currentStatus: prefs.currentStatus,
         currentSort: prefs.currentSort,
         currentSearch: prefs.currentSearch,
+        currentAddedByUid: prefs.currentAddedByUid ?? "",
       })
     );
   } catch {

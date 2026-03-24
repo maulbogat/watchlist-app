@@ -907,6 +907,17 @@ body:has(#lists-modal[data-state="open"]) [data-slot="dialog-overlay"] {
   min-width: 0;
 }
 
+.added-by-filter-wrap .filter-subrow-label {
+  flex: 0 0 auto;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.9;
+  margin-right: 0.15rem;
+  align-self: center;
+}
+
 .genre-chip {
   appearance: none;
   border: 1px solid var(--border);

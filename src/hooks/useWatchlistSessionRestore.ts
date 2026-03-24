@@ -61,6 +61,8 @@ export function useWatchlistSessionRestore(
               ? prefs.currentSort
               : s.currentSort,
           currentSearch: typeof prefs.currentSearch === "string" ? prefs.currentSearch : s.currentSearch,
+          currentAddedByUid:
+            typeof prefs.currentAddedByUid === "string" ? prefs.currentAddedByUid : s.currentAddedByUid,
         }));
       }
 
