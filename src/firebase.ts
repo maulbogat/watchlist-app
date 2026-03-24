@@ -539,7 +539,7 @@ async function readUserDocForAddedBy(ref: DocumentReference): Promise<DocumentSn
   }
 }
 
-/** One read per distinct `addedByUid` (parallel); fills gaps when list rows lack denormalized fields. */
+/** One read per distinct `addedByUid` (parallel). */
 async function bulkGetAddedByUserFieldsForUids(uids: string[]): Promise<Map<string, AddedByUserFields>> {
   const uniq = [...new Set(uids.filter((id) => typeof id === "string" && id.length > 0))];
   const map = new Map<string, AddedByUserFields>();
@@ -553,13 +553,6 @@ async function bulkGetAddedByUserFieldsForUids(uids: string[]): Promise<Map<stri
         const n = displayNameFromUserDoc(d);
         const p = photoUrlFromUserDoc(d);
         if (n || p) map.set(id, { displayName: n, photoURL: p });
-        else if (
-          import.meta.env.DEV &&
-          typeof localStorage !== "undefined" &&
-          localStorage.getItem("DEBUG_AVATARS") === "1"
-        ) {
-          console.debug("[DEBUG_AVATARS] users/{uid} exists but displayName and photoURL are empty", id);
-        }
       } catch {
         /* rules / offline */
       }
@@ -570,47 +563,25 @@ async function bulkGetAddedByUserFieldsForUids(uids: string[]): Promise<Map<stri
 
 async function mergeAddedByDisplayNamesFromUsers(items: WatchlistItem[]): Promise<WatchlistItem[]> {
   const uids = items
-    .filter(
-      (m) =>
-        m.addedByUid &&
-        (!m.addedByDisplayName?.trim() || !m.addedByPhotoUrl?.trim())
-    )
     .map((m) => m.addedByUid)
     .filter((x): x is string => typeof x === "string" && x.length > 0);
   if (uids.length === 0) return items;
   const nameMap = await bulkGetAddedByUserFieldsForUids(uids);
-  if (
-    import.meta.env.DEV &&
-    typeof localStorage !== "undefined" &&
-    localStorage.getItem("DEBUG_AVATARS") === "1"
-  ) {
-    for (const m of items) {
-      const id = m.addedByUid;
-      if (!id) continue;
-      const u = nameMap.get(id);
-      if (!u) {
-        console.debug("[DEBUG_AVATARS] merge: no users/{uid} row or empty displayName+photoURL", {
-          addedByUid: id,
-          title: m.title,
-          key: movieKey(m),
-        });
-      } else {
-        console.debug("[DEBUG_AVATARS] merge: ok", {
-          addedByUid: id,
-          hasName: Boolean(u.displayName),
-          hasPhoto: Boolean(u.photoURL),
-          key: movieKey(m),
-        });
-      }
-    }
-  }
   return items.map((m) => {
     if (!m.addedByUid) return m;
     const u = nameMap.get(m.addedByUid);
-    if (!u) return m;
     const next: WatchlistItem = { ...m };
-    if (!m.addedByDisplayName?.trim() && u.displayName) next.addedByDisplayName = u.displayName;
-    if (!m.addedByPhotoUrl?.trim() && u.photoURL) next.addedByPhotoUrl = u.photoURL;
+    if (u) {
+      if (u.displayName) next.addedByDisplayName = u.displayName;
+      if (u.photoURL) next.addedByPhotoUrl = u.photoURL;
+    }
+    /** Denormalized list row when `users/{uid}` read is empty or missing fields. */
+    if (!next.addedByDisplayName?.trim() && m.addedByDisplayName?.trim()) {
+      next.addedByDisplayName = m.addedByDisplayName.trim();
+    }
+    if (!next.addedByPhotoUrl?.trim() && m.addedByPhotoUrl?.trim()) {
+      next.addedByPhotoUrl = m.addedByPhotoUrl.trim();
+    }
     return next;
   });
 }
@@ -732,22 +703,6 @@ async function getSharedListMovies(listId: string): Promise<WatchlistItem[]> {
   const archiveSet = new Set((data.archive ?? []).map((k) => String(k)));
   const hydrated = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
   const movies = await mergeAddedByDisplayNamesFromUsers(hydrated);
-  if (
-    import.meta.env.DEV &&
-    typeof localStorage !== "undefined" &&
-    localStorage.getItem("DEBUG_AVATARS") === "1"
-  ) {
-    console.debug("[DEBUG_AVATARS] getSharedListMovies summary", {
-      listId,
-      rowsWithoutAddedByUid: hydrated.filter((m) => !m.addedByUid).length,
-      sample: movies.slice(0, 6).map((x) => ({
-        title: x.title,
-        addedByUid: x.addedByUid ?? null,
-        addedByDisplayName: x.addedByDisplayName ?? null,
-        hasAddedByPhotoUrl: Boolean(x.addedByPhotoUrl),
-      })),
-    });
-  }
   void logEvent({
     type: "firestore.read",
     collection: "sharedLists",

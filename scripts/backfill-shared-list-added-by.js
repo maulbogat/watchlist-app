@@ -44,11 +44,8 @@ if (items.length === 0) {
 
 const next = items.map((row) => {
   if (!row || typeof row !== "object") return row;
-  const o = { ...row };
-  delete o.addedByDisplayName;
-  o.addedByUid = uid;
-  return o;
+  return { ...row, addedByUid: uid };
 });
 
 await ref.set({ items: next }, { merge: true });
-console.log(`Updated ${next.length} item row(s) on sharedLists/${listId} with addedByUid=${uid} (removed legacy addedByDisplayName from rows).`);
+console.log(`Updated ${next.length} item row(s) on sharedLists/${listId} with addedByUid=${uid} (keeps existing addedByDisplayName/addedByPhotoUrl on rows).`);
