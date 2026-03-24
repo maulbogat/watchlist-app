@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-03-23T07:14:00.220Z",
+  "exportedAt": "2026-03-24T07:07:12.756Z",
   "version": 3,
   "titleRegistry": {
     "tt0050083": {
@@ -298,6 +298,19 @@
         "Apple TV Store"
       ],
       "title": "Toy Soldiers",
+      "type": "movie"
+    },
+    "tt0104348": {
+      "id": "tt0104348",
+      "tmdbId": 9504,
+      "thumb": "https://image.tmdb.org/t/p/w500/zcaEDx8KlVfh4vKfMNLhiSi5Oz4.jpg",
+      "tmdbMedia": "movie",
+      "year": 1992,
+      "imdbId": "tt0104348",
+      "genre": "Crime / Drama / Mystery",
+      "youtubeId": "_VrekKSuFto",
+      "services": [],
+      "title": "Glengarry Glen Ross",
       "type": "movie"
     },
     "tt0104952": {
@@ -1204,6 +1217,22 @@
       "type": "show",
       "thumb": "https://image.tmdb.org/t/p/w500/Tc1mRuP5QrGaetGKcitZkhTU9g.jpg"
     },
+    "tt1045778": {
+      "id": "tt1045778",
+      "tmdbId": 17610,
+      "thumb": "https://image.tmdb.org/t/p/w500/qF573jdJYwtCbXVXPDn4xu8nW2a.jpg",
+      "tmdbMedia": "movie",
+      "year": 2009,
+      "imdbId": "tt1045778",
+      "genre": "Comedy / Adventure",
+      "youtubeId": "4H_Eepvg3aU",
+      "services": [
+        "Netflix",
+        "Apple TV Store"
+      ],
+      "title": "Year One",
+      "type": "movie"
+    },
     "tt10629360": {
       "id": "tt10629360",
       "tmdbId": 1009460,
@@ -1274,6 +1303,19 @@
       "title": "Hummus Full Trailer",
       "type": "movie",
       "thumb": "https://image.tmdb.org/t/p/w500/xs0xEQSCiMCYLi3tRfHAQdBcSSR.jpg"
+    },
+    "tt11173006": {
+      "id": "tt11173006",
+      "tmdbId": 126301,
+      "thumb": "https://image.tmdb.org/t/p/w500/rGZ7Hv2VvPHKM0Pav6cHyX4jaLN.jpg",
+      "tmdbMedia": "tv",
+      "year": 2022,
+      "imdbId": "tt11173006",
+      "genre": "Drama",
+      "youtubeId": "7j_CMSuiFrc",
+      "services": [],
+      "title": "Super Pumped: The Battle for Uber",
+      "type": "show"
     },
     "tt11280740": {
       "id": "tt11280740",
@@ -1396,7 +1438,8 @@
       "youtubeId": "JRgyBaTulbs",
       "services": [],
       "title": "Only Murders in the Building",
-      "type": "show"
+      "type": "show",
+      "tmdbMedia": "tv"
     },
     "tt11815960": {
       "id": "tt11815960",
@@ -1425,6 +1468,21 @@
       "title": "The Thursday Murder Club",
       "type": "movie"
     },
+    "tt12005128": {
+      "id": "tt12005128",
+      "tmdbId": 117821,
+      "thumb": "https://image.tmdb.org/t/p/w500/rFlYeo84b5YtzNkN0IonN6ZCPic.jpg",
+      "tmdbMedia": "tv",
+      "year": 2022,
+      "imdbId": "tt12005128",
+      "genre": "Drama",
+      "youtubeId": "UREIAoL0Spk",
+      "services": [
+        "Apple TV"
+      ],
+      "title": "WeCrashed",
+      "type": "show"
+    },
     "tt1219289": {
       "id": "tt1219289",
       "tmdbId": 51876,
@@ -1436,6 +1494,21 @@
       "youtubeId": "4TLppsfzQH8",
       "services": [],
       "title": "Limitless",
+      "type": "movie"
+    },
+    "tt1245492": {
+      "id": "tt1245492",
+      "tmdbId": 109414,
+      "thumb": "https://image.tmdb.org/t/p/w500/tNIW0NhX1hKvUsy6PQ80DOKUhkD.jpg",
+      "tmdbMedia": "movie",
+      "year": 2013,
+      "imdbId": "tt1245492",
+      "genre": "Action / Comedy",
+      "youtubeId": "kliQSsD_npo",
+      "services": [
+        "Apple TV Store"
+      ],
+      "title": "This Is the End",
       "type": "movie"
     },
     "tt12593682": {
@@ -1481,6 +1554,19 @@
       ],
       "title": "Looper",
       "type": "movie"
+    },
+    "tt12966558": {
+      "id": "tt12966558",
+      "tmdbId": 218348,
+      "thumb": "https://image.tmdb.org/t/p/w500/mKWj5nfgqwaGgQlJmJro6LzchU7.jpg",
+      "tmdbMedia": "tv",
+      "year": 2023,
+      "imdbId": "tt12966558",
+      "genre": "Drama / Crime",
+      "youtubeId": "75YtDvBniOo",
+      "services": [],
+      "title": "The Following Events are Based on a Pack of Lies",
+      "type": "show"
     },
     "tt1323045": {
       "id": "tt1323045",
@@ -1557,6 +1643,21 @@
         "Prime Video"
       ],
       "title": "X",
+      "type": "movie"
+    },
+    "tt13567480": {
+      "id": "tt13567480",
+      "tmdbId": 773655,
+      "thumb": "https://image.tmdb.org/t/p/w500/w9FPFsPkeiBDn6WwDHFgniWdVJm.jpg",
+      "tmdbMedia": "movie",
+      "year": 2020,
+      "imdbId": "tt13567480",
+      "genre": "Comedy",
+      "youtubeId": "veUqfcyZ_Bo",
+      "services": [
+        "Netflix"
+      ],
+      "title": "Death to 2020",
       "type": "movie"
     },
     "tt13640696": {
@@ -1702,16 +1803,29 @@
     "tt14269590": {
       "id": "tt14269590",
       "tmdbId": 120998,
-      "thumb": "https://m.media-amazon.com/images/M/MV5BZmEwZWEyMTktMmVmMy00YjE4LWEzNWEtMjc2Zjk5NWM3MjkxXkEyXkFqcGc@._V1_SX300.jpg",
       "tmdbMedia": "tv",
       "year": 2023,
       "imdbId": "tt14269590",
       "genre": "Crime / Mystery",
       "youtubeId": "7gmozhMRbmA",
-      "services": [
-        "Peacock"
-      ],
       "title": "Poker Face",
+      "type": "show",
+      "thumb": "https://image.tmdb.org/t/p/w500/8Xm5dyMQC9whMJKnGdFugUAW73C.jpg",
+      "services": []
+    },
+    "tt14271498": {
+      "id": "tt14271498",
+      "tmdbId": 197449,
+      "thumb": "https://image.tmdb.org/t/p/w500/aAcPJPOHLzJtAQQmTrvPzceasOI.jpg",
+      "tmdbMedia": "tv",
+      "year": 2022,
+      "imdbId": "tt14271498",
+      "genre": "Comedy",
+      "youtubeId": "ktzAq7wjJgs",
+      "services": [
+        "Apple TV"
+      ],
+      "title": "Loot",
       "type": "show"
     },
     "tt14364480": {
@@ -1889,6 +2003,34 @@
       "title": "Fall",
       "type": "movie"
     },
+    "tt1538403": {
+      "id": "tt1538403",
+      "tmdbId": 123553,
+      "thumb": "https://image.tmdb.org/t/p/w500/zaK1aVn5vXfNwLIDop9U8XA3Q0x.jpg",
+      "tmdbMedia": "movie",
+      "year": 2013,
+      "imdbId": "tt1538403",
+      "genre": "Fantasy / Action / Mystery",
+      "youtubeId": "hc4CiTvQ-YE",
+      "services": [],
+      "title": "The Mortal Instruments: City of Bones",
+      "type": "movie"
+    },
+    "tt15469618": {
+      "id": "tt15469618",
+      "tmdbId": 199318,
+      "thumb": "https://image.tmdb.org/t/p/w500/z63D1Y8udrrFOhLFCT9YElcTr0w.jpg",
+      "tmdbMedia": "tv",
+      "year": 2022,
+      "imdbId": "tt15469618",
+      "genre": "Drama / Crime",
+      "youtubeId": "IZUrhfCl0Xc",
+      "services": [
+        "Apple TV"
+      ],
+      "title": "Bad Sisters",
+      "type": "show"
+    },
     "tt15474916": {
       "id": "tt15474916",
       "tmdbId": 882598,
@@ -2030,6 +2172,21 @@
       "services": [],
       "title": "Absentia",
       "type": "movie"
+    },
+    "tt16124614": {
+      "id": "tt16124614",
+      "tmdbId": 201874,
+      "thumb": "https://image.tmdb.org/t/p/w500/1seIJ8wIKo3KXp7hnwS5wj69U8M.jpg",
+      "tmdbMedia": "tv",
+      "year": 2022,
+      "imdbId": "tt16124614",
+      "genre": "Comedy",
+      "youtubeId": "kDA-phXyYH8",
+      "services": [
+        "Netflix"
+      ],
+      "title": "Blockbuster",
+      "type": "show"
     },
     "tt1618434": {
       "id": "tt1618434",
@@ -2177,6 +2334,19 @@
         "Apple TV"
       ],
       "title": "The Bridge",
+      "type": "show"
+    },
+    "tt17543592": {
+      "id": "tt17543592",
+      "tmdbId": 208569,
+      "thumb": "https://image.tmdb.org/t/p/w500/qG5O46gUxxYGImld03tl2zLhvrg.jpg",
+      "tmdbMedia": "tv",
+      "year": 2023,
+      "imdbId": "tt17543592",
+      "genre": "Crime / Drama / Comedy",
+      "youtubeId": "Iy9PoT19ujk",
+      "services": [],
+      "title": "Will Trent",
       "type": "show"
     },
     "tt1783495": {
@@ -2398,6 +2568,19 @@
       "title": "Break",
       "type": "movie"
     },
+    "tt21433690": {
+      "id": "tt21433690",
+      "tmdbId": 251941,
+      "thumb": "https://image.tmdb.org/t/p/w500/8tUjI21ZcfSynLCk3Zr0Gs5BQwz.jpg",
+      "tmdbMedia": "tv",
+      "year": 2024,
+      "imdbId": "tt21433690",
+      "genre": "Comedy",
+      "youtubeId": "k1NkZGmN1Eg",
+      "services": [],
+      "title": "St. Denis Medical",
+      "type": "show"
+    },
     "tt21807222": {
       "id": "tt21807222",
       "tmdbId": 951491,
@@ -2435,6 +2618,21 @@
       "youtubeId": "a6lzvWby9UE",
       "services": [],
       "title": "Pluribus",
+      "type": "show"
+    },
+    "tt22746676": {
+      "id": "tt22746676",
+      "tmdbId": 212186,
+      "thumb": "https://image.tmdb.org/t/p/w500/xQL165yqkpEEMxnr6lPtdjqbcGC.jpg",
+      "tmdbMedia": "tv",
+      "year": 2022,
+      "imdbId": "tt22746676",
+      "genre": "Documentary",
+      "youtubeId": "ca00ZHJWKuA",
+      "services": [
+        "Netflix"
+      ],
+      "title": "Vatican Girl: The Disappearance of Emanuela Orlandi",
       "type": "show"
     },
     "tt2283362": {
@@ -2549,6 +2747,21 @@
         "Prime Video"
       ],
       "title": "Delivery Man",
+      "type": "movie"
+    },
+    "tt24509990": {
+      "id": "tt24509990",
+      "tmdbId": 1061117,
+      "thumb": "https://image.tmdb.org/t/p/w500/kb9ow17gQv2196VTgLnbRoA3amZ.jpg",
+      "tmdbMedia": "movie",
+      "year": 2023,
+      "imdbId": "tt24509990",
+      "genre": "Crime / Documentary",
+      "youtubeId": "E2r4vg3vdkM",
+      "services": [
+        "Netflix"
+      ],
+      "title": "The Hatchet Wielding Hitchhiker",
       "type": "movie"
     },
     "tt2452242": {
@@ -3100,16 +3313,29 @@
     "tt32267726": {
       "id": "tt32267726",
       "tmdbId": 253376,
-      "thumb": "https://m.media-amazon.com/images/M/MV5BNjU2OWNjMDctYzdhMi00ZmUwLTk1OTYtYmNkMjE1MDBjMDU1XkEyXkFqcGc@._V1_SX300.jpg",
       "tmdbMedia": "tv",
       "year": 2025,
       "imdbId": "tt32267726",
       "genre": "Drama / Mystery",
       "youtubeId": "SKGdid_6V5s",
-      "services": [
-        "Prime Video"
-      ],
       "title": "The Girlfriend",
+      "type": "show",
+      "thumb": "https://image.tmdb.org/t/p/w500/ktrp3tdZ5IQpFux4nLy8z70bt3n.jpg",
+      "services": [
+        "Amazon Prime Video"
+      ]
+    },
+    "tt3230454": {
+      "id": "tt3230454",
+      "tmdbId": 61888,
+      "thumb": "https://image.tmdb.org/t/p/w500/vONS5oceFmM93hsS3q3mvQ1iBC3.jpg",
+      "tmdbMedia": "tv",
+      "year": 2015,
+      "imdbId": "tt3230454",
+      "genre": "Drama / Comedy",
+      "youtubeId": null,
+      "services": [],
+      "title": "The Last Man on Earth",
       "type": "show"
     },
     "tt32376165": {
@@ -3138,6 +3364,19 @@
       "title": "Fall for Me",
       "type": "movie"
     },
+    "tt32799276": {
+      "id": "tt32799276",
+      "tmdbId": 1312666,
+      "thumb": "https://image.tmdb.org/t/p/w500/g1K4O0UMA4eY5Wpi6lXpdPtqCY5.jpg",
+      "tmdbMedia": "movie",
+      "year": 2024,
+      "imdbId": "tt32799276",
+      "genre": "Comedy / Drama",
+      "youtubeId": null,
+      "services": [],
+      "title": "The Ring",
+      "type": "movie"
+    },
     "tt33293130": {
       "id": "tt33293130",
       "imdbId": "tt33293130",
@@ -3151,6 +3390,19 @@
         "Netflix"
       ],
       "title": "The Asset",
+      "type": "show"
+    },
+    "tt33362589": {
+      "id": "tt33362589",
+      "tmdbId": 271053,
+      "thumb": "https://image.tmdb.org/t/p/w500/6xrLXEQABvoVwGka9KDDAOt4lFs.jpg",
+      "tmdbMedia": "tv",
+      "year": 2025,
+      "imdbId": "tt33362589",
+      "genre": "Comedy",
+      "youtubeId": "DnBAmvw_Yow",
+      "services": [],
+      "title": "I Love LA",
       "type": "show"
     },
     "tt3339966": {
@@ -3295,6 +3547,19 @@
       "title": "Aileen: Queen of the Serial Killers",
       "type": "movie"
     },
+    "tt38961906": {
+      "id": "tt38961906",
+      "tmdbId": 304909,
+      "thumb": "https://image.tmdb.org/t/p/w500/oBjmpCn90hC9f5BuJj3YE8gqJaO.jpg",
+      "tmdbMedia": "tv",
+      "year": 2025,
+      "imdbId": "tt38961906",
+      "genre": "Drama / Comedy",
+      "youtubeId": null,
+      "services": [],
+      "title": "A Happy Place",
+      "type": "show"
+    },
     "tt39572794": {
       "id": "tt39572794",
       "tmdbId": 313739,
@@ -3398,6 +3663,19 @@
       "title": "Man Seeking Woman",
       "type": "show"
     },
+    "tt4270492": {
+      "id": "tt4270492",
+      "tmdbId": 62852,
+      "thumb": "https://image.tmdb.org/t/p/w500/edwYPQdZE998d748AdwWLsfy0rl.jpg",
+      "tmdbMedia": "tv",
+      "year": 2016,
+      "imdbId": "tt4270492",
+      "genre": "Drama",
+      "youtubeId": "_raEUMLL-ZI",
+      "services": [],
+      "title": "Billions",
+      "type": "show"
+    },
     "tt4301160": {
       "id": "tt4301160",
       "tmdbId": 155537,
@@ -3428,6 +3706,19 @@
       "title": "Better Things",
       "type": "show"
     },
+    "tt4477976": {
+      "id": "tt4477976",
+      "tmdbId": 62649,
+      "thumb": "https://image.tmdb.org/t/p/w500/2tpY5qIYwH85njvjI5BnH4VNA6p.jpg",
+      "tmdbMedia": "tv",
+      "year": 2015,
+      "imdbId": "tt4477976",
+      "genre": "Comedy",
+      "youtubeId": "NgZXnTZbF3g",
+      "services": [],
+      "title": "Superstore",
+      "type": "show"
+    },
     "tt4995790": {
       "id": "tt4995790",
       "tmdbId": 401246,
@@ -3455,6 +3746,21 @@
       "services": [],
       "title": "12 Feet Deep",
       "type": "movie"
+    },
+    "tt5189670": {
+      "id": "tt5189670",
+      "tmdbId": 64439,
+      "thumb": "https://image.tmdb.org/t/p/w500/sy2nV3rCcJQaRK5M0NWvvTU7CBx.jpg",
+      "tmdbMedia": "tv",
+      "year": 2015,
+      "imdbId": "tt5189670",
+      "genre": "Documentary / Crime",
+      "youtubeId": "qxgbdYaR_KQ",
+      "services": [
+        "Netflix"
+      ],
+      "title": "Making a Murderer",
+      "type": "show"
     },
     "tt5308322": {
       "id": "tt5308322",
@@ -3951,6 +4257,19 @@
       "title": "The Inventor: Out for Blood in Silicon Valley",
       "type": "movie"
     },
+    "tt8694364": {
+      "id": "tt8694364",
+      "tmdbId": 87104,
+      "thumb": "https://image.tmdb.org/t/p/w500/u1FBsyMH9Tx7K5yzMnJsYRvNEKQ.jpg",
+      "tmdbMedia": "tv",
+      "year": 2019,
+      "imdbId": "tt8694364",
+      "genre": "Drama / War & Politics / Sci-Fi & Fantasy",
+      "youtubeId": "SY41jhIP_xI",
+      "services": [],
+      "title": "Years and Years",
+      "type": "show"
+    },
     "tt8740976": {
       "id": "tt8740976",
       "tmdbId": 95665,
@@ -3991,6 +4310,21 @@
       "title": "Knives Out",
       "type": "movie"
     },
+    "tt8962124": {
+      "id": "tt8962124",
+      "tmdbId": 82596,
+      "thumb": "https://image.tmdb.org/t/p/w500/c0bkO416OU7YGdOFktk45H8REgL.jpg",
+      "tmdbMedia": "tv",
+      "year": 2020,
+      "imdbId": "tt8962124",
+      "genre": "Drama / Comedy",
+      "youtubeId": "oXmk18bJ2Qw",
+      "services": [
+        "Netflix"
+      ],
+      "title": "Emily in Paris",
+      "type": "show"
+    },
     "tt9128686": {
       "id": "tt9128686",
       "tmdbId": 550201,
@@ -4006,6 +4340,19 @@
       ],
       "title": "The Pool",
       "type": "movie"
+    },
+    "tt9278304": {
+      "id": "tt9278304",
+      "tmdbId": 300351,
+      "thumb": "https://image.tmdb.org/t/p/w500/4JeMr89guc4A0SxWA4q7qyvV8W5.jpg",
+      "tmdbMedia": "tv",
+      "year": 2025,
+      "imdbId": "tt9278304",
+      "genre": "Drama / Mystery",
+      "youtubeId": "FBEhMj44cpM",
+      "services": [],
+      "title": "The Rumour",
+      "type": "show"
     }
   },
   "upcomingAlerts": {
@@ -4105,6 +4452,22 @@
       "detail": "Season 3, Episode 9 — Daddy Issues",
       "detectedAt": "2026-03-21T18:55:46.245Z"
     },
+    "tv_208569_4_12": {
+      "id": "tv_208569_4_12",
+      "alertType": "new_episode",
+      "airDate": "2026-03-24",
+      "media": "tv",
+      "title": "Will Trent",
+      "type": "tv",
+      "confirmed": true,
+      "expiresAt": "2026-04-23",
+      "catalogTmdbId": 208569,
+      "tmdbId": 208569,
+      "fingerprint": "208569_4_12",
+      "sequelTmdbId": null,
+      "detectedAt": "2026-03-23T16:53:34.713Z",
+      "detail": "Season 4, Episode 12 — I Hear It Now, I Was Good"
+    },
     "tv_226637_2_16": {
       "id": "tv_226637_2_16",
       "alertType": "new_episode",
@@ -4153,6 +4516,22 @@
       "detail": "Season 3, Episode 1 — Episode 1",
       "detectedAt": "2026-03-21T18:56:21.355Z"
     },
+    "tv_251941_2_16": {
+      "id": "tv_251941_2_16",
+      "alertType": "new_episode",
+      "airDate": "2026-03-23",
+      "media": "tv",
+      "title": "St. Denis Medical",
+      "type": "tv",
+      "confirmed": true,
+      "expiresAt": "2026-04-22",
+      "catalogTmdbId": 251941,
+      "tmdbId": 251941,
+      "fingerprint": "251941_2_16",
+      "sequelTmdbId": null,
+      "detectedAt": "2026-03-23T16:53:30.428Z",
+      "detail": "Season 2, Episode 16 — Experience with Human Babies"
+    },
     "tv_313739_1_8": {
       "id": "tv_313739_1_8",
       "alertType": "new_episode",
@@ -4180,71 +4559,6 @@
       ],
       "maybeLater": [],
       "createdAt": "2026-03-18T20:44:01.555Z",
-      "watched": [
-        "tt5143226",
-        "tt26670955",
-        "tt1727770",
-        "tt39572794",
-        "tt0211915",
-        "tt0159273",
-        "tt23055142",
-        "tt0903747",
-        "tt2467372",
-        "tt12593682",
-        "tt0237123",
-        "tt4094300",
-        "tt0348913",
-        "tt8064302",
-        "tt27995114",
-        "tt0112851",
-        "tt4047038",
-        "tt11286314",
-        "tt6575296",
-        "tt0892535",
-        "tt15325794",
-        "tt5565334",
-        "tt11564570",
-        "tt6474378",
-        "tt2452242",
-        "tt3095080",
-        "tt11167448",
-        "tt0805663",
-        "tt8946378",
-        "tt1219289",
-        "tt4189492",
-        "tt1618434",
-        "tt2707408",
-        "tt19891306",
-        "tt26933824",
-        "tt22202452",
-        "tt0117381",
-        "tt34888633",
-        "tt7520794",
-        "tt11280740",
-        "tt3079380",
-        "tt2854926",
-        "tt30826447",
-        "tt11514868",
-        "tt7203552",
-        "tt23649128",
-        "tt12001534",
-        "tt7130300",
-        "tt3339966",
-        "tt14364480",
-        "tt13443470",
-        "tt0475784",
-        "tt6143796",
-        "tt0960144",
-        "tt3398228",
-        "tt5580540",
-        "tt10919420",
-        "tt1596363",
-        "tt13406094"
-      ],
-      "archive": [
-        "tt0094862",
-        "tt0103112"
-      ],
       "items": [
         {
           "registryId": "tt0211915"
@@ -4896,7 +5210,154 @@
         },
         {
           "registryId": "tt22091076"
+        },
+        {
+          "registryId": "tt1538403"
+        },
+        {
+          "registryId": "tt22746676"
+        },
+        {
+          "registryId": "tt24509990"
+        },
+        {
+          "registryId": "tt15469618"
+        },
+        {
+          "registryId": "tt11173006"
+        },
+        {
+          "registryId": "tt4270492"
+        },
+        {
+          "registryId": "tt12966558"
+        },
+        {
+          "registryId": "tt5189670"
+        },
+        {
+          "registryId": "tt13567480"
+        },
+        {
+          "registryId": "tt12005128"
+        },
+        {
+          "registryId": "tt4477976"
+        },
+        {
+          "registryId": "tt16124614"
+        },
+        {
+          "registryId": "tt3230454"
+        },
+        {
+          "registryId": "tt1045778"
+        },
+        {
+          "registryId": "tt1245492"
+        },
+        {
+          "registryId": "tt14271498"
+        },
+        {
+          "registryId": "tt0104348"
+        },
+        {
+          "registryId": "tt8694364"
+        },
+        {
+          "registryId": "tt33362589"
+        },
+        {
+          "registryId": "tt21433690"
+        },
+        {
+          "registryId": "tt17543592"
+        },
+        {
+          "registryId": "tt9278304"
+        },
+        {
+          "registryId": "tt32799276"
+        },
+        {
+          "registryId": "tt8962124"
+        },
+        {
+          "registryId": "tt38961906",
+          "addedAt": "2026-03-23T23:24:26.029Z"
         }
+      ],
+      "watched": [
+        "tt26670955",
+        "tt39572794",
+        "tt23055142",
+        "tt8064302",
+        "tt27995114",
+        "tt5565334",
+        "tt11564570",
+        "tt6474378",
+        "tt1219289",
+        "tt1618434",
+        "tt19891306",
+        "tt26933824",
+        "tt22202452",
+        "tt7520794",
+        "tt11280740",
+        "tt30826447",
+        "tt11514868",
+        "tt7203552",
+        "tt12001534",
+        "tt14364480",
+        "tt13443470",
+        "tt6143796",
+        "tt10919420",
+        "tt13406094",
+        "tt4270492",
+        "tt16124614",
+        "tt14271498",
+        "tt5189670",
+        "tt8962124",
+        "tt8946378"
+      ],
+      "archive": [
+        "tt0094862",
+        "tt0103112",
+        "tt5143226",
+        "tt1727770",
+        "tt0211915",
+        "tt0159273",
+        "tt3398228",
+        "tt0903747",
+        "tt2467372",
+        "tt12593682",
+        "tt0237123",
+        "tt4094300",
+        "tt0348913",
+        "tt0112851",
+        "tt4047038",
+        "tt11286314",
+        "tt6575296",
+        "tt0892535",
+        "tt15325794",
+        "tt2452242",
+        "tt3095080",
+        "tt11167448",
+        "tt0805663",
+        "tt4189492",
+        "tt2707408",
+        "tt0117381",
+        "tt34888633",
+        "tt5580540",
+        "tt3079380",
+        "tt2854926",
+        "tt1596363",
+        "tt23649128",
+        "tt7130300",
+        "tt3339966",
+        "tt0475784",
+        "tt0960144",
+        "tt1045778"
       ]
     }
   },
@@ -4921,9 +5382,6 @@
         "maybeLater": [],
         "archive": [],
         "createdAt": "2026-03-21T16:44:54.926Z",
-        "watched": [
-          "tt10795658"
-        ],
         "items": [
           {
             "registryId": "tt0092086"
@@ -5102,6 +5560,9 @@
           {
             "registryId": "tt21807222"
           }
+        ],
+        "watched": [
+          "tt10795658"
         ]
       }
     }
