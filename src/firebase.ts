@@ -25,7 +25,7 @@ import {
   arrayRemove,
   deleteField,
 } from "firebase/firestore";
-import type { DocumentData, Firestore } from "firebase/firestore";
+import type { DocumentData, DocumentReference, DocumentSnapshot, Firestore } from "firebase/firestore";
 
 import { firebaseConfig } from "./config/firebase.js";
 import { listKey as movieKey } from "./lib/registry-id.js";
@@ -436,12 +436,8 @@ async function getUserProfile(uid: string): Promise<UserProfile> {
       listName = typeof n === "string" ? n.trim() : "";
     }
   }
-  const displayNameRaw = data.displayName;
-  const displayName =
-    typeof displayNameRaw === "string" && displayNameRaw.trim() ? displayNameRaw.trim() : null;
-  const photoURLRaw = data.photoURL;
-  const photoURL =
-    typeof photoURLRaw === "string" && photoURLRaw.trim() ? photoURLRaw.trim() : null;
+  const displayName = displayNameFromUserDoc(data) || null;
+  const photoURL = photoUrlFromUserDoc(data);
 
   const dismissRaw = data.upcomingDismissals;
   const upcomingDismissals: Record<string, string> =
@@ -479,6 +475,46 @@ async function syncUserDisplayNameToFirestore(
 
 type AddedByUserFields = { displayName: string; photoURL: string | null };
 
+function displayNameFromUserDoc(d: DocumentData | undefined): string {
+  if (!d || typeof d !== "object") return "";
+  const n = (d as Record<string, unknown>).displayName;
+  return typeof n === "string" && n.trim() ? n.trim() : "";
+}
+
+/** Accept `photoURL` (Auth sync) or occasional `photoUrl` casing in Firestore. */
+function photoUrlFromUserDoc(d: DocumentData | undefined): string | null {
+  if (!d || typeof d !== "object") return null;
+  const rec = d as Record<string, unknown>;
+  const a = rec.photoURL;
+  const b = rec.photoUrl;
+  const s =
+    (typeof a === "string" && a.trim() ? a : typeof b === "string" && b.trim() ? b : "").trim();
+  return s || null;
+}
+
+/**
+ * Prefer server read for `users/{uid}` (fresh). Retries when `getDocFromServer` throws.
+ * If the server has no doc yet, fall back to persistence cache (offline / pending writes).
+ */
+async function readUserDocForAddedBy(ref: DocumentReference): Promise<DocumentSnapshot | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 200 * attempt));
+    try {
+      const snap = await getDocFromServer(ref);
+      if (snap.exists()) return snap;
+      break;
+    } catch {
+      /* retry */
+    }
+  }
+  try {
+    const snap = await getDoc(ref);
+    return snap.exists() ? snap : null;
+  } catch {
+    return null;
+  }
+}
+
 /** One read per distinct `addedByUid` (parallel); profile data lives only on `users/{uid}`. */
 async function bulkGetAddedByUserFieldsForUids(uids: string[]): Promise<Map<string, AddedByUserFields>> {
   const uniq = [...new Set(uids.filter((id) => typeof id === "string" && id.length > 0))];
@@ -487,13 +523,11 @@ async function bulkGetAddedByUserFieldsForUids(uids: string[]): Promise<Map<stri
     uniq.map(async (id) => {
       try {
         const ref = doc(db, "users", id);
-        /** Prefer server so `displayName` / `photoURL` are not stale vs local persistence cache. */
-        let snap = await getDocFromServer(ref).catch(() => null);
-        if (!snap || !snap.exists()) snap = await getDoc(ref);
-        if (!snap.exists()) return;
+        const snap = await readUserDocForAddedBy(ref);
+        if (!snap) return;
         const d = snap.data();
-        const n = typeof d.displayName === "string" ? d.displayName.trim() : "";
-        const p = typeof d.photoURL === "string" && d.photoURL.trim() ? d.photoURL.trim() : null;
+        const n = displayNameFromUserDoc(d);
+        const p = photoUrlFromUserDoc(d);
         if (n || p) map.set(id, { displayName: n, photoURL: p });
       } catch {
         /* rules / offline */
@@ -524,11 +558,9 @@ async function mergeAddedByDisplayNamesFromUsers(items: WatchlistItem[]): Promis
 async function getUserPublicPhotoUrl(uid: string): Promise<string | null> {
   try {
     const ref = doc(db, "users", uid);
-    let snap = await getDocFromServer(ref).catch(() => null);
-    if (!snap || !snap.exists()) snap = await getDoc(ref);
-    if (!snap.exists()) return null;
-    const p = snap.data()?.photoURL;
-    return typeof p === "string" && p.trim() ? p.trim() : null;
+    const snap = await readUserDocForAddedBy(ref);
+    if (!snap) return null;
+    return photoUrlFromUserDoc(snap.data());
   } catch {
     return null;
   }
