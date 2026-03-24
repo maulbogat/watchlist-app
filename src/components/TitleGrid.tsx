@@ -12,9 +12,22 @@ interface TitleGridProps {
   visibleMovies: WatchlistItem[];
   currentStatus: string;
   totalLoaded: number;
+  /** Set when viewing a shared list — attributes legacy items to the owner vs members. */
+  sharedListOwnerId?: string | null;
+  viewerDisplayName?: string | null;
+  viewerPhotoUrl?: string | null;
+  sharedListOwnerPhotoUrl?: string | null;
 }
 
-export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGridProps) {
+export function TitleGrid({
+  visibleMovies,
+  currentStatus,
+  totalLoaded,
+  sharedListOwnerId = null,
+  viewerDisplayName = null,
+  viewerPhotoUrl = null,
+  sharedListOwnerPhotoUrl = null,
+}: TitleGridProps) {
   const currentUser = useAppStore((s) => s.currentUser);
   const currentListMode = useAppStore((s) => s.currentListMode);
   const isShared =
@@ -140,6 +153,12 @@ export function TitleGrid({ visibleMovies, currentStatus, totalLoaded }: TitleGr
           <TitleCard
             key={movieKey(m)}
             movie={m}
+            showAddedBy={isShared}
+            viewerUid={currentUser?.uid ?? null}
+            viewerDisplayName={viewerDisplayName}
+            viewerPhotoUrl={viewerPhotoUrl}
+            sharedListOwnerId={sharedListOwnerId}
+            sharedListOwnerPhotoUrl={sharedListOwnerPhotoUrl}
             userCountryCode={userCountryCode}
             statusOpenKey={statusOpenKey}
             onSetStatusOpenKey={setStatusOpenKey}

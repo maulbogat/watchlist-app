@@ -7,6 +7,18 @@ import type { StatusKey, WatchlistItem } from "../types/index.js";
 
 export interface TitleCardProps {
   movie: WatchlistItem;
+  /** When true, show who added the title (shared lists). */
+  showAddedBy?: boolean;
+  /** Current viewer — used for "Added by you" when `addedByUid` matches. */
+  viewerUid?: string | null;
+  /** Display name or email local part — legacy shared items when you are the list owner. */
+  viewerDisplayName?: string | null;
+  /** Firebase Auth profile image for the viewer (shared “added by you”). */
+  viewerPhotoUrl?: string | null;
+  /** `sharedLists/{id}.ownerId` — legacy rows without `addedBy*` infer owner vs member. */
+  sharedListOwnerId?: string | null;
+  /** `users/{sharedListOwnerId}.photoURL` for “added by list owner” when you are not the owner. */
+  sharedListOwnerPhotoUrl?: string | null;
   userCountryCode: string;
   statusOpenKey: string | null;
   onSetStatusOpenKey: (key: string | null) => void;
@@ -17,6 +29,12 @@ export interface TitleCardProps {
 
 export function TitleCard({
   movie: m,
+  showAddedBy = false,
+  viewerUid = null,
+  viewerDisplayName = null,
+  viewerPhotoUrl = null,
+  sharedListOwnerId = null,
+  sharedListOwnerPhotoUrl = null,
   userCountryCode,
   statusOpenKey,
   onSetStatusOpenKey,
@@ -52,6 +70,49 @@ export function TitleCard({
   const badgeLabel = m.type === "show" ? "TV" : "Film";
   const serviceChips = renderServiceChips(servicesForMovie(m, userCountryCode), { limit: 3 });
   const serviceRow = serviceChips ? <div className="service-row" dangerouslySetInnerHTML={{ __html: serviceChips }} /> : null;
+
+  function sharedListAddedByLine(): string {
+    const name = m.addedByDisplayName?.trim();
+    if (name) return `Added by ${name}`;
+    if (m.addedByUid) {
+      if (viewerUid && m.addedByUid === viewerUid) return "Added by you";
+      return "Added by another member";
+    }
+    // Legacy rows (no per-item attribution): infer from list owner.
+    if (sharedListOwnerId && viewerUid && sharedListOwnerId === viewerUid) {
+      const who = viewerDisplayName?.trim() || "you";
+      return `Added by ${who}`;
+    }
+    if (sharedListOwnerId && viewerUid && sharedListOwnerId !== viewerUid) {
+      return "Added by list owner";
+    }
+    return "Added by unknown";
+  }
+
+  const addedByAriaLabel = sharedListAddedByLine();
+
+  function addedByAvatar(): { src: string; initial: string } | null {
+    if (!showAddedBy) return null;
+    if (m.addedByUid && viewerUid && m.addedByUid === viewerUid) {
+      const src = sanitizePosterUrl(viewerPhotoUrl ?? "");
+      return { src, initial: (viewerDisplayName|| "?").charAt(0).toUpperCase() };
+    }
+    if (m.addedByUid) {
+      const src = sanitizePosterUrl(m.addedByPhotoUrl ?? "");
+      return { src, initial: (m.addedByDisplayName || "?").charAt(0).toUpperCase() };
+    }
+    if (sharedListOwnerId && viewerUid && sharedListOwnerId === viewerUid) {
+      const src = sanitizePosterUrl(viewerPhotoUrl ?? "");
+      return { src, initial: (viewerDisplayName || "?").charAt(0).toUpperCase() };
+    }
+    if (sharedListOwnerId && viewerUid && sharedListOwnerId !== viewerUid) {
+      const src = sanitizePosterUrl(sharedListOwnerPhotoUrl ?? "");
+      return { src, initial: "O" };
+    }
+    return { src: "", initial: "?" };
+  }
+
+  const avatarBadge = showAddedBy ? addedByAvatar() : null;
 
   const s = m.status || "to-watch";
   const displayStatus = s;
@@ -171,8 +232,31 @@ export function TitleCard({
           {m.title}
         </div>
         <div className="card-meta">
-          <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
-          {yearStr} &nbsp;·&nbsp; {m.genre}
+          <span className="card-meta-main">
+            <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
+            {yearStr} &nbsp;·&nbsp; {m.genre}
+          </span>
+          {avatarBadge ? (
+            <div
+              className="card-added-by-avatar"
+              role="img"
+              aria-label={addedByAriaLabel}
+              title={addedByAriaLabel}
+            >
+              {avatarBadge.src ? (
+                <img
+                  src={avatarBadge.src}
+                  alt=""
+                  className="card-added-by-avatar-img"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : null}
+              <span className="card-added-by-avatar-initial">{avatarBadge.initial}</span>
+            </div>
+          ) : null}
         </div>
         {serviceRow}
       </div>

@@ -1096,7 +1096,54 @@ body:has(#lists-modal[data-state="open"]) [data-slot="dialog-overlay"] {
   text-transform: uppercase;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: calc(0.5rem * var(--card-scale));
+}
+
+.card-meta-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: calc(0.5rem * var(--card-scale));
+  flex-wrap: wrap;
+}
+
+/* Shared list: who added — subtle avatar at end of metadata row. */
+.card-added-by-avatar {
+  flex-shrink: 0;
+  width: min(24px, calc(22px * var(--card-scale)));
+  height: min(24px, calc(22px * var(--card-scale)));
+  max-width: 24px;
+  max-height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  position: relative;
+}
+
+.card-added-by-avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  z-index: 1;
+}
+
+.card-added-by-avatar-initial {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(0.62rem * var(--card-scale));
+  font-weight: 600;
+  color: var(--muted);
+  z-index: 0;
+  font-family: var(--font-title);
+  letter-spacing: 0.02em;
 }
 
 .badge {
@@ -2128,7 +2175,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   color: var(--accent);
 }
 
-/* Jobs + Last deployment side by side (half width each on ≥768px) */
+/* Upcoming check job + GitHub backup side by side (half width each on ≥768px) */
 .admin-section--jobs-deploy .admin-jobs-deploy-grid {
   display: grid;
   gap: 1.25rem;
@@ -2152,14 +2199,61 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   max-width: 100%;
 }
 
+.admin-section--jobs-deploy .admin-jobs-deploy-col > h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-title);
+  font-size: 1.25rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.admin-github-backup-warning {
+  margin-bottom: 0.75rem;
+}
+
 .admin-section--jobs-deploy .admin-job-row {
   flex-wrap: wrap;
+  margin-bottom: 0;
 }
 
 .admin-section--jobs-deploy .admin-job-value {
   min-width: 0;
   flex: 1 1 8rem;
   word-break: break-word;
+}
+
+.admin-section--jobs-deploy .admin-job-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 0.85rem 0.95rem;
+}
+
+.admin-section--jobs-deploy .admin-job-card .admin-job-result {
+  margin-top: 0;
+}
+
+.admin-section--jobs-deploy .admin-job-row .admin-stat-label {
+  flex: 0 1 46%;
+  min-width: 0;
+}
+
+.admin-section--jobs-deploy .admin-job-row .admin-job-value,
+.admin-section--jobs-deploy .admin-job-row > .admin-job-status {
+  text-align: right;
+}
+
+.admin-section--jobs-deploy .admin-job-row--status-line > .admin-job-status {
+  flex-shrink: 0;
+}
+
+.admin-section--jobs-deploy .admin-job-row--actions {
+  margin-top: 0;
 }
 
 .admin-grid {
@@ -2213,6 +2307,23 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   top: 0.5rem;
   right: 0.65rem;
   color: var(--accent);
+}
+
+.admin-deploy-in-links-card {
+  position: relative;
+  padding: 0.85rem 0.95rem;
+}
+
+.admin-deploy-in-links-badge-wrap {
+  display: block;
+  margin-top: 0.5rem;
+  line-height: 0;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.admin-deploy-in-links-fallback {
+  margin-top: 0.45rem;
 }
 
 .admin-deploy-stack {
@@ -2399,6 +2510,10 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   margin-bottom: 0.55rem;
 }
 
+.admin-section--jobs-deploy .admin-job-card .admin-job-row {
+  margin-bottom: 0;
+}
+
 .admin-job-row:last-child {
   margin-bottom: 0;
 }
@@ -2411,6 +2526,12 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
+}
+
+.admin-section--jobs-deploy .admin-job-card .admin-job-row--actions .admin-job-actions {
+  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
 }
 
 .admin-job-status {
@@ -2434,34 +2555,66 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   background: rgba(105, 212, 138, 0.1);
 }
 
+.admin-job-status--failure,
+.admin-job-status--off {
+  border-color: rgba(231, 76, 60, 0.45);
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+}
+
 .admin-job-toggle-btn {
-  height: 30px;
-  padding: 0 0.72rem;
+  min-height: 34px;
+  height: 34px;
+  padding: 0 0.85rem;
   border-color: rgba(255, 255, 255, 0.16);
   color: var(--text);
+  font-family: var(--font-title);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
 }
 
 .admin-job-toggle-btn:hover {
   border-color: rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.06);
+  text-decoration: none;
 }
 
-.admin-job-run-btn {
+/* Primary job actions: outlined gold (Run now / Open run) */
+.admin-section--jobs-deploy .admin-job-run-btn[data-slot="button"] {
   min-width: 120px;
+  min-height: 34px;
   height: 34px;
   padding: 0 0.85rem;
-  background: rgba(232, 201, 106, 0.16);
-  border: 1px solid rgba(232, 201, 106, 0.4);
-  color: var(--accent);
+  background: transparent !important;
+  border: 1px solid rgba(232, 201, 106, 0.55) !important;
+  color: var(--accent) !important;
   font-family: var(--font-title);
+  font-size: 0.8rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  box-shadow: none;
 }
 
-.admin-job-run-btn:hover {
-  background: rgba(232, 201, 106, 0.22);
-  border-color: rgba(232, 201, 106, 0.55);
-  color: #f0d87a;
+a.admin-job-run-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.admin-section--jobs-deploy .admin-job-run-btn[data-slot="button"]:hover,
+.admin-section--jobs-deploy a.admin-job-run-btn[data-slot="button"]:hover {
+  background: rgba(232, 201, 106, 0.1) !important;
+  border-color: rgba(232, 201, 106, 0.65) !important;
+  color: #f0d87a !important;
+}
+
+.admin-section--jobs-deploy .admin-job-run-btn[data-slot="button"]:disabled {
+  opacity: 0.55;
 }
 
 .admin-job-value {

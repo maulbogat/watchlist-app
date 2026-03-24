@@ -13,6 +13,12 @@ export type ServicesByRegion = Record<string, string[]>;
 export interface WatchlistItem {
   registryId?: string;
   addedAt?: string | null;
+  /** Shared list only: Firebase Auth uid of who added the row (`sharedLists.items[]`). */
+  addedByUid?: string | null;
+  /** Hydrated from `users/{addedByUid}.displayName` (not stored on the list item). */
+  addedByDisplayName?: string | null;
+  /** Hydrated from `users/{addedByUid}.photoURL` (not stored on the list item). */
+  addedByPhotoUrl?: string | null;
   title: string;
   year: number | null;
   type: MediaType;
@@ -54,6 +60,10 @@ export interface SharedList {
 export interface UserProfile {
   country: string | null;
   countryName: string | null;
+  /** Shown for “added by” on shared lists; stored on `users/{uid}`. */
+  displayName?: string | null;
+  /** Synced from Firebase Auth `photoURL`; stored on `users/{uid}`. */
+  photoURL?: string | null;
   listName?: string;
   defaultPersonalListId?: string | null;
   upcomingDismissals?: Record<string, string>;

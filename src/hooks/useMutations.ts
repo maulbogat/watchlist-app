@@ -174,6 +174,11 @@ export function useRemoveTitle() {
   });
 }
 
+function enrichItemForSharedAdd(uid: string, listMode: ListMode, item: WatchlistItem): WatchlistItem {
+  if (!isSharedMode(listMode)) return item;
+  return { ...item, addedByUid: uid };
+}
+
 export function useAddTitleToList() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -181,10 +186,11 @@ export function useAddTitleToList() {
     onMutate: async ({ uid, listMode, item }) => {
       await queryClient.cancelQueries({ queryKey: ["watchlistMovies", uid] });
       const snapshot = captureSnapshot(queryClient, uid);
+      const itemForCache = enrichItemForSharedAdd(uid, listMode, item);
       const added = updateWatchlistCacheForMode(queryClient, uid, listMode, (prev) => {
-        const key = movieKey(item);
+        const key = movieKey(itemForCache);
         if (prev.some((m) => movieKey(m) === key)) return prev;
-        return [...prev, item];
+        return [...prev, itemForCache];
       });
       if (added) {
         const info = modeToListInfo(listMode);

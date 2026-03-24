@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { auth, onAuthStateChanged } from "../firebase.js";
+import { auth, onAuthStateChanged, syncUserDisplayNameToFirestore } from "../firebase.js";
 import { setBookmarkletCookieWithMode } from "../lib/bookmarkletCookie.js";
 import { clearUpcomingAlertsCache } from "../lib/storage.js";
 import { useAppStore } from "../store/useAppStore.js";
@@ -14,6 +14,10 @@ export function useAuthUser(): { loading: boolean } {
     const unsub = onAuthStateChanged(auth, (u) => {
       setCurrentUser(u);
       setLoading(false);
+      if (u) {
+        const label = u.displayName?.trim() || (u.email ? u.email.split("@")[0] : "") || "";
+        void syncUserDisplayNameToFirestore(u.uid, label || null, u.photoURL ?? null);
+      }
     });
     return () => unsub();
   }, []);

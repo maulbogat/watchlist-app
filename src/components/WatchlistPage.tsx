@@ -1,5 +1,12 @@
 import { useMemo, useEffect, useState, useRef } from "react";
-import { auth, fbSignOut, GoogleAuthProvider, renamePersonalList, signInWithPopup } from "../firebase.js";
+import {
+  auth,
+  fbSignOut,
+  getUserPublicPhotoUrl,
+  GoogleAuthProvider,
+  renamePersonalList,
+  signInWithPopup,
+} from "../firebase.js";
 import { getUserProfile, setUserCountry } from "../data/user.js";
 import { COUNTRIES } from "../countries.js";
 import { errorMessage } from "../lib/utils.js";
@@ -119,6 +126,36 @@ export function WatchlistPage() {
 
   const personalLists = personalQ.data ?? [];
   const sharedLists = sharedQ.data ?? [];
+
+  const sharedListOwnerId = useMemo(() => {
+    if (!currentListMode || typeof currentListMode !== "object" || currentListMode.type !== "shared") {
+      return null;
+    }
+    const hit = sharedLists.find((l) => l.id === currentListMode.listId);
+    if (!hit) return null;
+    if (hit.ownerId) return hit.ownerId;
+    const m = hit.members;
+    if (Array.isArray(m) && m.length > 0 && typeof m[0] === "string") return m[0];
+    return null;
+  }, [currentListMode, sharedLists]);
+
+  const [sharedListOwnerPhotoUrl, setSharedListOwnerPhotoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sharedListOwnerId) {
+      setSharedListOwnerPhotoUrl(null);
+      return;
+    }
+    let cancelled = false;
+    void getUserPublicPhotoUrl(sharedListOwnerId).then((url) => {
+      if (!cancelled) setSharedListOwnerPhotoUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sharedListOwnerId]);
+
+  const viewerDisplayNameForCards =
+    user.displayName?.trim() || user.email?.split("@")[0] || null;
 
   const initial = (user.displayName || user.email || "?").charAt(0).toUpperCase();
   const mainLoading = !listsReady || moviesQ.isPending;
@@ -314,6 +351,10 @@ export function WatchlistPage() {
               visibleMovies={visibleMovies}
               currentStatus={currentStatus}
               totalLoaded={allMovies.length}
+              sharedListOwnerId={sharedListOwnerId}
+              viewerDisplayName={viewerDisplayNameForCards}
+              viewerPhotoUrl={user.photoURL ?? null}
+              sharedListOwnerPhotoUrl={sharedListOwnerPhotoUrl}
             />
           </>
         )}

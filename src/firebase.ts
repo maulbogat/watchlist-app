@@ -13,6 +13,7 @@ import {
   persistentLocalCache,
   doc,
   getDoc,
+  getDocFromServer,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -213,6 +214,11 @@ async function hydrateListItemsFromRegistry(
       status?: unknown;
     };
     const meta: Record<string, unknown> = { ...inline, ...fromRegistry };
+    /** List row only — `addedByUid` lives on the item; display name is on `users/{uid}`. */
+    if (typeof inline.addedByUid === "string") meta.addedByUid = inline.addedByUid;
+    else delete meta.addedByUid;
+    delete meta.addedByDisplayName;
+    delete meta.addedByPhotoUrl;
     let status: WatchlistItem["status"] = "to-watch";
     if (watchedSet.has(rid)) status = "watched";
     else if (maybeLaterSet.has(rid)) status = "maybe-later";
@@ -421,12 +427,101 @@ async function getUserProfile(uid: string): Promise<UserProfile> {
       listName = typeof n === "string" ? n.trim() : "";
     }
   }
+  const displayNameRaw = data.displayName;
+  const displayName =
+    typeof displayNameRaw === "string" && displayNameRaw.trim() ? displayNameRaw.trim() : null;
+  const photoURLRaw = data.photoURL;
+  const photoURL =
+    typeof photoURLRaw === "string" && photoURLRaw.trim() ? photoURLRaw.trim() : null;
+
+  const dismissRaw = data.upcomingDismissals;
+  const upcomingDismissals: Record<string, string> =
+    dismissRaw && typeof dismissRaw === "object" && !Array.isArray(dismissRaw)
+      ? (dismissRaw as Record<string, string>)
+      : {};
+
   return {
     country: data.country != null ? String(data.country) : null,
     countryName: data.countryName != null ? String(data.countryName) : null,
+    displayName,
+    photoURL,
     listName,
     defaultPersonalListId: defaultId || null,
+    upcomingDismissals,
   };
+}
+
+/** Writes `users/{uid}.displayName` and optionally `photoURL` from Firebase Auth (shared-list “added by” + avatars). */
+async function syncUserDisplayNameToFirestore(
+  uid: string,
+  label: string | null | undefined,
+  authPhotoURL?: string | null
+): Promise<void> {
+  const raw = typeof label === "string" ? label.trim() : "";
+  const payload: Record<string, unknown> = {};
+  if (raw) payload.displayName = raw;
+  if (authPhotoURL !== undefined) {
+    const photoRaw = typeof authPhotoURL === "string" ? authPhotoURL.trim() : "";
+    payload.photoURL = photoRaw ? photoRaw : deleteField();
+  }
+  if (Object.keys(payload).length === 0) return;
+  await setDoc(doc(db, "users", uid), payload, { merge: true });
+}
+
+type AddedByUserFields = { displayName: string; photoURL: string | null };
+
+async function bulkGetAddedByUserFieldsForUids(uids: string[]): Promise<Map<string, AddedByUserFields>> {
+  const uniq = [...new Set(uids.filter((id) => typeof id === "string" && id.length > 0))];
+  const map = new Map<string, AddedByUserFields>();
+  await Promise.all(
+    uniq.map(async (id) => {
+      try {
+        const ref = doc(db, "users", id);
+        /** Prefer server so `displayName` / `photoURL` are not stale vs local persistence cache. */
+        let snap = await getDocFromServer(ref).catch(() => null);
+        if (!snap || !snap.exists()) snap = await getDoc(ref);
+        if (!snap.exists()) return;
+        const d = snap.data();
+        const n = typeof d.displayName === "string" ? d.displayName.trim() : "";
+        const p = typeof d.photoURL === "string" && d.photoURL.trim() ? d.photoURL.trim() : null;
+        if (n || p) map.set(id, { displayName: n, photoURL: p });
+      } catch {
+        /* rules / offline */
+      }
+    })
+  );
+  return map;
+}
+
+async function mergeAddedByDisplayNamesFromUsers(items: WatchlistItem[]): Promise<WatchlistItem[]> {
+  const uids = items
+    .map((m) => m.addedByUid)
+    .filter((x): x is string => typeof x === "string" && x.length > 0);
+  if (uids.length === 0) return items;
+  const nameMap = await bulkGetAddedByUserFieldsForUids(uids);
+  return items.map((m) => {
+    if (!m.addedByUid) return m;
+    const u = nameMap.get(m.addedByUid);
+    if (!u) return m;
+    const next: WatchlistItem = { ...m };
+    if (u.displayName) next.addedByDisplayName = u.displayName;
+    if (u.photoURL) next.addedByPhotoUrl = u.photoURL;
+    return next;
+  });
+}
+
+/** Lightweight read for shared-list UI (avatar) without resolving default personal list. */
+async function getUserPublicPhotoUrl(uid: string): Promise<string | null> {
+  try {
+    const ref = doc(db, "users", uid);
+    let snap = await getDocFromServer(ref).catch(() => null);
+    if (!snap || !snap.exists()) snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    const p = snap.data()?.photoURL;
+    return typeof p === "string" && p.trim() ? p.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 async function setUserCountry(uid: string, countryCode: string, countryName: string | null | undefined): Promise<void> {
@@ -532,7 +627,8 @@ async function getSharedListMovies(listId: string): Promise<WatchlistItem[]> {
   const watchedSet = new Set((data.watched ?? []).map((k) => String(k)));
   const maybeLaterSet = new Set((data.maybeLater ?? []).map((k) => String(k)));
   const archiveSet = new Set((data.archive ?? []).map((k) => String(k)));
-  const movies = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
+  const hydrated = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
+  const movies = await mergeAddedByDisplayNamesFromUsers(hydrated);
   void logEvent({
     type: "firestore.read",
     collection: "sharedLists",
@@ -575,7 +671,7 @@ async function removeFromSharedList(listId: string, key: string): Promise<void> 
   );
 }
 
-async function addToSharedList(listId: string, movie: WatchlistItem): Promise<void> {
+async function addToSharedList(listId: string, movie: WatchlistItem, addedByUid: string): Promise<void> {
   const ref = doc(db, "sharedLists", listId);
   const snap = await getDoc(ref);
   if (!snap.exists()) throw new Error("Shared list not found");
@@ -584,7 +680,9 @@ async function addToSharedList(listId: string, movie: WatchlistItem): Promise<vo
   const key = movieKey(movie);
   const exists = items.some((m) => movieKey(m) === key);
   if (exists) return;
-  items.push(rowToStore(movie));
+  const base = rowToStore(movie);
+  const row: FirestoreListRow = { ...base, addedByUid };
+  items.push(row);
   const watched = new Set((Array.isArray(data.watched) ? data.watched : []).map((k) => String(k)));
   const maybeLater = new Set((Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k)));
   const archive = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
@@ -1032,6 +1130,8 @@ export {
   movieKey,
   getStatusData,
   getUserProfile,
+  syncUserDisplayNameToFirestore,
+  getUserPublicPhotoUrl,
   setUserCountry,
   setStatus,
   removeTitle,

@@ -13,7 +13,7 @@ import type { ListMode, StatusKey, WatchlistItem } from "../types/index.js";
 
 export async function addTitleToList(uid: string, listMode: ListMode, item: WatchlistItem): Promise<void> {
   if (typeof listMode === "object" && listMode.type === "shared") {
-    await addToSharedList(listMode.listId, item);
+    await addToSharedList(listMode.listId, item, uid);
     return;
   }
   if (typeof listMode === "object" && listMode.type === "personal") {

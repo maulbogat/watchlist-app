@@ -64,3 +64,7 @@ node scripts/restore-from-backup.js backups/firestore-backup-2025-03-20.json
 ## Backup location
 
 Backups are committed to `backups/firestore-backup.json` in the repo. Git history keeps previous versions if you need to roll back.
+
+## Admin page (latest run)
+
+Signed-in **admin** users can see the latest GitHub Actions run for **Daily Firestore Backup** on the in-app **Admin** page. The Netlify function `github-backup-status` calls the GitHub API; for **private** repos or steadier rate limits, set optional **`GITHUB_TOKEN`** (PAT with `actions: read`) and optional **`GITHUB_REPO`** (`owner/name`) in Netlify environment variables.

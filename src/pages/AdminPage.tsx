@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAppStore } from "../store/useAppStore.js";
 import { isAdmin } from "../config/admin.js";
 import { useAuthUser } from "../hooks/useAuthUser.js";
-import { getJobConfigState, setCheckUpcomingEnabledState } from "../firebase.js";
+import { auth, getJobConfigState, setCheckUpcomingEnabledState } from "../firebase.js";
 import { getFirestore, collection, getCountFromServer, getDocs } from "firebase/firestore";
 
 type CatalogStats = {
@@ -34,6 +34,28 @@ type RunNowResponse = {
   alertsUpserted?: number;
   writesSkipped?: number;
   error?: string;
+};
+
+type GithubBackupLastRun = {
+  status: string;
+  conclusion: string | null;
+  created_at: string;
+  updated_at: string;
+  html_url: string;
+  event: string;
+  run_attempt?: number;
+};
+
+type GithubBackupStatusResponse = {
+  ok: boolean;
+  error?: string;
+  repo?: string;
+  workflowFile?: string;
+  workflowName?: string;
+  actionsUrl?: string;
+  lastRun: GithubBackupLastRun | null;
+  githubError?: string;
+  githubHttpStatus?: number;
 };
 
 const SERVICE_LINKS = [
@@ -136,6 +158,41 @@ function formatDateTime(ms: number | null): string | null {
   return `${day}/${month}/${year}, ${time}`;
 }
 
+function formatTitleCaseWords(s: string): string {
+  const t = s.trim();
+  if (!t) return "";
+  return t
+    .replace(/_/g, " ")
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+const GITHUB_EVENT_LABEL: Record<string, string> = {
+  schedule: "Scheduled",
+  workflow_dispatch: "Manual",
+  push: "Push",
+  pull_request: "Pull request",
+  release: "Release",
+};
+
+function formatGithubRunStatus(status: string): string {
+  return formatTitleCaseWords(status);
+}
+
+function formatGithubEvent(event: string): string {
+  return GITHUB_EVENT_LABEL[event] ?? formatTitleCaseWords(event);
+}
+
+function formatUpcomingLastRunLine(status: string | null | undefined, message: string | null | undefined): string {
+  const st = status?.trim();
+  const msg = message?.trim();
+  if (!st && !msg) return "N/A";
+  const head = st ? formatTitleCaseWords(st.replace(/_/g, " ")) : "";
+  if (!msg) return head || "N/A";
+  return head ? `${head} — ${msg}` : msg;
+}
+
 export function AdminPage() {
   const navigate = useNavigate();
   const { loading: authLoading } = useAuthUser();
@@ -219,6 +276,28 @@ export function AdminPage() {
     refetchOnWindowFocus: true,
     enabled: !authLoading && userIsAdmin,
     queryFn: () => getJobConfigState(),
+  });
+
+  const githubBackupQ = useQuery<GithubBackupStatusResponse>({
+    queryKey: ["admin", "github-backup-status"],
+    staleTime: 60 * 1000,
+    enabled: !authLoading && userIsAdmin,
+    queryFn: async () => {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not signed in");
+      const idToken = await user.getIdToken();
+      const res = await fetch("/.netlify/functions/github-backup-status", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = (await res.json()) as GithubBackupStatusResponse & { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error || `Request failed (${res.status})`);
+      }
+      if (data.ok === false && data.error) {
+        throw new Error(data.error);
+      }
+      return data;
+    },
   });
 
   const [runNowResult, setRunNowResult] = useState<string | null>(null);
@@ -336,6 +415,32 @@ export function AdminPage() {
               </span>
             </a>
           ))}
+          <div className="admin-card admin-deploy-in-links-card">
+            <span className="admin-link-label">Last deployment</span>
+            <span className="admin-link-sublabel">Netlify build status</span>
+            {NETLIFY_DEPLOY_BADGE_URL ? (
+              <a
+                className="admin-deploy-in-links-badge-wrap"
+                href={NETLIFY_DEPLOYS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open Netlify deploys and build logs"
+              >
+                <img className="admin-deploy-badge" src={NETLIFY_DEPLOY_BADGE_URL} alt="" decoding="async" />
+              </a>
+            ) : (
+              <p className="admin-deploy-fallback admin-deploy-in-links-fallback">
+                <a className="admin-deploy-text-link" href={NETLIFY_DEPLOYS_URL} target="_blank" rel="noopener noreferrer">
+                  Netlify deploys
+                  <span aria-hidden="true"> ↗</span>
+                </a>
+                <span className="admin-deploy-hint">
+                  {" "}
+                  · set <code className="admin-deploy-code">VITE_NETLIFY_SITE_ID</code> for the status badge
+                </span>
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
@@ -389,7 +494,7 @@ export function AdminPage() {
       <section className="admin-section admin-section--jobs-deploy">
         <div className="admin-jobs-deploy-grid">
           <div className="admin-jobs-deploy-col">
-            <h2>Jobs</h2>
+            <h2>Upcoming Check Job</h2>
             <div className="admin-card admin-job-card">
               {jobConfigQ.isPending ? (
                 <p className="admin-job-result">Loading job config…</p>
@@ -404,18 +509,41 @@ export function AdminPage() {
                 </>
               ) : (
                 <>
-                  <div className="admin-job-row">
+                  <div className="admin-job-row admin-job-row--status-line">
                     <span className="admin-stat-label">Upcoming check enabled</span>
+                    <span
+                      className={
+                        jobConfigQ.data?.checkUpcomingEnabled
+                          ? "admin-job-status admin-job-status--on"
+                          : "admin-job-status admin-job-status--off"
+                      }
+                    >
+                      {jobConfigQ.data?.checkUpcomingEnabled ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
+                  <div className="admin-job-row">
+                    <span className="admin-stat-label">Last run</span>
+                    <span className="admin-job-value">
+                      {formatDateTime(toEpochMs(jobConfigQ.data?.lastRunAt ?? null)) || "N/A"}
+                    </span>
+                  </div>
+                  <div className="admin-job-row">
+                    <span className="admin-stat-label">Result</span>
+                    <span className="admin-job-value">
+                      {formatUpcomingLastRunLine(jobConfigQ.data?.lastRunStatus, jobConfigQ.data?.lastRunMessage)}
+                    </span>
+                  </div>
+                  <div className="admin-job-row admin-job-row--actions">
                     <div className="admin-job-actions">
-                      <span
-                        className={
-                          jobConfigQ.data?.checkUpcomingEnabled
-                            ? "admin-job-status admin-job-status--on"
-                            : "admin-job-status"
-                        }
+                      <Button
+                        type="button"
+                        className="admin-job-run-btn"
+                        variant="outline"
+                        disabled={runNowMutation.isPending || toggleJobMutation.isPending}
+                        onClick={() => runNowMutation.mutate()}
                       >
-                        {jobConfigQ.data?.checkUpcomingEnabled ? "Enabled" : "Disabled"}
-                      </span>
+                        {runNowMutation.isPending ? "Running…" : "Run Now"}
+                      </Button>
                       <Button
                         type="button"
                         className="admin-job-toggle-btn"
@@ -431,71 +559,110 @@ export function AdminPage() {
                       </Button>
                     </div>
                   </div>
-                  <div className="admin-job-row">
-                    <span className="admin-stat-label">Last run timestamp</span>
-                    <span className="admin-job-value">
-                      {formatDateTime(toEpochMs(jobConfigQ.data?.lastRunAt ?? null)) || "N/A"}
-                    </span>
-                  </div>
-                  <div className="admin-job-row">
-                    <span className="admin-stat-label">Last run result</span>
-                    <span className="admin-job-value">
-                      {jobConfigQ.data?.lastRunStatus || "N/A"}
-                      {jobConfigQ.data?.lastRunMessage ? ` — ${jobConfigQ.data.lastRunMessage}` : ""}
-                    </span>
-                  </div>
-                  <div className="admin-job-row admin-job-row--actions">
-                    <Button
-                      type="button"
-                      className="admin-job-run-btn"
-                      disabled={runNowMutation.isPending || toggleJobMutation.isPending}
-                      onClick={() => runNowMutation.mutate()}
-                    >
-                      {runNowMutation.isPending ? "Running…" : "Run Now"}
-                    </Button>
-                  </div>
                   {runNowResult ? <p className="admin-job-result">{runNowResult}</p> : null}
                 </>
               )}
             </div>
           </div>
           <div className="admin-jobs-deploy-col">
-            <h2>Last deployment</h2>
-            <div className="admin-deploy-stack">
-              <div className="admin-card admin-deploy-card">
-                {NETLIFY_DEPLOY_BADGE_URL ? (
-                  <a
-                    className="admin-deploy-link"
-                    href={NETLIFY_DEPLOYS_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Open Netlify deploys and build logs"
-                  >
-                    <img
-                      className="admin-deploy-badge"
-                      src={NETLIFY_DEPLOY_BADGE_URL}
-                      alt=""
-                      decoding="async"
-                    />
-                  </a>
-                ) : (
-                  <p className="admin-deploy-fallback">
-                    <a
-                      className="admin-deploy-text-link"
-                      href={NETLIFY_DEPLOYS_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Netlify deploys
-                      <span aria-hidden="true"> ↗</span>
-                    </a>
-                    <span className="admin-deploy-hint">
-                      {" "}
-                      · set <code className="admin-deploy-code">VITE_NETLIFY_SITE_ID</code> for the status badge
-                    </span>
+            <h2>GitHub Backup</h2>
+            <div className="admin-card admin-job-card">
+              {githubBackupQ.isPending ? (
+                <p className="admin-job-result">Loading backup workflow status…</p>
+              ) : githubBackupQ.isError ? (
+                <div className="admin-job-row admin-job-row--actions">
+                  <p className="admin-job-result">
+                    {githubBackupQ.error instanceof Error ? githubBackupQ.error.message : "Could not load status."}
                   </p>
-                )}
-              </div>
+                  <Button type="button" variant="outline" onClick={() => void githubBackupQ.refetch()}>
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {githubBackupQ.data?.githubError ? (
+                    <p className="admin-job-result admin-github-backup-warning">
+                      {githubBackupQ.data.githubError}
+                      {githubBackupQ.data.githubHttpStatus != null
+                        ? ` (HTTP ${githubBackupQ.data.githubHttpStatus})`
+                        : ""}
+                      . For private repos or higher rate limits, set{" "}
+                      <code className="admin-deploy-code">GITHUB_TOKEN</code> in Netlify (Actions: read).
+                    </p>
+                  ) : null}
+                  {githubBackupQ.data?.lastRun ? (
+                    <>
+                      <div className="admin-job-row admin-job-row--status-line">
+                        <span className="admin-stat-label">Outcome</span>
+                        <span
+                          className={
+                            githubBackupQ.data.lastRun.conclusion === "success"
+                              ? "admin-job-status admin-job-status--on"
+                              : githubBackupQ.data.lastRun.conclusion === "failure"
+                                ? "admin-job-status admin-job-status--failure"
+                                : githubBackupQ.data.lastRun.conclusion
+                                  ? "admin-job-status"
+                                  : "admin-job-value"
+                          }
+                        >
+                          {githubBackupQ.data.lastRun.conclusion
+                            ? githubBackupQ.data.lastRun.conclusion.toUpperCase()
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="admin-job-row">
+                        <span className="admin-stat-label">Last run</span>
+                        <span className="admin-job-value">
+                          {formatDateTime(toEpochMs(githubBackupQ.data.lastRun.updated_at)) || "—"}
+                        </span>
+                      </div>
+                      <div className="admin-job-row">
+                        <span className="admin-stat-label">Run status</span>
+                        <span className="admin-job-value">
+                          {formatGithubRunStatus(githubBackupQ.data.lastRun.status)}
+                        </span>
+                      </div>
+                      <div className="admin-job-row">
+                        <span className="admin-stat-label">Trigger</span>
+                        <span className="admin-job-value">
+                          {formatGithubEvent(githubBackupQ.data.lastRun.event)}
+                        </span>
+                      </div>
+                    </>
+                  ) : !githubBackupQ.data?.githubError ? (
+                    <p className="admin-job-result">No runs recorded yet for this workflow.</p>
+                  ) : null}
+                  <div className="admin-job-row admin-job-row--actions">
+                    <div className="admin-job-actions">
+                      {githubBackupQ.data?.lastRun ? (
+                        <Button type="button" className="admin-job-run-btn" variant="outline" asChild>
+                          <a
+                            href={githubBackupQ.data.lastRun.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Open run
+                            <span aria-hidden="true"> ↗</span>
+                          </a>
+                        </Button>
+                      ) : null}
+                      <Button type="button" variant="outline" className="admin-job-toggle-btn" asChild>
+                        <a
+                          href={
+                            githubBackupQ.data?.actionsUrl ||
+                            "https://github.com/maulbogat/movie-trailer-site/actions/workflows/backup.yml"
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Workflow & history
+                          <span aria-hidden="true"> ↗</span>
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

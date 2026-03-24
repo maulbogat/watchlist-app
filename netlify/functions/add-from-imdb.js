@@ -343,14 +343,23 @@ function normalizeAddedAt(value) {
 /**
  * @param {string} registryId
  * @param {Record<string, unknown> | null | undefined} existingRow
- * @returns {{ registryId: string, addedAt: string }}
+ * @param {{ addedByUid?: string } | null | undefined} addedBy
+ * @returns {{ registryId: string, addedAt: string } & Record<string, unknown>}
  */
-function toStoredRegistryRef(registryId, existingRow) {
+function toStoredRegistryRef(registryId, existingRow, addedBy) {
   const keepExisting = normalizeAddedAt(existingRow?.addedAt);
-  return {
+  const out = {
     registryId,
     addedAt: keepExisting || new Date().toISOString(),
   };
+  const prevUid =
+    existingRow && typeof existingRow.addedByUid === "string" ? existingRow.addedByUid : null;
+  if (prevUid) {
+    out.addedByUid = prevUid;
+  } else if (addedBy?.addedByUid) {
+    out.addedByUid = addedBy.addedByUid;
+  }
+  return out;
 }
 
 /**
@@ -650,6 +659,19 @@ exports.handler = async (event, context) => {
     if (!listSnap.exists) {
       return jsonRes(404, { ok: false, error: "Shared list not found" }, event);
     }
+    const authAdmin = getAuth(getApp());
+    try {
+      const u = await authAdmin.getUser(uid);
+      const dn =
+        (u.displayName && String(u.displayName).trim()) ||
+        (u.email ? String(u.email).split("@")[0] : null) ||
+        null;
+      if (dn) {
+        await db.collection("users").doc(uid).set({ displayName: dn }, { merge: true });
+      }
+    } catch {
+      /* ignore profile sync */
+    }
     const listData = listSnap.data();
     const members = Array.isArray(listData.members) ? listData.members : [];
     if (!members.includes(uid)) {
@@ -677,7 +699,7 @@ exports.handler = async (event, context) => {
       archive = remapStatusKeys(archive, oldKey, registryId);
     } else {
       await writeRegistryMerge(movie);
-      items.push(toStoredRegistryRef(registryId));
+      items.push(toStoredRegistryRef(registryId, null, { addedByUid: uid }));
     }
 
     await listRef.set({ items, watched, maybeLater, archive }, { merge: true });
