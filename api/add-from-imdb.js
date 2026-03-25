@@ -832,3 +832,6 @@ exports.handler = async (event, context) => {
     return jsonRes(500, { ok: false, error: msg }, event);
   }
 };
+
+const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+module.exports = wrapNetlifyHandler(exports.handler);

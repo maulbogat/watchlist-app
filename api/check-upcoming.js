@@ -48,7 +48,11 @@ const logEvent = createFunctionLogger("check-upcoming");
  */
 exports.handler = async (event, context) => {
   const startedAt = Date.now();
-  const trigger = event?.headers?.["x-netlify-event"] || event?.httpMethod || "unknown";
+  const trigger =
+    event?.headers?.["x-netlify-event"] ||
+    (event?.headers?.["x-vercel-cron"] ? "vercel-cron" : null) ||
+    event?.httpMethod ||
+    "unknown";
   console.log("check-upcoming: start", JSON.stringify({ trigger }));
   try {
     const firstLogResult = logEvent({ type: "function.invoked", trigger });
@@ -145,3 +149,6 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
+const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+module.exports = wrapNetlifyHandler(exports.handler);

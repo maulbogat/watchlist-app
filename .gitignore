@@ -44,4 +44,6 @@ Thumbs.db
 
 # Local Netlify folder
 .netlify
+# Vercel CLI link metadata
+.vercel
 deno.lock

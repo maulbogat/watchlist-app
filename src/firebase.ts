@@ -1146,7 +1146,7 @@ async function getBookmarkletPersonalListFirestoreId(
 
 async function getJobConfigState(): Promise<JobConfigState> {
   try {
-    const res = await fetch("/.netlify/functions/admin-job-config", {
+    const res = await fetch("/api/admin-job-config", {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });
@@ -1179,7 +1179,7 @@ async function getJobConfigState(): Promise<JobConfigState> {
 
 async function setCheckUpcomingEnabledState(enabled: boolean): Promise<JobConfigState> {
   try {
-    const res = await fetch("/.netlify/functions/admin-job-config", {
+    const res = await fetch("/api/admin-job-config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ checkUpcomingEnabled: enabled }),

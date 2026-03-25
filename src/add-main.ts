@@ -65,7 +65,7 @@ if (!imdbId || !/^tt\d+$/.test(nImdb ?? "") || !statusEl || !backLink) {
       const plMatch = document.cookie.match(/bookmarklet_personal_list_id=([^;]+)/);
       if (plMatch?.[1]) body.personalListId = decodeURIComponent(plMatch[1].trim());
 
-      const res = await fetch("/.netlify/functions/add-from-imdb", {
+      const res = await fetch("/api/add-from-imdb", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

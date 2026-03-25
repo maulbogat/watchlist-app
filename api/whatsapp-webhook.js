@@ -42,3 +42,6 @@ exports.handler = async (event) => {
 
   return { statusCode: 405, headers: { "Content-Type": "text/plain" }, body: "Method Not Allowed" };
 };
+
+const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+module.exports = wrapNetlifyHandler(exports.handler);

@@ -8,7 +8,7 @@ TV miniseries and docuseries (e.g. *Crime Scene: The Vanishing at the Cecil Hote
 
 ### What we changed
 
-1. **`netlify/functions/add-from-imdb.js`**  
+1. **`api/add-from-imdb.js`**  
    - Chooses movie vs TV using **OMDb `Type`** when both exist (`movie` vs `series`/`episode`).  
    - If OMDb isn’t available, **prefers TV** when both exist (safer for miniseries).
 

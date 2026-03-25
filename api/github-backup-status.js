@@ -144,3 +144,6 @@ exports.handler = async (event) => {
       : null,
   });
 };
+
+const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+module.exports = wrapNetlifyHandler(exports.handler);

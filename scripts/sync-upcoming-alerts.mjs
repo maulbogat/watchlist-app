@@ -15,7 +15,7 @@ import { createRequire } from "node:module";
 import { getDb } from "./lib/admin-init.mjs";
 
 const require = createRequire(import.meta.url);
-const { runFullRegistrySync } = require("../netlify/functions/lib/sync-upcoming-alerts.js");
+const { runFullRegistrySync } = require("../api/lib/sync-upcoming-alerts.js");
 
 const apiKey = process.env.TMDB_API_KEY;
 if (!apiKey || !String(apiKey).trim()) {

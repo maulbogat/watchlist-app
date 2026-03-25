@@ -58,11 +58,15 @@ type GithubBackupStatusResponse = {
   githubHttpStatus?: number;
 };
 
+/** Production site origin (bookmarklet / admin links). Override with VITE_APP_ORIGIN when your host differs. */
+const DEFAULT_APP_ORIGIN = "https://watchlist-trailers.vercel.app";
+const appOrigin = (import.meta.env.VITE_APP_ORIGIN as string | undefined)?.trim() || DEFAULT_APP_ORIGIN;
+
 const SERVICE_LINKS = [
   {
     label: "Watchlist",
-    sublabel: "Production List",
-    url: "https://watchlist-trailers.netlify.app/",
+    sublabel: "Production site",
+    url: `${appOrigin}/`,
   },
   {
     label: "Firebase",
@@ -70,9 +74,9 @@ const SERVICE_LINKS = [
     url: "https://console.firebase.google.com/u/0/project/movie-trailer-site/firestore/databases/-default-/data/",
   },
   {
-    label: "Netlify",
-    sublabel: "Environment Variables",
-    url: "https://app.netlify.com/projects/watchlist-trailers/configuration/env#environment-variables",
+    label: "Vercel",
+    sublabel: "Dashboard & env vars",
+    url: "https://vercel.com/dashboard",
   },
   {
     label: "GitHub",
@@ -112,15 +116,16 @@ const SERVICE_LINKS = [
   },
 ] as const;
 
-/** Netlify dashboard URL uses this slug (`/projects/<slug>/…`). */
-const NETLIFY_PROJECT_SLUG =
+const deploymentsUrl =
+  (import.meta.env.VITE_DEPLOYMENTS_URL as string | undefined)?.trim() || "https://vercel.com/dashboard";
+
+/** Optional legacy Netlify deploy-status badge (UUID from Netlify site settings). */
+const legacyNetlifySiteId = (import.meta.env.VITE_NETLIFY_SITE_ID as string | undefined)?.trim();
+const legacyNetlifyProjectSlug =
   (import.meta.env.VITE_NETLIFY_PROJECT_SLUG as string | undefined)?.trim() || "watchlist-trailers";
-
-const NETLIFY_DEPLOYS_URL = `https://app.netlify.com/projects/${NETLIFY_PROJECT_SLUG}/deploys`;
-
-const netlifySiteId = (import.meta.env.VITE_NETLIFY_SITE_ID as string | undefined)?.trim();
-const NETLIFY_DEPLOY_BADGE_URL = netlifySiteId
-  ? `https://api.netlify.com/api/v1/badges/${encodeURIComponent(netlifySiteId)}/deploy-status`
+const legacyNetlifyDeploysUrl = `https://app.netlify.com/projects/${legacyNetlifyProjectSlug}/deploys`;
+const NETLIFY_DEPLOY_BADGE_URL = legacyNetlifySiteId
+  ? `https://api.netlify.com/api/v1/badges/${encodeURIComponent(legacyNetlifySiteId)}/deploy-status`
   : null;
 
 type MaybeSelectable<T> = T & {
@@ -286,7 +291,7 @@ export function AdminPage() {
       const user = auth.currentUser;
       if (!user) throw new Error("Not signed in");
       const idToken = await user.getIdToken();
-      const res = await fetch("/.netlify/functions/github-backup-status", {
+      const res = await fetch("/api/github-backup-status", {
         headers: { Authorization: `Bearer ${idToken}` },
       });
       const data = (await res.json()) as GithubBackupStatusResponse & { error?: string };
@@ -329,7 +334,7 @@ export function AdminPage() {
 
   const runNowMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/.netlify/functions/check-upcoming", {
+      const res = await fetch("/api/check-upcoming", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trigger: "manual" }),
@@ -416,27 +421,28 @@ export function AdminPage() {
             </a>
           ))}
           <div className="admin-card admin-deploy-in-links-card">
-            <span className="admin-link-label">Last deployment</span>
-            <span className="admin-link-sublabel">Netlify build status</span>
+            <span className="admin-link-label">Deployments</span>
+            <span className="admin-link-sublabel">Vercel builds &amp; previews</span>
             {NETLIFY_DEPLOY_BADGE_URL ? (
               <a
                 className="admin-deploy-in-links-badge-wrap"
-                href={NETLIFY_DEPLOYS_URL}
+                href={legacyNetlifyDeploysUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Open Netlify deploys and build logs"
+                aria-label="Open legacy Netlify deploys (badge)"
               >
                 <img className="admin-deploy-badge" src={NETLIFY_DEPLOY_BADGE_URL} alt="" decoding="async" />
               </a>
             ) : (
               <p className="admin-deploy-fallback admin-deploy-in-links-fallback">
-                <a className="admin-deploy-text-link" href={NETLIFY_DEPLOYS_URL} target="_blank" rel="noopener noreferrer">
-                  Netlify deploys
+                <a className="admin-deploy-text-link" href={deploymentsUrl} target="_blank" rel="noopener noreferrer">
+                  Open deployments
                   <span aria-hidden="true"> ↗</span>
                 </a>
                 <span className="admin-deploy-hint">
                   {" "}
-                  · set <code className="admin-deploy-code">VITE_NETLIFY_SITE_ID</code> for the status badge
+                  · set <code className="admin-deploy-code">VITE_DEPLOYMENTS_URL</code> to your project deployments page; optional{" "}
+                  <code className="admin-deploy-code">VITE_SITE_ID</code> for server env diagnostics
                 </span>
               </p>
             )}

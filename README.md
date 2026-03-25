@@ -2,7 +2,7 @@
 
 A personal movie/show watchlist with YouTube trailers, filters, and Firestore. **Architecture, data model, and flows** are documented in **[`system-design.md`](./system-design.md)** (source of truth for how pieces fit together).
 
-**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). Netlify hosts **`dist/`** and runs **`netlify/functions/*.js`** (Admin SDK) for the IMDb add flow, shared-list joins, and upcoming-title sync.
+**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). **Vercel** hosts **`dist/`** and runs **`api/*.js`** serverless routes (Firebase Admin SDK) for the IMDb add flow, shared-list joins, and upcoming-title sync.
 
 ## Environment Quick Start
 
@@ -14,13 +14,13 @@ cp .env.example .env
 Then set values in:
 
 - `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional `AXIOM_*`, optional script toggles)
-- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional `VITE_APP_VERSION`, optional `VITE_NETLIFY_*`)
+- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional `VITE_APP_VERSION`, optional `VITE_APP_ORIGIN`, `VITE_DEPLOYMENTS_URL`, `VITE_SITE_ID`, legacy `VITE_NETLIFY_*`)
 
-**Netlify production:** mirror the same keys in the dashboard — see **[`docs/netlify-environment.md`](./docs/netlify-environment.md)** (delete **`VITE_AXIOM_*`**, scope **`VITE_*`** for builds, server vars for functions).
+**Vercel production:** mirror the same keys in the project **Settings → Environment Variables** — see **[`docs/netlify-environment.md`](./docs/netlify-environment.md)** for naming (delete **`VITE_AXIOM_*`**; never expose **`AXIOM_*`** to the client bundle).
 
 ## Run locally
 
-The watchlist is **React** (`src/`) served by **Vite**. Root **`index.html`** is the Vite entry (`#root` + `/src/main.jsx`). **`npm run build:react`** outputs **`dist/`**, which Netlify publishes.
+The watchlist is **React** (`src/`) served by **Vite**. Root **`index.html`** is the Vite entry (`#root` + `/src/main.jsx`). **`npm run build:react`** outputs **`dist/`**, which Vercel publishes (see **`vercel.json`**).
 
 **Requirements:** [Node.js](https://nodejs.org/) **18+** and npm.
 
@@ -32,7 +32,7 @@ npm run dev:react
 Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--host` so LAN devices can reach it if needed.
 
 - **Firebase Auth:** Add your dev host (e.g. `localhost` and the port you use) under Firebase Console → Authentication → Settings → **Authorized domains**.
-- **Netlify functions locally:** `vite.config.ts` proxies `/.netlify/functions/*` to `http://localhost:8888`. For **bookmarklet**, **shared-list join**, **`log-client-event`** (browser → Axiom), and **upcoming jobs**, load the same vars as production into `.env` / `.env.local` and run **`netlify dev`** (all-in-one) **or** run **`netlify functions:serve`** / **`netlify dev`** on port **8888** in another terminal while **`npm run dev:react`** is running.
+- **API routes locally:** `vite.config.ts` proxies **`/api/*`** to **`http://localhost:3000`**. Run **`vercel dev`** in the repo root (serves API + env) on port **3000**, then **`npm run dev:react`** (Vite, port **5173**) in another terminal. Load the same `.env` / `.env.local` vars as production so **`log-client-event`**, **bookmarklet**, joins, and jobs work end-to-end.
 
 **Other commands**
 
@@ -57,9 +57,11 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
 - Optional client variables:
   - `VITE_FIREBASE_MEASUREMENT_ID` (Analytics)
   - `VITE_APP_VERSION` (defaults to `1.0.0` when missing)
-  - `VITE_NETLIFY_SITE_ID` — Netlify **Site ID** (General → Site details) for the **Admin** deploy badge; scope to **Functions** too if other functions need it; optional; do **not** mark as secret (also in `dist/`)
-  - `VITE_NETLIFY_PROJECT_SLUG` — defaults to `watchlist-trailers` if your Netlify project URL slug differs
-- **Axiom (client events):** do **not** use `VITE_AXIOM_*`. The app POSTs to **`/.netlify/functions/log-client-event`** with a Firebase ID token; **`AXIOM_TOKEN`** and **`AXIOM_DATASET`** are server-only (Netlify **Environment variables** + local `.env` when running functions).
+  - `VITE_APP_ORIGIN` — production origin for Admin links (default in code: `https://watchlist-trailers.vercel.app`)
+  - `VITE_DEPLOYMENTS_URL` — Admin “Deployments” card (e.g. `https://vercel.com/<team>/<project>/deployments`)
+  - `VITE_SITE_ID` — optional; marks `SITE_ID` in **`/api/admin-env-status`**
+  - `VITE_NETLIFY_SITE_ID` / `VITE_NETLIFY_PROJECT_SLUG` — optional legacy Netlify deploy badge only
+- **Axiom (client events):** do **not** use `VITE_AXIOM_*`. The app POSTs to **`/api/log-client-event`** with a Firebase ID token; **`AXIOM_TOKEN`** and **`AXIOM_DATASET`** are server-only (Vercel env + local `.env` when running **`vercel dev`**).
 - `src/config/firebase.ts` normalizes/sanitizes client config values and falls back to project defaults when values are missing or malformed.
 
 ## Firebase setup
@@ -72,59 +74,59 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
    ```
    Or paste the rules in Firebase Console → Firestore → Rules
 
-4. **Movie lists** are stored under **`users/{uid}/personalLists/{listId}`** (plus optional **shared lists** in **`sharedLists/{listId}`**). The **`users/{uid}`** document holds profile fields (e.g. country, **`defaultPersonalListId`**) and optional **`upcomingDismissals`** — not the row arrays. Canonical title metadata lives in **`titleRegistry/{registryId}`** (client read-only; writes via Netlify/scripts). Users add titles via the bookmarklet; no legacy **`catalog`** collection is used.
+4. **Movie lists** are stored under **`users/{uid}/personalLists/{listId}`** (plus optional **shared lists** in **`sharedLists/{listId}`**). The **`users/{uid}`** document holds profile fields (e.g. country, **`defaultPersonalListId`**) and optional **`upcomingDismissals`** — not the row arrays. Canonical title metadata lives in **`titleRegistry/{registryId}`** (client read-only; writes via **`api/*`** / scripts). Users add titles via the bookmarklet; no legacy **`catalog`** collection is used.
 
-## Netlify deployment (bookmarklet)
+## Vercel deployment (bookmarklet)
 
-**Build:** `netlify.toml` runs **`npm run build:react`** and publishes **`dist/`** (includes `index.html` + hashed assets). The live site is the **React** watchlist.
+**Build:** **`vercel.json`** sets **`npm run build:react`**, **`outputDirectory`: `dist/`** (includes `index.html`, `add.html`, hashed assets), **Cron** **`/api/check-upcoming`** at **03:00 UTC**, and **`maxDuration`** **60s** for heavy API routes. Serverless handlers live under **`api/*.js`**.
 
 ### Production missing new UI after a Git push?
 
-GitHub alone does not update the live site — **Netlify must build and publish** that commit.
+GitHub alone does not update the live site — **Vercel must build and assign that deployment to production**.
 
-1. **Netlify → Deploys:** Open the latest deploy. It should be **Published** and show the **same commit** you pushed. If it’s missing or **Failed**, open **Deploy log** and fix the error (often a build or env var issue).
-2. **Branch:** **Site configuration → Build & deploy → Continuous deployment → Production branch** must match the branch you push (e.g. `main`). Pushes to another branch only create **Deploy Previews**, not production.
-3. **Clear cache:** **Deploys → … menu → Clear cache and deploy site** if assets look stuck on an old bundle.
-4. **Browser:** Hard refresh (e.g. Cmd+Shift+R) or try a private window — rare, but a cached `index.html` can point at old hashed JS until refreshed.
+1. **Vercel → Deployments:** Open the latest production deployment; confirm it matches the commit you pushed and read **Build logs** if it failed (often env vars).
+2. **Git integration:** Production branch (e.g. `main`) must match the branch you push.
+3. **Redeploy** or **clear build cache** from the deployment menu if assets look stuck.
+4. **Browser:** Hard refresh (e.g. Cmd+Shift+R) or a private window if `index.html` cached old hashed JS.
 
 For the IMDb bookmarklet to add titles from imdb.com:
 
-1. Set `FIREBASE_SERVICE_ACCOUNT` in Netlify → Site settings → Environment variables:
+1. Set `FIREBASE_SERVICE_ACCOUNT` in Vercel → Project → **Settings → Environment Variables**:
    ```bash
    base64 -i serviceAccountKey.json | tr -d '\n'
    ```
    Paste the output as the value.
 
-2. Set `OMDB_API_KEY` in Netlify → Site settings → Environment variables. Get a free key at [omdbapi.com](https://www.omdbapi.com/apikey.aspx).
+2. Set `OMDB_API_KEY` in Vercel environment variables. Get a free key at [omdbapi.com](https://www.omdbapi.com/apikey.aspx).
 
-3. Set `TMDB_API_KEY` in Netlify → Site settings → Environment variables (for trailer lookup and **upcoming** sync). Get a free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
+3. Set `TMDB_API_KEY` in Vercel environment variables (for trailer lookup and **upcoming** sync). Get a free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
 
-4. Set all **`VITE_*`** variables for production builds and all **server** variables for functions — full checklist, scopes, and **mandatory deletion of `VITE_AXIOM_*`** are in **[`docs/netlify-environment.md`](./docs/netlify-environment.md)**.
+4. Set all **`VITE_*`** variables for **production builds** and all **server** variables for **API routes** — naming and pitfalls (**never `VITE_AXIOM_*`**) are in **[`docs/netlify-environment.md`](./docs/netlify-environment.md)** (still the env checklist; hosting is Vercel).
 
 5. **Summary (details in `docs/netlify-environment.md`):**
-   - **Delete** `VITE_AXIOM_TOKEN` and `VITE_AXIOM_DATASET` in Netlify (unused; breaks [secret scanning](https://docs.netlify.com/manage/security/secret-scanning/) if values overlap server `AXIOM_*`).
-   - **`VITE_*` (Firebase, `VITE_APP_VERSION`, `VITE_NETLIFY_*`)** — must be available at **build** time (All scopes / includes Builds).
-   - **Server-only** (`FIREBASE_SERVICE_ACCOUNT`, `TMDB_API_KEY`, `OMDB_API_KEY`, `AXIOM_*`, optional `UPCOMING_SYNC_TRIGGER_SECRET`) — for **functions**; prefer scoping to Functions without Builds when Netlify allows it. Use **`VITE_NETLIFY_SITE_ID`** for the site UUID (build + functions); avoid a duplicate secret **`NETLIFY_SITE_ID`** — see **`docs/netlify-environment.md`**.
+   - **Do not** set `VITE_AXIOM_TOKEN` / `VITE_AXIOM_DATASET` (unused; exposes or duplicates server secrets).
+   - **`VITE_*` (Firebase, `VITE_APP_VERSION`, Admin URLs)** — required at **build** time on Vercel.
+   - **Server-only** (`FIREBASE_SERVICE_ACCOUNT`, `TMDB_API_KEY`, `OMDB_API_KEY`, `AXIOM_*`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, `WHATSAPP_*`) — for **`api/*`** at **runtime**.
 
-   **Do not** put real **`AXIOM_DATASET`** values in **`.env.example`** or client code; Netlify compares the repo and `dist/` to secrets.
+   **Do not** put real **`AXIOM_DATASET`** values in **`.env.example`** or client code.
 
-### Netlify: “Potentially exposed secrets” / failed build
+### Vercel / build hygiene
 
-Builds fail if Netlify’s scanner finds secret-like strings in **published `dist/` assets** or **logs**. This project keeps **`AXIOM_*` on the server** only; do not reintroduce **`VITE_AXIOM_*`**. If something else is flagged, use the deploy log location and Netlify’s **`SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES`** [safelist](https://docs.netlify.com/manage/security/secret-scanning/#manage-false-positives) for false positives.
+Keep **`AXIOM_*` on the server** only; do not reintroduce **`VITE_AXIOM_*`**. If a deploy flags a false positive secret in logs, adjust values or use Vercel’s guidance for omitted patterns.
 
-6. **Upcoming episodes / movies (optional UI):** Netlify runs `check-upcoming` on a schedule (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
+6. **Upcoming episodes / movies (optional UI):** Vercel **Cron** invokes **`/api/check-upcoming`** on the schedule in **`vercel.json`** (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
 
    Job enable/disable is controlled in Firestore at `meta/jobConfig.checkUpcomingEnabled` (exposed in `/admin` Jobs section). The schedule remains on; when disabled, scheduled runs exit early.
 
-   **If `curl …/check-upcoming` returns Netlify “Internal Error”** or logs show **Duration: 30000 ms** with no `check-upcoming: done`: the old “full registry in one run” flow **exceeds Netlify’s ~30s limit**. The deployed function now uses a **time budget + Firestore cursor** (`syncState/upcomingAlerts`, Admin-only — deploy updated **`firestore.rules`**). Use **Netlify → Functions → check-upcoming → Run now** repeatedly until logs show **`completed":true`** (or wait for daily cron). Each run should finish under 30s; **`upcomingAlerts`** appears after the first chunk writes.
+   **If `curl …/api/check-upcoming` errors or times out:** the sync uses a **time budget + Firestore cursor** (`syncState/upcomingAlerts`, Admin-only — deploy updated **`firestore.rules`**). Use **Admin → Run now** (POST **`/api/check-upcoming`**) or cron until logs show **`completed":true`**. **`vercel.json`** sets **`maxDuration`** **60s** for the heaviest API routes.
 
-   **Manual HTTP / `curl`:** Do **not** call `/.netlify/functions/check-upcoming` — Netlify **scheduled** functions often fail **within ~1s** when hit by URL (while **Run now** in the dashboard still works). Use the separate HTTP function:
+   **Manual HTTP / `curl`:** You can POST **`/api/check-upcoming`** with `{"trigger":"manual"}` from the Admin UI, or use the dedicated trigger:
 
    ```bash
-   curl -X POST "https://YOUR-SITE.netlify.app/.netlify/functions/trigger-upcoming-sync"
+   curl -X POST "https://YOUR-SITE.vercel.app/api/trigger-upcoming-sync"
    ```
 
-   Repeat until the JSON shows `"completed":true` (same chunked sync as the scheduler). Optional: set **`UPCOMING_SYNC_TRIGGER_SECRET`** in Netlify and send `Authorization: Bearer <that-value>` so random people can’t trigger TMDB/Firestore work.
+   Repeat until the JSON shows `"completed":true` (same chunked sync as the scheduler). Optional: set **`UPCOMING_SYNC_TRIGGER_SECRET`** in Vercel and send `Authorization: Bearer <that-value>` so random people can’t trigger TMDB/Firestore work.
 
    **Firestore `RESOURCE_EXHAUSTED` / “Quota exceeded”** in function logs usually means the **Spark (free) plan daily read/write budget** was hit, or two runs overlapped and doubled traffic. The sync now **pages through `titleRegistry`** (instead of downloading the whole collection every run) and **retries** quota errors with backoff. If errors persist: upgrade to **Blaze (pay-as-you-go)** in Firebase, reduce how often you manually trigger sync, or run **`node scripts/sync-upcoming-alerts.mjs`** locally when the registry is large.
 
@@ -160,7 +162,7 @@ Deploy Firestore rules: `firebase deploy --only firestore:rules`
 **Verify in Firebase Console:**
 
 1. **Authentication → Sign-in method** → Google → Enabled
-2. **Authentication → Settings → Authorized domains** → Add your Netlify URL (e.g. `watchlist-trailers.netlify.app`) and `localhost` for local dev
+2. **Authentication → Settings → Authorized domains** → Add your production host (e.g. `watchlist-trailers.vercel.app` or your custom domain) and `localhost` for local dev
 3. **Firestore rules** (in `firestore.rules`) — signed-in users: read/write their **`users/{uid}`** doc and **`users/{uid}/personalLists/*`**; read/write **`sharedLists/{listId}`** only when their uid is in **`members`**; read **`titleRegistry`** and **`upcomingAlerts`** (no client writes there). **`syncState`** is Admin-only.
 
 The header shows the signed-in user's email so family members know whose account they're using on shared devices.
@@ -249,5 +251,5 @@ Many scripts expect **`TMDB_API_KEY`**, **`FIREBASE_SERVICE_ACCOUNT`** (base64) 
 - **Filters:** Movies / TV / Both, **genre**, persisted per account in **localStorage** (with session restore).
 - **Country / region:** set in app for TMDB **watch providers** at add time; **service chips** on cards (e.g. Netflix, Prime).
 - **Upcoming:** dismissible **upcoming alerts** bar for the current list (backed by **`upcomingAlerts`** + scheduled **`check-upcoming`**; optional calendar export when dated).
-- **Bookmarklet:** add from **imdb.com** via **`add.html`** + **`/.netlify/functions/add-from-imdb`**.
+- **Bookmarklet:** add from **imdb.com** via **`add.html`** + **`/api/add-from-imdb`**.
 - **Google sign-in:** same Firebase project as production; remember **authorized domains** for each host/port you use locally.

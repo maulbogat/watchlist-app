@@ -1,6 +1,6 @@
-# Netlify environment variables (checklist)
+# Environment variables (checklist)
 
-Apply these in **Netlify → Site configuration → Environment variables**. The Git repo cannot edit the dashboard; use this file as the source of truth.
+**Production hosting is Vercel** (`api/*`, `vercel.json`). Apply these in **Vercel → Project → Settings → Environment variables** (or legacy Netlify if you still mirror there). The Git repo cannot edit the dashboard; use this file as the source of truth.
 
 ## Secret scanning: Site ID vs `dist/`
 
@@ -18,7 +18,7 @@ Do **not** mark **`VITE_NETLIFY_SITE_ID`** as a secret (it is always in the bund
 | Variable | Reason |
 |----------|--------|
 | **`VITE_AXIOM_TOKEN`** | Unused. Vite can embed `VITE_*` into `dist/`; [secret scanning](https://docs.netlify.com/manage/security/secret-scanning/) fails if values overlap server secrets. |
-| **`VITE_AXIOM_DATASET`** | Same. Client logging uses **`/.netlify/functions/log-client-event`** with server-only **`AXIOM_TOKEN`** / **`AXIOM_DATASET`**. |
+| **`VITE_AXIOM_DATASET`** | Same. Client logging uses **`/api/log-client-event`** with server-only **`AXIOM_TOKEN`** / **`AXIOM_DATASET`**. |
 
 ## 2. Client / Vite (`npm run build:react`)
 
@@ -44,7 +44,7 @@ These must be available **during the build** (Vite inlines `VITE_*` into the bro
 
 ## 3. Server / functions only (never `VITE_*`)
 
-Used by **`netlify/functions/*.js`** (bookmarklet, jobs, `log-client-event`, etc.).
+Used by **`api/*.js`** (bookmarklet, jobs, `log-client-event`, etc.).
 
 **Scopes:** Prefer **Functions** only for secrets that functions read (and **Builds** only when an `npm run build` script needs the same key—rare here). Do **not** add **Functions** scope to **`VITE_FIREBASE_*`** / **`VITE_APP_VERSION`** (see §2 and §6).
 
@@ -74,7 +74,7 @@ Mark sensitive values as **Contains secret values** in Netlify.
 
 Copy **the same variable names** as in Netlify; values come from your machine.
 
-- **`npm run dev:react`** — reads `.env.local`; proxies `/.netlify/functions` to port **8888** (`vite.config.ts`).
+- **`npm run dev:react`** — reads `.env.local`; proxies **`/api`** to **`vercel dev`** on port **3000** (`vite.config.ts`).
 - **`netlify dev`** (recommended) — loads both and runs the app + functions together **or** run **`netlify dev`** / **`netlify functions:serve`** on **8888** alongside Vite.
 
 ## 5. What still works after cleanup

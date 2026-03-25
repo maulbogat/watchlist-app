@@ -13,7 +13,7 @@ const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) || "
 const environment = import.meta.env.MODE || "unknown";
 
 /** Same-origin Netlify function — token stays on the server (`AXIOM_*`), not in `dist/` bundles. */
-const LOG_CLIENT_EVENT_PATH = "/.netlify/functions/log-client-event";
+const LOG_CLIENT_EVENT_PATH = "/api/log-client-event";
 
 function getFirebaseApp() {
   return getApps().length ? getApp() : initializeApp(firebaseConfig);

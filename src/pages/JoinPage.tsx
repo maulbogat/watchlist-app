@@ -28,7 +28,7 @@ export function JoinPage() {
   const joinMutation = useMutation({
     mutationFn: async (): Promise<JoinResponse> => {
       if (!listId) throw new Error("Invalid invite link.");
-      const response = await fetch("/.netlify/functions/join-shared-list", {
+      const response = await fetch("/api/join-shared-list", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

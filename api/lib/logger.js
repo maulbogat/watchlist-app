@@ -25,7 +25,7 @@ function createFunctionLogger(functionName) {
     try {
       const payload = {
         timestamp: new Date().toISOString(),
-        environment: process.env.CONTEXT || process.env.NODE_ENV || "unknown",
+        environment: process.env.CONTEXT || process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown",
         function: functionName,
         ...event,
       };

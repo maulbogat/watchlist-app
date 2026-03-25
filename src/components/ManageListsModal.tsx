@@ -431,7 +431,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                       return;
                     }
                     try {
-                      const res = await fetch(`${window.location.origin}/.netlify/functions/join-shared-list`, {
+                      const res = await fetch(`${window.location.origin}/api/join-shared-list`, {
                         method: "POST",
                         credentials: "include",
                         headers: { "Content-Type": "application/json" },

@@ -103,3 +103,6 @@ exports.handler = async (event) => {
 
   return { statusCode: 204, headers: corsHeaders(event), body: "" };
 };
+
+const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+module.exports = wrapNetlifyHandler(exports.handler);

@@ -5,7 +5,8 @@
     alert("Not an IMDb title page. Open a movie or TV show page first.");
     return;
   }
-  var url = "https://watchlist-trailers.netlify.app/add.html?imdbId=" + encodeURIComponent(imdbId) + "&embed=1";
+  var origin = "https://watchlist-trailers.vercel.app";
+  var url = origin + "/add.html?imdbId=" + encodeURIComponent(imdbId) + "&embed=1";
   var popup = window.open(url, "addToWatchlist", "width=420,height=220,menubar=no,toolbar=no,location=no,status=no");
   if (!popup) {
     alert("Popup blocked. Allow popups for this site and try again.");
@@ -24,7 +25,10 @@
     showToast("Timed out. Sign in on the watchlist first.", true);
   }, 15000);
   function handleMessage(e) {
-    var okOrigin = e.origin === "https://watchlist-trailers.netlify.app" || /^https?:\/\/localhost(:\d+)?$/.test(e.origin);
+    var okOrigin =
+      e.origin === "https://watchlist-trailers.vercel.app" ||
+      e.origin === "https://watchlist-trailers.netlify.app" ||
+      /^https?:\/\/localhost(:\d+)?$/.test(e.origin);
     if (!okOrigin || !e.data || e.data.type !== "add-result") return;
     clearTimeout(timeoutId);
     clearInterval(checkClosed);

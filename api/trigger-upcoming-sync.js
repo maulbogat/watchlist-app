@@ -6,7 +6,7 @@
  *
  * Netlify **scheduled** functions are not reliably invokable via `curl`; use this URL for manual runs:
  *
- *   curl -X POST "https://YOUR-SITE.netlify.app/.netlify/functions/trigger-upcoming-sync"
+ *   curl -X POST "https://YOUR-SITE.vercel.app/api/trigger-upcoming-sync"
  *
  * Optional: `UPCOMING_SYNC_TRIGGER_SECRET` — require header `Authorization: Bearer <secret>`.
  *
@@ -83,3 +83,6 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
+const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+module.exports = wrapNetlifyHandler(exports.handler);

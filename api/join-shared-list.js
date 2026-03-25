@@ -151,3 +151,6 @@ exports.handler = async (event, context) => {
 
   return jsonRes(200, { ok: true, joined: true, message: `Joined "${listName}"`, name: listName }, event);
 };
+
+const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+module.exports = wrapNetlifyHandler(exports.handler);

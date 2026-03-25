@@ -31,9 +31,10 @@ exports.handler = async (event) => {
   const status = Object.fromEntries(
     SERVER_ENV_KEYS.map((key) => [key, Boolean(process.env[key] && String(process.env[key]).trim())])
   );
-  // Site UUID (build + functions): prefer VITE_; legacy NETLIFY_SITE_ID ok.
-  status.NETLIFY_SITE_ID = Boolean(
-    (process.env.VITE_NETLIFY_SITE_ID && String(process.env.VITE_NETLIFY_SITE_ID).trim()) ||
+  // Optional site id for deploy dashboards / diagnostics (Vercel, Netlify legacy).
+  status.SITE_ID = Boolean(
+    (process.env.VITE_SITE_ID && String(process.env.VITE_SITE_ID).trim()) ||
+      (process.env.VITE_NETLIFY_SITE_ID && String(process.env.VITE_NETLIFY_SITE_ID).trim()) ||
       (process.env.NETLIFY_SITE_ID && String(process.env.NETLIFY_SITE_ID).trim())
   );
 
@@ -43,3 +44,6 @@ exports.handler = async (event) => {
     body: JSON.stringify({ ok: true, status }),
   };
 };
+
+const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+module.exports = wrapNetlifyHandler(exports.handler);
