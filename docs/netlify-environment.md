@@ -24,26 +24,29 @@ Do **not** mark **`VITE_NETLIFY_SITE_ID`** as a secret (it is always in the bund
 
 These must be available **during the build** (Vite inlines `VITE_*` into the browser bundle).
 
-**Scopes in Netlify:** use **All scopes** or any option that **includes Builds** and **Functions** (so serverless functions can read the same `VITE_NETLIFY_SITE_ID` when needed).
+**Scopes in Netlify (important for the Lambda 4KB limit — see §6):**
+
+- **`VITE_FIREBASE_*`**, **`VITE_APP_VERSION`**, **`VITE_FIREBASE_MEASUREMENT_ID`**, **`VITE_NETLIFY_PROJECT_SLUG`**: scope **Builds** only. No function in this repo reads them at runtime; if they are also scoped to **Functions**, Netlify duplicates their values into every Lambda and you can hit AWS’s **4096-byte** env limit.
+- **`VITE_NETLIFY_SITE_ID`**: scope **Builds** and **Functions**. The build inlines it into `dist/`; **`admin-env-status`** checks it in the function environment (tiny UUID).
 
 | Variable | Required | Notes |
 |----------|----------|--------|
-| `VITE_FIREBASE_API_KEY` | Yes | |
-| `VITE_FIREBASE_AUTH_DOMAIN` | Yes | |
-| `VITE_FIREBASE_PROJECT_ID` | Yes | |
-| `VITE_FIREBASE_STORAGE_BUCKET` | Yes | |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Yes | |
-| `VITE_FIREBASE_APP_ID` | Yes | |
-| `VITE_FIREBASE_MEASUREMENT_ID` | No | Analytics |
-| `VITE_APP_VERSION` | No | Shown in client logs |
-| `VITE_NETLIFY_SITE_ID` | No | Admin deploy badge (not a secret — appears in `dist/`) |
-| `VITE_NETLIFY_PROJECT_SLUG` | No | Only if the Netlify project slug ≠ default in code |
+| `VITE_FIREBASE_API_KEY` | Yes | Builds only |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Yes | Builds only |
+| `VITE_FIREBASE_PROJECT_ID` | Yes | Builds only |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Yes | Builds only |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Yes | Builds only |
+| `VITE_FIREBASE_APP_ID` | Yes | Builds only |
+| `VITE_FIREBASE_MEASUREMENT_ID` | No | Analytics; Builds only |
+| `VITE_APP_VERSION` | No | Shown in client logs; Builds only |
+| `VITE_NETLIFY_SITE_ID` | No | Admin deploy badge; **Builds + Functions** |
+| `VITE_NETLIFY_PROJECT_SLUG` | No | Builds only if set |
 
 ## 3. Server / functions only (never `VITE_*`)
 
 Used by **`netlify/functions/*.js`** (bookmarklet, jobs, `log-client-event`, etc.).
 
-**Scopes:** Prefer **Functions** (+ **Runtime** if your plan lists it) and **omit Builds** if Netlify lets you scope per variable—so secrets are not loaded into the Vite build step. If your UI only offers **Builds, Functions, Runtime** together, that still works; deleting **`VITE_AXIOM_*`** is the critical fix.
+**Scopes:** Prefer **Functions** only for secrets that functions read (and **Builds** only when an `npm run build` script needs the same key—rare here). Do **not** add **Functions** scope to **`VITE_FIREBASE_*`** / **`VITE_APP_VERSION`** (see §2 and §6).
 
 Mark sensitive values as **Contains secret values** in Netlify.
 
@@ -56,6 +59,9 @@ Mark sensitive values as **Contains secret values** in Netlify.
 | `AXIOM_DATASET` | Dataset name for ingest |
 | `NETLIFY_SITE_ID` | **Avoid** if duplicate of `VITE_NETLIFY_SITE_ID` (see § top). Optional legacy fallback only. |
 | `UPCOMING_SYNC_TRIGGER_SECRET` | Optional — auth for `trigger-upcoming-sync` |
+| `WHATSAPP_VERIFY_TOKEN` | `whatsapp-webhook` — Meta subscription GET |
+| `WHATSAPP_TOKEN` | Sending messages / Graph API (when implemented) |
+| `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp phone number id (when implemented) |
 
 ## 4. Local development (parity with prod)
 
@@ -80,5 +86,20 @@ Copy **the same variable names** as in Netlify; values come from your machine.
 | **Scheduled / manual upcoming sync** | `TMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, Firestore rules |
 | **Client → Axiom logs** | `AXIOM_*` + `FIREBASE_SERVICE_ACCOUNT` (`log-client-event` verifies Firebase ID tokens) |
 | **Admin deploy badge** | `VITE_NETLIFY_SITE_ID` |
+| **WhatsApp webhook** | `WHATSAPP_VERIFY_TOKEN` (+ token / phone id when sending) |
 
 No code path requires **`VITE_AXIOM_*`**.
+
+## 6. Deploy fails: “environment variables exceed the 4KB limit” (AWS Lambda)
+
+Netlify uploads each function with **every environment variable whose scope includes Functions**. The **combined** size of names and values must stay under **4096 bytes** per Lambda.
+
+**What usually breaks it:** a large **`FIREBASE_SERVICE_ACCOUNT`** (base64 service account JSON is often **2.5–4KB** on its own) **plus** extra keys duplicated into Functions—especially **`VITE_FIREBASE_*`** and **`VITE_APP_VERSION`** if they were set to **All scopes** or **Functions**.
+
+**Fix (Netlify → Environment variables → edit each row → Scopes):**
+
+1. Set **`VITE_FIREBASE_*`**, **`VITE_APP_VERSION`**, **`VITE_FIREBASE_MEASUREMENT_ID`**, **`VITE_NETLIFY_PROJECT_SLUG`** to **Builds** only (remove **Functions**).
+2. Set **`VITE_NETLIFY_SITE_ID`** to **Builds** and **Functions** (see §2).
+3. Keep **`FIREBASE_SERVICE_ACCOUNT`**, **`TMDB_API_KEY`**, **`OMDB_API_KEY`**, **`AXIOM_*`**, **`WHATSAPP_*`**, **`UPCOMING_SYNC_TRIGGER_SECRET`**, **`GITHUB_*`** on **Functions** (add **Builds** only if something in `npm run build` reads them—it does not for this repo).
+
+Trigger a **new deploy** after saving. If you are still over the limit, the service account blob is the remainder: confirm you are not base64-encoding unnecessary whitespace or a duplicated JSON; as a last resort, create a **dedicated minimal Firebase service account** (same JSON layout, not much smaller) or contact Netlify about limits on your plan.
