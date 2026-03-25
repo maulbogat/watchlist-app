@@ -273,10 +273,10 @@ export function WhatsAppSettings({
                         value={rowChoices[p] || "p:personal"}
                         onValueChange={(v) => void onRowListChange(p, v)}
                       >
-                        <SelectTrigger className="w-[min(100%,220px)] border-white/15 bg-black/30 text-[#f0ede8]">
+                        <SelectTrigger className="lists-modal-select-trigger w-[min(100%,220px)] focus-visible:ring-0">
                           <SelectValue placeholder="Default list" />
                         </SelectTrigger>
-                        <SelectContent className="z-[1300]">
+                        <SelectContent className="z-[1300] border border-white/10 bg-[#1c1c22] text-[#f0ede8]">
                           {listOptions.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>
                               {opt.label}
@@ -326,7 +326,7 @@ export function WhatsAppSettings({
                       value={phoneInput}
                       onChange={(e) => setPhoneInput(e.target.value)}
                       placeholder="+972501234567"
-                      className="border-white/15 bg-black/30 text-[#f0ede8]"
+                      className="lists-modal-input focus-visible:ring-0"
                       autoComplete="tel"
                     />
                     <p className="text-xs text-white/45 mt-1">
@@ -336,10 +336,10 @@ export function WhatsAppSettings({
                   <div>
                     <label className="block text-xs text-white/50 mb-1">Default list for adds</label>
                     <Select value={connectListChoice} onValueChange={setConnectListChoice}>
-                      <SelectTrigger className="w-full border-white/15 bg-black/30 text-[#f0ede8]">
+                      <SelectTrigger className="lists-modal-select-trigger w-full focus-visible:ring-0">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="z-[1300]">
+                      <SelectContent className="z-[1300] border border-white/10 bg-[#1c1c22] text-[#f0ede8]">
                         {listOptions.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>
                             {opt.label}
@@ -372,7 +372,7 @@ export function WhatsAppSettings({
                     value={codeInput}
                     onChange={(e) => setCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     placeholder="000000"
-                    className="border-white/15 bg-black/30 text-[#f0ede8] tracking-widest"
+                    className="lists-modal-input tracking-widest focus-visible:ring-0"
                     inputMode="numeric"
                   />
                   <div className="flex gap-2">

@@ -61,6 +61,7 @@ function json(status, body, event) {
  * @param {import('@netlify/functions').HandlerEvent} event
  */
 exports.handler = async (event) => {
+  try {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders(event), body: "" };
   }
@@ -184,6 +185,16 @@ exports.handler = async (event) => {
 
   logEvent({ type: "whatsapp.send_code.ok", phoneMasked: maskPhone(phone) });
   return json(200, { ok: true }, event);
+  } catch (err) {
+    console.error("whatsapp-verify unhandled error:", err);
+    if (err instanceof Error) {
+      console.error("whatsapp-verify message:", err.message);
+      console.error("whatsapp-verify stack:", err.stack);
+    } else {
+      console.error("whatsapp-verify non-Error payload:", err);
+    }
+    return json(502, { ok: false, error: "internal_error" }, event);
+  }
 };
 
 /**

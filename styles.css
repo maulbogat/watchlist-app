@@ -635,6 +635,30 @@ body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay
   border-color: rgba(232, 201, 106, 0.4);
 }
 
+/* Shadcn Select trigger inside dark modals (e.g. WhatsApp settings) — matches lists-modal-input */
+.lists-modal-select-trigger {
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+  box-shadow: none;
+}
+.lists-modal-select-trigger:focus,
+.lists-modal-select-trigger:focus-visible {
+  outline: none;
+  border-color: rgba(232, 201, 106, 0.4);
+  box-shadow: none;
+}
+.lists-modal-select-trigger[data-placeholder] {
+  color: var(--muted);
+}
+.lists-modal-select-trigger svg {
+  color: var(--muted);
+}
+
 .delete-confirm-body p {
   color: var(--text);
   font-size: 0.95rem;
