@@ -19,7 +19,7 @@
  * @typedef {import('../../src/types/index.js').UpcomingAlert} UpcomingAlert
  */
 
-const { runUpcomingSyncCore } = require("./lib/execute-upcoming-sync");
+const { runUpcomingSyncCore } = require("../src/api-lib/execute-upcoming-sync");
 
 /**
  * @returns {Record<string, string>}
@@ -84,5 +84,5 @@ exports.handler = async (event, context) => {
   }
 };
 
-const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+const { wrapNetlifyHandler } = require("../src/api-lib/vercel-adapter");
 module.exports = wrapNetlifyHandler(exports.handler);

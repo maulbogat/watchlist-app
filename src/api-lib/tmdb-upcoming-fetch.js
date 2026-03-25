@@ -8,7 +8,7 @@
  */
 
 /**
- * @typedef {import('../../../src/types/index.js').UpcomingAlert} UpcomingAlert
+ * @typedef {import('../types/index.js').UpcomingAlert} UpcomingAlert
  */
 
 const https = require("https");

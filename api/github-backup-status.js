@@ -8,7 +8,7 @@
 
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { ADMIN_UIDS } = require("./lib/admin-uids");
+const { ADMIN_UIDS } = require("../src/api-lib/admin-uids");
 
 const APP_NAME = "watchlist-admin";
 const WORKFLOW_FILE = "backup.yml";
@@ -145,5 +145,5 @@ exports.handler = async (event) => {
   });
 };
 
-const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+const { wrapNetlifyHandler } = require("../src/api-lib/vercel-adapter");
 module.exports = wrapNetlifyHandler(exports.handler);

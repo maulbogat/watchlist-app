@@ -11,7 +11,7 @@
 
 /**
  * Client/shared TypeScript shape (subset enforced at write time).
- * @typedef {import('../../../src/types/index.js').UpcomingAlert} UpcomingAlert
+ * @typedef {import('../types/index.js').UpcomingAlert} UpcomingAlert
  *
  * Firestore document fields for **`upcomingAlerts/{docId}`** (plus `detectedAt` server timestamp on write).
  * Aligns with {@link UpcomingAlert}; `airDate` stored as `YYYY-MM-DD` string; `expiresAt` ISO date string.

@@ -15,7 +15,7 @@ This document describes **only what exists in this repository** (static site, Ve
 | **OMDb** | Title metadata by IMDb id; disambiguate movie vs TV when TMDB returns both; fallback row when TMDB has no match. | **REST:** `https://www.omdbapi.com/?i=...&apikey=...` in `add-from-imdb.js` and various scripts. | API key query parameter. | `OMDB_API_KEY` (Vercel + local scripts per README / `.env.example`). |
 | **YouTube** | Trailer playback in modal via iframe embed. | **Browser:** `https://www.youtube-nocookie.com/embed/{youtubeId}?...` and link to `youtube.com/watch`. | None for embed (public video ids). | None. |
 | **Google Fonts** | UI typography (Bebas Neue, DM Sans). | `<link href="https://fonts.googleapis.com/...">` in HTML. | None. | None. |
-| **Vercel** | Host static HTML/CSS/JS from **`dist/`**; run Node serverless routes under **`/api/*`** (`api/*.js`, **`vercel.json`**). | **Browser:** `fetch` to same-origin **`/api/...`** (e.g. **`log-client-event`** for Axiom ingest with `Authorization: Bearer` ID token). **Server:** CommonJS handlers wrapped by **`api/lib/vercel-adapter.js`** for `(req, res)`. | Routes verify Firebase ID token (cookie or `Authorization: Bearer`) where needed. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional `AXIOM_TOKEN`, optional `AXIOM_DATASET` (server-only; no `VITE_AXIOM_*`). |
+| **Vercel** | Host static HTML/CSS/JS from **`dist/`**; run Node serverless routes under **`/api/*`** (`api/*.js`, **`vercel.json`**). | **Browser:** `fetch` to same-origin **`/api/...`** (e.g. **`log-client-event`** for Axiom ingest with `Authorization: Bearer` ID token). **Server:** CommonJS handlers wrapped by **`src/api-lib/vercel-adapter.js`** for `(req, res)`. | Routes verify Firebase ID token (cookie or `Authorization: Bearer`) where needed. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional `AXIOM_TOKEN`, optional `AXIOM_DATASET` (server-only; no `VITE_AXIOM_*`). |
 
 **Note:** `.env` is for server/script vars (`process.env`) and `.env.local` is for client Vite vars (`import.meta.env`). The live add flow uses the signed-in user’s Firestore `country` (via `getUserProfile` in `src/add-main.ts`), not `WATCH_REGION`, when calling **`/api/add-from-imdb`**.
 
@@ -32,9 +32,9 @@ This document describes **only what exists in this repository** (static site, Ve
 **Vercel (`api/*`)**  
 - **Static hosting** for HTML, CSS, JS, SVG assets from **`dist/`**.  
 - **Serverless API routes** (root **`api/*.js`**, **`vercel.json`** rewrites + cron **`/api/check-upcoming`**):  
-  - `add-from-imdb.js` — verifies token, calls OMDb/TMDB, writes Firestore via Admin SDK; after a successful add with `tmdbId`, runs **upcoming alerts** sync for that title (`api/lib/sync-upcoming-alerts.js`).  
+  - `add-from-imdb.js` — verifies token, calls OMDb/TMDB, writes Firestore via Admin SDK; after a successful add with `tmdbId`, runs **upcoming alerts** sync for that title (`src/api-lib/sync-upcoming-alerts.js`).  
   - `join-shared-list.js` — verifies token, adds caller’s uid to `sharedLists/{listId}.members`.  
-  - `check-upcoming.js` — **cron** (3:00 UTC, **`vercel.json`**): runs chunked sync (`runRegistrySyncWithTimeBudget`) over **`titleRegistry`**, writes to `upcomingAlerts`, `upcomingChecks`, and `syncState/upcomingAlerts`, and writes latest run status to `meta/jobConfig`. Uses shared logic in **`api/lib/execute-upcoming-sync.js`** and respects `meta/jobConfig.checkUpcomingEnabled` for scheduled runs (manual runs still proceed). Recognizes **`x-vercel-cron`** like Netlify’s **`x-netlify-event`**.  
+  - `check-upcoming.js` — **cron** (3:00 UTC, **`vercel.json`**): runs chunked sync (`runRegistrySyncWithTimeBudget`) over **`titleRegistry`**, writes to `upcomingAlerts`, `upcomingChecks`, and `syncState/upcomingAlerts`, and writes latest run status to `meta/jobConfig`. Uses shared logic in **`src/api-lib/execute-upcoming-sync.js`** and respects `meta/jobConfig.checkUpcomingEnabled` for scheduled runs (manual runs still proceed). Recognizes **`x-vercel-cron`** like Netlify’s **`x-netlify-event`**.  
   - `trigger-upcoming-sync.js` — **HTTP** (GET/POST) manual trigger for the same upcoming sync as `check-upcoming`. Optional env **`UPCOMING_SYNC_TRIGGER_SECRET`** + `Authorization: Bearer …`.  
   - `log-client-event.js` — POST authenticated client events to **Axiom** (server-only `AXIOM_*`).  
   - `admin-job-config.js` — GET/POST **`meta/jobConfig`** (toggle scheduled upcoming job, read last run).  
@@ -70,7 +70,7 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 |-------|------|--------|
 | (same as former embedded item) | | `title`, `year`, `type`, `genre`, `thumb`, `youtubeId`, `imdbId`, `tmdbId`, `tmdbMedia`, `services`, … |
 
-**`registryId` algorithm:** **`src/lib/registry-id.ts`** (client) / **`api/lib/registry-id.cjs`** (functions) — prefer normalized IMDb id (`tt…`), else `tmdb-tv-{id}` / `tmdb-movie-{id}`, else deterministic `legacy-{hash}` from `title|year`.
+**`registryId` algorithm:** **`src/lib/registry-id.ts`** (client) / **`src/api-lib/registry-id.cjs`** (functions) — prefer normalized IMDb id (`tt…`), else `tmdb-tv-{id}` / `tmdb-movie-{id}`, else deterministic `legacy-{hash}` from `title|year`.
 
 **List rows** in `users` / `sharedLists` / `personalLists` store **`{ registryId: "<id>" }`** only (after migration). Status arrays use the same string as the key (`registryId`). Per-user display overrides can attach here or on list rows in a future version.
 

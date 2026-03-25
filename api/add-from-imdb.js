@@ -48,9 +48,9 @@ const { getAuth } = require("firebase-admin/auth");
 
 const APP_NAME = "watchlist-admin";
 const https = require("https");
-const { runSingleTitleSync } = require("./lib/sync-upcoming-alerts");
-const { registryDocIdFromItem, payloadForRegistry, listKey } = require("./lib/registry-id.cjs");
-const { createFunctionLogger } = require("./lib/logger");
+const { runSingleTitleSync } = require("../src/api-lib/sync-upcoming-alerts");
+const { registryDocIdFromItem, payloadForRegistry, listKey } = require("../src/api-lib/registry-id.cjs");
+const { createFunctionLogger } = require("../src/api-lib/logger");
 
 const logEvent = createFunctionLogger("add-from-imdb");
 
@@ -833,5 +833,5 @@ exports.handler = async (event, context) => {
   }
 };
 
-const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+const { wrapNetlifyHandler } = require("../src/api-lib/vercel-adapter");
 module.exports = wrapNetlifyHandler(exports.handler);

@@ -8,7 +8,7 @@
  */
 
 /**
- * @typedef {import('../../../src/types/index.js').WatchlistItem} WatchlistItem
+ * @typedef {import('../types/index.js').WatchlistItem} WatchlistItem
  */
 
 /**

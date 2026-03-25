@@ -7,7 +7,7 @@
 
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { createFunctionLogger } = require("./lib/logger");
+const { createFunctionLogger } = require("../src/api-lib/logger");
 
 const APP_NAME = "watchlist-admin";
 
@@ -104,5 +104,5 @@ exports.handler = async (event) => {
   return { statusCode: 204, headers: corsHeaders(event), body: "" };
 };
 
-const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+const { wrapNetlifyHandler } = require("../src/api-lib/vercel-adapter");
 module.exports = wrapNetlifyHandler(exports.handler);

@@ -3,7 +3,7 @@
  * GET: subscription verification. POST: incoming events (acknowledge; extend for business logic).
  */
 
-const { createFunctionLogger } = require("./lib/logger");
+const { createFunctionLogger } = require("../src/api-lib/logger");
 
 const logEvent = createFunctionLogger("whatsapp-webhook");
 
@@ -43,5 +43,5 @@ exports.handler = async (event) => {
   return { statusCode: 405, headers: { "Content-Type": "text/plain" }, body: "Method Not Allowed" };
 };
 
-const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+const { wrapNetlifyHandler } = require("../src/api-lib/vercel-adapter");
 module.exports = wrapNetlifyHandler(exports.handler);

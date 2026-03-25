@@ -1,6 +1,6 @@
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
-const { readJobConfig, setCheckUpcomingEnabled } = require("./lib/job-config");
+const { readJobConfig, setCheckUpcomingEnabled } = require("../src/api-lib/job-config");
 
 const APP_NAME = "watchlist-admin";
 
@@ -85,5 +85,5 @@ exports.handler = async (event) => {
   }
 };
 
-const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+const { wrapNetlifyHandler } = require("../src/api-lib/vercel-adapter");
 module.exports = wrapNetlifyHandler(exports.handler);

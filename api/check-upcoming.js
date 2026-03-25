@@ -35,9 +35,9 @@
  */
 
 const { getFirestore } = require("firebase-admin/firestore");
-const { getAdminApp, runUpcomingSyncCore } = require("./lib/execute-upcoming-sync");
-const { readJobConfig, writeCheckUpcomingRunResult } = require("./lib/job-config");
-const { createFunctionLogger } = require("./lib/logger");
+const { getAdminApp, runUpcomingSyncCore } = require("../src/api-lib/execute-upcoming-sync");
+const { readJobConfig, writeCheckUpcomingRunResult } = require("../src/api-lib/job-config");
+const { createFunctionLogger } = require("../src/api-lib/logger");
 
 const logEvent = createFunctionLogger("check-upcoming");
 
@@ -150,5 +150,5 @@ exports.handler = async (event, context) => {
   }
 };
 
-const { wrapNetlifyHandler } = require("./lib/vercel-adapter");
+const { wrapNetlifyHandler } = require("../src/api-lib/vercel-adapter");
 module.exports = wrapNetlifyHandler(exports.handler);
