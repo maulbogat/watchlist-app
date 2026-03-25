@@ -55,6 +55,9 @@ export interface AppState {
 
   userCountryCode: string;
   setUserCountryCode: (userCountryCode: string) => void;
+
+  whatsAppSettingsOpen: boolean;
+  setWhatsAppSettingsOpen: (open: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -99,6 +102,9 @@ export const useAppStore = create<AppState>()((set) => ({
 
   userCountryCode: "IL",
   setUserCountryCode: (userCountryCode) => set({ userCountryCode }),
+
+  whatsAppSettingsOpen: false,
+  setWhatsAppSettingsOpen: (whatsAppSettingsOpen) => set({ whatsAppSettingsOpen }),
 }));
 
 export {

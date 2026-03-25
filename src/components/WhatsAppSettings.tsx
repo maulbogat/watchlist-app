@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { displayListName } from "../lib/utils.js";
 import { useAppStore } from "../store/useAppStore.js";
 import type { ListMode, PersonalList, SharedList } from "../types/index.js";
+import { VisuallyHidden } from "radix-ui";
 import {
   auth,
   getPhoneIndexDefaultsForNumber,
@@ -218,13 +219,30 @@ export function WhatsAppSettings({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="modal max-w-md bg-[#131317] border-white/10 text-[#f0ede8]"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-      >
+    <>
+      {open ? (
+        <Dialog
+          open={open}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) onOpenChange(false);
+          }}
+        >
+          <DialogContent
+            className="lists-modal z-[1201] max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8] sm:max-w-[520px]"
+            id="whatsapp-settings-modal"
+            onEscapeKeyDown={(e) => {
+              e.preventDefault();
+              onOpenChange(false);
+            }}
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
         <DialogHeader>
           <DialogTitle className="text-lg tracking-tight">WhatsApp integration</DialogTitle>
+          <DialogDescription asChild>
+            <VisuallyHidden.Root>
+              Connect a phone number to add watchlist titles by sending IMDb links on WhatsApp.
+            </VisuallyHidden.Root>
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 text-sm">
@@ -377,7 +395,9 @@ export function WhatsAppSettings({
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </>
   );
 }

@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { auth, GoogleAuthProvider, signInWithPopup } from "./firebase.js";
 import { useAuthUser } from "./hooks/useAuthUser.js";
 import { WatchlistPage } from "./components/WatchlistPage.js";
+import { WhatsAppSettings } from "./components/WhatsAppSettings.js";
 import { JoinPage } from "./pages/JoinPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
 import { logEvent } from "./lib/axiom-logger.js";
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAppStore } from "./store/useAppStore.js";
+import { usePersonalLists, useSharedLists } from "./hooks/useWatchlist.js";
 import { Toaster } from "@/components/ui/toaster";
 
 function isAuthError(err: unknown): err is { code?: string; message?: string } {
@@ -88,6 +90,25 @@ function WatchlistAuthGate() {
   return <WatchlistPage />;
 }
 
+function WhatsAppSettingsHost() {
+  const user = useAppStore((s) => s.currentUser);
+  const open = useAppStore((s) => s.whatsAppSettingsOpen);
+  const setOpen = useAppStore((s) => s.setWhatsAppSettingsOpen);
+  const uid = user?.uid;
+  const personalQ = usePersonalLists(uid, { enabled: Boolean(uid) });
+  const sharedQ = useSharedLists(uid, { enabled: Boolean(uid) });
+  if (!uid) return null;
+  return (
+    <WhatsAppSettings
+      open={open}
+      onOpenChange={setOpen}
+      uid={uid}
+      personalLists={personalQ.data ?? []}
+      sharedLists={sharedQ.data ?? []}
+    />
+  );
+}
+
 export default function App() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -109,6 +130,7 @@ export default function App() {
         <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <WhatsAppSettingsHost />
       <Toaster />
     </>
   );
