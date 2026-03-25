@@ -116,8 +116,9 @@ const SERVICE_LINKS = [
   },
 ] as const;
 
-const deploymentsUrl =
-  (import.meta.env.VITE_DEPLOYMENTS_URL as string | undefined)?.trim() || "https://vercel.com/dashboard";
+const rawViteDeploymentsUrl = (import.meta.env.VITE_DEPLOYMENTS_URL as string | undefined)?.trim();
+const deploymentsUrl = rawViteDeploymentsUrl || "https://vercel.com/dashboard";
+const hasCustomDeploymentsUrl = Boolean(rawViteDeploymentsUrl);
 
 /** Optional legacy Netlify deploy-status badge (UUID from Netlify site settings). */
 const legacyNetlifySiteId = (import.meta.env.VITE_NETLIFY_SITE_ID as string | undefined)?.trim();
@@ -441,8 +442,14 @@ export function AdminPage() {
                 </a>
                 <span className="admin-deploy-hint">
                   {" "}
-                  · set <code className="admin-deploy-code">VITE_DEPLOYMENTS_URL</code> to your project deployments page; optional{" "}
-                  <code className="admin-deploy-code">VITE_SITE_ID</code> for server env diagnostics
+                  ·{" "}
+                  {!hasCustomDeploymentsUrl && (
+                    <>
+                      set <code className="admin-deploy-code">VITE_DEPLOYMENTS_URL</code> to your project deployments
+                      page;{" "}
+                    </>
+                  )}
+                  optional <code className="admin-deploy-code">VITE_SITE_ID</code> for server env diagnostics
                 </span>
               </p>
             )}
