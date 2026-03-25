@@ -24,6 +24,7 @@ import {
   arrayUnion,
   arrayRemove,
   deleteField,
+  writeBatch,
 } from "firebase/firestore";
 import type { DocumentData, DocumentReference, DocumentSnapshot, Firestore } from "firebase/firestore";
 
@@ -463,7 +464,12 @@ async function getUserProfile(uid: string): Promise<UserProfile> {
       ? (dismissRaw as Record<string, string>)
       : {};
 
-  return {
+  const phoneRaw = data.phoneNumbers;
+  const phoneNumbersParsed = Array.isArray(phoneRaw)
+    ? phoneRaw.map((x) => String(x).replace(/\D/g, "")).filter(Boolean)
+    : [];
+
+  const out: UserProfile = {
     country: data.country != null ? String(data.country) : null,
     countryName: data.countryName != null ? String(data.countryName) : null,
     displayName,
@@ -472,6 +478,10 @@ async function getUserProfile(uid: string): Promise<UserProfile> {
     defaultPersonalListId: defaultId || null,
     upcomingDismissals,
   };
+  if (phoneNumbersParsed.length > 0) {
+    out.phoneNumbers = phoneNumbersParsed;
+  }
+  return out;
 }
 
 /** Writes `users/{uid}.displayName` and optionally `photoURL` from Firebase Auth (shared-list “added by” + avatars). */
@@ -1144,6 +1154,169 @@ async function getBookmarkletPersonalListFirestoreId(
   return listIdOrAlias || null;
 }
 
+type WhatsAppListType = "personal" | "shared";
+
+function phoneIndexDocIdClient(e164Phone: string): string {
+  return String(e164Phone || "").replace(/\D/g, "");
+}
+
+async function getUserPhoneNumbers(uid: string): Promise<string[]> {
+  const snap = await getDoc(doc(db, "users", uid));
+  const raw = snap.exists() ? snap.data().phoneNumbers : undefined;
+  if (!Array.isArray(raw)) return [];
+  return raw.map((x) => String(x).replace(/\D/g, "")).filter(Boolean);
+}
+
+async function addUserPhoneNumber(
+  uid: string,
+  e164Phone: string,
+  defaultAddListId: string,
+  defaultListType: WhatsAppListType
+): Promise<void> {
+  const pid = phoneIndexDocIdClient(e164Phone);
+  const listId = defaultAddListId.trim();
+  if (!pid || !listId) throw new Error("Invalid phone or list");
+  const t: WhatsAppListType = defaultListType === "shared" ? "shared" : "personal";
+  await setDoc(
+    doc(db, "phoneIndex", pid),
+    {
+      uid,
+      defaultAddListId: listId,
+      defaultListType: t,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+  await setDoc(doc(db, "users", uid), { phoneNumbers: arrayUnion(pid) }, { merge: true });
+}
+
+async function removeUserPhoneNumber(uid: string, e164Phone: string): Promise<void> {
+  const pid = phoneIndexDocIdClient(e164Phone);
+  if (!pid) return;
+  await deleteDoc(doc(db, "phoneIndex", pid));
+  await setDoc(doc(db, "users", uid), { phoneNumbers: arrayRemove(pid) }, { merge: true });
+}
+
+async function getUserDefaultWhatsAppList(
+  uid: string
+): Promise<{ defaultAddListId: string; defaultListType: WhatsAppListType } | null> {
+  const nums = await getUserPhoneNumbers(uid);
+  if (nums.length === 0) return null;
+  const first = nums[0];
+  if (first === undefined) return null;
+  const snap = await getDoc(doc(db, "phoneIndex", first));
+  if (!snap.exists()) return null;
+  const d = snap.data();
+  const defaultAddListId = typeof d.defaultAddListId === "string" ? d.defaultAddListId.trim() : "";
+  const defaultListType: WhatsAppListType = d.defaultListType === "shared" ? "shared" : "personal";
+  if (!defaultAddListId) return null;
+  return { defaultAddListId, defaultListType };
+}
+
+async function setUserDefaultWhatsAppList(
+  uid: string,
+  defaultAddListId: string,
+  defaultListType: WhatsAppListType
+): Promise<void> {
+  const nums = await getUserPhoneNumbers(uid);
+  if (nums.length === 0) return;
+  const t: WhatsAppListType = defaultListType === "shared" ? "shared" : "personal";
+  const trimmed = defaultAddListId.trim();
+  if (!trimmed) throw new Error("Invalid list");
+  const batch = writeBatch(db);
+  for (const p of nums) {
+    batch.set(
+      doc(db, "phoneIndex", p),
+      {
+        uid,
+        defaultAddListId: trimmed,
+        defaultListType: t,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  }
+  await batch.commit();
+}
+
+async function setWhatsAppDefaultListForPhone(
+  uid: string,
+  phoneDigits: string,
+  defaultAddListId: string,
+  defaultListType: WhatsAppListType
+): Promise<void> {
+  const pid = phoneIndexDocIdClient(phoneDigits);
+  const trimmed = defaultAddListId.trim();
+  if (!pid || !trimmed) throw new Error("Invalid phone or list");
+  const snap = await getDoc(doc(db, "phoneIndex", pid));
+  if (!snap.exists()) throw new Error("Phone not linked");
+  const owner = snap.data().uid;
+  if (typeof owner !== "string" || owner !== uid) throw new Error("Not your number");
+  const t: WhatsAppListType = defaultListType === "shared" ? "shared" : "personal";
+  await setDoc(
+    doc(db, "phoneIndex", pid),
+    {
+      uid,
+      defaultAddListId: trimmed,
+      defaultListType: t,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+}
+
+async function resolveWhatsAppListPayload(
+  uid: string,
+  choice: string
+): Promise<{ defaultAddListId: string; defaultListType: WhatsAppListType }> {
+  if (choice.startsWith("s:")) {
+    const id = choice.slice(2).trim();
+    if (!id) throw new Error("Pick a shared list.");
+    return { defaultAddListId: id, defaultListType: "shared" };
+  }
+  if (choice.startsWith("p:")) {
+    const listKey = choice.slice(2) || "personal";
+    const fid = await getBookmarkletPersonalListFirestoreId(uid, listKey);
+    if (!fid) throw new Error("Pick a valid personal list.");
+    return { defaultAddListId: fid, defaultListType: "personal" };
+  }
+  throw new Error("Pick a list.");
+}
+
+async function whatsappListChoiceKeyForTargets(
+  uid: string,
+  defaultAddListId: string,
+  defaultListType: WhatsAppListType,
+  personalLists: PersonalList[],
+  sharedLists: SharedList[]
+): Promise<string> {
+  if (defaultListType === "shared") {
+    const hit = sharedLists.find((l) => l.id === defaultAddListId);
+    return hit ? `s:${hit.id}` : `s:${defaultAddListId}`;
+  }
+  for (const pl of personalLists) {
+    const fid = await getBookmarkletPersonalListFirestoreId(uid, pl.id);
+    if (fid === defaultAddListId) return `p:${pl.id}`;
+  }
+  return "p:personal";
+}
+
+async function getPhoneIndexDefaultsForNumber(
+  uid: string,
+  phoneDigits: string
+): Promise<{ defaultAddListId: string; defaultListType: WhatsAppListType } | null> {
+  const pid = phoneIndexDocIdClient(phoneDigits);
+  if (!pid) return null;
+  const snap = await getDoc(doc(db, "phoneIndex", pid));
+  if (!snap.exists()) return null;
+  const d = snap.data();
+  if (typeof d.uid !== "string" || d.uid !== uid) return null;
+  const defaultAddListId = typeof d.defaultAddListId === "string" ? d.defaultAddListId.trim() : "";
+  const defaultListType: WhatsAppListType = d.defaultListType === "shared" ? "shared" : "personal";
+  if (!defaultAddListId) return null;
+  return { defaultAddListId, defaultListType };
+}
+
 async function getJobConfigState(): Promise<JobConfigState> {
   try {
     const res = await fetch("/api/admin-job-config", {
@@ -1248,4 +1421,15 @@ export {
   getBookmarkletPersonalListFirestoreId,
   getJobConfigState,
   setCheckUpcomingEnabledState,
+  getUserPhoneNumbers,
+  addUserPhoneNumber,
+  removeUserPhoneNumber,
+  getUserDefaultWhatsAppList,
+  setUserDefaultWhatsAppList,
+  setWhatsAppDefaultListForPhone,
+  resolveWhatsAppListPayload,
+  whatsappListChoiceKeyForTargets,
+  getPhoneIndexDefaultsForNumber,
 };
+
+export type { WhatsAppListType };

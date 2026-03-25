@@ -435,59 +435,18 @@ async function migrateLegacyPersonalListAdmin(db, uid) {
 }
 
 /**
- * @param {import('@netlify/functions').HandlerEvent} event
- * @param {import('@netlify/functions').HandlerContext} context
- * @returns {Promise<import('@netlify/functions').HandlerResponse>}
+ * Core add-from-imdb logic (shared by HTTP handler and WhatsApp).
+ * @param {string} uid
+ * @param {string} imdbId
+ * @param {string | null} listId
+ * @param {string | null} cookiePersonalListId
+ * @param {string} watchRegion
+ * @returns {Promise<{ statusCode: number, body: Record<string, unknown> }>}
  */
-exports.handler = async (event, context) => {
-  try {
-  logEvent({ type: "function.invoked", trigger: "bookmarklet" });
-  if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 204, headers: corsHeaders(event) };
-  }
-
-  if (event.httpMethod !== "POST") {
-    return jsonRes(405, { ok: false, error: "Method not allowed" }, event);
-  }
-
-  const cookies = {};
-  (event.headers?.cookie || "").split(";").forEach((c) => {
-    const [k, v] = c.trim().split("=").map((s) => (s || "").trim());
-    if (k && v) cookies[k] = decodeURIComponent(v);
-  });
-  const token = cookies.bookmarklet_token || (event.headers?.authorization || "").replace("Bearer ", "");
-  if (!token) {
-    return jsonRes(401, { ok: false, error: "Sign in on the watchlist site first" }, event);
-  }
-
-  let uid;
-  try {
-    const app = getApp();
-    const auth = getAuth(app);
-    const decoded = await auth.verifyIdToken(token);
-    uid = decoded.uid;
-  } catch (e) {
-    return jsonRes(401, { ok: false, error: "Invalid or expired token. Sign in again." }, event);
-  }
-
-  let body;
-  try {
-    body = typeof event.body === "string" ? JSON.parse(event.body) : event.body || {};
-  } catch (e) {
-    return jsonRes(400, { ok: false, error: "Invalid JSON body" }, event);
-  }
-  const { imdbId, listId: bodyListId, personalListId: bodyPersonalListId, watch_region: bodyWatch } = body;
-  const listId = bodyListId || cookies.bookmarklet_list_id || null;
-  const cookiePersonalListId =
-    cookies.bookmarklet_personal_list_id ||
-    (typeof bodyPersonalListId === "string" ? bodyPersonalListId : null);
-  if (!imdbId) {
-    return jsonRes(400, { ok: false, error: "imdbId required" }, event);
-  }
-
+async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId, watchRegion) {
   const norm = (id) => (String(id).startsWith("tt") ? id : `tt${id}`);
   const nImdb = norm(imdbId);
-  const watchRegion = String(bodyWatch || body.watchRegion || "").trim().toUpperCase().slice(0, 2);
+  const region = String(watchRegion || "").trim().toUpperCase().slice(0, 2);
 
   let omdbForTmdb = null;
   try {
@@ -517,7 +476,7 @@ exports.handler = async (event, context) => {
   // 1) TMDB from IMDb id: type, poster, genres, year, providers, trailer key
   if (tmdbKey) {
     try {
-      const e = await enrichFromTmdb(nImdb, tmdbKey, watchRegion, omdbForTmdb, {
+      const e = await enrichFromTmdb(nImdb, tmdbKey, region, omdbForTmdb, {
         onApiCall: ({ endpoint, imdbId, durationMs, status }) =>
           logEvent({
             type: "api.call",
@@ -567,7 +526,7 @@ exports.handler = async (event, context) => {
         durationMs: 0,
         status: 500,
       });
-      return jsonRes(502, { ok: false, error: e.message || "Title not found in TMDB or OMDb" }, event);
+      return { statusCode: 502, body: { ok: false, error: e.message || "Title not found in TMDB or OMDb" } };
     }
 
     const title = omdb.Title || "Unknown";
@@ -669,7 +628,7 @@ exports.handler = async (event, context) => {
     const listRef = db.collection("sharedLists").doc(listId);
     const listSnap = await listRef.get();
     if (!listSnap.exists) {
-      return jsonRes(404, { ok: false, error: "Shared list not found" }, event);
+      return { statusCode: 404, body: { ok: false, error: "Shared list not found" } };
     }
     const authAdmin = getAuth(getApp());
     /** Denormalized onto list rows + `users/{uid}` (same as client `addToSharedList`). */
@@ -694,7 +653,7 @@ exports.handler = async (event, context) => {
     const listData = listSnap.data();
     const members = Array.isArray(listData.members) ? listData.members : [];
     if (!members.includes(uid)) {
-      return jsonRes(403, { ok: false, error: "Not a member of this shared list" }, event);
+      return { statusCode: 403, body: { ok: false, error: "Not a member of this shared list" } };
     }
     const items = Array.isArray(listData.items) ? [...listData.items] : [];
     let watched = Array.isArray(listData.watched) ? [...listData.watched] : [];
@@ -706,7 +665,7 @@ exports.handler = async (event, context) => {
 
     if (idx >= 0) {
       if (watched.includes(statusKey) || maybeLater.includes(statusKey) || archive.includes(statusKey)) {
-        return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in the list` }, event);
+        return { statusCode: 200, body: { ok: true, added: false, message: `"${movie.title}" is already in the list`, title: movie.title, year: movie.year ?? null } };
       }
       const existing = items[idx];
       const merged = { ...existing, ...movie };
@@ -738,7 +697,7 @@ exports.handler = async (event, context) => {
       title: movie.title,
       listType: "shared",
     });
-    return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to shared list` }, event);
+    return { statusCode: 200, body: { ok: true, added: true, message: `Added "${movie.title}" to shared list`, title: movie.title, year: movie.year ?? null } };
   }
 
   await migrateLegacyPersonalListAdmin(db, uid);
@@ -749,20 +708,16 @@ exports.handler = async (event, context) => {
     typeof uData.defaultPersonalListId === "string" ? uData.defaultPersonalListId.trim() : "";
   const targetPlId = (cookiePersonalListId && String(cookiePersonalListId).trim()) || defaultPl;
   if (!targetPlId) {
-    return jsonRes(
-      400,
-      {
+    return { statusCode: 400, body: {
         ok: false,
         error:
           "Open the watchlist app, name your main list, then try again (or pick a personal list so the site can set the bookmarklet target).",
-      },
-      event
-    );
+      } };
   }
   const plRef = userRef.collection("personalLists").doc(targetPlId);
   const plSnap = await plRef.get();
   if (!plSnap.exists) {
-    return jsonRes(404, { ok: false, error: "Personal list not found. Switch list in the app and try again." }, event);
+    return { statusCode: 404, body: { ok: false, error: "Personal list not found. Switch list in the app and try again." } };
   }
   const data = plSnap.data() || {};
   const items = Array.isArray(data.items) ? [...data.items] : [];
@@ -777,7 +732,7 @@ exports.handler = async (event, context) => {
 
   if (idx >= 0) {
     if (watched.includes(statusKey) || maybeLater.includes(statusKey) || archive.includes(statusKey)) {
-      return jsonRes(200, { ok: true, added: false, message: `"${movie.title}" is already in your list` }, event);
+      return { statusCode: 200, body: { ok: true, added: false, message: `"${movie.title}" is already in your list`, title: movie.title, year: movie.year ?? null } };
     }
     const existing = items[idx];
     const merged = { ...existing, ...movie };
@@ -824,7 +779,65 @@ exports.handler = async (event, context) => {
     listType: "personal",
   });
 
-  return jsonRes(200, { ok: true, added: true, message: `Added "${movie.title}" to To Watch` }, event);
+  return { statusCode: 200, body: { ok: true, added: true, message: `Added "${movie.title}" to To Watch`, title: movie.title, year: movie.year ?? null } };
+}
+
+
+
+/**
+ * @param {import('@netlify/functions').HandlerEvent} event
+ * @param {import('@netlify/functions').HandlerContext} context
+ * @returns {Promise<import('@netlify/functions').HandlerResponse>}
+ */
+exports.handler = async (event, context) => {
+  try {
+  logEvent({ type: "function.invoked", trigger: "bookmarklet" });
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 204, headers: corsHeaders(event) };
+  }
+
+  if (event.httpMethod !== "POST") {
+    return jsonRes(405, { ok: false, error: "Method not allowed" }, event);
+  }
+
+  const cookies = {};
+  (event.headers?.cookie || "").split(";").forEach((c) => {
+    const [k, v] = c.trim().split("=").map((s) => (s || "").trim());
+    if (k && v) cookies[k] = decodeURIComponent(v);
+  });
+  const token = cookies.bookmarklet_token || (event.headers?.authorization || "").replace("Bearer ", "");
+  if (!token) {
+    return jsonRes(401, { ok: false, error: "Sign in on the watchlist site first" }, event);
+  }
+
+  let uid;
+  try {
+    const app = getApp();
+    const auth = getAuth(app);
+    const decoded = await auth.verifyIdToken(token);
+    uid = decoded.uid;
+  } catch (e) {
+    return jsonRes(401, { ok: false, error: "Invalid or expired token. Sign in again." }, event);
+  }
+
+  let body;
+  try {
+    body = typeof event.body === "string" ? JSON.parse(event.body) : event.body || {};
+  } catch (e) {
+    return jsonRes(400, { ok: false, error: "Invalid JSON body" }, event);
+  }
+  const { imdbId, listId: bodyListId, personalListId: bodyPersonalListId, watch_region: bodyWatch } = body;
+  const listId = bodyListId || cookies.bookmarklet_list_id || null;
+  const cookiePersonalListId =
+    cookies.bookmarklet_personal_list_id ||
+    (typeof bodyPersonalListId === "string" ? bodyPersonalListId : null);
+  if (!imdbId) {
+    return jsonRes(400, { ok: false, error: "imdbId required" }, event);
+  }
+
+  const watchRegion = String(bodyWatch || body.watchRegion || "").trim().toUpperCase().slice(0, 2);
+  const r = await performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId, watchRegion);
+  return jsonRes(r.statusCode, r.body, event);
   } catch (err) {
     const msg = presentableErrorMessage(err);
     console.error("add-from-imdb fatal:", err);
@@ -834,4 +847,6 @@ exports.handler = async (event, context) => {
 };
 
 const { wrapNetlifyHandler } = require("../src/api-lib/vercel-adapter");
-module.exports = wrapNetlifyHandler(exports.handler);
+const vercelHandler = wrapNetlifyHandler(exports.handler);
+vercelHandler.performAddFromImdbByUid = performAddFromImdbByUid;
+module.exports = vercelHandler;

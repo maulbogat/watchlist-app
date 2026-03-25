@@ -6,6 +6,8 @@
   "functions": {
     "api/check-upcoming.js": { "maxDuration": 60 },
     "api/trigger-upcoming-sync.js": { "maxDuration": 60 },
-    "api/add-from-imdb.js": { "maxDuration": 60 }
+    "api/add-from-imdb.js": { "maxDuration": 60 },
+    "api/whatsapp-webhook.js": { "maxDuration": 60 },
+    "api/whatsapp-verify.js": { "maxDuration": 30 }
   }
 }

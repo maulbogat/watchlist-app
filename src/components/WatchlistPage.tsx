@@ -30,6 +30,7 @@ import { TitleGrid } from "./TitleGrid.js";
 import { TrailerModal } from "./TrailerModal.js";
 import { ManageListsModal } from "./ManageListsModal.js";
 import { CountryModal } from "./CountryModal.js";
+import { WhatsAppSettings } from "./WhatsAppSettings.js";
 import { ListNameModal } from "./modals/ListNameModal.js";
 import { UpcomingAlertsBar } from "./UpcomingAlertsBar.js";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -54,6 +55,7 @@ export function WatchlistPage() {
 
   const [manageListsOpen, setManageListsOpen] = useState(false);
   const [authMenuOpen, setAuthMenuOpen] = useState(false);
+  const [whatsAppSettingsOpen, setWhatsAppSettingsOpen] = useState(false);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [onboardingCountry, setOnboardingCountry] = useState(false);
   const [onboardingListName, setOnboardingListName] = useState(false);
@@ -312,6 +314,18 @@ export function WatchlistPage() {
                     type="button"
                     className="auth-dropdown-item"
                     role="menuitem"
+                    id="auth-whatsapp-btn"
+                    onClick={() => {
+                      setAuthMenuOpen(false);
+                      setWhatsAppSettingsOpen(true);
+                    }}
+                  >
+                    WhatsApp
+                  </button>
+                  <button
+                    type="button"
+                    className="auth-dropdown-item"
+                    role="menuitem"
                     id="auth-switch-btn"
                     onClick={async () => {
                       setAuthMenuOpen(false);
@@ -432,6 +446,14 @@ export function WatchlistPage() {
           setOnboardingCountry(false);
           await continueProfileOnboarding();
         }}
+      />
+
+      <WhatsAppSettings
+        open={whatsAppSettingsOpen}
+        onOpenChange={setWhatsAppSettingsOpen}
+        uid={uid}
+        personalLists={personalLists}
+        sharedLists={sharedLists}
       />
 
       <ListNameModal

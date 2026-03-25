@@ -29,5 +29,19 @@ service cloud.firestore {
     match /syncState/{docId} {
       allow read, write: if false;
     }
+
+    // WhatsApp sender → uid + default list (client may update/delete own mapping; Admin used for verify)
+    match /phoneIndex/{phone} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // 6-digit link codes (Admin SDK only)
+    match /verificationCodes/{docId} {
+      allow read, write: if false;
+    }
   }
 }

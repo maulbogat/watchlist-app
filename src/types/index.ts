@@ -66,6 +66,8 @@ export interface UserProfile {
   photoURL?: string | null;
   listName?: string;
   defaultPersonalListId?: string | null;
+  /** Digits-only E.164 keys; same ids as `phoneIndex/{phone}` documents. */
+  phoneNumbers?: string[];
   upcomingDismissals?: Record<string, string>;
 }
 
