@@ -299,7 +299,8 @@ header h1 span {
 .custom-dropdown-content {
   padding: 0.25rem;
 }
-#list-selector-panel [data-slot="select-item"] > span.pointer-events-none.absolute {
+/* Radix check column: hide indicator in header list dropdown (we use row icons), collapse the slot */
+#list-selector-panel [data-slot="select-item"] > span:first-child {
   display: none;
 }
 
@@ -384,10 +385,16 @@ header h1 span {
 .lists-modal-body {
   padding: 0.5rem 0 1rem;
 }
-#lists-modal,
-#whatsapp-settings-modal {
+#lists-modal {
   width: min(360px, calc(100vw - 2rem));
   max-width: 360px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem;
+}
+#whatsapp-settings-modal {
+  width: min(520px, calc(100vw - 2rem));
+  max-width: 520px;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.9rem;
@@ -499,6 +506,37 @@ body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay
   background: rgba(232, 201, 106, 0.18);
   border-color: rgba(232, 201, 106, 0.6);
 }
+.lists-modal-create-buttons.lists-modal-create-buttons--full > .lists-modal-new-personal,
+.lists-modal-create-buttons.lists-modal-create-buttons--full > .lists-modal-btn {
+  width: 100%;
+  text-align: center;
+}
+.lists-modal-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.lists-modal-actions-row .lists-modal-btn {
+  appearance: none;
+  border: 1px solid rgba(232, 201, 106, 0.4);
+  background: rgba(232, 201, 106, 0.1);
+  color: var(--accent);
+  font-family: var(--font-title);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  flex: 1 1 7rem;
+}
+.lists-modal-actions-row .lists-modal-btn:hover {
+  background: rgba(232, 201, 106, 0.18);
+  border-color: rgba(232, 201, 106, 0.6);
+}
 .lists-modal-list {
   list-style: none;
   margin: 0;
@@ -555,6 +593,25 @@ body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+.lists-modal-list-item-actions--wrap {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* WhatsApp row: keep select + remove on one line so phone aligns with the control block */
+.lists-modal-wa-row-actions {
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+#whatsapp-settings-modal .lists-modal-list-item {
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+#whatsapp-settings-modal .lists-modal-list-item:last-child {
+  margin-bottom: 0;
 }
 .lists-modal-list-item-action {
   appearance: none;
@@ -638,7 +695,8 @@ body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay
 /* Shadcn Select trigger inside dark modals (e.g. WhatsApp settings) — matches lists-modal-input */
 .lists-modal-select-trigger {
   min-width: 0;
-  padding: 0.5rem 0.75rem;
+  /* Extra right padding so the chevron never sits on the label text */
+  padding: 0.5rem 2.25rem 0.5rem 0.75rem;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border);
   border-radius: 6px;

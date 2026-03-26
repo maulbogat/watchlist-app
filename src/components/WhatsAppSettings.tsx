@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,6 +21,9 @@ function formatPhoneDisplay(digits: string): string {
   if (!d) return "";
   return `+${d}`;
 }
+
+const waSelectContentClass =
+  "z-[5000] border border-white/10 bg-[#1c1c22] text-[#f0ede8] [&_[data-slot=select-scroll-up-button]]:hidden [&_[data-slot=select-scroll-down-button]]:hidden";
 
 function listModeToChoiceKey(mode: ListMode): string {
   if (mode === "personal") return "p:personal";
@@ -236,8 +238,8 @@ export function WhatsAppSettings({
             }}
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
-        <DialogHeader>
-          <DialogTitle className="text-lg tracking-tight">WhatsApp integration</DialogTitle>
+        <DialogHeader className="modal-header">
+          <DialogTitle className="modal-title font-title tracking-widest">WhatsApp integration</DialogTitle>
           <DialogDescription asChild>
             <VisuallyHidden.Root>
               Connect a phone number to add watchlist titles by sending IMDb links on WhatsApp.
@@ -245,38 +247,46 @@ export function WhatsAppSettings({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 text-sm">
-          <p className="text-white/70">
+        <div className="lists-modal-body">
+          <p className="lists-modal-description">
             Send an IMDb link from WhatsApp to add titles to your chosen list. Numbers must be verified once.
           </p>
 
-          {error ? <p className="text-red-400 text-sm">{error}</p> : null}
+          {error ? (
+            <p className="lists-modal-description text-[#e85a5a]" role="alert">
+              {error}
+            </p>
+          ) : null}
 
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-              Connected numbers
-            </h3>
+          <section className="lists-modal-section">
+            <h3 className="lists-modal-section-title">Connected numbers</h3>
             {loading ? (
-              <p className="text-white/50">Loading…</p>
+              <p className="lists-modal-description">Loading…</p>
             ) : phones.length === 0 ? (
-              <p className="text-white/50">No numbers linked yet.</p>
+              <p className="lists-modal-description">No numbers linked yet.</p>
             ) : (
-              <ul className="space-y-3">
+              <ul className="lists-modal-list">
                 {phones.map((p) => (
-                  <li
-                    key={p}
-                    className="flex flex-col gap-2 rounded-lg border border-white/10 bg-black/20 p-3 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <span className="font-medium tabular-nums">{formatPhoneDisplay(p)}</span>
-                    <div className="flex flex-wrap items-center gap-2">
+                  <li key={p} className="lists-modal-list-item">
+                    <span className="lists-modal-list-item-name min-w-0 flex-1">
+                      <span className="lists-modal-list-item-name-text tabular-nums">
+                        {formatPhoneDisplay(p)}
+                      </span>
+                    </span>
+                    <div className="lists-modal-list-item-actions lists-modal-wa-row-actions">
                       <Select
                         value={rowChoices[p] || "p:personal"}
                         onValueChange={(v) => void onRowListChange(p, v)}
                       >
-                        <SelectTrigger className="lists-modal-select-trigger w-[min(100%,220px)] focus-visible:ring-0">
+                        <SelectTrigger className="lists-modal-select-trigger w-[min(100%,260px)] min-w-0 focus-visible:ring-0">
                           <SelectValue placeholder="Default list" />
                         </SelectTrigger>
-                        <SelectContent className="z-[1300] border border-white/10 bg-[#1c1c22] text-[#f0ede8]">
+                        <SelectContent
+                          position="popper"
+                          sideOffset={6}
+                          collisionPadding={16}
+                          className={waSelectContentClass}
+                        >
                           {listOptions.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>
                               {opt.label}
@@ -284,62 +294,79 @@ export function WhatsAppSettings({
                           ))}
                         </SelectContent>
                       </Select>
-                      <Button
+                      <button
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        className="border-white/20 text-[#f0ede8]"
+                        className="lists-modal-list-item-action lists-modal-list-item-action--delete"
                         onClick={() => void onRemove(p)}
                       >
                         Remove
-                      </Button>
+                      </button>
                     </div>
                   </li>
                 ))}
               </ul>
             )}
-          </div>
+          </section>
 
           {!connectOpen ? (
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full"
-              onClick={() => {
-                setConnectOpen(true);
-                setAwaitingCode(false);
-                setCodeInput("");
-                setPhoneInput("");
-                setPendingPhoneDigits("");
-                setError(null);
-              }}
-            >
-              + Connect a number
-            </Button>
+            <div className="lists-modal-create-buttons lists-modal-create-buttons--full">
+              <button
+                type="button"
+                className="lists-modal-new-personal"
+                onClick={() => {
+                  setConnectOpen(true);
+                  setAwaitingCode(false);
+                  setCodeInput("");
+                  setPhoneInput("");
+                  setPendingPhoneDigits("");
+                  setError(null);
+                }}
+              >
+                + Connect a number
+              </button>
+            </div>
           ) : (
-            <div className="rounded-lg border border-white/10 bg-black/25 p-3 space-y-3">
+            <section className="lists-modal-section">
+              <h3 className="lists-modal-section-title">
+                {!awaitingCode ? "Link a number" : "Enter code"}
+              </h3>
               {!awaitingCode ? (
                 <>
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1">Phone (E.164)</label>
-                    <Input
-                      value={phoneInput}
-                      onChange={(e) => setPhoneInput(e.target.value)}
-                      placeholder="+972501234567"
-                      className="lists-modal-input focus-visible:ring-0"
-                      autoComplete="tel"
-                    />
-                    <p className="text-xs text-white/45 mt-1">
-                      Include country code; spaces are optional. Example: +1 650 555 0100
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1">Default list for adds</label>
-                    <Select value={connectListChoice} onValueChange={setConnectListChoice}>
-                      <SelectTrigger className="lists-modal-select-trigger w-full focus-visible:ring-0">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-[1300] border border-white/10 bg-[#1c1c22] text-[#f0ede8]">
+                  <div className="flex flex-col gap-5">
+                    <div>
+                      <label className="lists-modal-list-item-label" htmlFor="whatsapp-phone-input">
+                        Phone (E.164)
+                      </label>
+                      <Input
+                        id="whatsapp-phone-input"
+                        value={phoneInput}
+                        onChange={(e) => setPhoneInput(e.target.value)}
+                        placeholder="+972501234567"
+                        className="lists-modal-input mt-1.5 focus-visible:ring-0"
+                        autoComplete="tel"
+                      />
+                      <div className="lists-modal-description mt-2.5 space-y-1.5 leading-relaxed">
+                        <p className="mb-0">Include country code; spaces are optional.</p>
+                        <p className="mb-0">Example: +1 650 555 0100</p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="lists-modal-list-item-label" htmlFor="whatsapp-list-select">
+                        Default list for adds
+                      </label>
+                      <Select value={connectListChoice} onValueChange={setConnectListChoice}>
+                        <SelectTrigger
+                          id="whatsapp-list-select"
+                          className="lists-modal-select-trigger mt-1.5 w-full min-w-0 focus-visible:ring-0"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent
+                          position="popper"
+                          sideOffset={6}
+                          collisionPadding={16}
+                          className={waSelectContentClass}
+                        >
                         {listOptions.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>
                             {opt.label}
@@ -347,14 +374,14 @@ export function WhatsAppSettings({
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="button" className="flex-1" onClick={() => void sendCode()}>
+                    </div>
+                    <div className="lists-modal-actions-row pt-1">
+                    <button type="button" className="lists-modal-btn" onClick={() => void sendCode()}>
                       Send verification code
-                    </Button>
-                    <Button
+                    </button>
+                    <button
                       type="button"
-                      variant="ghost"
+                      className="lists-modal-list-item-leave"
                       onClick={() => {
                         setConnectOpen(false);
                         setAwaitingCode(false);
@@ -362,37 +389,40 @@ export function WhatsAppSettings({
                       }}
                     >
                       Cancel
-                    </Button>
+                    </button>
+                    </div>
                   </div>
                 </>
               ) : (
                 <>
-                  <p className="text-white/80">Enter the 6-digit code sent to your WhatsApp.</p>
+                  <p className="lists-modal-description">Enter the 6-digit code sent to your WhatsApp.</p>
                   <Input
+                    id="whatsapp-code-input"
                     value={codeInput}
                     onChange={(e) => setCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     placeholder="000000"
-                    className="lists-modal-input tracking-widest focus-visible:ring-0"
+                    className="lists-modal-input mt-2 tracking-widest focus-visible:ring-0"
                     inputMode="numeric"
+                    autoComplete="one-time-code"
                   />
-                  <div className="flex gap-2">
-                    <Button type="button" className="flex-1" onClick={() => void verifyCode()}>
+                  <div className="lists-modal-actions-row">
+                    <button type="button" className="lists-modal-btn" onClick={() => void verifyCode()}>
                       Verify
-                    </Button>
-                    <Button
+                    </button>
+                    <button
                       type="button"
-                      variant="ghost"
+                      className="lists-modal-list-item-leave"
                       onClick={() => {
                         setAwaitingCode(false);
                         setCodeInput("");
                       }}
                     >
                       Back
-                    </Button>
+                    </button>
                   </div>
                 </>
               )}
-            </div>
+            </section>
           )}
         </div>
           </DialogContent>
