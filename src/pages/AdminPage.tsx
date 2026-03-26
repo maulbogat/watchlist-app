@@ -127,23 +127,15 @@ const SERVICE_LINKS = [
   {
     label: "Axiom",
     sublabel: "Logs & Monitoring",
-    /* Avoid embedding the real dataset slug — it may match Netlify secret AXIOM_DATASET and fail the build. */
+    /* Avoid embedding the real dataset slug — it may match host secret scanners (e.g. AXIOM_DATASET) and fail the build. */
     url: "https://app.axiom.co/",
   },
 ] as const;
 
 const rawViteDeploymentsUrl = (import.meta.env.VITE_DEPLOYMENTS_URL as string | undefined)?.trim();
-const deploymentsUrl = rawViteDeploymentsUrl || "https://vercel.com/dashboard";
+const deploymentsUrl =
+  rawViteDeploymentsUrl || "https://vercel.com/maulbogats-projects/~/deployments";
 const hasCustomDeploymentsUrl = Boolean(rawViteDeploymentsUrl);
-
-/** Optional legacy Netlify deploy-status badge (UUID from Netlify site settings). */
-const legacyNetlifySiteId = (import.meta.env.VITE_NETLIFY_SITE_ID as string | undefined)?.trim();
-const legacyNetlifyProjectSlug =
-  (import.meta.env.VITE_NETLIFY_PROJECT_SLUG as string | undefined)?.trim() || "watchlist-trailers";
-const legacyNetlifyDeploysUrl = `https://app.netlify.com/projects/${legacyNetlifyProjectSlug}/deploys`;
-const NETLIFY_DEPLOY_BADGE_URL = legacyNetlifySiteId
-  ? `https://api.netlify.com/api/v1/badges/${encodeURIComponent(legacyNetlifySiteId)}/deploy-status`
-  : null;
 
 type MaybeSelectable<T> = T & {
   select?: (...fields: string[]) => T;
@@ -469,35 +461,29 @@ export function AdminPage() {
           <div className="admin-card admin-deploy-in-links-card">
             <span className="admin-link-label">Deployments</span>
             <span className="admin-link-sublabel">Vercel builds &amp; previews</span>
-            {NETLIFY_DEPLOY_BADGE_URL ? (
+            <p className="admin-deploy-fallback admin-deploy-in-links-fallback">
               <a
-                className="admin-deploy-in-links-badge-wrap"
-                href={legacyNetlifyDeploysUrl}
+                className="admin-deploy-text-link"
+                href={deploymentsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Open legacy Netlify deploys (badge)"
+                aria-label="Open Vercel deployments"
               >
-                <img className="admin-deploy-badge" src={NETLIFY_DEPLOY_BADGE_URL} alt="" decoding="async" />
+                Open Vercel deployments
+                <span aria-hidden="true"> ↗</span>
               </a>
-            ) : (
-              <p className="admin-deploy-fallback admin-deploy-in-links-fallback">
-                <a className="admin-deploy-text-link" href={deploymentsUrl} target="_blank" rel="noopener noreferrer">
-                  Open deployments
-                  <span aria-hidden="true"> ↗</span>
-                </a>
-                <span className="admin-deploy-hint">
-                  {" "}
-                  ·{" "}
-                  {!hasCustomDeploymentsUrl && (
-                    <>
-                      set <code className="admin-deploy-code">VITE_DEPLOYMENTS_URL</code> to your project deployments
-                      page;{" "}
-                    </>
-                  )}
-                  optional <code className="admin-deploy-code">VITE_SITE_ID</code> for server env diagnostics
-                </span>
-              </p>
-            )}
+              <span className="admin-deploy-hint">
+                {" "}
+                ·{" "}
+                {!hasCustomDeploymentsUrl && (
+                  <>
+                    set <code className="admin-deploy-code">VITE_DEPLOYMENTS_URL</code> to your project’s deployments
+                    page;{" "}
+                  </>
+                )}
+                optional <code className="admin-deploy-code">VITE_SITE_ID</code> for server env diagnostics
+              </span>
+            </p>
           </div>
         </div>
       </section>
@@ -720,7 +706,7 @@ export function AdminPage() {
                         ? ` (HTTP ${githubBackupQ.data.githubHttpStatus})`
                         : ""}
                       . For private repos or higher rate limits, set{" "}
-                      <code className="admin-deploy-code">GITHUB_TOKEN</code> in Netlify (Actions: read).
+                      <code className="admin-deploy-code">GITHUB_TOKEN</code> in Vercel (Actions: read).
                     </p>
                   ) : null}
                   {githubBackupQ.data?.lastRun ? (

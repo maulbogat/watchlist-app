@@ -2409,14 +2409,6 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   padding: 0.85rem 0.95rem;
 }
 
-.admin-deploy-in-links-badge-wrap {
-  display: block;
-  margin-top: 0.5rem;
-  line-height: 0;
-  width: fit-content;
-  max-width: 100%;
-}
-
 .admin-deploy-in-links-fallback {
   margin-top: 0.45rem;
 }
@@ -2448,13 +2440,6 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .admin-deploy-link:hover {
   filter: brightness(1.06);
   opacity: 0.95;
-}
-
-.admin-deploy-badge {
-  height: 20px;
-  width: auto;
-  max-width: min(100%, 180px);
-  display: block;
 }
 
 .admin-deploy-fallback {

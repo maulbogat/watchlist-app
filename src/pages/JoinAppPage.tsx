@@ -53,10 +53,10 @@ export function JoinAppPage() {
           processedKeyRef.current = null;
           return;
         }
-        const res = await fetch("/api/accept-invite", {
+        const res = await fetch("/api/invites", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ inviteId }),
+          body: JSON.stringify({ action: "accept", inviteId }),
         });
         const data = (await res.json()) as { ok?: boolean; error?: string; listId?: string | null };
         if (cancelled) return;

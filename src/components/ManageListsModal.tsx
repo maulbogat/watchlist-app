@@ -132,7 +132,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
     queryFn: async (): Promise<PendingInvite[]> => {
       const token = await getIdTokenForApi();
       if (!token) throw new Error("Not signed in");
-      const res = await fetch("/api/get-invites", {
+      const res = await fetch("/api/invites", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = (await res.json()) as { ok?: boolean; invites?: PendingInvite[]; error?: string };
@@ -146,10 +146,10 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
     mutationFn: async (payload: { invitedEmail: string; listId: string | null }) => {
       const token = await getIdTokenForApi();
       if (!token) throw new Error("Not signed in");
-      const res = await fetch("/api/send-invite", {
+      const res = await fetch("/api/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ action: "send", ...payload }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) throw new Error(data.error || "Failed to send invite");
@@ -165,9 +165,10 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
     mutationFn: async (inviteId: string) => {
       const token = await getIdTokenForApi();
       if (!token) throw new Error("Not signed in");
-      const res = await fetch(`/api/revoke-invite?inviteId=${encodeURIComponent(inviteId)}`, {
+      const res = await fetch("/api/invites", {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ inviteId }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) throw new Error(data.error || "Failed to revoke");

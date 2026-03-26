@@ -2,7 +2,7 @@
 
 A personal movie/show watchlist with YouTube trailers, filters, and Firestore. **Architecture, data model, and flows** are documented in **[`system-design.md`](./system-design.md)** (source of truth for how pieces fit together).
 
-**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). **Vercel** hosts **`dist/`** and runs **`api/*.js`** serverless routes (Firebase Admin SDK) for the IMDb add flow, shared-list joins, **email app invites** (Resend: **`send-invite`**, **`accept-invite`**, **`get-invites`**, **`revoke-invite`**), upcoming-title sync, **WhatsApp** verification + webhook (Meta Cloud API), and other admin/diagnostic endpoints.
+**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). **Vercel** hosts **`dist/`** and runs **`api/*.js`** serverless routes (Firebase Admin SDK) for the IMDb add flow, shared-list joins, **email app invites** (single **`/api/invites`** route: GET list, POST `action: send|accept`, DELETE revoke — Resend on send), upcoming-title sync, **WhatsApp** verification + webhook (Meta Cloud API), and other admin/diagnostic endpoints.
 
 ## Environment Quick Start
 
@@ -76,7 +76,7 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
 
 4. **Movie lists** are stored under **`users/{uid}/personalLists/{listId}`** (plus optional **shared lists** in **`sharedLists/{listId}`**). The **`users/{uid}`** document holds profile fields (e.g. country, **`defaultPersonalListId`**) and optional **`upcomingDismissals`** — not the row arrays. Canonical title metadata lives in **`titleRegistry/{registryId}`** (client read-only; writes via **`api/*`** / scripts). Users add titles via the bookmarklet; no legacy **`catalog`** collection is used.
 
-5. **App access (allowlist):** Only Google accounts that have a row in **`allowedUsers/{lowercaseEmail}`** can use the watchlist after sign-in. **`AllowlistGate`** reads that document; others are signed out and see a full-screen message. **`/join-app/:inviteId`** is exempt so invitees can sign in and call **`/api/accept-invite`** first. Seed existing users once with Admin credentials:
+5. **App access (allowlist):** Only Google accounts that have a row in **`allowedUsers/{lowercaseEmail}`** can use the watchlist after sign-in. **`AllowlistGate`** reads that document; others are signed out and see a full-screen message. **`/join-app/:inviteId`** is exempt so invitees can sign in and call **`POST /api/invites`** with **`{ action: "accept", inviteId }`** first. Seed existing users once with Admin credentials:
 
    ```bash
    node scripts/seed-allowed-users.mjs --dry-run

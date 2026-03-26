@@ -77,7 +77,7 @@ function WatchlistAuthGate() {
           Authentication → Authorized domains.
         </p>
         <p className="react-migration-meta">
-          Lists, filters, grid, and trailer modal. Production build is deployed to Netlify.
+          Lists, filters, grid, and trailer modal. Production build is deployed to Vercel.
         </p>
         <button
           type="button"
