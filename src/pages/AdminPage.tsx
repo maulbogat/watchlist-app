@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { useAppStore } from "../store/useAppStore.js";
 import { isAdmin } from "../config/admin.js";
 import { useAuthUser } from "../hooks/useAuthUser.js";
-import { auth, getJobConfigState, setCheckUpcomingEnabledState } from "../firebase.js";
+import {
+  auth,
+  getFirestoreUsageStats,
+  getJobConfigState,
+  setCheckUpcomingEnabledState,
+  type FirestoreUsageStats,
+} from "../firebase.js";
 import { getFirestore, collection, getCountFromServer, getDocs } from "firebase/firestore";
 
 type CatalogStats = {
@@ -209,6 +215,27 @@ function formatUpcomingLastRunLine(status: string | null | undefined, message: s
   return head ? `${head} — ${msg}` : msg;
 }
 
+/** Defaults match `src/api-lib/firestore-guard.js` and `.env.example`. */
+const FIRESTORE_USAGE_HOURLY_LIMIT = 5000;
+const FIRESTORE_USAGE_DAILY_LIMIT = 45000;
+
+function usagePercent(current: number, limit: number): number {
+  if (!Number.isFinite(limit) || limit <= 0) return 0;
+  return Math.min(100, (current / limit) * 100);
+}
+
+function usageBarColor(percent: number): string {
+  if (percent > 80) return "#e85a5a";
+  if (percent >= 50) return "#e8c96a";
+  return "#6bcf7f";
+}
+
+function formatUsageUpdatedAt(stats: FirestoreUsageStats | null | undefined): string {
+  if (!stats?.updatedAt?.trim()) return "N/A";
+  const ms = toEpochMs(stats.updatedAt);
+  return formatDateTime(ms) || stats.updatedAt;
+}
+
 export function AdminPage() {
   const navigate = useNavigate();
   const { loading: authLoading } = useAuthUser();
@@ -251,6 +278,14 @@ export function AdminPage() {
 
       return base;
     },
+  });
+
+  const firestoreUsageQ = useQuery<FirestoreUsageStats | null>({
+    queryKey: ["admin", "firestore-usage-stats"],
+    staleTime: 0,
+    refetchOnMount: "always",
+    enabled: !authLoading && userIsAdmin,
+    queryFn: getFirestoreUsageStats,
   });
 
   const upcomingStatsQ = useQuery<UpcomingStats>({
@@ -484,6 +519,81 @@ export function AdminPage() {
                   <div className="admin-stat-value">{String(s.value ?? "0")}</div>
                 </div>
               ))}
+        </div>
+      </section>
+
+      <section className="admin-section">
+        <h2>Firestore Usage</h2>
+        <div className="admin-grid admin-grid--stats admin-grid--usage">
+          {firestoreUsageQ.isPending ? (
+            <div className="admin-card admin-job-card admin-skeleton" />
+          ) : firestoreUsageQ.isError ? (
+            <div className="admin-card admin-job-card">
+              <p className="admin-job-result" role="alert">
+                {firestoreUsageQ.error instanceof Error
+                  ? firestoreUsageQ.error.message
+                  : "Could not load usage stats."}
+              </p>
+              <div className="admin-job-row admin-job-row--actions">
+                <Button type="button" variant="outline" onClick={() => void firestoreUsageQ.refetch()}>
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="admin-card admin-job-card admin-usage-card">
+              {!firestoreUsageQ.data ? (
+                <p className="admin-job-result">No usage data yet (quota doc not created).</p>
+              ) : (
+                <>
+                  <div className="admin-usage-metric">
+                    <div className="admin-usage-metric-head">
+                      <span className="admin-stat-label">Reads this hour</span>
+                      <span className="admin-usage-metric-fraction">
+                        {Math.round(firestoreUsageQ.data.readsThisHour).toLocaleString()} /{" "}
+                        {FIRESTORE_USAGE_HOURLY_LIMIT.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="admin-usage-bar-wrap" aria-hidden="true">
+                      <div
+                        className="admin-usage-bar-fill"
+                        style={{
+                          width: `${usagePercent(firestoreUsageQ.data.readsThisHour, FIRESTORE_USAGE_HOURLY_LIMIT)}%`,
+                          backgroundColor: usageBarColor(
+                            usagePercent(firestoreUsageQ.data.readsThisHour, FIRESTORE_USAGE_HOURLY_LIMIT)
+                          ),
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="admin-usage-metric">
+                    <div className="admin-usage-metric-head">
+                      <span className="admin-stat-label">Reads today</span>
+                      <span className="admin-usage-metric-fraction">
+                        {Math.round(firestoreUsageQ.data.readsToday).toLocaleString()} /{" "}
+                        {FIRESTORE_USAGE_DAILY_LIMIT.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="admin-usage-bar-wrap" aria-hidden="true">
+                      <div
+                        className="admin-usage-bar-fill"
+                        style={{
+                          width: `${usagePercent(firestoreUsageQ.data.readsToday, FIRESTORE_USAGE_DAILY_LIMIT)}%`,
+                          backgroundColor: usageBarColor(
+                            usagePercent(firestoreUsageQ.data.readsToday, FIRESTORE_USAGE_DAILY_LIMIT)
+                          ),
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="admin-job-row">
+                    <span className="admin-stat-label">Last reset</span>
+                    <span className="admin-job-value">{formatUsageUpdatedAt(firestoreUsageQ.data)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

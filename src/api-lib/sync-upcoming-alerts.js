@@ -588,9 +588,6 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
       : null;
 
   if (typeof st.nextIndex === "number" && st.nextIndex > 0 && !st.lastRegistryDocId) {
-    console.info(
-      "sync-upcoming-alerts: legacy nextIndex cursor — restarting scan (migrated to lastRegistryDocId)"
-    );
     lastRegistryDocId = null;
   }
 
@@ -704,10 +701,6 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
       );
       if (rowMedia === "tv") {
         if (checkState.lastCheckedAtMs != null && Date.now() - checkState.lastCheckedAtMs < SEVEN_DAYS_MS) {
-          console.info(
-            "sync-upcoming-alerts: skipped recently checked row",
-            JSON.stringify({ tmdbId: row.tmdbId, media: rowMedia })
-          );
           rowsSkipped++;
           logEvent({
             type: "title.checked",
@@ -721,18 +714,6 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
       } else {
         const decision = movieSkipDecision(checkState);
         if (decision.skip) {
-          console.info(
-            "sync-upcoming-alerts: skipped movie row",
-            JSON.stringify({
-              tmdbId: row.tmdbId,
-              media: rowMedia,
-              case: decision.caseLabel || "unknown",
-              reason: decision.reason || "skipped",
-              releaseDate: checkState.releaseDate,
-              hasCollection: checkState.hasCollection,
-              collectionId: checkState.collectionId,
-            })
-          );
           rowsSkipped++;
           const skippedReason =
             decision.caseLabel === "case2_released_with_collection"
@@ -833,10 +814,6 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
       });
     }
   } else {
-    console.info(
-      "sync-upcoming-alerts: skipping weekly prune",
-      JSON.stringify({ lastPruneAt: st.lastPruneAt || null })
-    );
     logEvent({
       type: "prune.skipped",
       lastPruneAt: st.lastPruneAt || null,

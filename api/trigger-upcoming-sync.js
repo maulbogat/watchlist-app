@@ -19,7 +19,9 @@
  * @typedef {import('../../src/types/index.js').UpcomingAlert} UpcomingAlert
  */
 
-const { runUpcomingSyncCore } = require("../src/api-lib/execute-upcoming-sync");
+const { getFirestore } = require("firebase-admin/firestore");
+const { getAdminApp, runUpcomingSyncCore } = require("../src/api-lib/execute-upcoming-sync");
+const { checkFirestoreQuota, QuotaExceededError } = require("../src/api-lib/firestore-guard");
 
 /**
  * @returns {Record<string, string>}
@@ -63,17 +65,24 @@ exports.handler = async (event, context) => {
     }
   }
 
-  console.log("trigger-upcoming-sync: start", JSON.stringify({ method: event.httpMethod }));
+  const db = getFirestore(getAdminApp());
 
   try {
+    await checkFirestoreQuota(db, 50);
     const result = await runUpcomingSyncCore(21000);
-    console.log("trigger-upcoming-sync: done", JSON.stringify(result));
     return {
       statusCode: 200,
       headers: corsHeaders(),
       body: JSON.stringify({ ok: true, ...result }),
     };
   } catch (e) {
+    if (e instanceof QuotaExceededError) {
+      return {
+        statusCode: 503,
+        headers: corsHeaders(),
+        body: JSON.stringify({ error: "quota_exceeded", period: e.period }),
+      };
+    }
     console.error("trigger-upcoming-sync:", e);
     const code = e.statusCode || 500;
     return {

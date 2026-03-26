@@ -36,6 +36,7 @@
 
 const { getFirestore } = require("firebase-admin/firestore");
 const { getAdminApp, runUpcomingSyncCore } = require("../src/api-lib/execute-upcoming-sync");
+const { checkFirestoreQuota, QuotaExceededError } = require("../src/api-lib/firestore-guard");
 const { readJobConfig, writeCheckUpcomingRunResult } = require("../src/api-lib/job-config");
 const { createFunctionLogger } = require("../src/api-lib/logger");
 
@@ -53,16 +54,7 @@ exports.handler = async (event, context) => {
     (event?.headers?.["x-vercel-cron"] ? "vercel-cron" : null) ||
     event?.httpMethod ||
     "unknown";
-  console.log("check-upcoming: start", JSON.stringify({ trigger }));
-  try {
-    const firstLogResult = logEvent({ type: "function.invoked", trigger });
-    console.log("check-upcoming: first logger call result", firstLogResult);
-  } catch (firstLogErr) {
-    console.log(
-      "check-upcoming: first logger call error",
-      firstLogErr instanceof Error ? firstLogErr.message : String(firstLogErr || "")
-    );
-  }
+  logEvent({ type: "function.invoked", trigger });
 
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: { "Access-Control-Allow-Origin": "*" } };
@@ -87,7 +79,6 @@ exports.handler = async (event, context) => {
       result: { completed: true, skippedByConfig: true },
     };
     await writeCheckUpcomingRunResult(db, skipPayload);
-    console.log("check-upcoming: skipped", JSON.stringify(skipPayload));
     logEvent({ type: "job.skipped", reason: "disabled" });
     return {
       statusCode: 200,
@@ -97,16 +88,9 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    await checkFirestoreQuota(db, 50);
     // Stay under Netlify's 30s wall; paginated registry + completion (prune) need headroom.
     const result = await runUpcomingSyncCore(21000);
-    console.log(
-      "check-upcoming: writes",
-      JSON.stringify({
-        performed: result?.alertsUpserted ?? 0,
-        skipped: result?.writesSkipped ?? 0,
-      })
-    );
-    console.log("check-upcoming: done", JSON.stringify(result));
     await writeCheckUpcomingRunResult(db, {
       status: "success",
       message: "check-upcoming completed",
@@ -128,6 +112,30 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ ok: true, ...result }),
     };
   } catch (e) {
+    if (e instanceof QuotaExceededError) {
+      logEvent({
+        type: "quota.exceeded",
+        period: e.period,
+        function: "check-upcoming",
+        trigger,
+      });
+      await writeCheckUpcomingRunResult(db, {
+        status: "skipped",
+        message: `Quota exceeded (${e.period})`,
+        trigger,
+        result: { completed: true, skippedByQuota: true, period: e.period },
+      });
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ok: true,
+          skipped: true,
+          reason: "quota_exceeded",
+          period: e.period,
+        }),
+      };
+    }
     console.error("check-upcoming:", e);
     const message = e instanceof Error ? e.message : String(e);
     await writeCheckUpcomingRunResult(db, {

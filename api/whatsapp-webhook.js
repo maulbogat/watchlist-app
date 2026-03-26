@@ -4,16 +4,113 @@
  * Always returns HTTP 200 for POST so Meta does not retry aggressively.
  */
 
+const crypto = require("crypto");
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 
 const { createFunctionLogger } = require("../src/api-lib/logger");
+const { checkFirestoreQuota, QuotaExceededError } = require("../src/api-lib/firestore-guard");
 const { getPhoneIndexEntry, phoneIndexDocId } = require("../src/api-lib/phone-index.js");
 const { sendWhatsAppText } = require("../src/api-lib/whatsapp-graph.js");
+const { netlifyEventFromReq, sendNetlifyResponse } = require("../src/api-lib/vercel-adapter");
 
 const APP_NAME = "watchlist-admin";
 
 const logEvent = createFunctionLogger("whatsapp-webhook");
+
+/** @type {Map<string, number[]>} */
+const rateBuckets = new Map();
+
+/**
+ * @param {import('@netlify/functions').HandlerEvent} event
+ * @returns {string}
+ */
+function getRawBodyString(event) {
+  const b = event.body;
+  if (b == null) return "";
+  if (typeof b === "string") return b;
+  if (Buffer.isBuffer(b)) return b.toString("utf8");
+  return "";
+}
+
+/**
+ * @param {Record<string, string | string[] | undefined> | undefined} headers
+ * @param {string} name
+ * @returns {string | undefined}
+ */
+function headerInsensitive(headers, name) {
+  if (!headers || typeof headers !== "object") return undefined;
+  const lower = name.toLowerCase();
+  for (const k of Object.keys(headers)) {
+    if (k.toLowerCase() === lower) {
+      const v = headers[k];
+      if (Array.isArray(v)) return v[0];
+      if (v != null) return String(v);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * @param {string} rawBody
+ * @param {string | undefined} signatureHeader
+ * @param {string | undefined} appSecret
+ * @returns {boolean}
+ */
+function verifyMetaSignature256(rawBody, signatureHeader, appSecret) {
+  if (!signatureHeader || !appSecret) return false;
+  const prefix = "sha256=";
+  if (!signatureHeader.startsWith(prefix)) return false;
+  const theirHex = signatureHeader.slice(prefix.length);
+  let theirBuf;
+  try {
+    theirBuf = Buffer.from(theirHex, "hex");
+  } catch {
+    return false;
+  }
+  if (theirBuf.length !== 32) return false;
+  const hmac = crypto.createHmac("sha256", appSecret);
+  hmac.update(rawBody, "utf8");
+  const ourBuf = hmac.digest();
+  try {
+    return crypto.timingSafeEqual(ourBuf, theirBuf);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {string} phoneDigits
+ * @returns {boolean} true if limited (caller should skip processing)
+ */
+function isRateLimited(phoneDigits) {
+  const now = Date.now();
+  const windowMs = 60_000;
+  let arr = rateBuckets.get(phoneDigits) || [];
+  arr = arr.filter((t) => now - t < windowMs);
+  if (arr.length >= 5) {
+    rateBuckets.set(phoneDigits, arr);
+    return true;
+  }
+  arr.push(now);
+  rateBuckets.set(phoneDigits, arr);
+  return false;
+}
+
+/**
+ * @param {import('http').IncomingMessage} req
+ * @returns {Promise<string>}
+ */
+async function rawPostBodyString(req) {
+  if (typeof req.body === "string") return req.body;
+  if (Buffer.isBuffer(req.body)) return req.body.toString("utf8");
+  if (req.body != null && typeof req.body === "object") return JSON.stringify(req.body);
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
 
 /** @returns {import('firebase-admin/app').App} */
 function getApp() {
@@ -114,9 +211,48 @@ exports.handler = async (event) => {
   }
 
   if (event.httpMethod === "POST") {
+    const rawBody = getRawBodyString(event);
+    const sigHeader = headerInsensitive(event.headers, "x-hub-signature-256");
+    if (!sigHeader) {
+      return { statusCode: 403, headers: { "Content-Type": "text/plain" }, body: "Forbidden" };
+    }
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+    if (!appSecret || !verifyMetaSignature256(rawBody, sigHeader, appSecret)) {
+      return { statusCode: 403, headers: { "Content-Type": "text/plain" }, body: "Forbidden" };
+    }
+
+    const db = getFirestore(getApp());
+    try {
+      await checkFirestoreQuota(db, 10);
+    } catch (e) {
+      if (e instanceof QuotaExceededError) {
+        logEvent({ type: "quota.exceeded", period: e.period, function: "whatsapp-webhook" });
+        let body;
+        try {
+          body = rawBody ? JSON.parse(rawBody) : {};
+        } catch {
+          return json200(event);
+        }
+        const inbound = extractInboundTextMessage(body);
+        if (inbound) {
+          const senderDigits = phoneIndexDocId(inbound.from);
+          try {
+            await sendWhatsAppText(
+              senderDigits,
+              `Service temporarily unavailable (${e.period} quota reached). Try again later.`
+            );
+          } catch {
+            /* ignore */
+          }
+        }
+        return json200(event);
+      }
+      throw e;
+    }
+
     let body = {};
     try {
-      body = typeof event.body === "string" ? JSON.parse(event.body || "{}") : event.body || {};
+      body = rawBody ? JSON.parse(rawBody) : {};
     } catch {
       return json200(event);
     }
@@ -127,6 +263,11 @@ exports.handler = async (event) => {
     }
 
     const senderDigits = phoneIndexDocId(inbound.from);
+    if (isRateLimited(senderDigits)) {
+      logEvent({ type: "whatsapp.rate_limit", senderMasked: maskPhone(senderDigits) });
+      return json200(event);
+    }
+
     const addFromImdbModule = require("./add-from-imdb.js");
     const perform = addFromImdbModule.performAddFromImdbByUid;
     if (typeof perform !== "function") {
@@ -145,7 +286,6 @@ exports.handler = async (event) => {
         return json200(event);
       }
 
-      const db = getFirestore(getApp());
       const entry = await getPhoneIndexEntry(db, senderDigits);
       if (!entry) {
         const base = publicAppBaseUrl();
@@ -212,5 +352,31 @@ exports.handler = async (event) => {
   return { statusCode: 405, headers: { "Content-Type": "text/plain" }, body: "Method Not Allowed" };
 };
 
-const { wrapNetlifyHandler } = require("../src/api-lib/vercel-adapter");
-module.exports = wrapNetlifyHandler(exports.handler);
+/**
+ * @param {import('http').IncomingMessage & { body?: unknown }} req
+ * @param {import('http').ServerResponse} res
+ */
+module.exports = async (req, res) => {
+  try {
+    let event;
+    if (req.method === "POST") {
+      const raw = await rawPostBodyString(req);
+      event = netlifyEventFromReq({
+        method: "POST",
+        headers: { ...req.headers },
+        body: raw,
+        url: typeof req.url === "string" ? req.url : "",
+        query: req.query,
+      });
+    } else {
+      event = netlifyEventFromReq(req);
+    }
+    const result = await exports.handler(event, {});
+    sendNetlifyResponse(res, result);
+  } catch (e) {
+    console.error(e);
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+};

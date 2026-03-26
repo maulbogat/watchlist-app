@@ -1317,6 +1317,43 @@ async function getPhoneIndexDefaultsForNumber(
   return { defaultAddListId, defaultListType };
 }
 
+/** Document `meta/usageStats` — serverless read-quota guard (Admin client read only). */
+export type FirestoreUsageStats = {
+  readsToday: number;
+  readsThisHour: number;
+  lastResetDate: string;
+  lastResetHour: number;
+  updatedAt: string;
+};
+
+function numField(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function strField(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+/**
+ * Read Firestore read-quota counters (admin-only per `firestore.rules`).
+ * @returns `null` if the document does not exist yet.
+ */
+async function getFirestoreUsageStats(): Promise<FirestoreUsageStats | null> {
+  const ref = doc(db, "meta", "usageStats");
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+  const d = snap.data() as Record<string, unknown>;
+  return {
+    readsToday: numField(d.readsToday),
+    readsThisHour: numField(d.readsThisHour),
+    lastResetDate: strField(d.lastResetDate),
+    lastResetHour: numField(d.lastResetHour),
+    updatedAt: strField(d.updatedAt),
+  };
+}
+
 async function getJobConfigState(): Promise<JobConfigState> {
   try {
     const res = await fetch("/api/admin-job-config", {
@@ -1420,6 +1457,7 @@ export {
   dismissUpcomingAlert,
   getBookmarkletPersonalListFirestoreId,
   getJobConfigState,
+  getFirestoreUsageStats,
   setCheckUpcomingEnabledState,
   getUserPhoneNumbers,
   addUserPhoneNumber,

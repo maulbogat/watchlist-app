@@ -51,6 +51,7 @@ const https = require("https");
 const { runSingleTitleSync } = require("../src/api-lib/sync-upcoming-alerts");
 const { registryDocIdFromItem, payloadForRegistry, listKey } = require("../src/api-lib/registry-id.cjs");
 const { createFunctionLogger } = require("../src/api-lib/logger");
+const { checkFirestoreQuota, QuotaExceededError } = require("../src/api-lib/firestore-guard");
 
 const logEvent = createFunctionLogger("add-from-imdb");
 
@@ -444,6 +445,17 @@ async function migrateLegacyPersonalListAdmin(db, uid) {
  * @returns {Promise<{ statusCode: number, body: Record<string, unknown> }>}
  */
 async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId, watchRegion) {
+  const db = getFirestore(getApp());
+  try {
+    await checkFirestoreQuota(db, 10);
+  } catch (e) {
+    if (e instanceof QuotaExceededError) {
+      logEvent({ type: "quota.exceeded", period: e.period, function: "add-from-imdb" });
+      return { statusCode: 503, body: { error: "quota_exceeded", period: e.period } };
+    }
+    throw e;
+  }
+
   const norm = (id) => (String(id).startsWith("tt") ? id : `tt${id}`);
   const nImdb = norm(imdbId);
   const region = String(watchRegion || "").trim().toUpperCase().slice(0, 2);
@@ -557,7 +569,6 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
   }
 
   const registryId = registryDocIdFromItem(movie);
-  const db = getFirestore(getApp());
   const regDoc = db.collection("titleRegistry").doc(registryId);
 
   /**

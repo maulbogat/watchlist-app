@@ -794,7 +794,8 @@ body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay
   align-items: center;
   gap: 0.75rem;
 }
-.tab-group {
+.tab-group,
+.filter-group {
   display: inline-flex;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -817,6 +818,10 @@ body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay
   appearance: none;
   background: transparent;
   border: 0;
+}
+
+.tab,
+.filter-group label {
   cursor: pointer;
   padding: 8px 12px;
   font-size: 0.72rem;
@@ -853,36 +858,10 @@ body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay
   letter-spacing: 0.04em;
 }
 
-.filter-group {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(255,255,255,0.02);
-}
-
 .filter-group input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
-}
-
-.filter-group label {
-  cursor: pointer;
-  padding: 8px 12px;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  user-select: none;
-  border-right: 1px solid var(--border);
-  transition: background 0.15s ease, color 0.15s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1.2;
-  min-height: 32px;
-  box-sizing: border-box;
 }
 
 .filter-group label:last-child {
@@ -2600,6 +2579,49 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .admin-job-card {
   padding: 0.85rem 0.95rem;
+}
+
+.admin-grid--usage {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 520px;
+}
+
+.admin-usage-card .admin-usage-metric {
+  margin-bottom: 0.85rem;
+}
+
+.admin-usage-card .admin-usage-metric:last-of-type {
+  margin-bottom: 0.55rem;
+}
+
+.admin-usage-metric-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.admin-usage-metric-fraction {
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-usage-bar-wrap {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.admin-usage-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  min-width: 0;
+  transition: width 0.25s ease, background-color 0.25s ease;
 }
 
 .admin-job-row {

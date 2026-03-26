@@ -30,6 +30,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Firestore read quota stats (Admin SDK writes). Client read: admin UIDs only — same list as src/config/admin.ts
+    match /meta/{docId} {
+      allow read: if request.auth != null && request.auth.uid in ['fSyHdUXB56fBTeKlNFXPiAq1Lip2'];
+      allow write: if false;
+    }
+
     // WhatsApp sender → uid + default list (client may update/delete own mapping; Admin used for verify)
     match /phoneIndex/{phone} {
       allow read: if request.auth != null && resource.data.uid == request.auth.uid;

@@ -318,7 +318,6 @@ export function WatchlistPage() {
                       setAuthMenuOpen(false);
                       requestAnimationFrame(() => {
                         (document.activeElement as HTMLElement | null)?.blur();
-                        console.log("WhatsApp clicked, opening dialog");
                         setWhatsAppSettingsOpen(true);
                       });
                     }}
