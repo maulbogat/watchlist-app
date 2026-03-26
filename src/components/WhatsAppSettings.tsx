@@ -23,7 +23,7 @@ function formatPhoneDisplay(digits: string): string {
 }
 
 const waSelectContentClass =
-  "z-[5000] border border-white/10 bg-[#1c1c22] text-[#f0ede8] [&_[data-slot=select-scroll-up-button]]:hidden [&_[data-slot=select-scroll-down-button]]:hidden";
+  "lists-modal-select-popover--no-check z-[5000] border border-white/10 bg-[#1c1c22] text-[#f0ede8] [&_[data-slot=select-scroll-up-button]]:hidden [&_[data-slot=select-scroll-down-button]]:hidden";
 
 function listModeToChoiceKey(mode: ListMode): string {
   if (mode === "personal") return "p:personal";
@@ -297,6 +297,7 @@ export function WhatsAppSettings({
                       <button
                         type="button"
                         className="lists-modal-list-item-action lists-modal-list-item-action--delete"
+                        aria-label={`Remove ${formatPhoneDisplay(p)}`}
                         onClick={() => void onRemove(p)}
                       >
                         Remove

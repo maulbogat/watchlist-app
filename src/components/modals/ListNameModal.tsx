@@ -61,7 +61,11 @@ export function ListNameModal({
   const content = (
     <DialogContent
       disablePortal={elevatedStack}
-      {...(elevatedStack ? { overlayClassName: "z-[1220]" } : {})}
+      overlayClassName={
+        elevatedStack
+          ? "z-[1220] !bg-black/70 !backdrop-blur-sm supports-backdrop-filter:!backdrop-blur-sm"
+          : "bg-black/72"
+      }
       className={cn(
         "lists-modal max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8] sm:max-w-[420px]",
         elevatedStack && "z-[1230]"
@@ -99,7 +103,7 @@ export function ListNameModal({
         <Input
           type="text"
           id="list-name-input"
-          className="country-search list-name-input"
+          className="country-search list-name-input placeholder:text-[var(--muted)]"
           placeholder={placeholder}
           maxLength={120}
           autoComplete="off"

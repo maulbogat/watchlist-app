@@ -71,7 +71,7 @@ export function CountryModal({
       }}
     >
       <DialogContent
-        className="country-modal bg-[#131317] border-white/10 text-[#f0ede8]"
+        className="country-modal bg-[#131317] text-[#f0ede8]"
         id="country-modal"
         onEscapeKeyDown={(e) => {
           if (!allowCancel) {

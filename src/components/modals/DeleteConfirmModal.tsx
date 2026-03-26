@@ -28,7 +28,11 @@ export function DeleteConfirmModal({
   const content = (
     <DialogContent
       disablePortal={elevatedStack}
-      {...(elevatedStack ? { overlayClassName: "z-[1220]" } : {})}
+      overlayClassName={
+        elevatedStack
+          ? "z-[1220] !bg-black/70 !backdrop-blur-sm supports-backdrop-filter:!backdrop-blur-sm"
+          : "bg-black/72"
+      }
       className={cn(
         "delete-confirm-modal bg-[#131317] border-white/10 text-[#f0ede8]",
         elevatedStack && "z-[1230]"

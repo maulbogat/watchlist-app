@@ -40,7 +40,7 @@ export function BookmarkletSettings({ open, onOpenChange }: BookmarkletSettingsP
           }}
         >
           <DialogContent
-            className="lists-modal z-[1201] max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8] sm:max-w-[520px]"
+            className="lists-modal z-[1201] max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8]"
             id="bookmarklet-settings-modal"
             onEscapeKeyDown={(e) => {
               e.preventDefault();

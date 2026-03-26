@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPortal, DialogTitle } from "@/components/ui/dialog";
@@ -98,6 +98,11 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteListChoice, setInviteListChoice] = useState<string>(INVITE_LIST_NONE);
   const [inviteFormError, setInviteFormError] = useState<string | null>(null);
+  const [listSettingsNotice, setListSettingsNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) setListSettingsNotice(null);
+  }, [open]);
 
   if (!currentUser?.uid) return null;
   const signedInUser = currentUser;
@@ -237,6 +242,11 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
             <div className="lists-modal-body">
               <section className="lists-modal-section">
                 <h3 className="lists-modal-section-title">Your lists</h3>
+                {listSettingsNotice ? (
+                  <p className="lists-modal-your-lists-notice mb-2 text-sm" role="alert">
+                    {listSettingsNotice}
+                  </p>
+                ) : null}
                 <ul className="lists-modal-list" id="lists-modal-list">
                   {personalLists.map((l) => (
                     <li
@@ -295,14 +305,15 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                           className="lists-modal-list-item-action lists-modal-rename-btn"
                           data-list-id={l.id}
                           data-type="personal"
-                          onClick={() =>
+                          onClick={() => {
+                            setListSettingsNotice(null);
                             setEditing({
                               type: "personal",
                               id: l.id,
                               draft: displayListName(l.name),
                               original: displayListName(l.name),
-                            })
-                          }
+                            });
+                          }}
                         >
                           Rename
                         </Button>
@@ -314,9 +325,10 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                           data-type="personal"
                           onClick={() => {
                             if (personalLists.length <= 1) {
-                              window.alert("You must have at least one personal list.");
+                              setListSettingsNotice("You must have at least one personal list.");
                               return;
                             }
+                            setListSettingsNotice(null);
                             setDeleteTarget({
                               type: "personal",
                               id: l.id,
@@ -392,14 +404,15 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                             className="lists-modal-list-item-action lists-modal-rename-btn"
                             data-list-id={l.id}
                             data-type="shared"
-                            onClick={() =>
+                            onClick={() => {
+                              setListSettingsNotice(null);
                               setEditing({
                                 type: "shared",
                                 id: l.id,
                                 draft: displayListName(l.name),
                                 original: displayListName(l.name),
-                              })
-                            }
+                              });
+                            }}
                           >
                             Rename
                           </Button>
@@ -410,7 +423,8 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                               className="lists-modal-list-item-action lists-modal-list-item-action--delete lists-modal-delete-btn"
                               data-list-id={l.id}
                               data-type="shared"
-                              onClick={() =>
+                              onClick={() => {
+                                setListSettingsNotice(null);
                                 setDeleteTarget({
                                   type: "shared",
                                   id: l.id,
@@ -418,8 +432,8 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                                   count,
                                   isLeave: false,
                                   isSharedDelete: true,
-                                })
-                              }
+                                });
+                              }}
                             >
                               Delete
                             </Button>
@@ -429,15 +443,16 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                               variant="outline"
                               className="lists-modal-list-item-leave lists-modal-leave-btn"
                               data-list-id={l.id}
-                              onClick={() =>
+                              onClick={() => {
+                                setListSettingsNotice(null);
                                 setDeleteTarget({
                                   type: "shared",
                                   id: l.id,
                                   name: displayListName(l.name),
                                   count,
                                   isLeave: true,
-                                })
-                              }
+                                });
+                              }}
                             >
                               Leave
                             </Button>
@@ -453,7 +468,10 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                     variant="outline"
                     className="lists-modal-new-personal"
                     id="lists-new-personal-btn"
-                    onClick={() => setListNameKind("personal")}
+                    onClick={() => {
+                      setListSettingsNotice(null);
+                      setListNameKind("personal");
+                    }}
                   >
                     + New personal list
                   </Button>
@@ -462,7 +480,10 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                     variant="outline"
                     className="lists-modal-btn"
                     id="lists-create-btn"
-                    onClick={() => setListNameKind("shared")}
+                    onClick={() => {
+                      setListSettingsNotice(null);
+                      setListNameKind("shared");
+                    }}
                   >
                     + Create new shared list
                   </Button>
@@ -479,7 +500,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                     <Input
                       id="invite-email-input"
                       type="email"
-                      className="lists-modal-input mt-1"
+                      className="lists-modal-input lists-modal-invite-email-input mt-1 placeholder:text-[var(--invite-placeholder-gray)]"
                       placeholder="friend@example.com"
                       value={inviteEmail}
                       onChange={(e) => {
@@ -489,7 +510,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                       autoComplete="off"
                     />
                   </div>
-                  <div>
+                  <div className="lists-modal-invite-include-wrap">
                     <label className="lists-modal-list-item-label" htmlFor="invite-list-select">
                       Include list
                     </label>
@@ -506,7 +527,12 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                       >
                         <SelectValue placeholder="None" />
                       </SelectTrigger>
-                      <SelectContent className="border border-[var(--border)] bg-[#1c1c22] text-[#f0ede8]">
+                      <SelectContent
+                        position="popper"
+                        sideOffset={6}
+                        collisionPadding={16}
+                        className="lists-modal-select-popover--no-check z-[1300] border border-[var(--border)] bg-[#1c1c22] text-[#f0ede8]"
+                      >
                         {inviteListOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
                             {o.label}
@@ -523,10 +549,9 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                       </p>
                     ) : null}
                   </div>
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
-                    className="lists-modal-btn"
+                    className="lists-modal-btn lists-modal-send-invite-btn"
                     disabled={sendInviteMutation.isPending}
                     onClick={() => {
                       const em = inviteEmail.trim();
@@ -554,10 +579,13 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                     }}
                   >
                     {sendInviteMutation.isPending ? "Sending…" : "Send invite"}
-                  </Button>
+                  </button>
                 </div>
 
-                <h4 className="lists-modal-section-subtitle mt-6 font-title text-sm uppercase tracking-widest text-[var(--muted)]">
+                <h4
+                  id="lists-modal-pending-invites-heading"
+                  className="lists-modal-section-subtitle lists-modal-pending-invites-heading font-title text-sm uppercase tracking-widest text-[var(--muted)]"
+                >
                   Pending invites
                 </h4>
                 {invitesQ.isLoading ? (

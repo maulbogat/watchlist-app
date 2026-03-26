@@ -15,6 +15,9 @@
   --surface: #131317;
   --surface2: #1c1c22;
   --border: rgba(255,255,255,0.07);
+  /* Modals, Radix select panels, list-selector wrap, avatar menu — visible light edge */
+  --modal-dropdown-border: rgba(255, 255, 255, 0.14);
+  --invite-placeholder-gray: rgba(255, 255, 255, 0.5);
   --text: #f0ede8;
   --muted: #888;
   /* Muted gold (prod-style); keep hex so `color: var(--accent)` stays valid. */
@@ -54,6 +57,14 @@ body {
   color: var(--text);
   font-family: var(--font-body);
   min-height: 100vh;
+}
+
+/* Radix dialog + select panels: same light edge as `.list-controls-pair` (dialog base uses ring-0 in `dialog.tsx`) */
+[data-slot="dialog-content"] {
+  border: 1px solid var(--modal-dropdown-border) !important;
+}
+[data-slot="select-content"] {
+  border: 1px solid var(--modal-dropdown-border) !important;
 }
 
 .file-protocol-banner {
@@ -217,13 +228,13 @@ header h1 span {
 .list-controls-pair {
   display: flex;
   align-items: center;
-  border: 1px solid var(--border);
+  border: 1px solid var(--modal-dropdown-border);
   border-radius: 6px;
 }
 .list-controls-pair .custom-dropdown-trigger {
   border: none;
   border-radius: 6px 0 0 6px;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--modal-dropdown-border);
 }
 .list-controls-pair .list-settings-btn {
   border: none;
@@ -369,7 +380,7 @@ header h1 span {
   height: 36px;
   min-width: 36px;
   border-radius: 6px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--modal-dropdown-border);
   background: var(--surface2);
   color: var(--muted);
   cursor: pointer;
@@ -388,39 +399,49 @@ header h1 span {
 #lists-modal {
   width: min(360px, calc(100vw - 2rem));
   max-width: 360px;
-  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.9rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
 }
 #whatsapp-settings-modal {
   width: min(520px, calc(100vw - 2rem));
   max-width: 520px;
-  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.9rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
 }
 #list-name-modal {
   width: min(420px, calc(100vw - 2rem));
   max-width: 420px;
-  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.9rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+}
+#country-modal {
+  width: min(420px, calc(100vw - 2rem));
+  max-width: 420px;
+  border-radius: 10px;
+  padding: 0.9rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
 }
 #lists-modal .modal-header,
 #whatsapp-settings-modal .modal-header,
-#list-name-modal .modal-header {
+#list-name-modal .modal-header,
+#country-modal .modal-header {
   margin-bottom: 0.45rem;
   padding: 0;
 }
 #lists-modal .modal-title,
 #whatsapp-settings-modal .modal-title,
-#list-name-modal .modal-title {
+#list-name-modal .modal-title,
+#country-modal .modal-title {
   font-size: 1.8rem;
   letter-spacing: 0.065em;
 }
 #lists-modal button[data-slot="dialog-close"],
 #whatsapp-settings-modal button[data-slot="dialog-close"],
-#list-name-modal button[data-slot="dialog-close"] {
+#list-name-modal button[data-slot="dialog-close"],
+#country-modal button[data-slot="dialog-close"] {
   top: 0.55rem;
   right: 0.55rem;
   width: 28px;
@@ -434,6 +455,7 @@ header h1 span {
 #lists-modal button[data-slot="dialog-close"]:hover,
 #whatsapp-settings-modal button[data-slot="dialog-close"]:hover,
 #list-name-modal button[data-slot="dialog-close"]:hover,
+#country-modal button[data-slot="dialog-close"]:hover,
 #bookmarklet-settings-modal button[data-slot="dialog-close"]:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
@@ -441,13 +463,14 @@ header h1 span {
 #lists-modal button[data-slot="dialog-close"] svg,
 #whatsapp-settings-modal button[data-slot="dialog-close"] svg,
 #list-name-modal button[data-slot="dialog-close"] svg,
+#country-modal button[data-slot="dialog-close"] svg,
 #bookmarklet-settings-modal button[data-slot="dialog-close"] svg {
   width: 13px;
   height: 13px;
 }
 body:has(#lists-modal[data-state="open"]) [data-slot="dialog-overlay"],
 body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay"],
-body:has(#list-name-modal[data-state="open"]) [data-slot="dialog-overlay"],
+body:has(#country-modal[data-state="open"]) [data-slot="dialog-overlay"],
 body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-overlay"] {
   background: rgba(0, 0, 0, 0.72);
   backdrop-filter: none;
@@ -1511,7 +1534,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   right: 0;
   min-width: 160px;
   background: var(--surface2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--modal-dropdown-border);
   border-radius: 8px;
   padding: 4px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -1678,7 +1701,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .country-modal {
   max-width: 420px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--modal-dropdown-border);
   border-radius: 12px;
   padding: 1.5rem;
 }
@@ -1716,7 +1739,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   max-height: 240px;
   overflow-y: auto;
   background: var(--surface2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--modal-dropdown-border);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   display: none;
@@ -2810,4 +2833,172 @@ a.admin-job-run-btn {
 
 .admin-back-btn:active {
   transform: translateY(1px);
+}
+
+/* --- UI consistency: dialogs & manage-lists polish (see task) --- */
+
+#delete-confirm-modal {
+  width: min(360px, calc(100vw - 2rem));
+  max-width: 360px;
+  border-radius: 10px;
+  padding: 0.9rem;
+  box-shadow:
+    0 0 0 1px var(--modal-dropdown-border),
+    0 25px 50px -12px rgba(0, 0, 0, 0.78);
+}
+#delete-confirm-modal .modal-header {
+  margin-bottom: 0.45rem;
+  padding: 0;
+}
+#delete-confirm-modal .modal-title {
+  font-size: 1.8rem;
+  letter-spacing: 0.065em;
+}
+#delete-confirm-modal button[data-slot="dialog-close"] {
+  top: 0.55rem;
+  right: 0.55rem;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  padding: 0;
+}
+#delete-confirm-modal button[data-slot="dialog-close"]:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+#delete-confirm-modal button[data-slot="dialog-close"] svg {
+  width: 13px;
+  height: 13px;
+}
+#bookmarklet-settings-modal {
+  width: min(520px, calc(100vw - 2rem)) !important;
+  max-width: 520px !important;
+  box-sizing: border-box;
+  border-radius: 10px;
+  padding: 0.9rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
+}
+#bookmarklet-settings-modal .modal-header {
+  margin-bottom: 0.45rem;
+  padding: 0;
+}
+#bookmarklet-settings-modal .modal-title {
+  font-size: 1.8rem;
+  letter-spacing: 0.065em;
+}
+#bookmarklet-settings-modal button[data-slot="dialog-close"] {
+  top: 0.55rem;
+  right: 0.55rem;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  padding: 0;
+}
+
+/* Invite email placeholder: light gray (matches --invite-placeholder-gray on Input) */
+#invite-email-input::placeholder,
+.lists-modal-invite-email-input::placeholder {
+  color: var(--invite-placeholder-gray) !important;
+  opacity: 1 !important;
+}
+.lists-modal-invite-include-wrap {
+  margin-top: 1rem;
+}
+/* SelectContent is portaled to body; class on Content targets dropdown (not #lists-modal descendants) */
+.lists-modal-select-popover--no-check [data-slot="select-item"] > span:first-child {
+  display: none !important;
+}
+
+#list-name-input::placeholder,
+.list-name-input::placeholder {
+  color: var(--muted) !important;
+  opacity: 1 !important;
+}
+.country-search::placeholder {
+  color: var(--muted) !important;
+  opacity: 1 !important;
+}
+
+.lists-modal-your-lists-notice {
+  color: #e85a5a !important;
+}
+
+#lists-modal #lists-modal-pending-invites-heading {
+  margin-top: 0.25rem !important;
+  padding-top: 0.375rem !important;
+}
+
+/* Stacked dialogs: top layer reads clearly above parent (see ListNameModal / DeleteConfirm overlayClassName) */
+#list-name-modal[data-state="open"] {
+  box-shadow:
+    0 0 0 1px var(--modal-dropdown-border),
+    0 25px 50px -12px rgba(0, 0, 0, 0.75);
+}
+
+.list-name-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.list-name-modal-actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.list-name-error {
+  font-size: 0.8rem;
+  color: #e85a5a;
+  margin: 0;
+}
+
+.lists-modal-wa-row-actions .lists-modal-list-item-action--delete {
+  min-width: 4.5rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+.lists-modal-wa-row-actions .lists-modal-list-item-action--delete:hover {
+  color: #e85a5a;
+  background: rgba(232, 90, 90, 0.12);
+}
+
+.lists-modal-send-invite-btn {
+  appearance: none;
+  border: 1px solid rgba(232, 201, 106, 0.4);
+  background: rgba(232, 201, 106, 0.1);
+  color: var(--accent);
+  font-family: var(--font-title);
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  text-transform: uppercase;
+  margin-bottom: 0.875rem;
+}
+.lists-modal-send-invite-btn:hover:not(:disabled) {
+  background: rgba(232, 201, 106, 0.18);
+  border-color: rgba(232, 201, 106, 0.6);
+}
+.lists-modal-send-invite-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#lists-modal [data-slot="select-content"] {
+  z-index: 1300 !important;
 }

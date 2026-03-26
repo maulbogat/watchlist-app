@@ -380,3 +380,9 @@ module.exports = async (req, res) => {
     }
   }
 };
+
+module.exports.config = {
+  api: {
+    bodyParser: false,
+  },
+};
