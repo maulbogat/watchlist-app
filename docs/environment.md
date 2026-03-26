@@ -56,7 +56,9 @@ Read at **runtime** by **`api/*.js`** on Vercel (and by **`vercel dev`** / local
 | `WHATSAPP_VERIFY_TOKEN` | **`/api/whatsapp-webhook`** — Meta webhook verification (GET) |
 | `WHATSAPP_TOKEN` | WhatsApp Cloud API — outbound messages (`whatsapp-verify`, `whatsapp-webhook`) |
 | `WHATSAPP_PHONE_NUMBER_ID` | Cloud API **Phone number ID** for sends |
-| `APP_PUBLIC_URL` | Optional — canonical site URL in WhatsApp replies; **`VERCEL_URL`** used if unset |
+| `APP_PUBLIC_URL` | Optional — canonical site URL in WhatsApp replies and **email invite links**; **`VERCEL_URL`** used if unset |
+| `RESEND_API_KEY` | **`/api/send-invite`** — [Resend](https://resend.com) API key for invitation emails |
+| `RESEND_FROM_EMAIL` | Optional — `From:` for invite mail; defaults to **`onboarding@resend.dev`** (Resend shared testing domain) when unset |
 | `NETLIFY_SITE_ID` | Optional legacy — **`admin-env-status`** fallback; **avoid** setting the same value as a “secret” elsewhere if it already appears verbatim inside **`dist/`** (e.g. duplicated Netlify site UUID) |
 
 Some routes also read **`VITE_APP_ORIGIN`** from **`process.env`** when present (e.g. WhatsApp copy); the SPA normally supplies it via the Vite build only.
@@ -83,6 +85,7 @@ Keep **names identical** to Vercel so behavior matches.
 | **Client → Axiom** | `AXIOM_*`, `FIREBASE_SERVICE_ACCOUNT` (token verification on **`log-client-event`**) |
 | **Admin Netlify badge (legacy)** | `VITE_NETLIFY_SITE_ID` |
 | **WhatsApp link + inbound messages** | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` |
+| **Email app invites** | `RESEND_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `APP_PUBLIC_URL` (or `VERCEL_URL`); optional `RESEND_FROM_EMAIL` |
 | **Admin GitHub backup status** | `GITHUB_TOKEN` optional for public repo; often required for private |
 
 Nothing in the app expects **`VITE_AXIOM_*`**.

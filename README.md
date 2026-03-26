@@ -2,7 +2,7 @@
 
 A personal movie/show watchlist with YouTube trailers, filters, and Firestore. **Architecture, data model, and flows** are documented in **[`system-design.md`](./system-design.md)** (source of truth for how pieces fit together).
 
-**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). **Vercel** hosts **`dist/`** and runs **`api/*.js`** serverless routes (Firebase Admin SDK) for the IMDb add flow, shared-list joins, upcoming-title sync, **WhatsApp** verification + webhook (Meta Cloud API), and other admin/diagnostic endpoints.
+**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). **Vercel** hosts **`dist/`** and runs **`api/*.js`** serverless routes (Firebase Admin SDK) for the IMDb add flow, shared-list joins, **email app invites** (Resend: **`send-invite`**, **`accept-invite`**, **`get-invites`**, **`revoke-invite`**), upcoming-title sync, **WhatsApp** verification + webhook (Meta Cloud API), and other admin/diagnostic endpoints.
 
 ## Environment Quick Start
 
@@ -13,10 +13,10 @@ cp .env.example .env
 
 Then set values in:
 
-- `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional `AXIOM_*`, optional script toggles)
+- `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional `AXIOM_*`, optional **`RESEND_API_KEY`**, optional **`RESEND_FROM_EMAIL`**, optional **`APP_PUBLIC_URL`**, optional script toggles)
 - `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional `VITE_APP_VERSION`, optional `VITE_APP_ORIGIN`, `VITE_DEPLOYMENTS_URL`, `VITE_SITE_ID`, legacy `VITE_NETLIFY_*`)
 
-**Vercel production:** mirror the same keys in the project **Settings → Environment Variables** (deep link from **`/admin`** → Service Links → **Vercel**). Naming and pitfalls are in **[`docs/environment.md`](./docs/environment.md)** (delete **`VITE_AXIOM_*`**; never expose **`AXIOM_*`** to the client bundle). WhatsApp uses **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_TOKEN`**, and **`WHATSAPP_PHONE_NUMBER_ID`** — see that doc and **`.env.example`**.
+**Vercel production:** mirror the same keys in the project **Settings → Environment Variables** (deep link from **`/admin`** → Service Links → **Vercel**). Naming and pitfalls are in **[`docs/environment.md`](./docs/environment.md)** (delete **`VITE_AXIOM_*`**; never expose **`AXIOM_*`** to the client bundle). WhatsApp uses **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_TOKEN`**, and **`WHATSAPP_PHONE_NUMBER_ID`**; email invites use **`RESEND_API_KEY`** (and optional **`RESEND_FROM_EMAIL`**, **`APP_PUBLIC_URL`**) — see that doc and **`.env.example`**.
 
 ## Run locally
 
@@ -75,6 +75,15 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
    Or paste the rules in Firebase Console → Firestore → Rules
 
 4. **Movie lists** are stored under **`users/{uid}/personalLists/{listId}`** (plus optional **shared lists** in **`sharedLists/{listId}`**). The **`users/{uid}`** document holds profile fields (e.g. country, **`defaultPersonalListId`**) and optional **`upcomingDismissals`** — not the row arrays. Canonical title metadata lives in **`titleRegistry/{registryId}`** (client read-only; writes via **`api/*`** / scripts). Users add titles via the bookmarklet; no legacy **`catalog`** collection is used.
+
+5. **App access (allowlist):** Only Google accounts that have a row in **`allowedUsers/{lowercaseEmail}`** can use the watchlist after sign-in. **`AllowlistGate`** reads that document; others are signed out and see a full-screen message. **`/join-app/:inviteId`** is exempt so invitees can sign in and call **`/api/accept-invite`** first. Seed existing users once with Admin credentials:
+
+   ```bash
+   node scripts/seed-allowed-users.mjs --dry-run
+   node scripts/seed-allowed-users.mjs --write
+   ```
+
+   Deploy updated **`firestore.rules`** (and **`firestore.indexes.json`** if prompted) before relying on **`allowedUsers`** / **`invites`**.
 
 ## Vercel deployment (bookmarklet)
 
@@ -148,16 +157,17 @@ Keep **`AXIOM_*` on the server** only; do not reintroduce **`VITE_AXIOM_*`**. If
 
 ## Multi-user support
 
-Multiple people can use the app with their own Google accounts. Each account has its own **personal lists** (default list + optional extra lists in the subcollection). The bookmarklet adds to the **currently selected** list in the main app (personal or shared). Items go only to lists that user is allowed to write (see Firestore rules).
+Multiple people can use the app with their own Google accounts, but **new** accounts must be **invited** (email invite → **`/join-app/:inviteId`**) or already present in **`allowedUsers`** (e.g. seeded). Each account has its own **personal lists** (default list + optional extra lists in the subcollection). The bookmarklet adds to the **currently selected** list in the main app (personal or shared). Items go only to lists that user is allowed to write (see Firestore rules).
 
 ## Shared lists
 
 Create shared lists that multiple people can add to and update together:
 
 1. **Create:** Use the list dropdown → "+ Create shared list" → enter a name
-2. **Share:** Copy the link shown and send it to others
-3. **Join:** Others open the link while signed in to join the list
-4. **Add items:** When viewing a shared list, the bookmarklet adds to that list (sign in and switch to the shared list first)
+2. **Share:** After creation, copy the **`/join/{listId}`** link from the dialog and send it to people who are **already allowed** to use the app (same allowlist as Google sign-in)
+3. **Invite by email:** Manage lists → **Invite someone** — optional shared list attachment; pending invites can be revoked
+4. **Join (link):** Others open **`/join/{listId}`** while signed in to join the list (unchanged)
+5. **Add items:** When viewing a shared list, the bookmarklet adds to that list (sign in and switch to the shared list first)
 
 Deploy Firestore rules: `firebase deploy --only firestore:rules`
 
@@ -165,7 +175,7 @@ Deploy Firestore rules: `firebase deploy --only firestore:rules`
 
 1. **Authentication → Sign-in method** → Google → Enabled
 2. **Authentication → Settings → Authorized domains** → Add your production host (e.g. `watchlist-trailers.vercel.app` or your custom domain) and `localhost` for local dev
-3. **Firestore rules** (in `firestore.rules`) — signed-in users: read/write their **`users/{uid}`** doc and **`users/{uid}/personalLists/*`**; read/write **`sharedLists/{listId}`** only when their uid is in **`members`**; read **`titleRegistry`** and **`upcomingAlerts`** (no client writes there). **`syncState`** is Admin-only.
+3. **Firestore rules** (in `firestore.rules`) — signed-in users: read/write their **`users/{uid}`** doc and **`users/{uid}/personalLists/*`**; read/write **`sharedLists/{listId}`** only when their uid is in **`members`**; read **`titleRegistry`** and **`upcomingAlerts`** (no client writes there); read their own **`allowedUsers/{email}`** row (document id matches normalized email); read **`invites`** (writes Admin-only). **`syncState`** is Admin-only.
 
 The header shows the signed-in user's email so family members know whose account they're using on shared devices.
 
@@ -247,8 +257,9 @@ Many scripts expect **`TMDB_API_KEY`**, **`FIREBASE_SERVICE_ACCOUNT`** (base64) 
 ## Features
 
 - **Watchlist UI (React):** grid of titles with poster, status controls, and **trailer modal** (YouTube embed).
-- **Personal lists:** default list + extra lists; **manage lists** modal (create/rename/delete, pick default).
-- **Shared lists:** create, copy invite link (`/join/:listId`), join while signed in; bookmarklet targets the list you’re viewing.
+- **Personal lists:** default list + extra lists; **manage lists** modal (create/rename/delete, pick default, **invite someone** + pending invites).
+- **Shared lists:** create; share **`/join/:listId`** from the post-create dialog; join while signed in; optional list on email invite; bookmarklet targets the list you’re viewing.
+- **App access:** **`allowedUsers`** + **`/join-app/:inviteId`**; profile menu **Bookmarklet** dialog (instructions + drag button; moved out of manage lists).
 - **WhatsApp adds:** verified numbers and per-number default list (**`phoneIndex`** + **`users/{uid}.phoneNumbers`**); inbound messages handled by **`/api/whatsapp-webhook`** (see deployment above).
 - **Admin (`/admin`, admin users only):** catalog/upcoming stats, upcoming job toggle, GitHub backup workflow status, and **Service Links** (production site, Firebase, **Vercel env vars**, **Meta WhatsApp** dev console, **Google Cloud billing**, GitHub, TMDB, Trakt, etc.).
 - **Status tabs:** Recently Added, To Watch (**includes “maybe later”** rows), Watched, Archive — persisted in Firestore.

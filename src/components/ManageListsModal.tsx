@@ -1,5 +1,5 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLayoutEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import {
   createSharedList,
   deletePersonalList,
   deleteSharedList,
+  getIdTokenForApi,
   leaveSharedList,
   renamePersonalList,
   renameSharedList,
@@ -21,7 +22,13 @@ import { setBookmarkletCookieWithMode } from "../lib/bookmarkletCookie.js";
 import { ListNameModal } from "./modals/ListNameModal.js";
 import { DeleteConfirmModal } from "./modals/DeleteConfirmModal.js";
 import { SharedCreatedModal } from "./modals/SharedCreatedModal.js";
-import { useNavigate } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const iconPerson = (
   <svg className="custom-dropdown-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -59,6 +66,17 @@ type DeleteTarget = {
   isSharedDelete?: boolean;
 };
 
+type PendingInvite = {
+  inviteId: string;
+  invitedEmail: string;
+  listId: string | null;
+  createdAt: string | null;
+  expiresAt: string | null;
+  usedAt: string | null;
+};
+
+const INVITE_LIST_NONE = "__none__";
+
 interface ManageListsModalProps {
   open: boolean;
   onClose: () => void;
@@ -67,39 +85,18 @@ interface ManageListsModalProps {
 }
 
 export function ManageListsModal({ open, onClose, personalLists, sharedLists }: ManageListsModalProps) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const currentUser = useAppStore((s) => s.currentUser);
   const currentListMode = useAppStore((s) => s.currentListMode);
   const setCurrentListMode = useAppStore((s) => s.setCurrentListMode);
 
-  const [joinInput, setJoinInput] = useState("");
   const [listNameKind, setListNameKind] = useState<ListNameKind>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [editing, setEditing] = useState<EditingRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-  const bookmarkletRef = useRef<HTMLAnchorElement | null>(null);
 
-  const bookmarkletHref = useMemo(() => {
-    const scriptUrl = `${window.location.origin}/bookmarklet.js?v=10`;
-    return `javascript:(function(){var s=document.createElement('script');s.src='${scriptUrl}';document.body.appendChild(s);})();`;
-  }, []);
-  const bookmarkletLabel = "Add to Watchlist";
-
-  useLayoutEffect(() => {
-    const node = bookmarkletRef.current;
-    if (!node) return;
-    // React 19 blocks javascript: URLs in JSX props; set directly for drag-to-bookmarks support.
-    node.setAttribute("href", bookmarkletHref);
-    node.setAttribute("title", bookmarkletLabel);
-  }, [bookmarkletHref, bookmarkletLabel]);
-
-  function ensureBookmarkletHref() {
-    const node = bookmarkletRef.current;
-    if (!node) return;
-    node.setAttribute("href", bookmarkletHref);
-    node.setAttribute("title", bookmarkletLabel);
-  }
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteListChoice, setInviteListChoice] = useState<string>(INVITE_LIST_NONE);
 
   if (!currentUser?.uid) return null;
   const signedInUser = currentUser;
@@ -130,6 +127,79 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
     }
   }
 
+  const invitesQ = useQuery({
+    queryKey: ["pending-invites", uid],
+    queryFn: async (): Promise<PendingInvite[]> => {
+      const token = await getIdTokenForApi();
+      if (!token) throw new Error("Not signed in");
+      const res = await fetch("/api/get-invites", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = (await res.json()) as { ok?: boolean; invites?: PendingInvite[]; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to load invites");
+      return Array.isArray(data.invites) ? data.invites : [];
+    },
+    enabled: open && Boolean(uid),
+  });
+
+  const sendInviteMutation = useMutation({
+    mutationFn: async (payload: { invitedEmail: string; listId: string | null }) => {
+      const token = await getIdTokenForApi();
+      if (!token) throw new Error("Not signed in");
+      const res = await fetch("/api/send-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to send invite");
+    },
+    onSuccess: async () => {
+      setInviteEmail("");
+      setInviteListChoice(INVITE_LIST_NONE);
+      await queryClient.invalidateQueries({ queryKey: ["pending-invites", uid] });
+    },
+  });
+
+  const revokeInviteMutation = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const token = await getIdTokenForApi();
+      if (!token) throw new Error("Not signed in");
+      const res = await fetch(`/api/revoke-invite?inviteId=${encodeURIComponent(inviteId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to revoke");
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["pending-invites", uid] });
+    },
+  });
+
+  const inviteListOptions = useMemo(() => {
+    const opts: { value: string; label: string }[] = [{ value: INVITE_LIST_NONE, label: "None" }];
+    for (const l of sharedLists) {
+      opts.push({
+        value: l.id,
+        label: displayListName(l.name) || "Shared list",
+      });
+    }
+    return opts;
+  }, [sharedLists]);
+
+  function listLabelForInvite(listId: string | null): string {
+    if (!listId) return "(app only)";
+    const hit = sharedLists.find((l) => l.id === listId);
+    return hit ? displayListName(hit.name) || "Shared list" : listId;
+  }
+
+  function resolveInviteListId(): string | null {
+    const v = inviteListChoice.trim();
+    if (!v || v === INVITE_LIST_NONE) return null;
+    return v;
+  }
+
   return (
     <>
       {open ? (
@@ -140,7 +210,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
           }}
         >
           <DialogContent
-                  className="lists-modal z-[1201] max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8] sm:max-w-[520px]"
+            className="lists-modal z-[1201] max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8] sm:max-w-[520px]"
             id="lists-modal"
             onEscapeKeyDown={(e) => {
               e.preventDefault();
@@ -150,120 +220,24 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
             <DialogHeader className="modal-header">
               <DialogTitle className="modal-title font-title tracking-widest">Manage lists</DialogTitle>
               <DialogDescription className="sr-only">
-                Manage personal and shared lists, join by invite link, or create new lists.
+                Manage personal and shared lists, invite people by email, or create new lists.
               </DialogDescription>
             </DialogHeader>
             <div className="lists-modal-body">
-            <section className="lists-modal-section">
-              <h3 className="lists-modal-section-title">Your lists</h3>
-              <ul className="lists-modal-list" id="lists-modal-list">
-                {personalLists.map((l) => (
-                  <li
-                    key={`p-${l.id}`}
-                    className="lists-modal-list-item"
-                    data-value={l.id}
-                    data-type="personal"
-                    data-count={String(l.count || 0)}
-                  >
-                    <span className="lists-modal-list-item-name">
-                      {iconPerson}
-                      {editing?.type === "personal" && editing.id === l.id ? (
-                        <Input
-                          type="text"
-                          className="lists-modal-list-item-edit"
-                          value={editing.draft}
-                          autoFocus
-                          onChange={(e) => setEditing({ ...editing, draft: e.target.value })}
-                          onBlur={async () => {
-                            const { draft, original } = editing;
-                            setEditing(null);
-                            const newName = draft.trim();
-                            if (!newName || newName === original) return;
-                            try {
-                              await renamePersonalList(currentUser.uid, l.id, newName);
-                              await refreshListsAndCookie();
-                              if (sameListId(useAppStore.getState().currentListMode, l.id)) {
-                                setCurrentListMode({
-                                  type: "personal",
-                                  listId: l.id,
-                                  name: newName,
-                                });
-                              }
-                            } catch (err: unknown) {
-                              window.alert(`Failed to rename: ${errorMessage(err)}`);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              e.currentTarget.blur();
-                            }
-                            if (e.key === "Escape") {
-                              setEditing(null);
-                            }
-                          }}
-                        />
-                      ) : (
-                        <span className="lists-modal-list-item-name-text">{displayListName(l.name)}</span>
-                      )}
-                    </span>
-                    <div className="lists-modal-list-item-actions">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="lists-modal-list-item-action lists-modal-rename-btn"
-                        data-list-id={l.id}
-                        data-type="personal"
-                        onClick={() =>
-                          setEditing({
-                            type: "personal",
-                            id: l.id,
-                            draft: displayListName(l.name),
-                            original: displayListName(l.name),
-                          })
-                        }
-                      >
-                        Rename
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        className="lists-modal-list-item-action lists-modal-list-item-action--delete lists-modal-delete-btn"
-                        data-list-id={l.id}
-                        data-type="personal"
-                        onClick={() => {
-                          if (personalLists.length <= 1) {
-                            window.alert("You must have at least one personal list.");
-                            return;
-                          }
-                          setDeleteTarget({
-                            type: "personal",
-                            id: l.id,
-                            name: displayListName(l.name),
-                            count: l.count || 0,
-                            isLeave: false,
-                          });
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-                {sharedLists.map((l) => {
-                  const isOwner = !!(l.ownerId && String(l.ownerId) === String(currentUser.uid));
-                  const count = Array.isArray(l.items) ? l.items.length : 0;
-                  return (
+              <section className="lists-modal-section">
+                <h3 className="lists-modal-section-title">Your lists</h3>
+                <ul className="lists-modal-list" id="lists-modal-list">
+                  {personalLists.map((l) => (
                     <li
-                      key={`s-${l.id}`}
+                      key={`p-${l.id}`}
                       className="lists-modal-list-item"
                       data-value={l.id}
-                      data-type="shared"
-                      data-count={String(count)}
+                      data-type="personal"
+                      data-count={String(l.count || 0)}
                     >
                       <span className="lists-modal-list-item-name">
-                        {iconGroup}
-                        {editing?.type === "shared" && editing.id === l.id ? (
+                        {iconPerson}
+                        {editing?.type === "personal" && editing.id === l.id ? (
                           <Input
                             type="text"
                             className="lists-modal-list-item-edit"
@@ -271,17 +245,16 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                             autoFocus
                             onChange={(e) => setEditing({ ...editing, draft: e.target.value })}
                             onBlur={async () => {
-                              const snap = editing;
+                              const { draft, original } = editing;
                               setEditing(null);
-                              if (!snap) return;
-                              const newName = snap.draft.trim();
-                              if (!newName || newName === snap.original) return;
+                              const newName = draft.trim();
+                              if (!newName || newName === original) return;
                               try {
-                                await renameSharedList(l.id, newName);
+                                await renamePersonalList(currentUser.uid, l.id, newName);
                                 await refreshListsAndCookie();
                                 if (sameListId(useAppStore.getState().currentListMode, l.id)) {
                                   setCurrentListMode({
-                                    type: "shared",
+                                    type: "personal",
                                     listId: l.id,
                                     name: newName,
                                   });
@@ -310,10 +283,10 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                           variant="ghost"
                           className="lists-modal-list-item-action lists-modal-rename-btn"
                           data-list-id={l.id}
-                          data-type="shared"
+                          data-type="personal"
                           onClick={() =>
                             setEditing({
-                              type: "shared",
+                              type: "personal",
                               id: l.id,
                               draft: displayListName(l.name),
                               original: displayListName(l.name),
@@ -322,157 +295,270 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                         >
                           Rename
                         </Button>
-                        {isOwner ? (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          className="lists-modal-list-item-action lists-modal-list-item-action--delete lists-modal-delete-btn"
+                          data-list-id={l.id}
+                          data-type="personal"
+                          onClick={() => {
+                            if (personalLists.length <= 1) {
+                              window.alert("You must have at least one personal list.");
+                              return;
+                            }
+                            setDeleteTarget({
+                              type: "personal",
+                              id: l.id,
+                              name: displayListName(l.name),
+                              count: l.count || 0,
+                              isLeave: false,
+                            });
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                  {sharedLists.map((l) => {
+                    const isOwner = !!(l.ownerId && String(l.ownerId) === String(currentUser.uid));
+                    const count = Array.isArray(l.items) ? l.items.length : 0;
+                    return (
+                      <li
+                        key={`s-${l.id}`}
+                        className="lists-modal-list-item"
+                        data-value={l.id}
+                        data-type="shared"
+                        data-count={String(count)}
+                      >
+                        <span className="lists-modal-list-item-name">
+                          {iconGroup}
+                          {editing?.type === "shared" && editing.id === l.id ? (
+                            <Input
+                              type="text"
+                              className="lists-modal-list-item-edit"
+                              value={editing.draft}
+                              autoFocus
+                              onChange={(e) => setEditing({ ...editing, draft: e.target.value })}
+                              onBlur={async () => {
+                                const snap = editing;
+                                setEditing(null);
+                                if (!snap) return;
+                                const newName = snap.draft.trim();
+                                if (!newName || newName === snap.original) return;
+                                try {
+                                  await renameSharedList(l.id, newName);
+                                  await refreshListsAndCookie();
+                                  if (sameListId(useAppStore.getState().currentListMode, l.id)) {
+                                    setCurrentListMode({
+                                      type: "shared",
+                                      listId: l.id,
+                                      name: newName,
+                                    });
+                                  }
+                                } catch (err: unknown) {
+                                  window.alert(`Failed to rename: ${errorMessage(err)}`);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  e.currentTarget.blur();
+                                }
+                                if (e.key === "Escape") {
+                                  setEditing(null);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span className="lists-modal-list-item-name-text">{displayListName(l.name)}</span>
+                          )}
+                        </span>
+                        <div className="lists-modal-list-item-actions">
                           <Button
                             type="button"
-                            variant="destructive"
-                            className="lists-modal-list-item-action lists-modal-list-item-action--delete lists-modal-delete-btn"
+                            variant="ghost"
+                            className="lists-modal-list-item-action lists-modal-rename-btn"
                             data-list-id={l.id}
                             data-type="shared"
                             onClick={() =>
-                              setDeleteTarget({
+                              setEditing({
                                 type: "shared",
                                 id: l.id,
-                                name: displayListName(l.name),
-                                count,
-                                isLeave: false,
-                                isSharedDelete: true,
+                                draft: displayListName(l.name),
+                                original: displayListName(l.name),
                               })
                             }
                           >
-                            Delete
+                            Rename
                           </Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="lists-modal-list-item-leave lists-modal-leave-btn"
-                            data-list-id={l.id}
-                            onClick={() =>
-                              setDeleteTarget({
-                                type: "shared",
-                                id: l.id,
-                                name: displayListName(l.name),
-                                count,
-                                isLeave: true,
-                              })
-                            }
-                          >
-                            Leave
-                          </Button>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="lists-modal-create-buttons">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="lists-modal-new-personal"
-                  id="lists-new-personal-btn"
-                  onClick={() => setListNameKind("personal")}
-                >
-                  + New personal list
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="lists-modal-btn"
-                  id="lists-create-btn"
-                  onClick={() => setListNameKind("shared")}
-                >
-                  + Create new shared list
-                </Button>
-              </div>
-            </section>
-            <section className="lists-modal-section">
-              <h3 className="lists-modal-section-title">Join with link</h3>
-              <div className="lists-modal-join">
-                <Input
-                  type="text"
-                  id="lists-join-input"
-                  className="lists-modal-input"
-                  placeholder="Paste invite link"
-                  value={joinInput}
-                  onChange={(e) => setJoinInput(e.target.value)}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="lists-modal-btn"
-                  id="lists-join-btn"
-                  onClick={async () => {
-                    const url = joinInput.trim();
-                    if (!url) {
-                      window.alert("Paste the invite link in the field above.");
-                      return;
-                    }
-                    let listId: string | null = null;
-                    try {
-                      const parsed = new URL(url);
-                      const byQuery = parsed.searchParams.get("join");
-                      if (byQuery) listId = byQuery;
-                      if (!listId) {
-                        const byPath = parsed.pathname.match(/\/join\/([a-z0-9]+)/i);
-                        listId = byPath?.[1] ?? null;
+                          {isOwner ? (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              className="lists-modal-list-item-action lists-modal-list-item-action--delete lists-modal-delete-btn"
+                              data-list-id={l.id}
+                              data-type="shared"
+                              onClick={() =>
+                                setDeleteTarget({
+                                  type: "shared",
+                                  id: l.id,
+                                  name: displayListName(l.name),
+                                  count,
+                                  isLeave: false,
+                                  isSharedDelete: true,
+                                })
+                              }
+                            >
+                              Delete
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="lists-modal-list-item-leave lists-modal-leave-btn"
+                              data-list-id={l.id}
+                              onClick={() =>
+                                setDeleteTarget({
+                                  type: "shared",
+                                  id: l.id,
+                                  name: displayListName(l.name),
+                                  count,
+                                  isLeave: true,
+                                })
+                              }
+                            >
+                              Leave
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div className="lists-modal-create-buttons">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="lists-modal-new-personal"
+                    id="lists-new-personal-btn"
+                    onClick={() => setListNameKind("personal")}
+                  >
+                    + New personal list
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="lists-modal-btn"
+                    id="lists-create-btn"
+                    onClick={() => setListNameKind("shared")}
+                  >
+                    + Create new shared list
+                  </Button>
+                </div>
+              </section>
+
+              <section className="lists-modal-section lists-modal-section--divider">
+                <h3 className="lists-modal-section-title">Invite someone</h3>
+                <div className="lists-modal-invite-form flex flex-col gap-3">
+                  <div>
+                    <label className="lists-modal-list-item-label" htmlFor="invite-email-input">
+                      Email
+                    </label>
+                    <Input
+                      id="invite-email-input"
+                      type="email"
+                      className="lists-modal-input mt-1"
+                      placeholder="friend@example.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <label className="lists-modal-list-item-label" htmlFor="invite-list-select">
+                      Include list
+                    </label>
+                    <Select value={inviteListChoice} onValueChange={setInviteListChoice}>
+                      <SelectTrigger
+                        id="invite-list-select"
+                        className="lists-modal-select-trigger mt-1 w-full border border-[var(--border)] bg-[#1c1c22] text-[#f0ede8]"
+                      >
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent className="border border-[var(--border)] bg-[#1c1c22] text-[#f0ede8]">
+                        {inviteListOptions.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="lists-modal-description mt-1 text-xs opacity-80">
+                      Optional — invite them to the app only, or also add them to a shared list you belong to.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="lists-modal-btn"
+                    disabled={sendInviteMutation.isPending}
+                    onClick={() => {
+                      const em = inviteEmail.trim();
+                      if (!em) {
+                        window.alert("Enter an email address.");
+                        return;
                       }
-                    } catch {
-                      const byQueryMatch = url.match(/[?&]join=([a-z0-9]+)/i);
-                      if (byQueryMatch?.[1]) listId = byQueryMatch[1];
-                      if (!listId) {
-                        const byPathMatch = url.match(/\/join\/([a-z0-9]+)/i);
-                        listId = byPathMatch?.[1] ?? null;
-                      }
-                    }
-                    if (!listId) {
-                      window.alert("Invalid link. Paste the full URL from the person who shared the list.");
-                      return;
-                    }
-                    try {
-                      const res = await fetch(`${window.location.origin}/api/join-shared-list`, {
-                        method: "POST",
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ listId }),
-                      });
-                      const data = await res.json();
-                      if (data.ok) {
-                        setJoinInput("");
-                        const mode = { type: "shared", listId, name: data.name || "" };
-                        setCurrentListMode(mode);
-                        saveLastList(currentUser, mode);
-                        await refreshListsAndCookie();
-                        navigate(`/list/${listId}`, { replace: true });
-                      } else {
-                        window.alert(data.error || "Failed to join");
-                      }
-                    } catch (err: unknown) {
-                      window.alert(`Failed to join: ${errorMessage(err)}`);
-                    }
-                  }}
-                >
-                  Join
-                </Button>
-              </div>
-            </section>
-            <section className="lists-modal-section">
-              <h3 className="lists-modal-section-title">Add from IMDb</h3>
-              <p className="lists-modal-description">
-                Drag this button to your bookmarks bar to add titles directly from any IMDb page.
-              </p>
-              <a
-                ref={bookmarkletRef}
-                id="lists-bookmarklet-btn"
-                className="lists-modal-bookmarklet-btn"
-                draggable="true"
-                onMouseDown={ensureBookmarkletHref}
-                onClick={(e) => e.preventDefault()}
-              >
-                Add to Watchlist
-              </a>
-            </section>
+                      const listId = resolveInviteListId();
+                      sendInviteMutation.mutate(
+                        { invitedEmail: em, listId },
+                        {
+                          onError: (err: Error) => window.alert(err.message || "Failed to send invite"),
+                          onSuccess: () => window.alert("Invitation sent."),
+                        }
+                      );
+                    }}
+                  >
+                    {sendInviteMutation.isPending ? "Sending…" : "Send invite"}
+                  </Button>
+                </div>
+
+                <h4 className="lists-modal-section-subtitle mt-6 font-title text-sm uppercase tracking-widest text-[var(--muted)]">
+                  Pending invites
+                </h4>
+                {invitesQ.isLoading ? (
+                  <p className="lists-modal-description">Loading…</p>
+                ) : invitesQ.isError ? (
+                  <p className="lists-modal-description text-[#e85a5a]">{errorMessage(invitesQ.error)}</p>
+                ) : !invitesQ.data?.length ? (
+                  <p className="lists-modal-description">No pending invites.</p>
+                ) : (
+                  <ul className="lists-modal-list mt-2">
+                    {invitesQ.data.map((inv) => (
+                      <li key={inv.inviteId} className="lists-modal-list-item">
+                        <span className="lists-modal-list-item-name min-w-0 flex-1">
+                          <span className="lists-modal-list-item-name-text break-all text-sm">
+                            {inv.invitedEmail} → {listLabelForInvite(inv.listId)}
+                          </span>
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="lists-modal-list-item-action shrink-0"
+                          disabled={revokeInviteMutation.isPending}
+                          onClick={() =>
+                            revokeInviteMutation.mutate(inv.inviteId, {
+                              onError: (e: Error) => window.alert(e.message || "Revoke failed"),
+                            })
+                          }
+                        >
+                          Revoke
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
             </div>
           </DialogContent>
         </Dialog>
@@ -511,9 +597,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
 
       <DeleteConfirmModal
         open={deleteTarget != null}
-        title={
-          deleteTarget?.isLeave ? "Leave list?" : "Delete list?"
-        }
+        title={deleteTarget?.isLeave ? "Leave list?" : "Delete list?"}
         message={
           deleteTarget == null
             ? ""

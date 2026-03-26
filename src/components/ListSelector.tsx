@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { saveLastList } from "../lib/storage.js";
 import { displayListName } from "../lib/utils.js";
 import { logEvent } from "../lib/axiom-logger.js";
@@ -125,47 +124,3 @@ export function ListSelector({ personalLists, sharedLists, onManageLists }: List
   );
 }
 
-interface CopyInviteButtonProps {
-  currentListMode: ListMode;
-}
-
-export function CopyInviteButton({ currentListMode }: CopyInviteButtonProps) {
-  const [copied, setCopied] = useState(false);
-  const isShared =
-    currentListMode &&
-    typeof currentListMode === "object" &&
-    currentListMode.type === "shared";
-
-  if (!isShared) return null;
-
-  const listId = currentListMode.listId;
-  const shareUrl = `${window.location.origin}/join/${listId}`;
-
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      id="copy-invite-btn"
-      className="copy-invite-btn"
-      title="Copy invite link"
-      disabled={copied}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(shareUrl);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        } catch {
-          window.alert(`Could not copy. The link is:\n${shareUrl}`);
-        }
-      }}
-    >
-      <svg className="copy-invite-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-        <path
-          fill="currentColor"
-          d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
-        />
-      </svg>
-      <span className="copy-invite-text">{copied ? "Copied!" : "Copy invite link"}</span>
-    </Button>
-  );
-}

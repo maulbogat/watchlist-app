@@ -15,7 +15,8 @@ This document describes **only what exists in this repository** (static site, Ve
 | **OMDb** | Title metadata by IMDb id; disambiguate movie vs TV when TMDB returns both; fallback row when TMDB has no match. | **REST:** `https://www.omdbapi.com/?i=...&apikey=...` in `add-from-imdb.js` and various scripts. | API key query parameter. | `OMDB_API_KEY` (Vercel + local scripts per README / `.env.example`). |
 | **YouTube** | Trailer playback in modal via iframe embed. | **Browser:** `https://www.youtube-nocookie.com/embed/{youtubeId}?...` and link to `youtube.com/watch`. | None for embed (public video ids). | None. |
 | **Google Fonts** | UI typography (Bebas Neue, DM Sans). | `<link href="https://fonts.googleapis.com/...">` in HTML. | None. | None. |
-| **Vercel** | Host static HTML/CSS/JS from **`dist/`**; run Node serverless routes under **`/api/*`** (`api/*.js`, **`vercel.json`**). | **Browser:** `fetch` to same-origin **`/api/...`** (e.g. **`log-client-event`** for Axiom ingest with `Authorization: Bearer` ID token). **Server:** CommonJS handlers wrapped by **`src/api-lib/vercel-adapter.js`** for `(req, res)`. | Routes verify Firebase ID token (cookie or `Authorization: Bearer`) where needed. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional `AXIOM_TOKEN`, optional `AXIOM_DATASET`, optional **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_TOKEN`**, **`WHATSAPP_PHONE_NUMBER_ID`**, optional **`APP_PUBLIC_URL`** / **`VITE_APP_ORIGIN`** for outbound message copy (server-only; no `VITE_AXIOM_*`). |
+| **Vercel** | Host static HTML/CSS/JS from **`dist/`**; run Node serverless routes under **`/api/*`** (`api/*.js`, **`vercel.json`**). | **Browser:** `fetch` to same-origin **`/api/...`** (e.g. **`log-client-event`** for Axiom ingest with `Authorization: Bearer` ID token). **Server:** CommonJS handlers wrapped by **`src/api-lib/vercel-adapter.js`** for `(req, res)`. | Routes verify Firebase ID token (cookie or `Authorization: Bearer`) where needed. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional `AXIOM_TOKEN`, optional `AXIOM_DATASET`, optional **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_TOKEN`**, **`WHATSAPP_PHONE_NUMBER_ID`**, optional **`RESEND_API_KEY`**, optional **`RESEND_FROM_EMAIL`** (defaults in code to Resend’s testing sender), optional **`APP_PUBLIC_URL`** / **`VERCEL_URL`** for invite links and WhatsApp copy, optional **`VITE_APP_ORIGIN`** (server-only reads where implemented; no `VITE_AXIOM_*`). |
+| **Resend** | Transactional email for **app invitations** (`send-invite`). | **Server:** HTTPS `POST https://api.resend.com/emails` from **`src/api-lib/resend-send.js`** (no Resend npm package in repo). **Not** called from the browser. | API key in `Authorization: Bearer`. | **`RESEND_API_KEY`**, optional **`RESEND_FROM_EMAIL`**. |
 | **Meta (WhatsApp Cloud API)** | Webhook verification (GET) and inbound text (POST); outbound text replies after verify/add flows. | **Server:** **`api/whatsapp-webhook.js`** (Meta → app), **`api/whatsapp-verify.js`** and **`src/api-lib/whatsapp-graph.js`** (Graph `messages` API). **Not** called from the browser. | **`WHATSAPP_VERIFY_TOKEN`** must match Meta’s verify field; **`WHATSAPP_TOKEN`** + **`WHATSAPP_PHONE_NUMBER_ID`** for sending. | Same WhatsApp env vars as above. |
 
 **Note:** `.env` is for server/script vars (`process.env`) and `.env.local` is for client Vite vars (`import.meta.env`). The live add flow uses the signed-in user’s Firestore `country` (via `getUserProfile` in `src/add-main.ts`), not `WATCH_REGION`, when calling **`/api/add-from-imdb`**. For Vercel vs Vite variable placement and sensitive keys, see **[`docs/environment.md`](./docs/environment.md)**.
@@ -25,7 +26,7 @@ This document describes **only what exists in this repository** (static site, Ve
 ## Section 2: Architecture Overview
 
 **Browser (client-side)**  
-- **Watchlist UI — React + TypeScript + Vite:** Root **`index.html`** loads **`#root`** and **`/src/main.tsx`**. **`npm run dev:react`** / **`npm run build:react`**; Vercel publishes **`dist/`** from **`npm run build:react`** (**`vercel.json`**). **`src/firebase.ts`** (Firebase JS SDK from npm, bundled by Vite) initializes App, Auth, Firestore, optional Analytics; list CRUD uses the same module. **`src/store/useAppStore.ts`** (Zustand) + **`src/store/watchlistConstants.ts`**. **`src/hooks/useWatchlist.ts`** (TanStack Query) loads lists; **`useAuthUser.ts`** → **`onAuthStateChanged`**. **`WatchlistPage.tsx`**: **`ListSelector`**, **`WatchlistToolbar`**, **`ManageListsModal`**, auth menu (**WhatsApp** → **`WhatsAppSettings`**), **`CountryModal`**, **`src/components/modals/*.tsx`**, **`UpcomingAlertsBar`**, filters, **`TitleGrid`** / **`TitleCard`**, **`TrailerModal`**. Session restore **`useWatchlistSessionRestore.ts`**; **`src/lib/watchlistFilters.ts`**, **`bookmarkletCookie.ts`**, **`storage.ts`**, **`movieDisplay.ts`**, **`utils.ts`**, **`src/data/lists.ts`**, **`src/hooks/useMutations.ts`**. **`src/main.tsx`** warns if **`#root`** is missing.
+- **Watchlist UI — React + TypeScript + Vite:** Root **`index.html`** loads **`#root`** and **`/src/main.tsx`**. **`npm run dev:react`** / **`npm run build:react`**; Vercel publishes **`dist/`** from **`npm run build:react`** (**`vercel.json`**). **`src/App.tsx`** routes include **`/join/:listId`** (**`JoinPage`**), **`/join-app/:inviteId`** (**`JoinAppPage`**), **`/admin`**, and the signed-in watchlist shell (**`WatchlistAuthGate`** → **`AllowlistGate`** → **`WatchlistPage`**). **`AccessDeniedScreen`** replaces the app when the user is not on **`allowedUsers`** (except **`/join-app/*`** where they can sign in and accept). **`src/firebase.ts`** (Firebase JS SDK from npm, bundled by Vite) initializes App, Auth, Firestore, optional Analytics; list CRUD uses the same module; **`checkUserAllowed`** reads **`allowedUsers`**. **`src/store/useAppStore.ts`** (Zustand) + **`src/store/watchlistConstants.ts`**. **`src/hooks/useWatchlist.ts`** (TanStack Query) loads lists; **`useAuthUser.ts`** → **`onAuthStateChanged`**. **`WatchlistPage.tsx`**: **`ListSelector`**, **`WatchlistToolbar`**, **`ManageListsModal`** (lists + email invites; no in-modal bookmarklet or paste-to-join), auth menu (**WhatsApp** → **`WhatsAppSettings`**, **Bookmarklet** → **`BookmarkletSettings`**), **`CountryModal`**, **`src/components/modals/*.tsx`**, **`UpcomingAlertsBar`**, filters, **`TitleGrid`** / **`TitleCard`**, **`TrailerModal`**. Session restore **`useWatchlistSessionRestore.ts`**; **`src/lib/watchlistFilters.ts`**, **`bookmarkletCookie.ts`**, **`storage.ts`**, **`movieDisplay.ts`**, **`utils.ts`**, **`src/data/lists.ts`**, **`src/hooks/useMutations.ts`**. **`src/main.tsx`** warns if **`#root`** is missing.
 - All routine Firestore access uses the **signed-in user’s** Firebase session and **`firestore.rules`**.  
 - **`add.html`** + **`src/add-main.ts`** — bookmarklet popup: auth, POST **`/api/add-from-imdb`**, `postMessage` handshake.  
 - **`public/bookmarklet.js`** on **imdb.com** opens hosted **`add.html`**. Production origin is hardcoded in **`public/bookmarklet.js`** (see file); `postMessage` also allows **`localhost`** and legacy Netlify origins for dev.
@@ -35,6 +36,10 @@ This document describes **only what exists in this repository** (static site, Ve
 - **Serverless API routes** (root **`api/*.js`**, **`vercel.json`** rewrites + cron **`/api/check-upcoming`**):  
   - `add-from-imdb.js` — verifies token, calls OMDb/TMDB, writes Firestore via Admin SDK; after a successful add with `tmdbId`, runs **upcoming alerts** sync for that title (`src/api-lib/sync-upcoming-alerts.js`).  
   - `join-shared-list.js` — verifies token, adds caller’s uid to `sharedLists/{listId}.members`.  
+  - `send-invite.js` — verifies token, validates email, writes **`invites/{inviteId}`**, sends Resend mail with **`/join-app/{inviteId}`** link.  
+  - `accept-invite.js` — verifies token, checks invite unused/unexpired and email match, writes **`allowedUsers/{email}`**, optional **`sharedLists`** membership, marks invite used.  
+  - `get-invites.js` — lists pending invites created by caller (`invitedBy`).  
+  - `revoke-invite.js` — deletes **`invites/{inviteId}`** when caller is inviter.  
   - `check-upcoming.js` — **cron** (3:00 UTC, **`vercel.json`**): runs chunked sync (`runRegistrySyncWithTimeBudget`) over **`titleRegistry`**, writes to `upcomingAlerts`, `upcomingChecks`, and `syncState/upcomingAlerts`, and writes latest run status to `meta/jobConfig`. Uses shared logic in **`src/api-lib/execute-upcoming-sync.js`** and respects `meta/jobConfig.checkUpcomingEnabled` for scheduled runs (manual runs still proceed). Recognizes **`x-vercel-cron`** like Netlify’s **`x-netlify-event`**.  
   - `trigger-upcoming-sync.js` — **HTTP** (GET/POST) manual trigger for the same upcoming sync as `check-upcoming`. Optional env **`UPCOMING_SYNC_TRIGGER_SECRET`** + `Authorization: Bearer …`.  
   - `log-client-event.js` — POST authenticated client events to **Axiom** (server-only `AXIOM_*`).  
@@ -48,11 +53,12 @@ This document describes **only what exists in this repository** (static site, Ve
 
 **Firebase**  
 - **Authentication:** Google provider; users identified by `uid`.  
-- **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: **`titleRegistry` read for signed-in users, no client writes**; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`); `upcomingAlerts` read for any signed-in user, no client writes; `syncState` and **`verificationCodes`** denied to clients; **`phoneIndex`** readable/writable only when **`resource` / `request` `uid` matches** the signed-in user (owner-scoped rows). Collections not explicitly matched (for example `upcomingChecks`, `meta`) are also denied to clients by default. (Legacy **`catalog`** is removed from rules; delete leftover docs with `scripts/delete-legacy-catalog.mjs`.)
+- **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: **`titleRegistry` read for signed-in users, no client writes**; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`); `upcomingAlerts` read for any signed-in user, no client writes; `syncState` and **`verificationCodes`** denied to clients; **`phoneIndex`** readable/writable only when **`resource` / `request` `uid` matches** the signed-in user (owner-scoped rows); **`allowedUsers/{email}`** read only when path email (lowercased) matches the signed-in user’s token email (lowercased), no client writes; **`invites`** read for any signed-in user, no client writes (Admin + invite APIs only). Collections not explicitly matched (for example `upcomingChecks`, `meta`) are also denied to clients by default. (Legacy **`catalog`** is removed from rules; delete leftover docs with `scripts/delete-legacy-catalog.mjs`.)
 
 **External APIs — where invoked**  
 - **TMDB / OMDb:** from **`api/add-from-imdb.js`** (POST) and from **local Node scripts**, not from the deployed watchlist client.  
 - **Meta WhatsApp:** from **`api/whatsapp-webhook.js`** and **`api/whatsapp-verify.js`** (server only).  
+- **Resend:** from **`send-invite.js`** via **`src/api-lib/resend-send.js`** (server only).  
 - **YouTube:** browser loads embed URLs; no YouTube Data API key in repo.  
 - **No** TMDB calls from the watchlist UI for watch providers or enrichment at runtime; chips use data already on each item (`services`, `servicesByRegion`).
 
@@ -124,7 +130,38 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 
 **Relationship:** Many-to-many via `members` (users can be in multiple lists).
 
-**Indexed / queried:** Client uses `query(collection(db, "sharedLists"), where("members", "array-contains", uid))` in `getSharedListsForUser`. **No `firestore.indexes.json`** is present in repo; Firebase may auto-index simple `array-contains` queries or prompt in console if needed.
+**Indexed / queried:** Client uses `query(collection(db, "sharedLists"), where("members", "array-contains", uid))` in `getSharedListsForUser`. **`firestore.indexes.json`** includes a composite index on **`invites`** (`invitedEmail`, `usedAt`) for server-side invite queries. Firebase may auto-index simple `array-contains` queries or prompt in console if needed.
+
+---
+
+### `allowedUsers` / `{email}`
+
+**Document id:** Lowercased, trimmed email (same normalization as **`normalizeUserEmailKey`** in **`src/firebase.ts`** and invite APIs).
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `uid` | `string` | Firebase uid after the user accepts (set by **`accept-invite`**). |
+| `invitedBy` | `string` | Inviter uid or sentinel (e.g. seed **`self`**). |
+| `invitedAt` | `string` (ISO) | From invite creation or seed time. |
+| `acceptedAt` | `string` (ISO) | When invite was accepted or seeded. |
+
+**Writes:** Admin SDK only (`accept-invite`, **`scripts/seed-allowed-users.mjs`**). **Reads:** Owner may read their own row (`firestore.rules`). **`AllowlistGate`** uses **`checkUserAllowed`** before loading watchlist Firestore UX.
+
+---
+
+### `invites` / `{inviteId}`
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `invitedEmail` | `string` | Normalized lowercase. |
+| `invitedBy` | `string` | Inviter uid. |
+| `listId` | `string` or null | Optional shared list to join on accept. |
+| `createdAt` | `string` (ISO) | |
+| `expiresAt` | `string` (ISO) | Typically seven days from creation. |
+| `usedAt` | `string` (ISO) or null | Set when accepted. |
+| `usedBy` | `string` or null | Accepter uid. |
+
+**Writes:** Admin SDK only (`send-invite`, `accept-invite`, `revoke-invite`). **Reads:** Any signed-in user per rules (UI uses **`get-invites`** API instead of direct client queries for listing).
 
 ---
 
@@ -278,24 +315,24 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 8. If TMDB fails: build minimal row from OMDb only (`youtubeId: null`).  
 9. Dedupe/merge into target list document; normalize `youtubeId` through 11-char validation before persist.
 
-### 4. Shared list invite flow
+### 4. Shared list and app-invite flows
 
-**Create:**  
+**Shared list — create:**  
 1. Signed-in user opens list settings modal → “Create shared list”, enters name.  
 2. `createSharedList(uid, name)` writes `sharedLists/{listId}` with `ownerId`, `members: [uid]`, empty arrays.  
-3. Modal shows URL `/join/{listId}` and copy button.
+3. **`SharedCreatedModal`** shows URL **`/join/{listId}`** to copy (header “Copy invite link” was removed).
 
-**Join via link:**  
-1. User opens site with `/join/{listId}` while signed in (legacy `?join=` links are redirected).
-2. Client `POST`s `/api/join-shared-list` with JSON `{ listId }`, `credentials: "include"` — **`useWatchlistSessionRestore.ts`** (legacy query redirect on load) or **`ManageListsModal.tsx`** (paste URL). Function reads Firebase ID token from cookie and/or `Authorization` header.
-3. Function verifies Firebase ID token, `arrayUnion(uid)` on `members` if not already present (fails with **400** if the list document has no non-empty `name` and the user was not already a member).  
-4. Client refreshes shared lists, switches `currentListMode` to that shared list.
+**Shared list — join via link:**  
+1. User opens site with **`/join/{listId}`** while signed in (legacy **`?join=`** links are redirected).  
+2. Client **`POST`s `/api/join-shared-list`** with JSON **`{ listId }`**, `credentials: "include"` — **`useWatchlistSessionRestore.ts`** or **`JoinPage`**. Function reads Firebase ID token from cookie and/or **`Authorization`** header.  
+3. Function verifies Firebase ID token, **`arrayUnion(uid)`** on **`members`** if not already present (fails with **400** if the list document has no non-empty **`name`** and the user was not already a member). Caller must already pass **`allowedUsers`** (signed-in Google session is not enough).  
+4. Client refreshes shared lists, switches **`currentListMode`** to that shared list.
 
-**Join via paste:**  
-- Lists modal “Join” reads URL from input, extracts `join` query param, same POST as above.
-
-**Copy invite (header):**  
-- When viewing a shared list, “Copy invite link” copies `/join/{listId}`.
+**App access — email invite:**  
+1. Allowed user opens **Manage lists** → **Invite someone**, enters email and optional shared list, **`POST /api/send-invite`**.  
+2. Server creates **`invites/{inviteId}`**, emails **`/join-app/{inviteId}`** (Resend).  
+3. Invitee opens link: if not signed in, **`JoinAppPage`** prompts Google sign-in; when signed in, **`POST /api/accept-invite`** adds **`allowedUsers/{email}`** and optional **`sharedLists`** membership, marks invite used.  
+4. **`AllowlistGate`** then allows the main app; revoker uses **`DELETE /api/revoke-invite`**; pending rows from **`GET /api/get-invites`**.
 
 ### 5. Watch provider lookup flow
 
@@ -318,14 +355,18 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
 | Name / file | Responsibility | Reads Firestore | Writes Firestore | External APIs |
 |-------------|----------------|-----------------|------------------|---------------|
-| `index.html` / `src/main.tsx` | Vite entry; mounts React (`App` → routes → `WatchlistPage` / `JoinPage` / `AdminPage`). | — | — | Google Fonts (from HTML) |
+| `index.html` / `src/main.tsx` | Vite entry; mounts React (`App` → routes → **`WatchlistAuthGate`** / **`JoinPage`** / **`JoinAppPage`** / **`AdminPage`**). | — | — | Google Fonts (from HTML) |
 | `src/pages/AdminPage.tsx` | Admin-only dashboard: stats, upcoming job controls, GitHub backup status, **Service Links** (Vercel env vars, Meta WhatsApp console, Google Cloud billing, Firebase, etc.). | Via queries / `fetch` to admin APIs | — | `fetch` → `github-backup-status`, `admin-job-config`; external HTTPS links |
 | `src/components/WhatsAppSettings.tsx` | Dialog: list linked numbers, default list per number, connect flow; **`fetch`** → **`/api/whatsapp-verify`**. | Via `src/firebase.ts` | Via `src/firebase.ts` (`phoneIndex`, `users.phoneNumbers`) | WhatsApp verify API |
-| `src/components/*.tsx`, `src/components/modals/*.tsx`, `src/hooks/*` | React watchlist UI (see Architecture). | Via `src/firebase.ts` | Via `src/firebase.ts` | `fetch` → `join-shared-list`, `log-client-event`, admin functions where used; YouTube embeds; clipboard |
+| `src/components/BookmarkletSettings.tsx` | Dialog: bookmarklet instructions + draggable control (opened from profile menu). | — | — | — |
+| `src/components/AllowlistGate.tsx` | After sign-in, **`checkUserAllowed`** on **`allowedUsers`**; blocks watchlist children when denied. | `allowedUsers` | — | Firebase SDK |
+| `src/components/AccessDeniedScreen.tsx` | Full-screen copy when user is not allowlisted (or email missing). | — | — | — |
+| `src/pages/JoinAppPage.tsx` | Accept email invite: sign-in CTA or **`POST /api/accept-invite`**, then redirect. | — | — | Same-origin `fetch` |
+| `src/components/*.tsx`, `src/components/modals/*.tsx`, `src/hooks/*` | React watchlist UI (see Architecture). | Via `src/firebase.ts` | Via `src/firebase.ts` | `fetch` → `join-shared-list`, `send-invite`, `get-invites`, `revoke-invite`, `accept-invite`, `log-client-event`, admin functions where used; YouTube embeds; clipboard |
 | `src/store/watchlistConstants.ts` | Status labels, checkmark/upcoming SVG snippets, `GENRE_LIMIT`. | — | — | — |
 | `src/lib/movieDisplay.ts` | `servicesForMovie`, `renderServiceChips`, `hasPlayableTrailerYoutubeId`. | — | — | — |
 | `src/config/firebase.ts` | Firebase Web SDK config from `import.meta.env` (`VITE_FIREBASE_*`) with normalization/sanitization and safe defaults. | — | — | — |
-| `src/firebase.ts` | Imports config, initializes App/Auth/Firestore, optional Analytics (`getAnalytics(app)` when allowed — not exported); **`titleRegistry`** hydration, user/shared/personal list CRUD, status keys, upcoming helpers, admin job config fetch. | `titleRegistry`, `users/*`, `sharedLists/*`, `personalLists/*` | Same | Firebase SDK (npm, Vite bundle) |
+| `src/firebase.ts` | Imports config, initializes App/Auth/Firestore, optional Analytics (`getAnalytics(app)` when allowed — not exported); **`titleRegistry`** hydration, user/shared/personal list CRUD, status keys, upcoming helpers, admin job config fetch; **`checkUserAllowed`**. | `titleRegistry`, `users/*`, `sharedLists/*`, `personalLists/*`, `allowedUsers` (read) | Same | Firebase SDK (npm, Vite bundle) |
 | `src/countries.ts` | Static ISO country list + flags for country modal. | — | — | — |
 | `src/lib/youtube-trailer-id.ts` | Validate/normalize TMDB YouTube key strings. | — | — | — |
 | `src/lib/axiom-logger.ts` | POST signed-in events to **`/api/log-client-event`**. | — | — | Same-origin `fetch` |
@@ -335,13 +376,17 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `public/bookmarklet.js` | On IMDb: open popup, `postMessage` handshake. | — | — | Opens hosted `add.html` (hardcoded production host + localhost for dev) |
 | `api/add-from-imdb.js` | Auth verify, OMDb/TMDB enrichment, merge/write list docs. | Firestore via Admin | `users`, `sharedLists` | OMDb, TMDB |
 | `api/join-shared-list.js` | Add member to shared list. | Firestore via Admin | `sharedLists` | — |
+| `api/send-invite.js` | Create **`invites`** doc; send Resend email. | Firestore via Admin | `invites` | Resend HTTP API |
+| `api/accept-invite.js` | Validate invite; write **`allowedUsers`**; optional shared list member; mark used. | Firestore via Admin | `invites`, `allowedUsers`, `sharedLists` | — |
+| `api/get-invites.js` | List caller’s pending invites. | Firestore via Admin | — | — |
+| `api/revoke-invite.js` | Delete invite doc when caller is inviter. | Firestore via Admin | `invites` | — |
 | `api/whatsapp-webhook.js` | Meta webhook; inbound IMDb text → `add-from-imdb` by mapped uid. | Firestore via Admin | — (uses add-from-imdb for lists / registry) | Meta Graph send; TMDB/OMDb indirect |
 | `api/whatsapp-verify.js` | Link phone: send/verify code; write `phoneIndex`, `users`, `verificationCodes`. | Firestore via Admin | `phoneIndex`, `users`, `verificationCodes` | Meta Graph send |
 | `src/api-lib/phone-index.js`, `src/api-lib/whatsapp-graph.js` | Shared helpers for **`phoneIndex`** CRUD and Graph text messages. | — | — | Meta Graph API |
 | `styles.css` | Visual styling. | — | — | — |
 | `check-upcoming.mjs` | Local diagnostic: read Firestore + TMDB, print report. | Admin + `dotenv` | — | TMDB |
 | `compare-upcoming-trakt.mjs` | Optional read-only compare: TMDB vs Trakt “next episode” (same Firestore sources as `check-upcoming.mjs`). | Admin + `dotenv` | — | Trakt, TMDB |
-| `scripts/*.js`, `scripts/*.mjs`, `scripts/lib/*` | Maintenance, backup, migration (titleRegistry model). | Admin (typical) | Varies | TMDB, OMDb, etc. |
+| `scripts/*.js`, `scripts/*.mjs`, `scripts/lib/*` | Maintenance, backup, migration (titleRegistry model); **`seed-allowed-users.mjs`** seeds **`allowedUsers`**. | Admin (typical) | Varies | TMDB, OMDb, etc. |
 
 ---
 
@@ -363,6 +408,7 @@ flowchart LR
     NF3["check-upcoming (scheduled)"]
     NF4["trigger-upcoming-sync (HTTP)"]
     NF5["whatsapp-webhook / whatsapp-verify"]
+    NF6["send-invite / accept-invite / get-invites / revoke-invite"]
     Static["Static assets"]
   end
 
@@ -375,12 +421,14 @@ flowchart LR
     TMDB["TMDB API"]
     OMDb["OMDb API"]
     WA["Meta WhatsApp API"]
+    RS["Resend API"]
     YT["YouTube embeds"]
     GFonts["Google Fonts"]
   end
 
   SPA --> FA
   SPA --> FS
+  SPA --> NF6
   ADD --> FA
   ADD --> NF1
   BM --> ADD
@@ -401,6 +449,9 @@ flowchart LR
   NF5 --> FS
   NF5 --> FA
   NF5 --> WA
+  NF6 --> FS
+  NF6 --> FA
+  NF6 --> RS
 
   SPA --> YT
 ```
@@ -570,11 +621,11 @@ flowchart TD
 
 5. **Firestore rules vs Admin** — **Accepted architecture (not a bug).** **`firestore.rules`**: **`titleRegistry`**, **`upcomingAlerts`**, and **`syncState`** deny client writes (`allow write: if false` where applicable); **`sharedLists`** / **`users`** follow member/owner rules. **`api/*`** routes use **Firebase Admin SDK** and bypass rules by design. *Operational reality (true for any admin key):* compromise of **`FIREBASE_SERVICE_ACCOUNT`** implies broad Firestore access — expected tradeoff, not an open “gap” to close in app code.
 
-6. **Shared list join token** — **Still exists (audit).** **`api/join-shared-list.js`** verifies only the Firebase **ID token** (`bookmarklet_token` cookie or **`Authorization: Bearer`**) and **`body.listId`**. **No** invite-specific secret or signed invite token was added; anyone who can authenticate and supply a valid **`listId`** can attempt to join (subject to list existing, having a name, membership rules).
+6. **Shared list join vs app allowlist** — **`api/join-shared-list.js`** still verifies only the Firebase **ID token** and **`body.listId`** (no signed list secret). **However**, the React shell **`AllowlistGate`** requires a row in **`allowedUsers`** before the watchlist loads, so arbitrary Google accounts cannot use the app or obtain list UI to abuse joins without an **app** invite or seed. **`/join-app/:inviteId`** is routed outside that gate so invitees can sign in and call **`accept-invite`** first.
 
 7. **`join-shared-list` CORS** — **Still implemented; acceptable for current setup (audit).** **`corsHeaders(event)`** sets **`Access-Control-Allow-Origin`** to the request **`Origin`** header (or **`*`** if absent). **`Access-Control-Allow-Credentials: true`** is set. For the SPA on the **same deployment origin** calling **`/api/join-shared-list`**, the browser sends the real site origin; echoing it is the usual pattern for credentialed requests to same-site API routes. *Residual concern:* only if the function were called from additional allowed origins without updating CORS policy.
 
-8. **Composite indexes** — **Still no repo file (audit).** There is **no** **`firestore.indexes.json`** committed. **`src/firebase.ts`** still queries **`sharedLists`** with **`where("members", "array-contains", uid)`** (`getSharedListsForUser`). Firebase typically auto-provisions a single-field index for that query; any **composite** index Firebase requests would be created in the **Firebase console** (or a future checked-in `firestore.indexes.json`), not in this repo today.
+8. **Composite indexes** — **`firestore.indexes.json`** commits a composite index on **`invites`** (`invitedEmail`, `usedAt`) for invite API queries. **`sharedLists`** still uses **`where("members", "array-contains", uid)`** (`getSharedListsForUser`); Firebase typically auto-provisions single-field support for that pattern.
 
 9. **“Recently Added” tab** — **Partially resolved (unchanged from prior audit).** **`src/lib/watchlistFilters.ts`**: “recently-added” collects **to-watch** items, sorts primarily by persisted **`addedAt`** (ISO), then tie-breaks by **array index** (`b.index - a.index`). **`src/firebase.ts`** persists **`addedAt`** on list rows via **`rowToStore` / `ensureAddedAt`**. *Residual:* missing **`addedAt`** uses **`NEGATIVE_INFINITY`** so order falls back to index among ties — legacy rows may behave like “array order” for those entries.
 

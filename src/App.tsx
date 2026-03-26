@@ -3,7 +3,11 @@ import { auth, GoogleAuthProvider, signInWithPopup } from "./firebase.js";
 import { useAuthUser } from "./hooks/useAuthUser.js";
 import { WatchlistPage } from "./components/WatchlistPage.js";
 import { WhatsAppSettings } from "./components/WhatsAppSettings.js";
+import { BookmarkletSettings } from "./components/BookmarkletSettings.js";
+import { AllowlistGate } from "./components/AllowlistGate.js";
+import { AccessDeniedScreen } from "./components/AccessDeniedScreen.js";
 import { JoinPage } from "./pages/JoinPage.js";
+import { JoinAppPage } from "./pages/JoinAppPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
 import { logEvent } from "./lib/axiom-logger.js";
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -18,6 +22,7 @@ function isAuthError(err: unknown): err is { code?: string; message?: string } {
 function WatchlistAuthGate() {
   const { loading: authLoading } = useAuthUser();
   const user = useAppStore((s) => s.currentUser);
+  const accessDenied = useAppStore((s) => s.accessDenied);
   const [signingIn, setSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
 
@@ -51,6 +56,10 @@ function WatchlistAuthGate() {
     } finally {
       setSigningIn(false);
     }
+  }
+
+  if (accessDenied) {
+    return null;
   }
 
   if (authLoading) {
@@ -87,7 +96,11 @@ function WatchlistAuthGate() {
     );
   }
 
-  return <WatchlistPage />;
+  return (
+    <AllowlistGate>
+      <WatchlistPage />
+    </AllowlistGate>
+  );
 }
 
 function WhatsAppSettingsHost() {
@@ -109,10 +122,40 @@ function WhatsAppSettingsHost() {
   );
 }
 
+function BookmarkletSettingsHost() {
+  const user = useAppStore((s) => s.currentUser);
+  const open = useAppStore((s) => s.bookmarkletSettingsOpen);
+  const setOpen = useAppStore((s) => s.setBookmarkletSettingsOpen);
+  if (!user) return null;
+  return <BookmarkletSettings open={open} onOpenChange={setOpen} />;
+}
+
+function AdminRouteShell() {
+  const { loading: authLoading } = useAuthUser();
+  const user = useAppStore((s) => s.currentUser);
+  const accessDenied = useAppStore((s) => s.accessDenied);
+
+  if (accessDenied) {
+    return null;
+  }
+  if (authLoading) {
+    return <div className="react-migration-shell">Loading…</div>;
+  }
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+  return (
+    <AllowlistGate>
+      <AdminPage />
+    </AllowlistGate>
+  );
+}
+
 export default function App() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const accessDenied = useAppStore((s) => s.accessDenied);
 
   const joinId = searchParams.get("join");
   useEffect(() => {
@@ -121,16 +164,26 @@ export default function App() {
     navigate(`/join/${joinId}`, { replace: true });
   }, [joinId, navigate, location.pathname]);
 
+  const showAccessDenied = Boolean(accessDenied) && !location.pathname.startsWith("/join-app");
+
   return (
     <>
-      <Routes>
-        <Route path="/" element={<WatchlistAuthGate />} />
-        <Route path="/list/:listId" element={<WatchlistAuthGate />} />
-        <Route path="/join/:listId" element={<JoinPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <WhatsAppSettingsHost />
+      {showAccessDenied ? (
+        <AccessDeniedScreen />
+      ) : (
+        <>
+          <Routes>
+            <Route path="/join-app/:inviteId" element={<JoinAppPage />} />
+            <Route path="/join/:listId" element={<JoinPage />} />
+            <Route path="/admin" element={<AdminRouteShell />} />
+            <Route path="/" element={<WatchlistAuthGate />} />
+            <Route path="/list/:listId" element={<WatchlistAuthGate />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          <WhatsAppSettingsHost />
+          <BookmarkletSettingsHost />
+        </>
+      )}
       <Toaster />
     </>
   );

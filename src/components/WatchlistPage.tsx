@@ -24,7 +24,7 @@ import {
   isAddedByPresentInMovies,
   isGenrePresentInMovies,
 } from "../lib/watchlistFilters.js";
-import { ListSelector, CopyInviteButton } from "./ListSelector.js";
+import { ListSelector } from "./ListSelector.js";
 import { WatchlistToolbar } from "./WatchlistToolbar.js";
 import { TitleGrid } from "./TitleGrid.js";
 import { TrailerModal } from "./TrailerModal.js";
@@ -55,6 +55,7 @@ export function WatchlistPage() {
   const [manageListsOpen, setManageListsOpen] = useState(false);
   const [authMenuOpen, setAuthMenuOpen] = useState(false);
   const setWhatsAppSettingsOpen = useAppStore((s) => s.setWhatsAppSettingsOpen);
+  const setBookmarkletSettingsOpen = useAppStore((s) => s.setBookmarkletSettingsOpen);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [onboardingCountry, setOnboardingCountry] = useState(false);
   const [onboardingListName, setOnboardingListName] = useState(false);
@@ -254,7 +255,6 @@ export function WatchlistPage() {
                       sharedLists={sharedLists}
                       onManageLists={() => setManageListsOpen(true)}
                     />
-                    <CopyInviteButton currentListMode={currentListMode} />
                   </>
                 ) : (
                   <span className="custom-dropdown-value" style={{ opacity: 0.6 }}>
@@ -323,6 +323,21 @@ export function WatchlistPage() {
                     }}
                   >
                     WhatsApp
+                  </button>
+                  <button
+                    type="button"
+                    className="auth-dropdown-item"
+                    role="menuitem"
+                    id="auth-bookmarklet-btn"
+                    onClick={() => {
+                      setAuthMenuOpen(false);
+                      requestAnimationFrame(() => {
+                        (document.activeElement as HTMLElement | null)?.blur();
+                        setBookmarkletSettingsOpen(true);
+                      });
+                    }}
+                  >
+                    Bookmarklet
                   </button>
                   <button
                     type="button"

@@ -142,6 +142,32 @@ function initFirestoreWithLocalCache(): Firestore {
 const auth = getAuth(app);
 const db: Firestore = initFirestoreWithLocalCache();
 
+/** Lowercase email key for `allowedUsers/{email}` document ids. */
+function normalizeUserEmailKey(email: string): string {
+  return String(email || "")
+    .trim()
+    .toLowerCase();
+}
+
+/** Returns true if `allowedUsers/{normalizedEmail}` exists (invite / seed allowlist). */
+async function checkUserAllowed(email: string | null | undefined): Promise<boolean> {
+  if (email == null || typeof email !== "string") return false;
+  const key = normalizeUserEmailKey(email);
+  if (!key) return false;
+  const snap = await getDoc(doc(db, "allowedUsers", key));
+  return snap.exists();
+}
+
+async function getIdTokenForApi(): Promise<string | null> {
+  const u = auth.currentUser;
+  if (!u) return null;
+  try {
+    return await u.getIdToken();
+  } catch {
+    return null;
+  }
+}
+
 /** Stored list rows: registry refs, legacy embeds, or hydrated client rows re-saved with the same keys. */
 type ListRowForHydrate = FirestoreListRow | WatchlistItem;
 
@@ -1468,6 +1494,9 @@ export {
   resolveWhatsAppListPayload,
   whatsappListChoiceKeyForTargets,
   getPhoneIndexDefaultsForNumber,
+  normalizeUserEmailKey,
+  checkUserAllowed,
+  getIdTokenForApi,
 };
 
 export type { WhatsAppListType };

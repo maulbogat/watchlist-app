@@ -58,6 +58,13 @@ export interface AppState {
 
   whatsAppSettingsOpen: boolean;
   setWhatsAppSettingsOpen: (open: boolean) => void;
+
+  bookmarkletSettingsOpen: boolean;
+  setBookmarkletSettingsOpen: (open: boolean) => void;
+
+  /** Set when sign-in fails app allowlist (full-screen gate in App). */
+  accessDenied: null | "not_invited" | "no_email";
+  setAccessDenied: (reason: null | "not_invited" | "no_email") => void;
 }
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -105,6 +112,12 @@ export const useAppStore = create<AppState>()((set) => ({
 
   whatsAppSettingsOpen: false,
   setWhatsAppSettingsOpen: (whatsAppSettingsOpen) => set({ whatsAppSettingsOpen }),
+
+  bookmarkletSettingsOpen: false,
+  setBookmarkletSettingsOpen: (bookmarkletSettingsOpen) => set({ bookmarkletSettingsOpen }),
+
+  accessDenied: null,
+  setAccessDenied: (accessDenied) => set({ accessDenied }),
 }));
 
 export {

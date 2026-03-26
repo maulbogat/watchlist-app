@@ -422,19 +422,35 @@ header h1 span {
   padding: 0;
 }
 #lists-modal button[data-slot="dialog-close"]:hover,
-#whatsapp-settings-modal button[data-slot="dialog-close"]:hover {
+#whatsapp-settings-modal button[data-slot="dialog-close"]:hover,
+#bookmarklet-settings-modal button[data-slot="dialog-close"]:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
 }
 #lists-modal button[data-slot="dialog-close"] svg,
-#whatsapp-settings-modal button[data-slot="dialog-close"] svg {
+#whatsapp-settings-modal button[data-slot="dialog-close"] svg,
+#bookmarklet-settings-modal button[data-slot="dialog-close"] svg {
   width: 13px;
   height: 13px;
 }
 body:has(#lists-modal[data-state="open"]) [data-slot="dialog-overlay"],
-body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay"] {
+body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay"],
+body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-overlay"] {
   background: rgba(0, 0, 0, 0.72);
   backdrop-filter: none;
+}
+.lists-modal-section--divider {
+  border-top: 1px solid var(--border);
+  padding-top: 1.1rem;
+  margin-top: 0.35rem;
+}
+.lists-modal-section-subtitle {
+  font-family: var(--font-title);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
 }
 .lists-modal-section {
   margin-bottom: 1.25rem;
