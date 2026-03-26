@@ -85,6 +85,11 @@ const SERVICE_LINKS = [
     url: "https://vercel.com/maulbogats-projects/movie-trailer-site/settings/environment-variables",
   },
   {
+    label: "Resend",
+    sublabel: "Emails",
+    url: "https://resend.com/emails",
+  },
+  {
     label: "Meta",
     sublabel: "WhatsApp API",
     url: "https://developers.facebook.com/apps/1104781941831455/use_cases/customize/wa-settings/?use_case_enum=WHATSAPP_BUSINESS_MESSAGING&product_route=whatsapp-business&business_id=762125852300048&selected_tab=wa-dev-console",
@@ -93,6 +98,11 @@ const SERVICE_LINKS = [
     label: "Google Cloud",
     sublabel: "Billing",
     url: "https://console.cloud.google.com/billing/0145FD-CB6342-6B19AD",
+  },
+  {
+    label: "Cloudflare",
+    sublabel: "Dashboard",
+    url: "https://dash.cloudflare.com/a32df282319e2330a05f8a4511017022/home/overview",
   },
   {
     label: "GitHub",
