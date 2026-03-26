@@ -567,6 +567,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
 
       <ListNameModal
         open={listNameKind != null}
+        elevatedStack
         title={listNameKind === "shared" ? "Name your shared list" : "Name your personal list"}
         placeholder={listNameKind === "shared" ? "e.g. Family watchlist" : "e.g. Weekend picks"}
         allowCancel
@@ -597,6 +598,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
       />
 
       <DeleteConfirmModal
+        elevatedStack
         open={deleteTarget != null}
         title={deleteTarget?.isLeave ? "Leave list?" : "Delete list?"}
         message={
@@ -630,6 +632,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
       />
 
       <SharedCreatedModal
+        elevatedStack
         open={shareUrl != null}
         shareUrl={shareUrl || ""}
         onClose={() => setShareUrl(null)}

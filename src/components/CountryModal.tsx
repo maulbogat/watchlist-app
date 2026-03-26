@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { COUNTRIES } from "../countries.js";
 import type { Country } from "../types/index.js";
@@ -92,6 +92,9 @@ export function CountryModal({
           <DialogTitle className="modal-title font-title tracking-widest">
             Where are you watching from?
           </DialogTitle>
+          <DialogDescription className="text-[0.9rem] text-[var(--muted)]">
+            Used for streaming availability when you add titles. Search or pick a country below.
+          </DialogDescription>
         </DialogHeader>
         <div className="country-modal-body">
           <div className="country-picker-wrap">

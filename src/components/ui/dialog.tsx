@@ -49,13 +49,16 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  overlayClassName,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /** Raise overlay when this dialog opens above another (e.g. Manage lists uses z-[1201] on content). */
+  overlayClassName?: string
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
@@ -122,6 +125,7 @@ function DialogFooter({
 
 function DialogTitle({
   className,
+  id: _omit,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
@@ -138,6 +142,7 @@ function DialogTitle({
 
 function DialogDescription({
   className,
+  id: _omit,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/shadcn-utils";
 
 export interface ListNameModalProps {
   open: boolean;
@@ -9,6 +10,8 @@ export interface ListNameModalProps {
   placeholder?: string;
   initialValue?: string;
   allowCancel?: boolean;
+  /** Stack above parent dialogs (e.g. Manage lists panel is z-[1201]). */
+  elevatedStack?: boolean;
   onSave: (name: string) => void | Promise<void>;
   onCancel?: () => void;
 }
@@ -19,6 +22,7 @@ export function ListNameModal({
   placeholder = "",
   initialValue = "",
   allowCancel = false,
+  elevatedStack = false,
   onSave,
   onCancel,
 }: ListNameModalProps) {
@@ -51,6 +55,9 @@ export function ListNameModal({
     }
   }
 
+  /** Stacked on another dialog (e.g. Manage lists): ignore outside dismiss so the opening click/pointer-up does not instantly close this modal. */
+  const blockOutsideDismiss = Boolean(elevatedStack && allowCancel);
+
   return (
     <Dialog
       open={open}
@@ -59,7 +66,11 @@ export function ListNameModal({
       }}
     >
       <DialogContent
-        className="modal country-modal bg-[#131317] border-white/10 text-[#f0ede8]"
+        {...(elevatedStack ? { overlayClassName: "z-[1220]" } : {})}
+        className={cn(
+          "lists-modal max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8] sm:max-w-[420px]",
+          elevatedStack && "z-[1230]"
+        )}
         id="list-name-modal"
         onEscapeKeyDown={(e) => {
           if (!allowCancel) {
@@ -68,8 +79,15 @@ export function ListNameModal({
           }
           close();
         }}
+        onPointerDownOutside={(e) => {
+          if (blockOutsideDismiss) e.preventDefault();
+        }}
         onInteractOutside={(e) => {
           if (!allowCancel) {
+            e.preventDefault();
+            return;
+          }
+          if (blockOutsideDismiss) {
             e.preventDefault();
             return;
           }
@@ -77,9 +95,10 @@ export function ListNameModal({
         }}
       >
         <DialogHeader className="modal-header">
-          <DialogTitle className="modal-title font-title tracking-widest" id="list-name-modal-title">
-            {title}
-          </DialogTitle>
+          <DialogTitle className="modal-title font-title tracking-widest">{title}</DialogTitle>
+          <DialogDescription className="text-[0.9rem] leading-snug text-[var(--muted)]">
+            Enter a name for this list, then save.
+          </DialogDescription>
         </DialogHeader>
         <div className="country-modal-body list-name-modal-body">
           <Input

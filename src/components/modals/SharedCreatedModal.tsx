@@ -1,17 +1,21 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/shadcn-utils";
 
 export interface SharedCreatedModalProps {
   open: boolean;
   shareUrl: string;
+  elevatedStack?: boolean;
   onClose: () => void;
 }
 
-export function SharedCreatedModal({ open, shareUrl, onClose }: SharedCreatedModalProps) {
+export function SharedCreatedModal({ open, shareUrl, elevatedStack = false, onClose }: SharedCreatedModalProps) {
   const [copied, setCopied] = useState(false);
 
   if (!open) return null;
+
+  const blockOutsideDismiss = elevatedStack;
 
   return (
     <Dialog
@@ -21,20 +25,32 @@ export function SharedCreatedModal({ open, shareUrl, onClose }: SharedCreatedMod
       }}
     >
       <DialogContent
-        className="modal shared-modal bg-[#131317] border-white/10 text-[#f0ede8]"
+        {...(elevatedStack ? { overlayClassName: "z-[1220]" } : {})}
+        className={cn(
+          "modal shared-modal bg-[#131317] border-white/10 text-[#f0ede8]",
+          elevatedStack && "z-[1230]"
+        )}
         id="shared-modal"
         onEscapeKeyDown={(e) => {
           e.preventDefault();
           onClose();
         }}
-        onInteractOutside={() => {
+        onPointerDownOutside={(e) => {
+          if (blockOutsideDismiss) e.preventDefault();
+        }}
+        onInteractOutside={(e) => {
+          if (blockOutsideDismiss) {
+            e.preventDefault();
+            return;
+          }
           onClose();
         }}
       >
         <DialogHeader className="modal-header">
-          <DialogTitle className="modal-title font-title tracking-widest" id="shared-modal-title">
-            Shared list created
-          </DialogTitle>
+          <DialogTitle className="modal-title font-title tracking-widest">Shared list created</DialogTitle>
+          <DialogDescription className="text-[0.9rem] text-[var(--muted)]">
+            Share this link for others to join this list. They must already be allowed to use the app and signed in.
+          </DialogDescription>
         </DialogHeader>
         <div className="shared-modal-body" id="shared-modal-body">
           <p>Share this link for others to join:</p>

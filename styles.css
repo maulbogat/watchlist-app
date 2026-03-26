@@ -399,18 +399,28 @@ header h1 span {
   border-radius: 10px;
   padding: 0.9rem;
 }
+#list-name-modal {
+  width: min(420px, calc(100vw - 2rem));
+  max-width: 420px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem;
+}
 #lists-modal .modal-header,
-#whatsapp-settings-modal .modal-header {
+#whatsapp-settings-modal .modal-header,
+#list-name-modal .modal-header {
   margin-bottom: 0.45rem;
   padding: 0;
 }
 #lists-modal .modal-title,
-#whatsapp-settings-modal .modal-title {
+#whatsapp-settings-modal .modal-title,
+#list-name-modal .modal-title {
   font-size: 1.8rem;
   letter-spacing: 0.065em;
 }
 #lists-modal button[data-slot="dialog-close"],
-#whatsapp-settings-modal button[data-slot="dialog-close"] {
+#whatsapp-settings-modal button[data-slot="dialog-close"],
+#list-name-modal button[data-slot="dialog-close"] {
   top: 0.55rem;
   right: 0.55rem;
   width: 28px;
@@ -423,18 +433,21 @@ header h1 span {
 }
 #lists-modal button[data-slot="dialog-close"]:hover,
 #whatsapp-settings-modal button[data-slot="dialog-close"]:hover,
+#list-name-modal button[data-slot="dialog-close"]:hover,
 #bookmarklet-settings-modal button[data-slot="dialog-close"]:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
 }
 #lists-modal button[data-slot="dialog-close"] svg,
 #whatsapp-settings-modal button[data-slot="dialog-close"] svg,
+#list-name-modal button[data-slot="dialog-close"] svg,
 #bookmarklet-settings-modal button[data-slot="dialog-close"] svg {
   width: 13px;
   height: 13px;
 }
 body:has(#lists-modal[data-state="open"]) [data-slot="dialog-overlay"],
 body:has(#whatsapp-settings-modal[data-state="open"]) [data-slot="dialog-overlay"],
+body:has(#list-name-modal[data-state="open"]) [data-slot="dialog-overlay"],
 body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-overlay"] {
   background: rgba(0, 0, 0, 0.72);
   backdrop-filter: none;
