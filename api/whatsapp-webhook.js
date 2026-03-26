@@ -213,11 +213,38 @@ exports.handler = async (event) => {
   if (event.httpMethod === "POST") {
     const rawBody = getRawBodyString(event);
     const sigHeader = headerInsensitive(event.headers, "x-hub-signature-256");
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+    console.log("[wa-debug] x-hub-signature-256 present:", Boolean(sigHeader));
+    console.log("[wa-debug] WHATSAPP_APP_SECRET set:", Boolean(appSecret && String(appSecret).trim()));
+    console.log("[wa-debug] raw body (first 20 chars):", rawBody.slice(0, 20));
     if (!sigHeader) {
+      console.log("[wa-debug] signature verification failed: missing x-hub-signature-256 header");
       return { statusCode: 403, headers: { "Content-Type": "text/plain" }, body: "Forbidden" };
     }
-    const appSecret = process.env.WHATSAPP_APP_SECRET;
-    if (!appSecret || !verifyMetaSignature256(rawBody, sigHeader, appSecret)) {
+    const verifyOk = Boolean(appSecret && verifyMetaSignature256(rawBody, sigHeader, appSecret));
+    console.log("[wa-debug] verifyMetaSignature256 result:", verifyOk);
+    if (!appSecret || !verifyOk) {
+      if (!appSecret || !String(appSecret).trim()) {
+        console.log("[wa-debug] signature verification failed: WHATSAPP_APP_SECRET missing or empty");
+      } else {
+        const prefix = "sha256=";
+        if (typeof sigHeader !== "string" || !sigHeader.startsWith(prefix)) {
+          console.log("[wa-debug] signature verification failed: x-hub-signature-256 does not start with sha256=");
+        } else {
+          const theirHex = sigHeader.slice(prefix.length);
+          let theirBuf;
+          try {
+            theirBuf = Buffer.from(theirHex, "hex");
+          } catch {
+            theirBuf = null;
+          }
+          if (!theirBuf || theirBuf.length !== 32) {
+            console.log("[wa-debug] signature verification failed: signature is not a 32-byte hex digest");
+          } else {
+            console.log("[wa-debug] signature verification failed: HMAC sha256 mismatch (body, secret, or signature)");
+          }
+        }
+      }
       return { statusCode: 403, headers: { "Content-Type": "text/plain" }, body: "Forbidden" };
     }
 
