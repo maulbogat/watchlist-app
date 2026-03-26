@@ -5,12 +5,6 @@
  * @returns {Promise<void>}
  */
 async function sendWhatsAppText(toDigits, bodyText) {
-  console.log(
-    "[reply-debug] sendWhatsAppText called, phoneNumberId set: " +
-      Boolean(process.env.WHATSAPP_PHONE_NUMBER_ID) +
-      ", token set: " +
-      Boolean(process.env.WHATSAPP_TOKEN)
-  );
   const token = process.env.WHATSAPP_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   if (!token || !phoneNumberId) {
@@ -32,7 +26,6 @@ async function sendWhatsAppText(toDigits, bodyText) {
       text: { body: bodyText },
     }),
   });
-  console.log("[reply-debug] graph api response status: " + res.status);
   const raw = await res.text();
   if (!res.ok) {
     throw new Error(`WhatsApp Graph error ${res.status}: ${raw.slice(0, 200)}`);

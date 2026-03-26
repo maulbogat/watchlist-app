@@ -312,15 +312,7 @@ exports.handler = async (event) => {
 
       if (ok && r.statusCode >= 200 && r.statusCode < 300) {
         if (added) {
-          console.log("[reply-debug] attempting success reply to: " + String(senderDigits).slice(-4));
-          try {
-            await sendWhatsAppText(senderDigits, `✓ Added: ${title} (${year})`);
-            console.log("[reply-debug] success reply sent");
-          } catch (e) {
-            const msg = e && typeof e === "object" && "message" in e ? String(e.message) : String(e);
-            console.log("[reply-debug] reply error: " + msg);
-            throw e;
-          }
+          await sendWhatsAppText(senderDigits, `✓ Added: ${title} (${year})`);
         } else {
           await sendWhatsAppText(senderDigits, `✓ Already on your list: ${title} (${year})`);
         }
