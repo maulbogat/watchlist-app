@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPortal, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { ListMode, PersonalList, SharedList } from "../types/index.js";
 import {
@@ -91,12 +91,13 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
   const setCurrentListMode = useAppStore((s) => s.setCurrentListMode);
 
   const [listNameKind, setListNameKind] = useState<ListNameKind>(null);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [sharedListCreatedModalOpen, setSharedListCreatedModalOpen] = useState(false);
   const [editing, setEditing] = useState<EditingRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteListChoice, setInviteListChoice] = useState<string>(INVITE_LIST_NONE);
+  const [inviteFormError, setInviteFormError] = useState<string | null>(null);
 
   if (!currentUser?.uid) return null;
   const signedInUser = currentUser;
@@ -151,10 +152,16 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action: "send", ...payload }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to send invite");
+      const data = (await res.json()) as { ok?: boolean; error?: string; message?: string };
+      if (!res.ok || !data.ok) {
+        if (res.status === 400 && data.error === "already_registered") {
+          throw new Error("already_registered");
+        }
+        throw new Error(data.message || data.error || "Failed to send invite");
+      }
     },
     onSuccess: async () => {
+      setInviteFormError(null);
       setInviteEmail("");
       setInviteListChoice(INVITE_LIST_NONE);
       await queryClient.invalidateQueries({ queryKey: ["pending-invites", uid] });
@@ -210,14 +217,17 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
             if (!nextOpen) onClose();
           }}
         >
-          <DialogContent
-            className="lists-modal z-[1201] max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8] sm:max-w-[520px]"
-            id="lists-modal"
-            onEscapeKeyDown={(e) => {
-              e.preventDefault();
-              onClose();
-            }}
-          >
+          <DialogPortal>
+            {/* Manage lists opens from the watchlist layout; portal to document.body keeps Radix `fixed` + translate centering relative to the viewport, not an ancestor with transform/filter. */}
+            <DialogContent
+              disablePortal
+              className="lists-modal z-[1201] max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8] sm:max-w-[520px]"
+              id="lists-modal"
+              onEscapeKeyDown={(e) => {
+                e.preventDefault();
+                onClose();
+              }}
+            >
             <DialogHeader className="modal-header">
               <DialogTitle className="modal-title font-title tracking-widest">Manage lists</DialogTitle>
               <DialogDescription className="sr-only">
@@ -472,7 +482,10 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                       className="lists-modal-input mt-1"
                       placeholder="friend@example.com"
                       value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
+                      onChange={(e) => {
+                        setInviteEmail(e.target.value);
+                        setInviteFormError(null);
+                      }}
                       autoComplete="off"
                     />
                   </div>
@@ -480,7 +493,13 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                     <label className="lists-modal-list-item-label" htmlFor="invite-list-select">
                       Include list
                     </label>
-                    <Select value={inviteListChoice} onValueChange={setInviteListChoice}>
+                    <Select
+                      value={inviteListChoice}
+                      onValueChange={(v) => {
+                        setInviteListChoice(v);
+                        setInviteFormError(null);
+                      }}
+                    >
                       <SelectTrigger
                         id="invite-list-select"
                         className="lists-modal-select-trigger mt-1 w-full border border-[var(--border)] bg-[#1c1c22] text-[#f0ede8]"
@@ -498,6 +517,11 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                     <p className="lists-modal-description mt-1 text-xs opacity-80">
                       Optional — invite them to the app only, or also add them to a shared list you belong to.
                     </p>
+                    {inviteFormError ? (
+                      <p className="lists-modal-description mt-2 text-sm text-[#e8c96a]" role="alert">
+                        {inviteFormError}
+                      </p>
+                    ) : null}
                   </div>
                   <Button
                     type="button"
@@ -510,11 +534,20 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
                         window.alert("Enter an email address.");
                         return;
                       }
+                      setInviteFormError(null);
                       const listId = resolveInviteListId();
                       sendInviteMutation.mutate(
                         { invitedEmail: em, listId },
                         {
-                          onError: (err: Error) => window.alert(err.message || "Failed to send invite"),
+                          onError: (err: Error) => {
+                            if (err.message === "already_registered") {
+                              setInviteFormError(
+                                "This person already uses the app. Select a list below to invite them to it."
+                              );
+                              return;
+                            }
+                            window.alert(err.message || "Failed to send invite");
+                          },
                           onSuccess: () => window.alert("Invitation sent."),
                         }
                       );
@@ -562,9 +595,11 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
               </section>
             </div>
           </DialogContent>
+          </DialogPortal>
         </Dialog>
       ) : null}
 
+      {/* Name / create list: ListNameModal uses DialogPortal + disablePortal on DialogContent when elevatedStack so the prompt is not under #lists-modal in the DOM tree. */}
       <ListNameModal
         open={listNameKind != null}
         elevatedStack
@@ -589,7 +624,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
               setCurrentListMode(mode);
               saveLastList(currentUser, mode);
               await refreshListsAndCookie();
-              setShareUrl(`${window.location.origin}/join/${listId}`);
+              setSharedListCreatedModalOpen(true);
             }
           } catch (err: unknown) {
             window.alert(`Failed to create: ${errorMessage(err)}`);
@@ -597,6 +632,7 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
         }}
       />
 
+      {/* Delete / leave: DeleteConfirmModal portals DialogContent to body when elevatedStack (see modal file) for correct centered overlay above Manage lists. */}
       <DeleteConfirmModal
         elevatedStack
         open={deleteTarget != null}
@@ -631,11 +667,11 @@ export function ManageListsModal({ open, onClose, personalLists, sharedLists }: 
         }}
       />
 
+      {/* Shared list created: SharedCreatedModal portals to body when elevatedStack so it stacks above Manage lists without inheriting its positioning context. */}
       <SharedCreatedModal
         elevatedStack
-        open={shareUrl != null}
-        shareUrl={shareUrl || ""}
-        onClose={() => setShareUrl(null)}
+        open={sharedListCreatedModalOpen}
+        onClose={() => setSharedListCreatedModalOpen(false)}
       />
     </>
   );

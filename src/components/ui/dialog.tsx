@@ -50,14 +50,20 @@ function DialogContent({
   children,
   showCloseButton = true,
   overlayClassName,
+  disablePortal = false,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
   /** Raise overlay when this dialog opens above another (e.g. Manage lists uses z-[1201] on content). */
   overlayClassName?: string
+  /**
+   * When true, render overlay + content without an inner Portal (caller must wrap in `DialogPortal`).
+   * Use for nested dialogs so the portal attaches to `document.body` outside a parent dialog subtree.
+   */
+  disablePortal?: boolean
 }) {
-  return (
-    <DialogPortal>
+  const inner = (
+    <>
       <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
@@ -82,8 +88,10 @@ function DialogContent({
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
-    </DialogPortal>
+    </>
   )
+  if (disablePortal) return inner
+  return <DialogPortal>{inner}</DialogPortal>
 }
 
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {

@@ -6,7 +6,8 @@
  *
  * **Firestore writes:**
  * - **`sharedLists/{listId}`** — `update` with `members: arrayUnion(uid)` when the list exists, has a name,
- *   and the user is not already a member.
+ *   the user is not already a member, and **`invites`** has a pending row for the caller’s email + this **`listId`**
+ *   (then that invite is marked **`usedAt` / `usedBy`**).
  *
  * @module netlify/functions/join-shared-list
  */
@@ -30,6 +31,7 @@
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
+const { getBearerToken, normalizeInviteEmail } = require("../src/api-lib/invite-helpers");
 
 const APP_NAME = "watchlist-admin";
 
@@ -57,7 +59,7 @@ function corsHeaders(event) {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
 }
 
@@ -93,16 +95,19 @@ exports.handler = async (event, context) => {
     const [k, v] = c.trim().split("=").map((s) => (s || "").trim());
     if (k && v) cookies[k] = decodeURIComponent(v);
   });
-  const token = cookies.bookmarklet_token || (event.headers?.authorization || "").replace("Bearer ", "");
+  const bearer = getBearerToken(event);
+  const token = bearer || cookies.bookmarklet_token;
   if (!token) {
     return jsonRes(401, { ok: false, error: "Sign in first" }, event);
   }
 
   let uid;
+  /** @type {import('firebase-admin/auth').DecodedIdToken | undefined} */
+  let decoded;
   try {
     const app = getApp();
     const auth = getAuth(app);
-    const decoded = await auth.verifyIdToken(token);
+    decoded = await auth.verifyIdToken(token);
     uid = decoded.uid;
   } catch (e) {
     return jsonRes(401, { ok: false, error: "Invalid or expired token. Sign in again." }, event);
@@ -145,8 +150,42 @@ exports.handler = async (event, context) => {
     );
   }
 
+  const tokenEmail = decoded.email != null ? normalizeInviteEmail(decoded.email) : "";
+  if (!tokenEmail) {
+    return jsonRes(403, { ok: false, error: "no_email_on_token" }, event);
+  }
+
+  const pendingSnap = await db
+    .collection("invites")
+    .where("invitedEmail", "==", tokenEmail)
+    .where("usedAt", "==", null)
+    .get();
+
+  const nowMs = Date.now();
+  /** @type {import('firebase-admin/firestore').DocumentReference | null} */
+  let inviteRefToConsume = null;
+  for (const d of pendingSnap.docs) {
+    const x = d.data() || {};
+    const invList = x.listId != null && String(x.listId).trim() ? String(x.listId).trim() : null;
+    if (invList !== listId) continue;
+    const ex = typeof x.expiresAt === "string" ? Date.parse(x.expiresAt) : 0;
+    if (!ex || ex <= nowMs) continue;
+    inviteRefToConsume = d.ref;
+    break;
+  }
+
+  if (!inviteRefToConsume) {
+    return jsonRes(403, { ok: false, error: "invite_required" }, event);
+  }
+
   await listRef.update({
     members: FieldValue.arrayUnion(uid),
+  });
+
+  const acceptedAt = new Date().toISOString();
+  await inviteRefToConsume.update({
+    usedAt: acceptedAt,
+    usedBy: uid,
   });
 
   return jsonRes(200, { ok: true, joined: true, message: `Joined "${listName}"`, name: listName }, event);

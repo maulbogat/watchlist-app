@@ -35,7 +35,7 @@ This document describes **only what exists in this repository** (static site, Ve
 - **Static hosting** for HTML, CSS, JS, SVG assets from **`dist/`**.  
 - **Serverless API routes** (root **`api/*.js`**, **`vercel.json`** rewrites + cron **`/api/check-upcoming`**):  
   - `add-from-imdb.js` — verifies token, calls OMDb/TMDB, writes Firestore via Admin SDK; after a successful add with `tmdbId`, runs **upcoming alerts** sync for that title (`src/api-lib/sync-upcoming-alerts.js`).  
-  - `join-shared-list.js` — verifies token, adds caller’s uid to `sharedLists/{listId}.members`.  
+  - `join-shared-list.js` — verifies token; requires a **pending** `invites` row whose **`invitedEmail`** matches the token email and **`listId`** matches the request (not expired, **`usedAt`** null); then **`arrayUnion(uid)`** on **`sharedLists/{listId}.members`** and marks that invite used. Returns **403** **`invite_required`** when no such invite exists.  
   - `invites.js` — single function: **GET** lists pending invites for caller; **POST** `{ action: "send", invitedEmail, listId? }` creates invite + Resend email; **POST** `{ action: "accept", inviteId }` allowlists user and optional shared list; **DELETE** `{ inviteId }` revokes if caller is inviter.  
   - `check-upcoming.js` — **cron** (3:00 UTC, **`vercel.json`**): runs chunked sync (`runRegistrySyncWithTimeBudget`) over **`titleRegistry`**, writes to `upcomingAlerts`, `upcomingChecks`, and `syncState/upcomingAlerts`, and writes latest run status to `meta/jobConfig`. Uses shared logic in **`src/api-lib/execute-upcoming-sync.js`** and respects `meta/jobConfig.checkUpcomingEnabled` for scheduled runs (manual runs still proceed). Recognizes **`x-vercel-cron`** like Netlify’s **`x-netlify-event`**.  
   - `trigger-upcoming-sync.js` — **HTTP** (GET/POST) manual trigger for the same upcoming sync as `check-upcoming`. Optional env **`UPCOMING_SYNC_TRIGGER_SECRET`** + `Authorization: Bearer …`.  
@@ -317,12 +317,12 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 **Shared list — create:**  
 1. Signed-in user opens list settings modal → “Create shared list”, enters name.  
 2. `createSharedList(uid, name)` writes `sharedLists/{listId}` with `ownerId`, `members: [uid]`, empty arrays.  
-3. **`SharedCreatedModal`** shows URL **`/join/{listId}`** to copy (header “Copy invite link” was removed).
+3. **`SharedCreatedModal`** explains that the owner should use **Invite someone** in the same modal and select the new list (no shareable **`/join/{listId}`** URL in the UI).
 
-**Shared list — join via link:**  
-1. User opens site with **`/join/{listId}`** while signed in (legacy **`?join=`** links are redirected).  
-2. Client **`POST`s `/api/join-shared-list`** with JSON **`{ listId }`**, `credentials: "include"` — **`useWatchlistSessionRestore.ts`** or **`JoinPage`**. Function reads Firebase ID token from cookie and/or **`Authorization`** header.  
-3. Function verifies Firebase ID token, **`arrayUnion(uid)`** on **`members`** if not already present (fails with **400** if the list document has no non-empty **`name`** and the user was not already a member). Caller must already pass **`allowedUsers`** (signed-in Google session is not enough).  
+**Shared list — join via `/join/{listId}`:**  
+1. User opens site with **`/join/{listId}`** while signed in (legacy **`?join=`** links are redirected to the same path).  
+2. Client **`POST`s `/api/join-shared-list`** with JSON **`{ listId }`**, `credentials: "include"`, and **`Authorization: Bearer`** when available — **`JoinPage`**. Function reads Firebase ID token from **`Authorization`** first, else **`bookmarklet_token`** cookie.  
+3. Function verifies Firebase ID token, requires a **valid list invite** in **`invites`** for the caller’s **email** and this **`listId`** (not expired, not used), then **`arrayUnion(uid)`** on **`members`** and consumes the invite (**`usedAt` / `usedBy`**). Fails with **403** **`invite_required`** if no matching pending invite; **400** if the list has no non-empty **`name`** (unless already a member). **Existing app users** cannot join without that emailed invite row, same as new users using this path.  
 4. Client refreshes shared lists, switches **`currentListMode`** to that shared list.
 
 **App access — email invite:**  
@@ -372,7 +372,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `public/bookmarklet.html` | Instructions + draggable bookmark. | — | — | — |
 | `public/bookmarklet.js` | On IMDb: open popup, `postMessage` handshake. | — | — | Opens hosted `add.html` (hardcoded production host + localhost for dev) |
 | `api/add-from-imdb.js` | Auth verify, OMDb/TMDB enrichment, merge/write list docs. | Firestore via Admin | `users`, `sharedLists` | OMDb, TMDB |
-| `api/join-shared-list.js` | Add member to shared list. | Firestore via Admin | `sharedLists` | — |
+| `api/join-shared-list.js` | Add member to shared list only when **`invites`** has a pending row for caller email + **`listId`**; consumes invite. | Firestore via Admin | `sharedLists`, `invites` | — |
 | `api/invites.js` | **GET** pending invites; **POST** `action: send` (Resend + **`invites`** doc) or **`accept`** (allowlist + optional shared list); **DELETE** revoke. | Firestore via Admin | `invites`, `allowedUsers`, `sharedLists` | Resend (send only) |
 | `api/whatsapp-webhook.js` | Meta webhook; inbound IMDb text → `add-from-imdb` by mapped uid. | Firestore via Admin | — (uses add-from-imdb for lists / registry) | Meta Graph send; TMDB/OMDb indirect |
 | `api/whatsapp-verify.js` | Link phone: send/verify code; write `phoneIndex`, `users`, `verificationCodes`. | Firestore via Admin | `phoneIndex`, `users`, `verificationCodes` | Meta Graph send |
@@ -615,7 +615,7 @@ flowchart TD
 
 5. **Firestore rules vs Admin** — **Accepted architecture (not a bug).** **`firestore.rules`**: **`titleRegistry`**, **`upcomingAlerts`**, and **`syncState`** deny client writes (`allow write: if false` where applicable); **`sharedLists`** / **`users`** follow member/owner rules. **`api/*`** routes use **Firebase Admin SDK** and bypass rules by design. *Operational reality (true for any admin key):* compromise of **`FIREBASE_SERVICE_ACCOUNT`** implies broad Firestore access — expected tradeoff, not an open “gap” to close in app code.
 
-6. **Shared list join vs app allowlist** — **`api/join-shared-list.js`** still verifies only the Firebase **ID token** and **`body.listId`** (no signed list secret). **However**, the React shell **`AllowlistGate`** requires a row in **`allowedUsers`** before the watchlist loads, so arbitrary Google accounts cannot use the app or obtain list UI to abuse joins without an **app** invite or seed. **`/join-app/:inviteId`** is routed outside that gate so invitees can sign in and call **`POST /api/invites`** (`action: accept`) first.
+6. **Shared list join vs app allowlist** — **`api/join-shared-list.js`** verifies the Firebase **ID token** and requires a **pending `invites`** document whose **`invitedEmail`** matches the token’s email and **`listId`** matches **`body.listId`** (not expired, not used); it then adds **`members`** and marks the invite used. Guessing **`/join/{listId}`** is not enough. The React shell **`AllowlistGate`** still requires **`allowedUsers`** before the main watchlist loads; **`/join/:listId`** and **`/join-app/:inviteId`** stay outside that gate so invitees can sign in and complete join / accept flows first.
 
 7. **`join-shared-list` CORS** — **Still implemented; acceptable for current setup (audit).** **`corsHeaders(event)`** sets **`Access-Control-Allow-Origin`** to the request **`Origin`** header (or **`*`** if absent). **`Access-Control-Allow-Credentials: true`** is set. For the SPA on the **same deployment origin** calling **`/api/join-shared-list`**, the browser sends the real site origin; echoing it is the usual pattern for credentialed requests to same-site API routes. *Residual concern:* only if the function were called from additional allowed origins without updating CORS policy.
 

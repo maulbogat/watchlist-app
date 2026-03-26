@@ -121,8 +121,18 @@ async function handleSend(event, body) {
   const allowedRef = db.collection("allowedUsers").doc(invitedEmail);
   const allowedSnap = await allowedRef.get();
   if (allowedSnap.exists) {
-    logEvent({ type: "invite.send.skip", reason: "already_allowed", emailMasked: maskEmailForLog(invitedEmail) });
-    return json(409, { ok: false, error: "user_already_allowed" }, event);
+    if (!listIdRaw) {
+      return json(
+        400,
+        {
+          ok: false,
+          error: "already_registered",
+          message: "This user already has access to the app. Select a list to invite them to.",
+        },
+        event
+      );
+    }
+    /* listId provided: invite existing user onto a shared list — continue */
   }
 
   const pendingSnap = await db.collection("invites").where("invitedEmail", "==", invitedEmail).where("usedAt", "==", null).get();

@@ -1,21 +1,55 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPortal, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/shadcn-utils";
 
 export interface SharedCreatedModalProps {
   open: boolean;
-  shareUrl: string;
   elevatedStack?: boolean;
   onClose: () => void;
 }
 
-export function SharedCreatedModal({ open, shareUrl, elevatedStack = false, onClose }: SharedCreatedModalProps) {
-  const [copied, setCopied] = useState(false);
-
+export function SharedCreatedModal({ open, elevatedStack = false, onClose }: SharedCreatedModalProps) {
   if (!open) return null;
 
   const blockOutsideDismiss = elevatedStack;
+
+  const content = (
+    <DialogContent
+      disablePortal={elevatedStack}
+      {...(elevatedStack ? { overlayClassName: "z-[1220]" } : {})}
+      className={cn(
+        "lists-modal max-h-[85vh] overflow-y-auto bg-[#131317] text-[#f0ede8] sm:max-w-[520px]",
+        elevatedStack && "z-[1230]"
+      )}
+      id="shared-modal"
+      onEscapeKeyDown={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onPointerDownOutside={(e) => {
+        if (blockOutsideDismiss) e.preventDefault();
+      }}
+      onInteractOutside={(e) => {
+        if (blockOutsideDismiss) {
+          e.preventDefault();
+          return;
+        }
+        onClose();
+      }}
+    >
+      <DialogHeader className="modal-header">
+        <DialogTitle className="modal-title font-title tracking-widest">Shared list created</DialogTitle>
+        <DialogDescription className="text-[0.95rem] leading-snug text-[var(--muted)]">
+          To add someone to this list, use the <strong>Invite someone</strong> form below and select this list.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="shared-modal-body" id="shared-modal-body">
+        <p className="lists-modal-description text-[0.9rem]">
+          They must already be allowed to use the app. They will receive an email with a link to accept access and join
+          this list.
+        </p>
+      </div>
+    </DialogContent>
+  );
 
   return (
     <Dialog
@@ -24,63 +58,14 @@ export function SharedCreatedModal({ open, shareUrl, elevatedStack = false, onCl
         if (!nextOpen) onClose();
       }}
     >
-      <DialogContent
-        {...(elevatedStack ? { overlayClassName: "z-[1220]" } : {})}
-        className={cn(
-          "modal shared-modal bg-[#131317] border-white/10 text-[#f0ede8]",
-          elevatedStack && "z-[1230]"
-        )}
-        id="shared-modal"
-        onEscapeKeyDown={(e) => {
-          e.preventDefault();
-          onClose();
-        }}
-        onPointerDownOutside={(e) => {
-          if (blockOutsideDismiss) e.preventDefault();
-        }}
-        onInteractOutside={(e) => {
-          if (blockOutsideDismiss) {
-            e.preventDefault();
-            return;
-          }
-          onClose();
-        }}
-      >
-        <DialogHeader className="modal-header">
-          <DialogTitle className="modal-title font-title tracking-widest">Shared list created</DialogTitle>
-          <DialogDescription className="text-[0.9rem] text-[var(--muted)]">
-            Share this link for others to join this list. They must already be allowed to use the app and signed in.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="shared-modal-body" id="shared-modal-body">
-          <p>Share this link for others to join:</p>
-          <p className="share-link" id="share-link-text">
-            {shareUrl}
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            className="auth-btn"
-            id="copy-share-link-btn"
-            style={{ marginTop: "0.75rem" }}
-            disabled={copied}
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(shareUrl);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              } catch {
-                window.alert("Could not copy. Select and copy the link above.");
-              }
-            }}
-          >
-            {copied ? "Copied!" : "Copy link"}
-          </Button>
-          <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--muted)" }}>
-            Anyone with the link can join. They must be signed in.
-          </p>
-        </div>
-      </DialogContent>
+      {elevatedStack ? (
+        <DialogPortal>
+          {/* Shown right after creating a shared list from Manage lists: portal to body so this layer is not nested under #lists-modal DOM. */}
+          {content}
+        </DialogPortal>
+      ) : (
+        content
+      )}
     </Dialog>
   );
 }

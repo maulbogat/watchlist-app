@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { auth, getSharedList, GoogleAuthProvider, signInWithPopup } from "../firebase.js";
+import { auth, getSharedList, getIdTokenForApi, GoogleAuthProvider, signInWithPopup } from "../firebase.js";
 import { useAuthUser } from "../hooks/useAuthUser.js";
 import { useAppStore } from "../store/useAppStore.js";
 import { saveLastList } from "../lib/storage.js";
@@ -28,14 +28,23 @@ export function JoinPage() {
   const joinMutation = useMutation({
     mutationFn: async (): Promise<JoinResponse> => {
       if (!listId) throw new Error("Invalid invite link.");
+      const token = await getIdTokenForApi();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
       const response = await fetch("/api/join-shared-list", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ listId }),
       });
       const data = (await response.json()) as JoinResponse;
-      if (!data.ok) throw new Error(data.error || "Failed to join list.");
+      if (!response.ok || !data.ok) {
+        const code = data.error || "";
+        if (response.status === 403 && code === "invite_required") {
+          throw new Error("invite_required");
+        }
+        throw new Error(code || "Failed to join list.");
+      }
       return data;
     },
     onSuccess: async (data) => {
@@ -73,7 +82,11 @@ export function JoinPage() {
     }
   }
 
-  const joinErrorMessage = joinMutation.error ? errorMessage(joinMutation.error) : null;
+  const joinErrRaw = joinMutation.error ? errorMessage(joinMutation.error) : null;
+  const joinErrorMessage =
+    joinErrRaw === "invite_required"
+      ? "You need an email invitation to join this list. Please ask a list member to invite you."
+      : joinErrRaw;
   const listLoadErrorMessage = sharedListQuery.error ? errorMessage(sharedListQuery.error) : null;
   const notFoundMessage =
     !loadingList && listId && sharedListQuery.isSuccess && sharedList == null ? "Shared list not found." : null;
