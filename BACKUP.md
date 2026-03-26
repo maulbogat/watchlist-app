@@ -67,4 +67,4 @@ Backups are committed to `backups/firestore-backup.json` in the repo. Git histor
 
 ## Admin page (latest run)
 
-Signed-in **admin** users can see the latest GitHub Actions run for **Daily Firestore Backup** on the in-app **Admin** page. The Netlify function `github-backup-status` calls the GitHub API; for **private** repos or steadier rate limits, set optional **`GITHUB_TOKEN`** (PAT with `actions: read`) and optional **`GITHUB_REPO`** (`owner/name`) in Netlify environment variables.
+Signed-in **admin** users can see the latest GitHub Actions run for **Daily Firestore Backup** on the in-app **Admin** page. The API route **`/api/external-status?service=github`** calls the GitHub API; for **private** repos or steadier rate limits, set optional **`GITHUB_TOKEN`** (PAT with `actions: read`) and optional **`GITHUB_REPO`** (`owner/name`) in Vercel (or local `.env`) environment variables.

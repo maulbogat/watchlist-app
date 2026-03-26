@@ -64,6 +64,21 @@ type GithubBackupStatusResponse = {
   githubHttpStatus?: number;
 };
 
+type VercelDeploymentLast = {
+  state: string;
+  createdAt: number | string | null;
+  url: string;
+  meta?: { githubCommitMessage?: string };
+};
+
+type VercelDeploymentStatusResponse = {
+  ok: boolean;
+  error?: string;
+  lastDeployment: VercelDeploymentLast | null;
+  vercelError?: string;
+  vercelHttpStatus?: number;
+};
+
 /** Production site origin (bookmarklet / admin links). Override with VITE_APP_ORIGIN when your host differs. */
 const DEFAULT_APP_ORIGIN = "https://watchlist-trailers.vercel.app";
 const appOrigin = (import.meta.env.VITE_APP_ORIGIN as string | undefined)?.trim() || DEFAULT_APP_ORIGIN;
@@ -218,6 +233,42 @@ function formatGithubEvent(event: string): string {
   return GITHUB_EVENT_LABEL[event] ?? formatTitleCaseWords(event);
 }
 
+function vercelCreatedToMs(createdAt: unknown): number | null {
+  if (createdAt == null) return null;
+  if (typeof createdAt === "number" && Number.isFinite(createdAt)) return createdAt;
+  if (typeof createdAt === "string") {
+    const trimmed = createdAt.trim();
+    const asNum = Number(trimmed);
+    if (Number.isFinite(asNum) && trimmed === String(asNum)) return asNum;
+    const parsed = Date.parse(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+const VERCEL_COMMIT_PREVIEW_MAX = 72;
+
+function truncateCommitMessage(raw: string | undefined | null): string {
+  const t = String(raw ?? "").trim();
+  if (!t) return "—";
+  if (t.length <= VERCEL_COMMIT_PREVIEW_MAX) return t;
+  return `${t.slice(0, VERCEL_COMMIT_PREVIEW_MAX)}...`;
+}
+
+function vercelStatusBadge(state: string): { label: string; className: string } {
+  const s = String(state || "").toUpperCase();
+  if (s === "READY") {
+    return { label: "SUCCESS", className: "admin-job-status admin-job-status--on" };
+  }
+  if (s === "ERROR" || s === "CANCELED") {
+    return { label: "ERROR", className: "admin-job-status admin-job-status--failure" };
+  }
+  if (!s) {
+    return { label: "—", className: "admin-job-value" };
+  }
+  return { label: s, className: "admin-job-status" };
+}
+
 function formatUpcomingLastRunLine(status: string | null | undefined, message: string | null | undefined): string {
   const st = status?.trim();
   const msg = message?.trim();
@@ -342,17 +393,40 @@ export function AdminPage() {
   });
 
   const githubBackupQ = useQuery<GithubBackupStatusResponse>({
-    queryKey: ["admin", "github-backup-status"],
+    queryKey: ["admin", "external-status", "github"],
     staleTime: 60 * 1000,
     enabled: !authLoading && userIsAdmin,
     queryFn: async () => {
       const user = auth.currentUser;
       if (!user) throw new Error("Not signed in");
       const idToken = await user.getIdToken();
-      const res = await fetch("/api/github-backup-status", {
+      const res = await fetch("/api/external-status?service=github", {
         headers: { Authorization: `Bearer ${idToken}` },
       });
       const data = (await res.json()) as GithubBackupStatusResponse & { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error || `Request failed (${res.status})`);
+      }
+      if (data.ok === false && data.error) {
+        throw new Error(data.error);
+      }
+      return data;
+    },
+  });
+
+  const vercelDeploymentQ = useQuery<VercelDeploymentStatusResponse>({
+    queryKey: ["admin", "external-status", "vercel"],
+    staleTime: 0,
+    refetchOnMount: "always",
+    enabled: !authLoading && userIsAdmin,
+    queryFn: async () => {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not signed in");
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/external-status?service=vercel", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = (await res.json()) as VercelDeploymentStatusResponse & { error?: string };
       if (!res.ok) {
         throw new Error(data.error || `Request failed (${res.status})`);
       }
@@ -478,33 +552,6 @@ export function AdminPage() {
               </span>
             </a>
           ))}
-          <div className="admin-card admin-deploy-in-links-card">
-            <span className="admin-link-label">Deployments</span>
-            <span className="admin-link-sublabel">Vercel builds &amp; previews</span>
-            <p className="admin-deploy-fallback admin-deploy-in-links-fallback">
-              <a
-                className="admin-deploy-text-link"
-                href={deploymentsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open Vercel deployments"
-              >
-                Open Vercel deployments
-                <span aria-hidden="true"> ↗</span>
-              </a>
-              <span className="admin-deploy-hint">
-                {" "}
-                ·{" "}
-                {!hasCustomDeploymentsUrl && (
-                  <>
-                    set <code className="admin-deploy-code">VITE_DEPLOYMENTS_URL</code> to your project’s deployments
-                    page;{" "}
-                  </>
-                )}
-                optional <code className="admin-deploy-code">VITE_SITE_ID</code> for server env diagnostics
-              </span>
-            </p>
-          </div>
         </div>
       </section>
 
@@ -800,6 +847,81 @@ export function AdminPage() {
                       </Button>
                     </div>
                   </div>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="admin-jobs-deploy-col">
+            <h2>Deployments</h2>
+            <div className="admin-card admin-job-card">
+              {vercelDeploymentQ.isPending ? (
+                <p className="admin-job-result">Loading deployment status…</p>
+              ) : vercelDeploymentQ.isError ? (
+                <div className="admin-job-row admin-job-row--actions">
+                  <p className="admin-job-result">
+                    {vercelDeploymentQ.error instanceof Error
+                      ? vercelDeploymentQ.error.message
+                      : "Could not load status."}
+                  </p>
+                  <Button type="button" variant="outline" onClick={() => void vercelDeploymentQ.refetch()}>
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {vercelDeploymentQ.data?.vercelError ? (
+                    <p className="admin-job-result admin-github-backup-warning">
+                      {vercelDeploymentQ.data.vercelError}
+                      {vercelDeploymentQ.data.vercelHttpStatus != null
+                        ? ` (HTTP ${vercelDeploymentQ.data.vercelHttpStatus})`
+                        : ""}
+                      . Check <code className="admin-deploy-code">VERCEL_API_TOKEN</code> and{" "}
+                      <code className="admin-deploy-code">VERCEL_PROJECT_ID</code> in Vercel env.
+                    </p>
+                  ) : null}
+                  {vercelDeploymentQ.data?.lastDeployment ? (() => {
+                    const dep = vercelDeploymentQ.data.lastDeployment;
+                    const status = vercelStatusBadge(dep.state);
+                    return (
+                      <>
+                        <div className="admin-job-row admin-job-row--status-line">
+                          <span className="admin-stat-label">Status</span>
+                          <span className={status.className}>{status.label}</span>
+                        </div>
+                        <div className="admin-job-row">
+                          <span className="admin-stat-label">Created</span>
+                          <span className="admin-job-value">
+                            {formatDateTime(vercelCreatedToMs(dep.createdAt)) || "—"}
+                          </span>
+                        </div>
+                        <div className="admin-job-row admin-job-row--align-start">
+                          <span className="admin-stat-label">Commit</span>
+                          <span className="admin-job-value">
+                            {truncateCommitMessage(dep.meta?.githubCommitMessage)}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })() : !vercelDeploymentQ.data?.vercelError ? (
+                    <p className="admin-job-result">No deployments returned for this project yet.</p>
+                  ) : null}
+                  <div className="admin-job-row admin-job-row--actions">
+                    <div className="admin-job-actions">
+                      <Button type="button" variant="outline" className="admin-job-toggle-btn" asChild>
+                        <a href={deploymentsUrl} target="_blank" rel="noopener noreferrer">
+                          Open deployments
+                          <span aria-hidden="true"> ↗</span>
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                  {!hasCustomDeploymentsUrl ? (
+                    <p className="admin-job-result">
+                      Optional: set <code className="admin-deploy-code">VITE_DEPLOYMENTS_URL</code> for a custom
+                      deployments page link; optional <code className="admin-deploy-code">VITE_SITE_ID</code> for
+                      server env diagnostics.
+                    </p>
+                  ) : null}
                 </>
               )}
             </div>

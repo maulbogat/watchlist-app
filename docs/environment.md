@@ -51,8 +51,10 @@ Read at **runtime** by **`api/*.js`** on Vercel (and by **`vercel dev`** / local
 | `AXIOM_TOKEN` | Server-side Axiom ingest (`log-client-event`, function loggers) |
 | `AXIOM_DATASET` | Axiom dataset name |
 | `UPCOMING_SYNC_TRIGGER_SECRET` | Optional — bearer auth for **`/api/trigger-upcoming-sync`** |
-| `GITHUB_TOKEN` | Optional — **`/api/github-backup-status`** (private repo or higher GitHub API rate limits) |
+| `GITHUB_TOKEN` | Optional — **`/api/external-status?service=github`** (private repo or higher GitHub API rate limits) |
 | `GITHUB_REPO` | Optional — override `owner/repo` for backup workflow discovery |
+| `VERCEL_API_TOKEN` | **`/api/external-status?service=vercel`** — Vercel API bearer token (Admin deployments card) |
+| `VERCEL_PROJECT_ID` | Same route — Vercel **Project ID** (Settings → General). Both `VERCEL_*` required or the route returns **503** |
 | `WHATSAPP_VERIFY_TOKEN` | **`/api/whatsapp-webhook`** — Meta webhook verification (GET) |
 | `WHATSAPP_APP_SECRET` | Meta **App Secret** — **`/api/whatsapp-webhook`** POST verifies `X-Hub-Signature-256` (HMAC over the **raw** JSON body; the handler reads the Node request stream so bytes match what Meta signed on Vercel) |
 | `WHATSAPP_TOKEN` | WhatsApp Cloud API — outbound messages (`whatsapp-verify`, `whatsapp-webhook`) |
@@ -87,6 +89,7 @@ Keep **names identical** to Vercel so behavior matches.
 | **Admin Netlify badge (legacy)** | `VITE_NETLIFY_SITE_ID` |
 | **WhatsApp link + inbound messages** | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` |
 | **Email app invites** | `RESEND_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `APP_PUBLIC_URL` (or `VERCEL_URL`); optional `RESEND_FROM_EMAIL` — all via **`/api/invites`** |
-| **Admin GitHub backup status** | `GITHUB_TOKEN` optional for public repo; often required for private |
+| **Admin GitHub backup status** | `GITHUB_TOKEN` optional for public repo; often required for private — **`/api/external-status?service=github`** |
+| **Admin Vercel deployment status** | `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` — **`/api/external-status?service=vercel`** |
 
 Nothing in the app expects **`VITE_AXIOM_*`**.

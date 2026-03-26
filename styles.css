@@ -1162,6 +1162,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 
 .card-info {
+  display: flex;
+  flex-direction: column;
   padding: calc(1rem * var(--card-scale)) calc(1.1rem * var(--card-scale)) calc(1.1rem * var(--card-scale));
 }
 
@@ -1226,18 +1228,23 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   letter-spacing: 0.06em;
   text-transform: uppercase;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: calc(0.5rem * var(--card-scale));
+  min-height: calc(2.8em * var(--card-scale));
 }
 
 .card-meta-main {
   flex: 1;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: calc(0.5rem * var(--card-scale));
-  flex-wrap: wrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-box-align: start;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.35;
 }
 
 /* Shared list: who added — subtle avatar at end of metadata row. */
@@ -1284,6 +1291,12 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   letter-spacing: 0.05em;
   font-weight: 500;
   text-transform: uppercase;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-right: calc(0.35rem * var(--card-scale));
+  white-space: nowrap;
 }
 
 .badge-movie {
@@ -1713,6 +1726,47 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .country-picker-wrap {
   position: relative;
 }
+/* Country modal: combobox shell (input + chevron) */
+.country-combobox-shell {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  transition: border-color 0.2s;
+}
+.country-combobox-shell:focus-within,
+.country-combobox-shell--open {
+  border-color: rgba(232, 201, 106, 0.4);
+}
+.country-combobox-input {
+  font-size: 1rem;
+  font-family: var(--font-body);
+  color: var(--text);
+}
+.country-combobox-input::placeholder {
+  color: var(--muted);
+}
+.country-combobox-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 0.35rem;
+  padding: 0.25rem 0.45rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.country-combobox-toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
 .country-search {
   width: 100%;
   padding: 0.6rem 0.85rem;
@@ -1770,6 +1824,12 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .country-dropdown-item[aria-selected="true"] {
   background: rgba(232, 201, 106, 0.12);
   color: var(--accent);
+}
+.country-dropdown-empty {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.9rem;
+  color: var(--muted);
 }
 .country-save-btn {
   padding: 0.6rem 1.25rem;
@@ -2306,7 +2366,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   color: var(--accent);
 }
 
-/* Upcoming check job + GitHub backup side by side (half width each on ≥768px) */
+/* Upcoming check + GitHub backup + Deployments — responsive columns */
 .admin-section--jobs-deploy .admin-jobs-deploy-grid {
   display: grid;
   gap: 1.25rem;
@@ -2317,6 +2377,12 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   .admin-section--jobs-deploy .admin-jobs-deploy-grid {
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1100px) {
+  .admin-section--jobs-deploy .admin-jobs-deploy-grid {
+    grid-template-columns: 1fr 1fr 1fr;
   }
 }
 
@@ -2381,6 +2447,11 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .admin-section--jobs-deploy .admin-job-row--status-line > .admin-job-status {
   flex-shrink: 0;
+}
+
+/* Label (e.g. "Commit") lines up with the first line of a multi-line value */
+.admin-job-row.admin-job-row--align-start {
+  align-items: flex-start;
 }
 
 .admin-section--jobs-deploy .admin-job-row--actions {
@@ -2913,6 +2984,13 @@ a.admin-job-run-btn {
 /* SelectContent is portaled to body; class on Content targets dropdown (not #lists-modal descendants) */
 .lists-modal-select-popover--no-check [data-slot="select-item"] > span:first-child {
   display: none !important;
+}
+/* With the check column hidden, defaults feel flush to the popper edge — add viewport + item inset */
+.lists-modal-select-popover--no-check [data-slot="select-content"] [data-position="popper"] {
+  padding: 0.5rem 0.625rem;
+}
+.lists-modal-select-popover--no-check [data-slot="select-item"] {
+  padding: 0.625rem 0.875rem !important;
 }
 
 #list-name-input::placeholder,

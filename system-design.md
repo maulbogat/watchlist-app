@@ -42,7 +42,7 @@ This document describes **only what exists in this repository** (static site, Ve
   - `log-client-event.js` — POST authenticated client events to **Axiom** (server-only `AXIOM_*`).  
   - `admin-job-config.js` — GET/POST **`meta/jobConfig`** (toggle scheduled upcoming job, read last run).  
   - `admin-env-status.js` — GET boolean flags for which server env keys are set (diagnostics; no secret values returned).  
-  - `github-backup-status.js` — Admin: latest GitHub Actions run for the Firestore backup workflow (optional `GITHUB_TOKEN`).  
+  - `external-status.js` — Admin: `GET ?service=github` — latest GitHub Actions run for the Firestore backup workflow (optional `GITHUB_TOKEN`); `GET ?service=vercel` — latest Vercel deployment (`VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID`; **503** if missing).  
   - `whatsapp-webhook.js` — **GET:** Meta subscription verification (`hub.verify_token` vs `WHATSAPP_VERIFY_TOKEN`). **POST:** read the raw request body from the Node stream (not Vercel’s pre-parsed `req.body`) so **`X-Hub-Signature-256`** HMAC matches Meta’s payload (`WHATSAPP_APP_SECRET`); then parse JSON, extract IMDb id; if sender maps in **`phoneIndex`**, call shared **`add-from-imdb`** logic as that user + default list; reply via Graph API; always **200** on POST to limit Meta retries.  
   - `whatsapp-verify.js` — **POST** + Firebase ID token: send or verify **6-digit** link code, write **`phoneIndex`** and **`users.phoneNumbers`** via Admin SDK; uses **`verificationCodes`** and **`src/api-lib/phone-index.js`**.    
 - Routes use **Firebase Admin** with `FIREBASE_SERVICE_ACCOUNT` where needed; they bypass Firestore security rules by design.
@@ -56,6 +56,7 @@ This document describes **only what exists in this repository** (static site, Ve
 - **TMDB / OMDb:** from **`api/add-from-imdb.js`** (POST) and from **local Node scripts**, not from the deployed watchlist client.  
 - **Meta WhatsApp:** from **`api/whatsapp-webhook.js`** and **`api/whatsapp-verify.js`** (server only).  
 - **Resend:** from **`invites.js`** (send action) via **`src/api-lib/resend-send.js`** (server only).  
+- **GitHub Actions / Vercel REST:** from **`api/external-status.js`** (admin-only, Firebase ID token + admin UID) for **`?service=github`** and **`?service=vercel`**.  
 - **YouTube:** browser loads embed URLs; no YouTube Data API key in repo.  
 - **No** TMDB calls from the watchlist UI for watch providers or enrichment at runtime; chips use data already on each item (`services`, `servicesByRegion`).
 
@@ -353,7 +354,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | Name / file | Responsibility | Reads Firestore | Writes Firestore | External APIs |
 |-------------|----------------|-----------------|------------------|---------------|
 | `index.html` / `src/main.tsx` | Vite entry; mounts React (`App` → routes → **`WatchlistAuthGate`** / **`JoinPage`** / **`JoinAppPage`** / **`AdminPage`**). | — | — | Google Fonts (from HTML) |
-| `src/pages/AdminPage.tsx` | Admin-only dashboard: stats, upcoming job controls, GitHub backup status, **Service Links** (Vercel env vars, Meta WhatsApp console, Google Cloud billing, Firebase, etc.). | Via queries / `fetch` to admin APIs | — | `fetch` → `github-backup-status`, `admin-job-config`; external HTTPS links |
+| `src/pages/AdminPage.tsx` | Admin-only dashboard: stats, upcoming job controls, GitHub backup + Vercel deployment status, **Service Links** (Vercel env vars, Meta WhatsApp console, Google Cloud billing, Firebase, etc.). | Via queries / `fetch` to admin APIs | — | `fetch` → `external-status`, `admin-job-config`; external HTTPS links |
 | `src/components/WhatsAppSettings.tsx` | Dialog: list linked numbers, default list per number, connect flow; **`fetch`** → **`/api/whatsapp-verify`**. | Via `src/firebase.ts` | Via `src/firebase.ts` (`phoneIndex`, `users.phoneNumbers`) | WhatsApp verify API |
 | `src/components/BookmarkletSettings.tsx` | Dialog: bookmarklet instructions + draggable control (opened from profile menu). | — | — | — |
 | `src/components/AllowlistGate.tsx` | After sign-in, **`checkUserAllowed`** on **`allowedUsers`**; blocks watchlist children when denied. | `allowedUsers` | — | Firebase SDK |

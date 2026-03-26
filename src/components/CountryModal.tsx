@@ -1,7 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/shadcn-utils";
 import { COUNTRIES } from "../countries.js";
 import type { Country } from "../types/index.js";
 
@@ -50,7 +52,7 @@ export function CountryModal({
     if (!open || !dropdownOpen) return;
     function onDoc(e: MouseEvent) {
       const t = e.target;
-      if (t instanceof Element && (t.closest("#country-search") || t.closest("#country-dropdown"))) return;
+      if (t instanceof Element && t.closest(".country-picker-wrap")) return;
       setDropdownOpen(false);
     }
     document.addEventListener("click", onDoc);
@@ -98,48 +100,79 @@ export function CountryModal({
         </DialogHeader>
         <div className="country-modal-body">
           <div className="country-picker-wrap">
-            <Input
-              type="text"
-              id="country-search"
-              className="country-search"
-              placeholder="Search countries..."
-              autoComplete="off"
-              aria-haspopup="listbox"
-              aria-expanded={dropdownOpen}
-              aria-controls="country-dropdown-list"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setDropdownOpen(true);
-              }}
-              onFocus={() => setDropdownOpen(true)}
-              autoFocus
-            />
+            <div
+              className={cn(
+                "country-combobox-shell",
+                dropdownOpen && "country-combobox-shell--open"
+              )}
+            >
+              <Input
+                type="text"
+                id="country-search"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={dropdownOpen}
+                aria-controls="country-dropdown-list"
+                className="country-combobox-input h-auto min-h-0 rounded-none border-0 bg-transparent py-2.5 pr-2 pl-3 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+                placeholder="Search or select country…"
+                autoComplete="off"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setDropdownOpen(true);
+                }}
+                onFocus={() => setDropdownOpen(true)}
+                autoFocus
+              />
+              <button
+                type="button"
+                className="country-combobox-toggle"
+                aria-label={dropdownOpen ? "Close country list" : "Open country list"}
+                tabIndex={-1}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setDropdownOpen((v) => !v)}
+              >
+                <ChevronDown
+                  className={cn(
+                    "country-combobox-chevron-icon size-4 shrink-0 text-[var(--muted)] transition-transform duration-200",
+                    dropdownOpen && "rotate-180"
+                  )}
+                  aria-hidden
+                />
+              </button>
+            </div>
             <div
               className={`country-dropdown${dropdownOpen ? " open" : ""}`}
               id="country-dropdown"
               role="listbox"
+              aria-label="Countries"
               aria-hidden={!dropdownOpen}
             >
               <div className="country-dropdown-list" id="country-dropdown-list">
-                {list.map((c) => (
-                  <Button
-                    key={c.code}
-                    type="button"
-                    variant="ghost"
-                    className="country-dropdown-item"
-                    role="option"
-                    data-code={c.code}
-                    aria-selected={c.code === selected.code}
-                    onClick={() => {
-                      setSelected(c);
-                      setSearch(c.name);
-                      setDropdownOpen(true);
-                    }}
-                  >
-                    {c.flag} {c.name}
-                  </Button>
-                ))}
+                {list.length === 0 ? (
+                  <p className="country-dropdown-empty" role="presentation">
+                    No matching countries.
+                  </p>
+                ) : (
+                  list.map((c) => (
+                    <Button
+                      key={c.code}
+                      type="button"
+                      variant="ghost"
+                      className="country-dropdown-item"
+                      role="option"
+                      data-code={c.code}
+                      aria-selected={c.code === selected.code}
+                      onClick={() => {
+                        setSelected(c);
+                        setSearch(c.name);
+                        setDropdownOpen(false);
+                      }}
+                    >
+                      {c.flag} {c.name}
+                    </Button>
+                  ))
+                )}
               </div>
             </div>
           </div>
