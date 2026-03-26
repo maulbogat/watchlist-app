@@ -8,23 +8,24 @@ This document describes **only what exists in this repository** (static site, Ve
 
 | Service name | Purpose | How it's accessed | Authentication | Environment variables |
 |--------------|---------|-------------------|----------------|----------------------|
-| **Firebase (Firestore)** | Persist watchlists, shared lists, **`titleRegistry`**, user profile (country, list name). | **Client:** Firebase JS SDK v10 in `src/firebase.ts` (`getFirestore`, `doc`, `getDoc`, `setDoc`, etc.), bundled by Vite. **Server:** `firebase-admin` in **`api/*`** routes and Node scripts. | **Client:** Firebase Auth user JWT (SDK attaches to requests per Firestore rules). **Server:** Service account JSON (base64) for Admin SDK. | **Client:** `VITE_FIREBASE_*` variables (read in `src/config/firebase.ts` via `import.meta.env`). **Server/scripts:** `FIREBASE_SERVICE_ACCOUNT` (base64 JSON). Scripts may also use `serviceAccountKey.json` in project root (per README / `check-upcoming.mjs`). |
+| **Firebase (Firestore)** | Persist watchlists, shared lists, **`titleRegistry`**, **`phoneIndex`**, **`verificationCodes`**, user profile (country, list name, linked phone ids). | **Client:** Firebase JS SDK v10 in `src/firebase.ts` (`getFirestore`, `doc`, `getDoc`, `setDoc`, etc.), bundled by Vite. **Server:** `firebase-admin` in **`api/*`** routes and Node scripts. | **Client:** Firebase Auth user JWT (SDK attaches to requests per Firestore rules). **Server:** Service account JSON (base64) for Admin SDK. | **Client:** `VITE_FIREBASE_*` variables (read in `src/config/firebase.ts` via `import.meta.env`). **Server/scripts:** `FIREBASE_SERVICE_ACCOUNT` (base64 JSON). Scripts may also use `serviceAccountKey.json` in project root (per README / `check-upcoming.mjs`). |
 | **Firebase Auth** | Google Sign-In for end users. | **Client:** Firebase Auth SDK from npm (`signInWithPopup`, `GoogleAuthProvider`, `onAuthStateChanged`) in `src/firebase.ts` (bundled by Vite; not a CDN script tag). | OAuth via Google; Firebase-issued ID tokens. | Same Firebase client env vars (`VITE_FIREBASE_*`). |
 | **Firebase Analytics** | Optional; skipped when **offline**, in **Vite dev** (`import.meta.env.DEV`), or when blocked. | **Client:** `src/firebase.ts` dynamically imports Analytics only if `shouldLoadWebAnalytics()` passes, then `isSupported()` + `getAnalytics(app)` (avoids Installations `app-offline` noise locally). | Inherits Firebase web app setup. | Uses the same `VITE_FIREBASE_*` values. |
 | **The Movie Database (TMDB)** | Resolve IMDb id → TMDB id; poster; genres/year; **YouTube trailer key** from appended `videos`; **watch providers** by region. | **REST:** `https://api.themoviedb.org/3/...` via Node `https.get` in `api/add-from-imdb.js`. Same pattern in maintenance scripts (e.g. `scripts/sync-services-from-tmdb.js`, `check-upcoming.mjs` uses `fetch`). **Not** called from the browser watchlist UI. | API key query parameter `api_key`. | `TMDB_API_KEY` in Vercel env / `.env` for local scripts / `check-upcoming.mjs`. |
 | **OMDb** | Title metadata by IMDb id; disambiguate movie vs TV when TMDB returns both; fallback row when TMDB has no match. | **REST:** `https://www.omdbapi.com/?i=...&apikey=...` in `add-from-imdb.js` and various scripts. | API key query parameter. | `OMDB_API_KEY` (Vercel + local scripts per README / `.env.example`). |
 | **YouTube** | Trailer playback in modal via iframe embed. | **Browser:** `https://www.youtube-nocookie.com/embed/{youtubeId}?...` and link to `youtube.com/watch`. | None for embed (public video ids). | None. |
 | **Google Fonts** | UI typography (Bebas Neue, DM Sans). | `<link href="https://fonts.googleapis.com/...">` in HTML. | None. | None. |
-| **Vercel** | Host static HTML/CSS/JS from **`dist/`**; run Node serverless routes under **`/api/*`** (`api/*.js`, **`vercel.json`**). | **Browser:** `fetch` to same-origin **`/api/...`** (e.g. **`log-client-event`** for Axiom ingest with `Authorization: Bearer` ID token). **Server:** CommonJS handlers wrapped by **`src/api-lib/vercel-adapter.js`** for `(req, res)`. | Routes verify Firebase ID token (cookie or `Authorization: Bearer`) where needed. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional `AXIOM_TOKEN`, optional `AXIOM_DATASET` (server-only; no `VITE_AXIOM_*`). |
+| **Vercel** | Host static HTML/CSS/JS from **`dist/`**; run Node serverless routes under **`/api/*`** (`api/*.js`, **`vercel.json`**). | **Browser:** `fetch` to same-origin **`/api/...`** (e.g. **`log-client-event`** for Axiom ingest with `Authorization: Bearer` ID token). **Server:** CommonJS handlers wrapped by **`src/api-lib/vercel-adapter.js`** for `(req, res)`. | Routes verify Firebase ID token (cookie or `Authorization: Bearer`) where needed. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional `AXIOM_TOKEN`, optional `AXIOM_DATASET`, optional **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_TOKEN`**, **`WHATSAPP_PHONE_NUMBER_ID`**, optional **`APP_PUBLIC_URL`** / **`VITE_APP_ORIGIN`** for outbound message copy (server-only; no `VITE_AXIOM_*`). |
+| **Meta (WhatsApp Cloud API)** | Webhook verification (GET) and inbound text (POST); outbound text replies after verify/add flows. | **Server:** **`api/whatsapp-webhook.js`** (Meta → app), **`api/whatsapp-verify.js`** and **`src/api-lib/whatsapp-graph.js`** (Graph `messages` API). **Not** called from the browser. | **`WHATSAPP_VERIFY_TOKEN`** must match Meta’s verify field; **`WHATSAPP_TOKEN`** + **`WHATSAPP_PHONE_NUMBER_ID`** for sending. | Same WhatsApp env vars as above. |
 
-**Note:** `.env` is for server/script vars (`process.env`) and `.env.local` is for client Vite vars (`import.meta.env`). The live add flow uses the signed-in user’s Firestore `country` (via `getUserProfile` in `src/add-main.ts`), not `WATCH_REGION`, when calling **`/api/add-from-imdb`**.
+**Note:** `.env` is for server/script vars (`process.env`) and `.env.local` is for client Vite vars (`import.meta.env`). The live add flow uses the signed-in user’s Firestore `country` (via `getUserProfile` in `src/add-main.ts`), not `WATCH_REGION`, when calling **`/api/add-from-imdb`**. For Vercel vs Vite variable placement and sensitive keys, see **[`docs/environment.md`](./docs/environment.md)**.
 
 ---
 
 ## Section 2: Architecture Overview
 
 **Browser (client-side)**  
-- **Watchlist UI — React + TypeScript + Vite:** Root **`index.html`** loads **`#root`** and **`/src/main.tsx`**. **`npm run dev:react`** / **`npm run build:react`**; Vercel publishes **`dist/`** from **`npm run build:react`** (**`vercel.json`**). **`src/firebase.ts`** (Firebase JS SDK from npm, bundled by Vite) initializes App, Auth, Firestore, optional Analytics; list CRUD uses the same module. **`src/store/useAppStore.ts`** (Zustand) + **`src/store/watchlistConstants.ts`**. **`src/hooks/useWatchlist.ts`** (TanStack Query) loads lists; **`useAuthUser.ts`** → **`onAuthStateChanged`**. **`WatchlistPage.tsx`**: **`ListSelector`**, **`WatchlistToolbar`**, **`ManageListsModal`**, auth menu, **`CountryModal`**, **`src/components/modals/*.tsx`**, **`UpcomingAlertsBar`**, filters, **`TitleGrid`** / **`TitleCard`**, **`TrailerModal`**. Session restore **`useWatchlistSessionRestore.ts`**; **`src/lib/watchlistFilters.ts`**, **`bookmarkletCookie.ts`**, **`storage.ts`**, **`movieDisplay.ts`**, **`utils.ts`**, **`src/data/lists.ts`**, **`src/hooks/useMutations.ts`**. **`src/main.tsx`** warns if **`#root`** is missing.
+- **Watchlist UI — React + TypeScript + Vite:** Root **`index.html`** loads **`#root`** and **`/src/main.tsx`**. **`npm run dev:react`** / **`npm run build:react`**; Vercel publishes **`dist/`** from **`npm run build:react`** (**`vercel.json`**). **`src/firebase.ts`** (Firebase JS SDK from npm, bundled by Vite) initializes App, Auth, Firestore, optional Analytics; list CRUD uses the same module. **`src/store/useAppStore.ts`** (Zustand) + **`src/store/watchlistConstants.ts`**. **`src/hooks/useWatchlist.ts`** (TanStack Query) loads lists; **`useAuthUser.ts`** → **`onAuthStateChanged`**. **`WatchlistPage.tsx`**: **`ListSelector`**, **`WatchlistToolbar`**, **`ManageListsModal`**, auth menu (**WhatsApp** → **`WhatsAppSettings`**), **`CountryModal`**, **`src/components/modals/*.tsx`**, **`UpcomingAlertsBar`**, filters, **`TitleGrid`** / **`TitleCard`**, **`TrailerModal`**. Session restore **`useWatchlistSessionRestore.ts`**; **`src/lib/watchlistFilters.ts`**, **`bookmarkletCookie.ts`**, **`storage.ts`**, **`movieDisplay.ts`**, **`utils.ts`**, **`src/data/lists.ts`**, **`src/hooks/useMutations.ts`**. **`src/main.tsx`** warns if **`#root`** is missing.
 - All routine Firestore access uses the **signed-in user’s** Firebase session and **`firestore.rules`**.  
 - **`add.html`** + **`src/add-main.ts`** — bookmarklet popup: auth, POST **`/api/add-from-imdb`**, `postMessage` handshake.  
 - **`public/bookmarklet.js`** on **imdb.com** opens hosted **`add.html`**. Production origin is hardcoded in **`public/bookmarklet.js`** (see file); `postMessage` also allows **`localhost`** and legacy Netlify origins for dev.
@@ -39,16 +40,19 @@ This document describes **only what exists in this repository** (static site, Ve
   - `log-client-event.js` — POST authenticated client events to **Axiom** (server-only `AXIOM_*`).  
   - `admin-job-config.js` — GET/POST **`meta/jobConfig`** (toggle scheduled upcoming job, read last run).  
   - `admin-env-status.js` — GET boolean flags for which server env keys are set (diagnostics; no secret values returned).  
-  - `github-backup-status.js`, `whatsapp-webhook.js` — Admin GitHub workflow status; Meta WhatsApp verification + webhook ack.  
+  - `github-backup-status.js` — Admin: latest GitHub Actions run for the Firestore backup workflow (optional `GITHUB_TOKEN`).  
+  - `whatsapp-webhook.js` — **GET:** Meta subscription verification (`hub.verify_token` vs `WHATSAPP_VERIFY_TOKEN`). **POST:** parse inbound text, extract IMDb id; if sender maps in **`phoneIndex`**, call shared **`add-from-imdb`** logic as that user + default list; reply via Graph API; always **200** on POST to limit Meta retries.  
+  - `whatsapp-verify.js` — **POST** + Firebase ID token: send or verify **6-digit** link code, write **`phoneIndex`** and **`users.phoneNumbers`** via Admin SDK; uses **`verificationCodes`** and **`src/api-lib/phone-index.js`**.    
 - Routes use **Firebase Admin** with `FIREBASE_SERVICE_ACCOUNT` where needed; they bypass Firestore security rules by design.
 - **`api/package.json`** sets `"type": "commonjs"` so handlers stay CommonJS while the repo root `package.json` is `"type": "module"`.
 
 **Firebase**  
 - **Authentication:** Google provider; users identified by `uid`.  
-- **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: **`titleRegistry` read for signed-in users, no client writes**; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`); `upcomingAlerts` read for any signed-in user, no client writes; `syncState` denied to clients. Collections not explicitly matched (for example `upcomingChecks`, `meta`) are also denied to clients by default. (Legacy **`catalog`** is removed from rules; delete leftover docs with `scripts/delete-legacy-catalog.mjs`.)
+- **Firestore:** Collections documented in Section 3. Rules in `firestore.rules`: **`titleRegistry` read for signed-in users, no client writes**; `users/{uid}` and `users/{uid}/personalLists/*` scoped to owner; `sharedLists` readable/writable only by members (with create requiring creator in `members`); `upcomingAlerts` read for any signed-in user, no client writes; `syncState` and **`verificationCodes`** denied to clients; **`phoneIndex`** readable/writable only when **`resource` / `request` `uid` matches** the signed-in user (owner-scoped rows). Collections not explicitly matched (for example `upcomingChecks`, `meta`) are also denied to clients by default. (Legacy **`catalog`** is removed from rules; delete leftover docs with `scripts/delete-legacy-catalog.mjs`.)
 
 **External APIs — where invoked**  
 - **TMDB / OMDb:** from **`api/add-from-imdb.js`** (POST) and from **local Node scripts**, not from the deployed watchlist client.  
+- **Meta WhatsApp:** from **`api/whatsapp-webhook.js`** and **`api/whatsapp-verify.js`** (server only).  
 - **YouTube:** browser loads embed URLs; no YouTube Data API key in repo.  
 - **No** TMDB calls from the watchlist UI for watch providers or enrichment at runtime; chips use data already on each item (`services`, `servicesByRegion`).
 
@@ -84,6 +88,7 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 | `country` | `string` | ISO 3166-1 alpha-2 (e.g. `"IL"`) for TMDB watch region when adding titles. |
 | `countryName` | `string` | Human-readable country name for UI. |
 | `upcomingDismissals` | `map` | Optional. Keys = alert **fingerprints** (e.g. `136311_3_9`, `12345_sequel_999`); values = ISO date string when the user dismissed that pill. Used so dismissed upcoming notifications stay hidden until a new fingerprint appears. |
+| `phoneNumbers` | `array` of string | Optional. **Digits-only** ids (same as **`phoneIndex`** document ids) for WhatsApp-linked numbers; maintained with **`arrayUnion` / `arrayRemove`** when linking or removing in **`WhatsAppSettings`**. |
 
 **Legacy (removed after migration):** `items`, `watched`, `maybeLater`, `archive`, `listName` on the user root doc were moved into the default `personalLists` subdoc. The client and `add-from-imdb` run a one-time migration; optional bulk script: `scripts/migrate-personal-items-to-subcollection.mjs`.
 
@@ -209,6 +214,29 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
 ---
 
+### `phoneIndex` / `{digits}`
+
+**Document id:** digits only (no `+`), aligned with WhatsApp Cloud API `from` and **`phoneIndexDocId`** in **`src/api-lib/phone-index.js`**.
+
+**Writes:** Owner via client (**`firebase.ts`**: `addUserPhoneNumber`, `removeUserPhoneNumber`, `setWhatsAppDefaultListForPhone`) when rules allow; Admin SDK in **`whatsapp-verify.js`** during code verification.
+
+**Reads:** Owner only (`firestore.rules`). Server webhook uses Admin SDK to resolve sender → **`uid`** + default list.
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `uid` | `string` | Firebase user who verified the number. |
+| `defaultAddListId` | `string` | Personal list subdoc id or shared list id. |
+| `defaultListType` | `"personal"` \| `"shared"` | Which list type **`defaultAddListId`** refers to. |
+| `updatedAt` | `string` (ISO) | Last write. |
+
+---
+
+### `verificationCodes` / `{docId}`
+
+**Writes / reads:** Admin SDK only (`whatsapp-verify.js`). Short-lived **6-digit** verification flow for linking a number; clients never touch this collection (rules deny all).
+
+---
+
 ## Section 4: User Flows
 
 ### 1. Sign in flow
@@ -276,6 +304,14 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 3. **At display time:** **`servicesForMovie(m, userCountryCode)`** in **`src/lib/movieDisplay.ts`** (used by **`TitleCard`** / **`TrailerModal`**) prefers `m.servicesByRegion[countryCode]`, else `m.services`.  
 4. **Persisting region-specific cache:** no watchlist client helper; `services` / `servicesByRegion` are set at add time (**`/api/add-from-imdb`**) or by scripts.
 
+### 6. WhatsApp → add title flow
+
+1. User configures Meta’s webhook to **`/api/whatsapp-webhook`** and sets **`WHATSAPP_*`** env vars on Vercel.  
+2. In the app, user opens profile menu → **WhatsApp** (**`WhatsAppSettings`** dialog): enters E.164 number, default list, **`POST /api/whatsapp-verify`** sends a code; user enters code; verify path writes **`verificationCodes`** (Admin) and **`phoneIndex`** + **`users.phoneNumbers`**.  
+3. User sends a message containing an **IMDb URL** or **`tt…`** id to the WhatsApp business number.  
+4. **`whatsapp-webhook`** resolves **`from`** → **`phoneIndex`**; loads **`users/{uid}.country`** for watch region; calls **`performAddFromImdbByUid`** (same core as bookmarklet).  
+5. Replies with a short **Graph API** text (added / duplicate / error / unregistered / no IMDb in message).
+
 ---
 
 ## Section 5: Component Map
@@ -283,6 +319,8 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | Name / file | Responsibility | Reads Firestore | Writes Firestore | External APIs |
 |-------------|----------------|-----------------|------------------|---------------|
 | `index.html` / `src/main.tsx` | Vite entry; mounts React (`App` → routes → `WatchlistPage` / `JoinPage` / `AdminPage`). | — | — | Google Fonts (from HTML) |
+| `src/pages/AdminPage.tsx` | Admin-only dashboard: stats, upcoming job controls, GitHub backup status, **Service Links** (Vercel env vars, Meta WhatsApp console, Google Cloud billing, Firebase, etc.). | Via queries / `fetch` to admin APIs | — | `fetch` → `github-backup-status`, `admin-job-config`; external HTTPS links |
+| `src/components/WhatsAppSettings.tsx` | Dialog: list linked numbers, default list per number, connect flow; **`fetch`** → **`/api/whatsapp-verify`**. | Via `src/firebase.ts` | Via `src/firebase.ts` (`phoneIndex`, `users.phoneNumbers`) | WhatsApp verify API |
 | `src/components/*.tsx`, `src/components/modals/*.tsx`, `src/hooks/*` | React watchlist UI (see Architecture). | Via `src/firebase.ts` | Via `src/firebase.ts` | `fetch` → `join-shared-list`, `log-client-event`, admin functions where used; YouTube embeds; clipboard |
 | `src/store/watchlistConstants.ts` | Status labels, checkmark/upcoming SVG snippets, `GENRE_LIMIT`. | — | — | — |
 | `src/lib/movieDisplay.ts` | `servicesForMovie`, `renderServiceChips`, `hasPlayableTrailerYoutubeId`. | — | — | — |
@@ -297,6 +335,9 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `public/bookmarklet.js` | On IMDb: open popup, `postMessage` handshake. | — | — | Opens hosted `add.html` (hardcoded production host + localhost for dev) |
 | `api/add-from-imdb.js` | Auth verify, OMDb/TMDB enrichment, merge/write list docs. | Firestore via Admin | `users`, `sharedLists` | OMDb, TMDB |
 | `api/join-shared-list.js` | Add member to shared list. | Firestore via Admin | `sharedLists` | — |
+| `api/whatsapp-webhook.js` | Meta webhook; inbound IMDb text → `add-from-imdb` by mapped uid. | Firestore via Admin | — (uses add-from-imdb for lists / registry) | Meta Graph send; TMDB/OMDb indirect |
+| `api/whatsapp-verify.js` | Link phone: send/verify code; write `phoneIndex`, `users`, `verificationCodes`. | Firestore via Admin | `phoneIndex`, `users`, `verificationCodes` | Meta Graph send |
+| `src/api-lib/phone-index.js`, `src/api-lib/whatsapp-graph.js` | Shared helpers for **`phoneIndex`** CRUD and Graph text messages. | — | — | Meta Graph API |
 | `styles.css` | Visual styling. | — | — | — |
 | `check-upcoming.mjs` | Local diagnostic: read Firestore + TMDB, print report. | Admin + `dotenv` | — | TMDB |
 | `compare-upcoming-trakt.mjs` | Optional read-only compare: TMDB vs Trakt “next episode” (same Firestore sources as `check-upcoming.mjs`). | Admin + `dotenv` | — | Trakt, TMDB |
@@ -316,11 +357,12 @@ flowchart LR
     BM["bookmarklet on imdb.com"]
   end
 
-  subgraph Netlify["Vercel API"]
+  subgraph VercelAPI["Vercel serverless"]
     NF1["add-from-imdb"]
     NF2["join-shared-list"]
     NF3["check-upcoming (scheduled)"]
     NF4["trigger-upcoming-sync (HTTP)"]
+    NF5["whatsapp-webhook / whatsapp-verify"]
     Static["Static assets"]
   end
 
@@ -332,6 +374,7 @@ flowchart LR
   subgraph External["External APIs"]
     TMDB["TMDB API"]
     OMDb["OMDb API"]
+    WA["Meta WhatsApp API"]
     YT["YouTube embeds"]
     GFonts["Google Fonts"]
   end
@@ -355,6 +398,9 @@ flowchart LR
   NF3 --> TMDB
   NF4 --> FS
   NF4 --> TMDB
+  NF5 --> FS
+  NF5 --> FA
+  NF5 --> WA
 
   SPA --> YT
 ```
@@ -426,16 +472,23 @@ sequenceDiagram
 
 ### Firestore ER (entity relationship)
 
-**Note:** List **content** (`items`, status arrays) lives on **`personalLists`** and **`sharedLists`** docs only. The **`users/{uid}`** doc holds profile + **`defaultPersonalListId`** + dismissals; legacy root-level `items` / `listName` were migrated into the default personal list (Section 3). **`catalog`** was removed (Section 3).
+**Note:** List **content** (`items`, status arrays) lives on **`personalLists`** and **`sharedLists`** docs only. The **`users/{uid}`** doc holds profile + **`defaultPersonalListId`** + dismissals + optional **`phoneNumbers`**; legacy root-level `items` / `listName` were migrated into the default personal list (Section 3). **`catalog`** was removed (Section 3). **`phoneIndex`** maps a digits-only phone id to **`uid`** and default add list (Section 3).
 
 ```mermaid
 erDiagram
   USER_DOC ||--o{ PERSONAL_LIST : "users/uid/personalLists"
+  USER_DOC ||--o{ PHONE_INDEX : "phoneNumbers[] to phoneIndex id"
   USER_DOC {
     string uid PK "document id"
     string defaultPersonalListId
     string country
     string countryName
+  }
+  PHONE_INDEX {
+    string digits PK "document id"
+    string uid FK "users uid"
+    string defaultAddListId
+    string defaultListType
   }
   PERSONAL_LIST {
     string listId PK
