@@ -224,6 +224,14 @@ Firestore **read-quota** counters for **`src/api-lib/firestore-guard.js`**. **Wr
 
 Daily and hourly buckets reset inside the guard transaction on the next write when the calendar day or UTC hour advances.
 
+### `meta` / `catalogHealthExclusions`
+
+Optional. **Writes:** Admin SDK or Console only (no client writes in rules). **Reads:** Admin UIDs only (**`meta/*`** rule). Used by **Admin → Data Quality** (`catalogStatsQ` in **`src/pages/AdminPage.tsx`): registry rows whose **imdb id** appears in **`missingTmdbId`** are omitted from the **missing `tmdbId`** count and detail list (e.g. titles with no TMDB listing). If the document is absent, no ids are excluded.
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `missingTmdbId` | `array` of `string` | IMDb ids (`tt…`) to exclude from missing-`tmdbId` stats; compared case-insensitively. |
+
 ### `upcomingAlerts` / `{docId}`
 
 Top-level collection. **Writes:** Admin SDK only (`check-upcoming` scheduled function, `add-from-imdb` single-title sync). **Reads:** Any signed-in user (`firestore.rules`).
@@ -394,7 +402,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | Name / file | Responsibility | Reads Firestore | Writes Firestore | External APIs |
 |-------------|----------------|-----------------|------------------|---------------|
 | `index.html` / `src/main.tsx` | Vite entry; mounts React (`App` → routes → **`WatchlistAuthGate`** / **`JoinPage`** / **`JoinAppPage`** / **`AdminPage`**). | — | — | Google Fonts (from HTML) |
-| `src/pages/AdminPage.tsx` | Admin-only dashboard: **Data Quality** (**`titleRegistry`** counts + expandable sample rows; **`POST /api/catalog-health`** per-title thumb fix), Firestore read-quota bars (**`meta/usageStats`** via **`getFirestoreUsageStats`**), upcoming job controls, GitHub backup + Vercel deployment status, **Service Links** (Vercel env vars, Meta WhatsApp console, Google Cloud billing, Firebase, etc.). | **`titleRegistry`** (client read + **`getCountFromServer`** / **`getDocs`** with field projection), **`meta/usageStats`** (admin UID), `fetch` to admin APIs | — | `fetch` → `external-status`, `admin-job-config`, **`catalog-health`**; external HTTPS links |
+| `src/pages/AdminPage.tsx` | Admin-only dashboard: **Data Quality** (**`titleRegistry`** counts + expandable sample rows; optional **`meta/catalogHealthExclusions`** filters missing-`tmdbId` stats; **`POST /api/catalog-health`** per-title thumb fix), Firestore read-quota bars (**`meta/usageStats`** via **`getFirestoreUsageStats`**), upcoming job controls, GitHub backup + Vercel deployment status, **Service Links** (Vercel env vars, Meta WhatsApp console, Google Cloud billing, Firebase, etc.). | **`titleRegistry`** (client read + **`getCountFromServer`** / **`getDocs`** with field projection), **`meta/usageStats`**, **`meta/catalogHealthExclusions`** (admin UID), `fetch` to admin APIs | — | `fetch` → `external-status`, `admin-job-config`, **`catalog-health`**; external HTTPS links |
 | `src/components/WhatsAppSettings.tsx` | Dialog: list linked numbers, default list per number, connect flow; **`fetch`** → **`/api/whatsapp-verify`**. | Via `src/firebase.ts` | Via `src/firebase.ts` (`phoneIndex`, `users.phoneNumbers`) | WhatsApp verify API |
 | `src/components/BookmarkletSettings.tsx` | Dialog: bookmarklet instructions + draggable control (opened from profile menu). | — | — | — |
 | `src/components/AllowlistGate.tsx` | After sign-in, **`checkUserAllowed`** on **`allowedUsers`**; blocks watchlist children when denied. | `allowedUsers` | — | Firebase SDK |

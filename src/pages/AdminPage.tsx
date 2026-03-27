@@ -13,7 +13,7 @@ import {
   setCheckUpcomingEnabledState,
   type FirestoreUsageStats,
 } from "../firebase.js";
-import { getFirestore, collection, getCountFromServer, getDocs } from "firebase/firestore";
+import { getFirestore, collection, doc, getDoc, getCountFromServer, getDocs } from "firebase/firestore";
 
 type DQTitleRow = {
   imdbId: string;
@@ -46,6 +46,27 @@ function dqRowImdbId(data: Record<string, unknown>, docId: string): string {
   const raw = data.imdbId;
   if (typeof raw === "string" && raw.trim() !== "") return raw.trim();
   return docId;
+}
+
+/** Normalize registry id for comparison with `meta/catalogHealthExclusions.missingTmdbId`. */
+function dqImdbIdKey(imdbId: string): string {
+  return imdbId.trim().toLowerCase();
+}
+
+async function loadMissingTmdbIdExclusions(db: ReturnType<typeof getFirestore>): Promise<Set<string>> {
+  const out = new Set<string>();
+  try {
+    const exSnap = await getDoc(doc(db, "meta", "catalogHealthExclusions"));
+    if (!exSnap.exists()) return out;
+    const raw = exSnap.data()?.missingTmdbId;
+    if (!Array.isArray(raw)) return out;
+    for (const x of raw) {
+      if (typeof x === "string" && x.trim() !== "") out.add(dqImdbIdKey(x));
+    }
+  } catch {
+    /* missing doc or read error — treat as no exclusions */
+  }
+  return out;
 }
 
 function dqRowTitle(data: Record<string, unknown>, docId: string): string {
@@ -417,6 +438,7 @@ export function AdminPage() {
             "type",
           ) ?? titleRegistryRef;
         const registrySnap = await getDocs(projectedRegistryRef);
+        const missingTmdbIdExcluded = await loadMissingTmdbIdExclusions(db);
         let missingTmdbId = 0;
         let missingYoutubeId = 0;
         let missingThumb = 0;
@@ -435,7 +457,9 @@ export function AdminPage() {
             typeof rec.year === "number" || typeof rec.year === "string" ? (rec.year as number | string) : null;
 
           const noTmdbId = rec.tmdbId == null || rec.tmdbId === "";
-          if (noTmdbId) {
+          const skipTmdbGap =
+            noTmdbId && missingTmdbIdExcluded.has(dqImdbIdKey(imdbId));
+          if (noTmdbId && !skipTmdbGap) {
             missingTmdbId += 1;
             if (missingTmdbIdTitles.length < maxTitles) {
               missingTmdbIdTitles.push({ imdbId, title, year });
