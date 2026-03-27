@@ -1,0 +1,14 @@
+# UI / Styling Rules
+
+When making any CSS or styling changes:
+- Use design system tokens from styles.css (:root block) instead of hardcoded values
+- Colors: use --color-* variables, never hardcode hex values
+- Spacing: use --space-* variables or multiples of 8px
+- Typography: use --text-* variables for font-size
+- Border radius: use --radius-* variables
+- Buttons: extend .btn-primary, .btn-secondary, .btn-ghost, or .btn-destructive
+
+When adding new UI components:
+- Check if a similar pattern already exists before creating a new class
+- Use the existing modal-header, modal-title patterns for dialogs
+- Document any new design tokens added to :root

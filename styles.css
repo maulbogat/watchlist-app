@@ -1,3 +1,20 @@
+/*
+ * WATCHLIST DESIGN SYSTEM
+ * ========================
+ * Colors:     --color-gold, --color-red, --color-surface-1/2/3, --color-text-muted
+ * Typography: --text-xs (0.72rem), --text-sm (0.85rem), --text-base (1rem),
+ *             --text-lg (1.15rem), --text-xl (1.5rem)
+ * Radius:     --radius-sm (4px), --radius-md (6px), --radius-lg (10px), --radius-pill (999px)
+ * Spacing:    --space-1 (4px), --space-2 (8px), --space-3 (12px), --space-4 (16px),
+ *             --space-6 (24px), --space-8 (32px), --space-12 (48px)
+ * Buttons:    .btn-primary, .btn-secondary, .btn-ghost, .btn-destructive
+ *
+ * When adding new styles:
+ * - Use design tokens instead of hardcoded values
+ * - Map new buttons to one of the 4 base button classes
+ * - Use the 5-step type scale
+ * - Use the 8px spacing grid
+ */
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
@@ -11,17 +28,47 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0a0a0c;
-  --surface: #131317;
-  --surface2: #1c1c22;
+  /* Design system — color tokens */
+  --color-gold: #e8c96a;
+  --color-red: #e85a5a;
+  --color-surface-1: #0a0a0c;
+  --color-surface-2: #131317;
+  --color-surface-3: #1c1c22;
+  --color-text-muted: #888;
+
+  /* Design system — typography scale (Stage 1: tokens only) */
+  --text-xs: 0.72rem;
+  --text-sm: 0.85rem;
+  --text-base: 1rem;
+  --text-lg: 1.15rem;
+  --text-xl: 1.5rem;
+
+  /* Design system — border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+
+  /* Design system — spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --bg: var(--color-surface-1);
+  --surface: var(--color-surface-2);
+  --surface2: var(--color-surface-3);
   --border: rgba(255,255,255,0.07);
   /* Modals, Radix select panels, list-selector wrap, avatar menu — visible light edge */
   --modal-dropdown-border: rgba(255, 255, 255, 0.14);
   --invite-placeholder-gray: rgba(255, 255, 255, 0.5);
   --text: #f0ede8;
-  --muted: #888;
-  /* Muted gold (prod-style); keep hex so `color: var(--accent)` stays valid. */
-  --accent: #e8c96a;
+  --muted: var(--color-text-muted);
+  /* Muted gold (prod-style); aliases design token. */
+  --accent: var(--color-gold);
   --accent2: #c96a6a;
   --font-title: 'Bebas Neue', sans-serif;
   --font-body: 'DM Sans', sans-serif;
@@ -44,20 +91,147 @@
   --popover: 19 19 23;
   --popover-foreground: 240 237 232;
   /* Hex colors: bare `242 210 68` breaks `color: var(--accent)` in plain CSS. */
-  --primary: #e8c96a;
-  --primary-foreground: #0a0a0c;
+  --primary: var(--color-gold);
+  --primary-foreground: var(--color-surface-1);
   --secondary: 28 28 34;
   --secondary-foreground: 240 237 232;
   --muted: 28 28 34;
   --muted-foreground: 136 136 136;
-  --accent: #e8c96a;
-  --accent-foreground: #0a0a0c;
+  --accent: var(--color-gold);
+  --accent-foreground: var(--color-surface-1);
   --destructive: 201 106 106;
   --destructive-foreground: 240 237 232;
   --border: rgba(255,255,255,0.07);
   --input: 28 28 34;
-  --ring: #e8c96a;
+  --ring: var(--color-gold);
   --radius: 0.5rem;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Button primitives — shared bases. Mapped classes also appear in comma       */
+/* groups; later rules override for layout and one-off visuals.                */
+/* -------------------------------------------------------------------------- */
+
+/* Primary — gold filled */
+.btn-primary,
+.lists-modal-send-invite-btn,
+.country-save-btn,
+.admin-job-run-btn,
+.admin-section--jobs-deploy .admin-job-run-btn[data-slot="button"],
+.lists-modal-bookmarklet-btn {
+  background: var(--color-gold);
+  color: var(--color-surface-1);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.btn-primary:hover,
+.lists-modal-send-invite-btn:hover,
+.country-save-btn:hover,
+.admin-job-run-btn:hover,
+.admin-section--jobs-deploy .admin-job-run-btn[data-slot="button"]:hover,
+.lists-modal-bookmarklet-btn:hover {
+  opacity: 0.85;
+}
+.btn-primary:disabled,
+.lists-modal-send-invite-btn:disabled,
+.country-save-btn:disabled,
+.admin-job-run-btn:disabled,
+.admin-section--jobs-deploy .admin-job-run-btn[data-slot="button"]:disabled,
+.lists-modal-bookmarklet-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Secondary — gold outlined */
+.btn-secondary,
+.lists-modal-btn,
+.list-name-secondary-btn,
+.modal-action-btn,
+.admin-job-toggle-btn,
+.header-link-btn {
+  background: transparent;
+  color: var(--color-gold);
+  border: 1px solid var(--color-gold);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-secondary:hover,
+.lists-modal-btn:hover,
+.list-name-secondary-btn:hover,
+.modal-action-btn:hover,
+.admin-job-toggle-btn:hover {
+  background: rgba(232, 201, 106, 0.08);
+}
+.btn-secondary:disabled,
+.lists-modal-btn:disabled,
+.list-name-secondary-btn:disabled,
+.modal-action-btn:disabled,
+.admin-job-toggle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Ghost — no border, subtle hover */
+.btn-ghost,
+.card-delete-btn,
+.admin-back-btn,
+.up-next-card-dismiss-btn,
+.up-next-card-icon-btn,
+.genre-clear-btn,
+.watchlist-empty-inline-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.btn-ghost:hover,
+.card-delete-btn:hover,
+.admin-back-btn:hover,
+.up-next-card-dismiss-btn:hover,
+.up-next-card-icon-btn:hover,
+.genre-clear-btn:hover,
+.watchlist-empty-inline-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Destructive — red */
+.btn-destructive,
+.move-all-list-btn,
+.auth-btn-outline {
+  background: transparent;
+  color: var(--color-red);
+  border: 1px solid var(--color-red);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-destructive:hover,
+.move-all-list-btn:hover,
+.auth-btn-outline:hover {
+  background: rgba(232, 90, 90, 0.08);
+}
+.btn-destructive:disabled,
+.move-all-list-btn:disabled,
+.auth-btn-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 body {
@@ -84,8 +258,8 @@ body {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.75rem 1rem;
-  background: rgba(232, 201, 106, 0.12);
-  border-bottom: 1px solid rgba(232, 201, 106, 0.25);
+  background: rgb(from var(--color-gold) r g b / 0.12);
+  border-bottom: 1px solid rgb(from var(--color-gold) r g b / 0.25);
   color: var(--text);
   backdrop-filter: blur(10px);
 }
@@ -97,11 +271,11 @@ body {
 
 .file-protocol-banner code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.85em;
+  font-size: var(--text-sm);
   background: rgba(0,0,0,0.25);
   border: 1px solid rgba(255,255,255,0.08);
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   white-space: nowrap;
 }
 
@@ -111,7 +285,7 @@ body {
   color: var(--text);
   width: 32px;
   height: 32px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -147,6 +321,7 @@ header {
 header h1 {
   font-family: var(--font-title);
   font-size: clamp(2.25rem, 5vw, 3rem);
+  font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 1;
   margin: 0;
@@ -158,7 +333,7 @@ header h1 span {
 }
 
 .header-meta {
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -166,7 +341,7 @@ header h1 span {
 }
 
 .header-link {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -182,6 +357,14 @@ header h1 span {
   border: none;
   cursor: pointer;
   font-family: inherit;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 0;
+  border-radius: 0;
+  transition: color 0.2s;
 }
 
 .copy-invite-btn {
@@ -192,7 +375,7 @@ header h1 span {
   border: none;
   padding: 0;
   font-family: var(--font-title);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
@@ -240,7 +423,7 @@ header h1 span {
   display: flex;
   align-items: center;
   border: 1px solid var(--modal-dropdown-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 .list-controls-pair .custom-dropdown-trigger {
   border: none;
@@ -254,10 +437,10 @@ header h1 span {
   min-width: 36px;
 }
 .list-controls-pair:hover {
-  border-color: rgba(232, 201, 106, 0.35);
+  border-color: rgb(from var(--color-gold) r g b / 0.35);
 }
 .list-controls-pair:has(.custom-dropdown-trigger[aria-expanded="true"]) {
-  border-color: rgba(232, 201, 106, 0.5);
+  border-color: rgb(from var(--color-gold) r g b / 0.5);
 }
 
 /* Custom dropdown — dark theme, gold accent, Bebas Neue */
@@ -273,12 +456,12 @@ header h1 span {
   height: 36px;
   padding: 0 1.65rem 0 0.75rem;
   font-family: var(--font-title);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   letter-spacing: 0.08em;
   color: var(--text);
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s, color 0.2s;
   white-space: nowrap;
@@ -307,14 +490,14 @@ header h1 span {
 }
 
 .custom-dropdown-trigger:hover {
-  border-color: rgba(232, 201, 106, 0.35);
+  border-color: rgb(from var(--color-gold) r g b / 0.35);
   background: rgba(255, 255, 255, 0.04);
   color: var(--accent);
 }
 
 .custom-dropdown-trigger[aria-expanded="true"] {
-  border-color: rgba(232, 201, 106, 0.5);
-  background: rgba(232, 201, 106, 0.08);
+  border-color: rgb(from var(--color-gold) r g b / 0.5);
+  background: rgb(from var(--color-gold) r g b / 0.08);
   color: var(--accent);
 }
 
@@ -331,12 +514,12 @@ header h1 span {
   align-items: center;
   gap: 0.5rem;
   font-family: var(--font-title);
-  font-size: 0.9rem;
-  letter-spacing: 0.06em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
   padding: 0.5rem 0.75rem;
   color: var(--muted);
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: background 0.15s, color 0.15s;
   white-space: nowrap;
 }
@@ -368,7 +551,7 @@ header h1 span {
   color: inherit;
 }
 #list-selector-panel [data-slot="select-item"][data-state="checked"] {
-  background: rgba(232, 201, 106, 0.12) !important;
+  background: rgb(from var(--color-gold) r g b / 0.12) !important;
   color: var(--accent) !important;
 }
 #list-selector-panel [data-slot="select-item"][data-highlighted] {
@@ -376,7 +559,7 @@ header h1 span {
   color: var(--text) !important;
 }
 #list-selector-panel [data-slot="select-item"][data-state="checked"][data-highlighted] {
-  background: rgba(232, 201, 106, 0.22) !important;
+  background: rgb(from var(--color-gold) r g b / 0.22) !important;
   color: var(--text) !important;
 }
 #list-selector-panel [data-slot="select-item"][data-highlighted] .custom-dropdown-icon {
@@ -390,7 +573,7 @@ header h1 span {
   width: 36px;
   height: 36px;
   min-width: 36px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--modal-dropdown-border);
   background: var(--surface2);
   color: var(--muted);
@@ -399,8 +582,8 @@ header h1 span {
   flex-shrink: 0;
 }
 .list-settings-btn:hover {
-  border-color: rgba(232, 201, 106, 0.35);
-  background: rgba(232, 201, 106, 0.08);
+  border-color: rgb(from var(--color-gold) r g b / 0.35);
+  background: rgb(from var(--color-gold) r g b / 0.08);
   color: var(--accent);
 }
 
@@ -410,28 +593,28 @@ header h1 span {
 #lists-modal {
   width: min(360px, calc(100vw - 2rem));
   max-width: 360px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 0.9rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
 }
 #whatsapp-settings-modal {
   width: min(520px, calc(100vw - 2rem));
   max-width: 520px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 0.9rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
 }
 #list-name-modal {
   width: min(420px, calc(100vw - 2rem));
   max-width: 420px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 0.9rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
 }
 #country-modal {
   width: min(420px, calc(100vw - 2rem));
   max-width: 420px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 0.9rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
 }
@@ -447,7 +630,8 @@ header h1 span {
 #list-name-modal .modal-title,
 #country-modal .modal-title {
   font-size: 1.8rem;
-  letter-spacing: 0.065em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 #lists-modal button[data-slot="dialog-close"],
 #whatsapp-settings-modal button[data-slot="dialog-close"],
@@ -458,7 +642,7 @@ header h1 span {
   width: 28px;
   height: 28px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--muted);
   background: transparent;
   padding: 0;
@@ -493,8 +677,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 .lists-modal-section-subtitle {
   font-family: var(--font-title);
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 0.35rem;
@@ -507,14 +691,14 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 .lists-modal-section-title {
   font-family: var(--font-title);
-  font-size: 0.85rem;
-  letter-spacing: 0.1em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 0.5rem;
 }
 .lists-modal-description {
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: var(--muted);
   line-height: 1.5;
   margin-bottom: 0.75rem;
@@ -523,21 +707,21 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   display: inline-block;
   padding: 0.6rem 1rem;
   background: var(--accent);
-  color: #0a0a0c;
+  color: var(--color-surface-1);
   font-weight: 600;
   font-family: var(--font-title);
-  font-size: 0.75rem;
-  letter-spacing: 0.1em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   cursor: grab;
   user-select: none;
   transition: opacity 0.2s;
 }
 .lists-modal-bookmarklet-btn:hover {
   opacity: 0.9;
-  color: #0a0a0c;
+  color: var(--color-surface-1);
 }
 .lists-modal-bookmarklet-btn:active {
   cursor: grabbing;
@@ -551,23 +735,23 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .lists-modal-create-buttons .lists-modal-new-personal,
 .lists-modal-create-buttons .lists-modal-btn {
   appearance: none;
-  border: 1px solid rgba(232, 201, 106, 0.4);
-  background: rgba(232, 201, 106, 0.1);
+  border: 1px solid rgb(from var(--color-gold) r g b / 0.4);
+  background: rgb(from var(--color-gold) r g b / 0.1);
   color: var(--accent);
   font-family: var(--font-title);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   padding: 0.4rem 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: background 0.2s, border-color 0.2s, color 0.2s;
   width: fit-content;
 }
 .lists-modal-create-buttons .lists-modal-new-personal:hover,
 .lists-modal-create-buttons .lists-modal-btn:hover {
-  background: rgba(232, 201, 106, 0.18);
-  border-color: rgba(232, 201, 106, 0.6);
+  background: rgb(from var(--color-gold) r g b / 0.18);
+  border-color: rgb(from var(--color-gold) r g b / 0.6);
 }
 .lists-modal-create-buttons.lists-modal-create-buttons--full > .lists-modal-new-personal,
 .lists-modal-create-buttons.lists-modal-create-buttons--full > .lists-modal-btn {
@@ -583,22 +767,22 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 .lists-modal-actions-row .lists-modal-btn {
   appearance: none;
-  border: 1px solid rgba(232, 201, 106, 0.4);
-  background: rgba(232, 201, 106, 0.1);
+  border: 1px solid rgb(from var(--color-gold) r g b / 0.4);
+  background: rgb(from var(--color-gold) r g b / 0.1);
   color: var(--accent);
   font-family: var(--font-title);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   padding: 0.45rem 0.85rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: background 0.2s, border-color 0.2s, color 0.2s;
   flex: 1 1 7rem;
 }
 .lists-modal-actions-row .lists-modal-btn:hover {
-  background: rgba(232, 201, 106, 0.18);
-  border-color: rgba(232, 201, 106, 0.6);
+  background: rgb(from var(--color-gold) r g b / 0.18);
+  border-color: rgb(from var(--color-gold) r g b / 0.6);
 }
 .lists-modal-list {
   list-style: none;
@@ -611,7 +795,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   margin-bottom: 2px;
   transition: background 0.15s;
 }
@@ -623,8 +807,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   align-items: center;
   gap: 0.5rem;
   font-family: var(--font-title);
-  font-size: 1rem;
-  letter-spacing: 0.05em;
+  font-size: var(--text-base);
+  letter-spacing: 0.04em;
   color: var(--text);
 }
 .lists-modal-list-item-name .custom-dropdown-icon {
@@ -636,16 +820,16 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   border: 0;
   background: none;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: color 0.2s, background 0.2s;
 }
 .lists-modal-list-item-leave:hover {
-  color: #e85a5a;
+  color: var(--color-red);
   background: rgba(232, 90, 90, 0.15);
 }
 .lists-modal-list-item-leave:disabled {
@@ -681,8 +865,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   border: 0;
   background: none;
   color: var(--muted);
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
   cursor: pointer;
   padding: 2px 4px;
   transition: color 0.2s;
@@ -691,46 +875,46 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   color: var(--text);
 }
 .lists-modal-list-item-action--delete:hover {
-  color: #e85a5a;
+  color: var(--color-red);
 }
 .lists-modal-list-item-edit {
   flex: 1;
   min-width: 0;
   padding: 2px 6px;
-  border: 1px solid rgba(232, 201, 106, 0.4);
+  border: 1px solid rgb(from var(--color-gold) r g b / 0.4);
   background: rgba(0, 0, 0, 0.2);
   color: var(--text);
   font-family: var(--font-title);
-  font-size: 1rem;
-  letter-spacing: 0.05em;
-  border-radius: 4px;
+  font-size: var(--text-base);
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-sm);
 }
 .lists-modal-list-item-edit:focus {
   outline: none;
   border-color: var(--accent);
 }
 .lists-modal-list-item-label {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }
 .lists-modal-btn {
   appearance: none;
-  border: 1px solid rgba(232, 201, 106, 0.4);
-  background: rgba(232, 201, 106, 0.1);
+  border: 1px solid rgb(from var(--color-gold) r g b / 0.4);
+  background: rgb(from var(--color-gold) r g b / 0.1);
   color: var(--accent);
   font-family: var(--font-title);
-  font-size: 0.9rem;
-  letter-spacing: 0.06em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
 }
 .lists-modal-btn:hover {
-  background: rgba(232, 201, 106, 0.18);
-  border-color: rgba(232, 201, 106, 0.6);
+  background: rgb(from var(--color-gold) r g b / 0.18);
+  border-color: rgb(from var(--color-gold) r g b / 0.6);
 }
 .lists-modal-join {
   display: flex;
@@ -743,16 +927,16 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   padding: 0.5rem 0.75rem;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 .lists-modal-input::placeholder {
   color: var(--muted);
 }
 .lists-modal-input:focus {
   outline: none;
-  border-color: rgba(232, 201, 106, 0.4);
+  border-color: rgb(from var(--color-gold) r g b / 0.4);
 }
 
 /* Shadcn Select trigger inside dark modals (e.g. WhatsApp settings) — matches lists-modal-input */
@@ -762,15 +946,15 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   padding: 0.5rem 2.25rem 0.5rem 0.75rem;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   box-shadow: none;
 }
 .lists-modal-select-trigger:focus,
 .lists-modal-select-trigger:focus-visible {
   outline: none;
-  border-color: rgba(232, 201, 106, 0.4);
+  border-color: rgb(from var(--color-gold) r g b / 0.4);
   box-shadow: none;
 }
 .lists-modal-select-trigger[data-placeholder] {
@@ -782,7 +966,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 
 .delete-confirm-body p {
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   line-height: 1.5;
   margin-bottom: 1.25rem;
 }
@@ -796,9 +980,9 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
 }
@@ -810,16 +994,16 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   appearance: none;
   border: 1px solid rgba(232, 90, 90, 0.5);
   background: rgba(232, 90, 90, 0.2);
-  color: #e85a5a;
-  font-size: 0.8rem;
+  color: var(--color-red);
+  font-size: var(--text-sm);
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
 }
 .delete-confirm-delete:hover {
   background: rgba(232, 90, 90, 0.35);
-  border-color: #e85a5a;
+  border-color: var(--color-red);
 }
 
 .shared-modal-body {
@@ -830,12 +1014,12 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   padding: 0.5rem 0.75rem;
   background: rgba(255,255,255,0.06);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text);
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 .shared-modal-body .share-link {
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   word-break: break-all;
   color: var(--accent);
   margin-top: 0.75rem;
@@ -862,7 +1046,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   display: inline-flex;
   align-items: stretch;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   background: rgba(255,255,255,0.02);
   min-height: var(--watchlist-filter-control-height);
@@ -872,8 +1056,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   display: contents;
 }
 .filter-count {
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
   opacity: 0.85;
@@ -897,8 +1081,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .filter-group label {
   cursor: pointer;
   padding: 0 12px;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
   user-select: none;
@@ -931,7 +1115,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .tab[aria-selected="true"] {
   opacity: 1;
   font-weight: 600;
-  background: rgba(232, 201, 106, 0.22);
+  background: rgb(from var(--color-gold) r g b / 0.22);
   color: var(--accent);
 }
 
@@ -952,11 +1136,11 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   max-width: 26rem;
   margin: 0 auto;
   padding: var(--watchlist-zone-gap) var(--watchlist-space-16);
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   line-height: 1.55;
   color: var(--muted);
   text-align: center;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
 }
 
 .watchlist-empty-message .empty-state-link,
@@ -991,7 +1175,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 
 .filter-group input:checked + label {
-  background: rgba(232,201,106,0.14);
+  background: rgb(from var(--color-gold) r g b / 0.14);
   color: var(--accent);
 }
 
@@ -1002,8 +1186,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 
 .sort-wrap label {
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
   line-height: 1;
@@ -1025,16 +1209,16 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 
 .content-filters .watchlist-toolbar-genre-select-trigger {
-  font-size: 0.8rem;
-  letter-spacing: 0.06em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
   min-width: 7.5rem;
   max-width: min(200px, 100%);
 }
 
 /* Non-default sort / genre: subtle gold cue */
 .watchlist-toolbar-select-trigger.watchlist-filter-trigger--active {
-  border-color: rgba(232, 201, 106, 0.42);
-  box-shadow: 0 0 0 1px rgba(232, 201, 106, 0.12);
+  border-color: rgb(from var(--color-gold) r g b / 0.42);
+  box-shadow: 0 0 0 1px rgb(from var(--color-gold) r g b / 0.12);
 }
 
 .added-by-filter-wrap--active .tertiary-filter-label {
@@ -1043,7 +1227,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 
 .added-by-filter-wrap .segmented-control-btn.active {
-  background: rgba(232, 201, 106, 0.22);
+  background: rgb(from var(--color-gold) r g b / 0.22);
   color: var(--accent);
   font-weight: 600;
 }
@@ -1059,7 +1243,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   background: transparent !important;
 }
 .watchlist-filter-select-content [data-slot="select-item"][data-state="checked"] {
-  background: rgba(232, 201, 106, 0.12) !important;
+  background: rgb(from var(--color-gold) r g b / 0.12) !important;
   color: var(--accent) !important;
 }
 .watchlist-filter-select-content [data-slot="select-item"][data-highlighted] {
@@ -1067,7 +1251,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   color: var(--text) !important;
 }
 .watchlist-filter-select-content [data-slot="select-item"][data-state="checked"][data-highlighted] {
-  background: rgba(232, 201, 106, 0.22) !important;
+  background: rgb(from var(--color-gold) r g b / 0.22) !important;
   color: var(--text) !important;
 }
 
@@ -1078,8 +1262,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 
 .search-wrap label {
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
   line-height: 1;
@@ -1098,8 +1282,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   background: rgba(255,255,255,0.02);
   color: var(--text);
   border-radius: var(--radius-watchlist-control);
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
   padding: 0 12px;
   min-width: 180px;
   height: var(--watchlist-filter-control-height);
@@ -1114,7 +1298,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 
 .search-input:focus {
   outline: none;
-  border-color: rgba(232,201,106,0.45);
+  border-color: rgb(from var(--color-gold) r g b / 0.45);
 }
 
 .content {
@@ -1223,8 +1407,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 
 .tertiary-filter-label {
   flex: 0 0 auto;
-  font-size: 0.68rem;
-  letter-spacing: 0.1em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
   opacity: 0.62;
@@ -1240,7 +1424,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   display: inline-flex;
   align-items: stretch;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   background: rgba(255, 255, 255, 0.02);
   flex: 0 1 auto;
@@ -1255,7 +1439,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   border-right: 1px solid var(--border);
   background: transparent;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   letter-spacing: 0.04em;
   padding: 0 10px;
   height: calc(var(--watchlist-filter-control-height) - 6px);
@@ -1279,7 +1463,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 
 .segmented-control-btn.active {
-  background: rgba(232, 201, 106, 0.14);
+  background: rgb(from var(--color-gold) r g b / 0.14);
   color: var(--accent);
 }
 
@@ -1299,10 +1483,10 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   height: 26px;
   flex-shrink: 0;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.03);
   color: var(--muted);
-  font-size: 1rem;
+  font-size: var(--text-base);
   line-height: 1;
   cursor: pointer;
   display: flex;
@@ -1321,9 +1505,9 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   appearance: none;
   border: 1px solid var(--border);
   background: rgba(255,255,255,0.02);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 6px 12px;
@@ -1337,9 +1521,9 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 
 .genre-chip.active {
-  background: rgba(232,201,106,0.14);
+  background: rgb(from var(--color-gold) r g b / 0.14);
   color: var(--accent);
-  border-color: rgba(232,201,106,0.35);
+  border-color: rgb(from var(--color-gold) r g b / 0.35);
 }
 
 .grid {
@@ -1420,7 +1604,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .skeleton-service-row {
   margin-top: calc(0.55rem * var(--card-scale));
   height: calc(1.35rem * var(--card-scale));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   max-width: 72%;
 }
 
@@ -1429,7 +1613,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   vertical-align: middle;
   width: 5.5rem;
   height: 1.35rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .up-next-skeleton-strip {
@@ -1452,7 +1636,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 
 .up-next-card--skeleton .skeleton-up-next-line {
   display: block;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   height: 0.65rem;
 }
 
@@ -1551,8 +1735,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   transform: translate(-50%, -50%) scale(0.85);
   width: calc(52px * var(--card-scale));
   height: calc(52px * var(--card-scale));
-  border-radius: 50%;
-  background: rgba(232,201,106,0.92);
+  border-radius: var(--radius-pill);
+  background: rgb(from var(--color-gold) r g b / 0.92);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1563,7 +1747,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .play-btn svg {
   width: calc(20px * var(--card-scale));
   height: calc(20px * var(--card-scale));
-  fill: #0a0a0c;
+  fill: var(--color-surface-1);
   margin-left: calc(3px * var(--card-scale));
 }
 
@@ -1573,7 +1757,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1c1c22 0%, #111115 100%);
+  background: linear-gradient(135deg, var(--color-surface-3) 0%, #111115 100%);
   font-family: var(--font-title);
   font-size: calc(1.1rem * var(--card-scale));
   letter-spacing: 0.08em;
@@ -1591,7 +1775,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .card-title {
   font-family: var(--font-title);
   font-size: calc(1.35rem * var(--card-scale));
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: var(--text);
   margin-bottom: calc(0.3rem * var(--card-scale));
   overflow: hidden;
@@ -1626,10 +1810,10 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 
 .service-chip {
   font-size: calc(0.62rem * var(--card-scale));
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: calc(3px * var(--card-scale)) calc(7px * var(--card-scale));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(255,255,255,0.12);
   color: rgba(255,255,255,0.82);
   background: rgba(255,255,255,0.06);
@@ -1650,7 +1834,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .card-meta {
   font-size: calc(0.78rem * var(--card-scale));
   color: var(--muted);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   display: flex;
   align-items: flex-start;
@@ -1679,7 +1863,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   height: min(24px, calc(22px * var(--card-scale)));
   max-width: 24px;
   max-height: 24px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   background: rgba(255, 255, 255, 0.06);
   position: relative;
@@ -1706,14 +1890,14 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   color: var(--muted);
   z-index: 0;
   font-family: var(--font-title);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 .badge {
   font-size: calc(0.7rem * var(--card-scale));
   padding: calc(2px * var(--card-scale)) calc(7px * var(--card-scale));
   border-radius: calc(3px * var(--card-scale));
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   font-weight: 500;
   text-transform: uppercase;
   flex-shrink: 0;
@@ -1725,9 +1909,9 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 
 .badge-movie {
-  background: rgba(232,201,106,0.12);
+  background: rgb(from var(--color-gold) r g b / 0.12);
   color: var(--accent);
-  border: 1px solid rgba(232,201,106,0.25);
+  border: 1px solid rgb(from var(--color-gold) r g b / 0.25);
 }
 
 .badge-show {
@@ -1769,7 +1953,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .modal-title {
   font-family: var(--font-title);
   font-size: 2rem;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   color: var(--text);
 }
 
@@ -1779,9 +1964,9 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   color: var(--muted);
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: var(--text-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1814,7 +1999,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .modal-footer {
   margin-top: 0.6rem;
   padding: 0 0.25rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--muted);
   display: flex;
   align-items: center;
@@ -1841,7 +2026,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .status-badge {
   width: calc(32px * var(--card-scale));
   height: calc(32px * var(--card-scale));
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: rgba(0,0,0,0.5);
   color: var(--muted);
@@ -1857,9 +2042,9 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   border-color: rgba(255,255,255,0.2);
 }
 .status-badge.status-watched {
-  background: rgba(232,201,106,0.25);
+  background: rgb(from var(--color-gold) r g b / 0.25);
   color: var(--accent);
-  border-color: rgba(232,201,106,0.5);
+  border-color: rgb(from var(--color-gold) r g b / 0.5);
 }
 .status-badge.status-maybe-later {
   background: rgba(136,136,136,0.25);
@@ -1886,7 +2071,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   z-index: 3;
   width: calc(32px * var(--card-scale));
   height: calc(32px * var(--card-scale));
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: rgba(0,0,0,0.5);
   color: var(--muted);
@@ -1912,7 +2097,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   min-width: 140px;
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 4px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   display: none;
@@ -1925,11 +2110,11 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   border: 0;
   background: none;
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   padding: 8px 10px;
   text-align: left;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: background 0.15s;
 }
 .status-dropdown-item:hover { background: rgba(255,255,255,0.08); }
@@ -1944,13 +2129,13 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   position: relative;
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--surface2);
   color: var(--accent);
   font-family: var(--font-title);
-  font-size: 1rem;
-  letter-spacing: 0.05em;
+  font-size: var(--text-base);
+  letter-spacing: 0.04em;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1959,8 +2144,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   transition: border-color 0.2s, background 0.2s;
 }
 .auth-avatar:hover {
-  border-color: rgba(232, 201, 106, 0.4);
-  background: rgba(232, 201, 106, 0.1);
+  border-color: rgb(from var(--color-gold) r g b / 0.4);
+  background: rgb(from var(--color-gold) r g b / 0.1);
 }
 .auth-avatar-img {
   position: absolute;
@@ -1983,7 +2168,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   min-width: 160px;
   background: var(--surface2);
   border: 1px solid var(--modal-dropdown-border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 4px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   z-index: 50;
@@ -1999,12 +2184,12 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   border: 0;
   background: none;
   color: var(--text);
-  font-size: 0.8rem;
-  letter-spacing: 0.06em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
   padding: 0.5rem 0.75rem;
   text-align: left;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: background 0.15s, color 0.15s;
 }
 .auth-dropdown-item:hover {
@@ -2017,11 +2202,11 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   background: rgba(255,255,255,0.05);
   color: var(--text);
   padding: 6px 12px;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: background 0.2s, border-color 0.2s;
 }
 .auth-btn:hover {
@@ -2029,12 +2214,12 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   border-color: rgba(255,255,255,0.15);
 }
 .auth-btn-outline { background: transparent; }
-.auth-btn-ghost { background: transparent; border-color: transparent; font-size: 0.8rem; color: var(--muted); }
+.auth-btn-ghost { background: transparent; border-color: transparent; font-size: var(--text-sm); color: var(--muted); }
 .auth-btn-ghost:hover { color: var(--text); }
 .signed-in { display: flex; align-items: center; gap: 0.5rem; }
-.user-photo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.user-photo { width: 28px; height: 28px; border-radius: var(--radius-pill); object-fit: cover; }
 .user-email {
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--muted);
   max-width: 140px;
   overflow: hidden;
@@ -2051,7 +2236,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   gap: 0.6rem;
 }
 .modal-footer-meta {
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 .modal-footer-actions {
@@ -2070,13 +2255,13 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   gap: 0.35rem;
   min-height: 32px;
   padding: 0.4rem 0.6rem;
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   text-decoration: none;
   font-family: var(--font-title);
@@ -2084,7 +2269,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 .modal-action-btn:hover {
   color: var(--accent);
-  border-color: rgba(232, 201, 106, 0.35);
+  border-color: rgb(from var(--color-gold) r g b / 0.35);
   background: rgba(255, 255, 255, 0.04);
 }
 .modal-youtube-link {
@@ -2092,7 +2277,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 .modal-youtube-link:hover {
   color: var(--accent) !important;
-  border-color: rgba(232, 201, 106, 0.5) !important;
+  border-color: rgb(from var(--color-gold) r g b / 0.5) !important;
 }
 .modal-action-dropdown-panel {
   position: absolute;
@@ -2101,7 +2286,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   min-width: 160px;
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 4px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   display: none;
@@ -2116,14 +2301,14 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   gap: 0.5rem;
   width: 100%;
   padding: 0.5rem 0.75rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--muted);
   background: none;
   border: 0;
   cursor: pointer;
   text-align: left;
   font-family: inherit;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: background 0.15s, color 0.15s;
 }
 .modal-action-dropdown-item:hover {
@@ -2138,7 +2323,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .modal-add-to-list-empty {
   display: block;
   padding: 0.75rem 1rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
@@ -2150,7 +2335,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   max-width: 420px;
   background: var(--surface);
   border: 1px solid var(--modal-dropdown-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
 }
 .country-modal-body {
@@ -2168,16 +2353,16 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   min-height: 2.75rem;
   width: 100%;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--surface2);
   transition: border-color 0.2s;
 }
 .country-combobox-shell:focus-within,
 .country-combobox-shell--open {
-  border-color: rgba(232, 201, 106, 0.4);
+  border-color: rgb(from var(--color-gold) r g b / 0.4);
 }
 .country-combobox-input {
-  font-size: 1rem;
+  font-size: var(--text-base);
   font-family: var(--font-body);
   color: var(--text);
 }
@@ -2192,7 +2377,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   margin-right: 0.35rem;
   padding: 0.25rem 0.45rem;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -2205,17 +2390,17 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .country-search {
   width: 100%;
   padding: 0.6rem 0.85rem;
-  font-size: 1rem;
+  font-size: var(--text-base);
   font-family: var(--font-body);
   color: var(--text);
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   outline: none;
   transition: border-color 0.2s;
 }
 .country-search:focus {
-  border-color: rgba(232, 201, 106, 0.4);
+  border-color: rgb(from var(--color-gold) r g b / 0.4);
 }
 .country-search::placeholder {
   color: var(--muted);
@@ -2229,7 +2414,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   overflow-y: auto;
   background: var(--surface2);
   border: 1px solid var(--modal-dropdown-border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   display: none;
   z-index: 10;
@@ -2242,7 +2427,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.85rem;
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   color: var(--muted);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -2257,25 +2442,25 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   color: var(--text);
 }
 .country-dropdown-item[aria-selected="true"] {
-  background: rgba(232, 201, 106, 0.12);
+  background: rgb(from var(--color-gold) r g b / 0.12);
   color: var(--accent);
 }
 .country-dropdown-empty {
   margin: 0;
   padding: 0.65rem 0.85rem;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 .country-save-btn {
   padding: 0.6rem 1.25rem;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   font-family: var(--font-title);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--bg);
   background: var(--accent);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
 }
@@ -2286,7 +2471,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 
 .list-name-modal-body .list-name-error {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: #e57373;
 }
 .list-name-modal-actions {
@@ -2334,8 +2519,8 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .up-next-section-label {
   margin: 0 0 var(--watchlist-space-16);
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
   opacity: 0.72;
@@ -2397,7 +2582,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   background: var(--surface2);
   color: var(--muted);
   font-family: var(--font-body);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
@@ -2541,7 +2726,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 .up-next-card-hit:focus-visible {
-  outline: 2px solid rgba(232, 201, 106, 0.45);
+  outline: 2px solid rgb(from var(--color-gold) r g b / 0.45);
   outline-offset: 2px;
 }
 
@@ -2582,7 +2767,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .up-next-card-title {
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   line-height: 1.2;
   color: var(--text);
   overflow: hidden;
@@ -2591,7 +2776,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 .up-next-card-detail {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.25;
   color: var(--muted);
   overflow: hidden;
@@ -2600,11 +2785,11 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 .up-next-card-date {
-  font-size: 0.74rem;
-  font-weight: 600;
+  font-size: var(--text-xs);
+  font-weight: 500;
   color: var(--accent);
   margin-top: 2px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 .up-next-card-actions {
@@ -2638,9 +2823,9 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   margin: 0;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: rgba(10, 10, 12, 0.72);
-  color: rgba(232, 201, 106, 0.75);
+  color: rgb(from var(--color-gold) r g b / 0.75);
   cursor: pointer;
   line-height: 0;
   transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
@@ -2663,8 +2848,8 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 .up-next-card-dismiss-btn {
-  font-size: 1.1rem;
-  font-weight: 500;
+  font-size: var(--text-lg);
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.45);
 }
 
@@ -2706,9 +2891,9 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   background: var(--surface2);
   color: var(--accent);
   font-family: var(--font-body);
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
   text-align: center;
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
@@ -2717,8 +2902,8 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 .up-next-more-card:hover {
-  border-color: rgba(232, 201, 106, 0.35);
-  background: rgba(232, 201, 106, 0.08);
+  border-color: rgb(from var(--color-gold) r g b / 0.35);
+  background: rgb(from var(--color-gold) r g b / 0.08);
   color: #f0d87a;
 }
 
@@ -2770,7 +2955,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .react-migration-meta,
 .react-migration-hint {
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   opacity: 0.85;
   line-height: 1.5;
 }
@@ -2795,7 +2980,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .react-migration-error {
   margin-top: 1rem;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: #f5a0a0;
   line-height: 1.4;
 }
@@ -2866,6 +3051,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .admin-header h1 {
   font-family: var(--font-title);
   font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   line-height: 1;
@@ -2875,8 +3061,8 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .admin-subtitle {
   margin-top: 0.35rem;
   color: var(--muted);
-  font-size: 0.9rem;
-  letter-spacing: 0.05em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
 }
 
 .admin-section {
@@ -2886,8 +3072,8 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .admin-section h2 {
   margin-bottom: 0.65rem;
   font-family: var(--font-title);
-  letter-spacing: 0.06em;
-  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+  font-size: var(--text-lg);
   text-transform: uppercase;
   color: var(--accent);
 }
@@ -2925,8 +3111,8 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .admin-section--jobs-deploy .admin-jobs-deploy-col > h2 {
   margin: 0 0 0.5rem;
   font-family: var(--font-title);
-  font-size: 1.25rem;
-  letter-spacing: 0.06em;
+  font-size: var(--text-lg);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
   line-height: 1.2;
@@ -2952,7 +3138,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   flex-direction: column;
   gap: 0.55rem;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   padding: 0.85rem 0.95rem;
 }
@@ -2997,7 +3183,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .admin-card {
   position: relative;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
 }
 
@@ -3009,7 +3195,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 .admin-link-card:hover {
-  border-color: rgba(232, 201, 106, 0.32);
+  border-color: rgb(from var(--color-gold) r g b / 0.32);
   background: var(--surface2);
   transform: translateY(-1px);
 }
@@ -3017,16 +3203,16 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .admin-link-label {
   display: block;
   font-family: var(--font-title);
-  font-size: 1.25rem;
-  letter-spacing: 0.05em;
+  font-size: var(--text-lg);
+  letter-spacing: 0.04em;
 }
 
 .admin-link-sublabel {
   display: block;
   margin-top: 0.2rem;
   color: var(--muted);
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.01em;
   text-transform: uppercase;
 }
 
@@ -3066,7 +3252,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   display: inline-flex;
   align-items: center;
   line-height: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
@@ -3077,14 +3263,14 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .admin-deploy-fallback {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   line-height: 1.4;
   color: var(--muted);
 }
 
 .admin-deploy-text-link {
   font-family: var(--font-title);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   letter-spacing: 0.04em;
   text-decoration: none;
   color: var(--accent);
@@ -3096,22 +3282,22 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .admin-deploy-hint {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
 }
 
 .admin-deploy-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.85em;
+  font-size: var(--text-sm);
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 1px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text);
 }
 
 .admin-deploy-api-line {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   line-height: 1.45;
   color: var(--muted);
 }
@@ -3123,14 +3309,14 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .admin-deploy-failure {
   width: 100%;
   padding: 0.65rem 0.75rem;
-  border-radius: 8px;
-  border: 1px solid rgba(232, 201, 106, 0.28);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgb(from var(--color-gold) r g b / 0.28);
   background: rgba(0, 0, 0, 0.22);
   box-sizing: border-box;
 }
 
 .admin-deploy-failure-label {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
@@ -3138,7 +3324,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 .admin-deploy-failure-body {
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   line-height: 1.45;
   color: var(--text);
   white-space: pre-wrap;
@@ -3147,7 +3333,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .admin-deploy-failure-secondary {
   margin-top: 0.5rem;
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   line-height: 1.4;
   color: var(--muted);
   white-space: pre-wrap;
@@ -3158,7 +3344,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   display: inline-block;
   margin-top: 0.55rem;
   font-family: var(--font-title);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   letter-spacing: 0.04em;
   color: var(--accent);
   text-decoration: none;
@@ -3178,9 +3364,9 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .admin-stat-label {
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
   line-height: 1.2;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -3193,7 +3379,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 .admin-stat-value--small {
-  font-size: 1.05rem;
+  font-size: var(--text-base);
   font-family: var(--font-body);
   line-height: 1.35;
   word-break: break-word;
@@ -3238,7 +3424,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .admin-usage-metric-fraction {
   font-family: var(--font-title);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   letter-spacing: 0.04em;
   color: var(--text);
   font-variant-numeric: tabular-nums;
@@ -3246,14 +3432,14 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .admin-usage-bar-wrap {
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
 .admin-usage-bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   min-width: 0;
   transition: width 0.25s ease, background-color 0.25s ease;
 }
@@ -3297,11 +3483,11 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   min-width: 72px;
   height: 28px;
   padding: 0 0.55rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 0.76rem;
-  letter-spacing: 0.06em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -3325,8 +3511,8 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   border-color: rgba(255, 255, 255, 0.16);
   color: var(--text);
   font-family: var(--font-title);
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   text-decoration: none;
 }
@@ -3344,11 +3530,11 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   height: 34px;
   padding: 0 0.85rem;
   background: transparent !important;
-  border: 1px solid rgba(232, 201, 106, 0.55) !important;
+  border: 1px solid rgb(from var(--color-gold) r g b / 0.55) !important;
   color: var(--accent) !important;
   font-family: var(--font-title);
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   box-shadow: none;
 }
@@ -3359,13 +3545,13 @@ a.admin-job-run-btn {
   justify-content: center;
   box-sizing: border-box;
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 
 .admin-section--jobs-deploy .admin-job-run-btn[data-slot="button"]:hover,
 .admin-section--jobs-deploy a.admin-job-run-btn[data-slot="button"]:hover {
-  background: rgba(232, 201, 106, 0.1) !important;
-  border-color: rgba(232, 201, 106, 0.65) !important;
+  background: rgb(from var(--color-gold) r g b / 0.1) !important;
+  border-color: rgb(from var(--color-gold) r g b / 0.65) !important;
   color: #f0d87a !important;
 }
 
@@ -3374,14 +3560,14 @@ a.admin-job-run-btn {
 }
 
 .admin-job-value {
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   color: var(--text);
   text-align: right;
 }
 
 .admin-job-result {
   margin-top: 0.65rem;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
@@ -3392,7 +3578,7 @@ a.admin-job-run-btn {
   margin-right: 0.45rem;
   border: 2px solid currentColor;
   border-right-color: transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   animation: adminSpin 0.8s linear infinite;
 }
 
@@ -3411,20 +3597,20 @@ a.admin-job-run-btn {
 .admin-back-btn {
   height: 36px;
   padding: 0 0.9rem;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface2);
   color: var(--text);
   font-family: var(--font-title);
-  font-size: 0.9rem;
-  letter-spacing: 0.05em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.12s ease;
 }
 
 .admin-back-btn:hover {
-  border-color: rgba(232, 201, 106, 0.35);
-  background: rgba(232, 201, 106, 0.12);
+  border-color: rgb(from var(--color-gold) r g b / 0.35);
+  background: rgb(from var(--color-gold) r g b / 0.12);
   color: var(--accent);
 }
 
@@ -3437,7 +3623,7 @@ a.admin-job-run-btn {
 #delete-confirm-modal {
   width: min(360px, calc(100vw - 2rem));
   max-width: 360px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 0.9rem;
   box-shadow:
     0 0 0 1px var(--modal-dropdown-border),
@@ -3449,7 +3635,8 @@ a.admin-job-run-btn {
 }
 #delete-confirm-modal .modal-title {
   font-size: 1.8rem;
-  letter-spacing: 0.065em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 #delete-confirm-modal button[data-slot="dialog-close"] {
   top: 0.55rem;
@@ -3457,7 +3644,7 @@ a.admin-job-run-btn {
   width: 28px;
   height: 28px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--muted);
   background: transparent;
   padding: 0;
@@ -3474,7 +3661,7 @@ a.admin-job-run-btn {
   width: min(520px, calc(100vw - 2rem)) !important;
   max-width: 520px !important;
   box-sizing: border-box;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 0.9rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
 }
@@ -3484,7 +3671,8 @@ a.admin-job-run-btn {
 }
 #bookmarklet-settings-modal .modal-title {
   font-size: 1.8rem;
-  letter-spacing: 0.065em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 #bookmarklet-settings-modal button[data-slot="dialog-close"] {
   top: 0.55rem;
@@ -3492,7 +3680,7 @@ a.admin-job-run-btn {
   width: 28px;
   height: 28px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--muted);
   background: transparent;
   padding: 0;
@@ -3530,7 +3718,7 @@ a.admin-job-run-btn {
 }
 
 .lists-modal-your-lists-notice {
-  color: #e85a5a !important;
+  color: var(--color-red) !important;
 }
 
 #lists-modal #lists-modal-pending-invites-heading {
@@ -3557,34 +3745,34 @@ a.admin-job-run-btn {
   gap: 0.5rem;
 }
 .list-name-error {
-  font-size: 0.8rem;
-  color: #e85a5a;
+  font-size: var(--text-sm);
+  color: var(--color-red);
   margin: 0;
 }
 
 .lists-modal-wa-row-actions .lists-modal-list-item-action--delete {
   min-width: 4.5rem;
   padding: 0.35rem 0.5rem;
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 .lists-modal-wa-row-actions .lists-modal-list-item-action--delete:hover {
-  color: #e85a5a;
+  color: var(--color-red);
   background: rgba(232, 90, 90, 0.12);
 }
 
 .lists-modal-send-invite-btn {
   appearance: none;
-  border: 1px solid rgba(232, 201, 106, 0.4);
-  background: rgba(232, 201, 106, 0.1);
+  border: 1px solid rgb(from var(--color-gold) r g b / 0.4);
+  background: rgb(from var(--color-gold) r g b / 0.1);
   color: var(--accent);
   font-family: var(--font-title);
-  font-size: 0.9rem;
-  letter-spacing: 0.06em;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
   display: block;
@@ -3595,8 +3783,8 @@ a.admin-job-run-btn {
   margin-bottom: 0.875rem;
 }
 .lists-modal-send-invite-btn:hover:not(:disabled) {
-  background: rgba(232, 201, 106, 0.18);
-  border-color: rgba(232, 201, 106, 0.6);
+  background: rgb(from var(--color-gold) r g b / 0.18);
+  border-color: rgb(from var(--color-gold) r g b / 0.6);
 }
 .lists-modal-send-invite-btn:disabled {
   opacity: 0.5;
