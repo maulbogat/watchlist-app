@@ -4,6 +4,19 @@ A personal movie/show watchlist with YouTube trailers, filters, and Firestore. *
 
 **Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). **Vercel** hosts **`dist/`** and runs **`api/*.js`** serverless routes (Firebase Admin SDK) for the IMDb add flow, shared-list joins, **email app invites** (single **`/api/invites`** route: GET list, POST `action: send|accept`, DELETE revoke — Resend on send), upcoming-title sync, **WhatsApp** verification + webhook (Meta Cloud API), and other admin/diagnostic endpoints.
 
+## Design system
+
+**`styles.css`** defines shared tokens in **`:root`** and documents them in the **WATCHLIST DESIGN SYSTEM** comment at the top of the file:
+
+- **Colors:** `--color-gold`, `--color-red`, `--color-surface-1` / `-2` / `-3`, `--color-text-muted`
+- **Typography:** `--text-xs` … `--text-xl` (five-step scale)
+- **Radius:** `--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-pill`
+- **Spacing:** `--space-1` … `--space-12` (4px-based / 8px-aligned grid)
+
+**Button primitives:** **`.btn-primary`**, **`.btn-secondary`**, **`.btn-ghost`**, **`.btn-destructive`** — legacy button classes are tied to these bases via comma-grouped selectors so overrides in the rest of the stylesheet still win in the cascade.
+
+**`.cursorrules`** (repo root) enforces token usage for CSS/styling, points contributors at existing modal/header patterns, and requires documentation updates (README, **system-design.md**, **docs/environment.md**, **`.env.example`**) when features, API routes, collections, or env vars change.
+
 ## Environment Quick Start
 
 ```bash
@@ -13,7 +26,7 @@ cp .env.example .env
 
 Then set values in:
 
-- `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional `AXIOM_*`, optional **`RESEND_API_KEY`**, optional **`RESEND_FROM_EMAIL`**, optional **`APP_PUBLIC_URL`**, optional script toggles)
+- `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional **`FIRESTORE_HOURLY_READ_LIMIT`** / **`FIRESTORE_DAILY_READ_LIMIT`**, optional `AXIOM_*`, optional **`RESEND_API_KEY`**, optional **`RESEND_FROM_EMAIL`**, optional **`APP_PUBLIC_URL`**, optional **`VERCEL_API_TOKEN`** / **`VERCEL_PROJECT_ID`** (Admin deployment card), optional script toggles)
 - `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional `VITE_APP_VERSION`, optional `VITE_APP_ORIGIN`, `VITE_DEPLOYMENTS_URL`, `VITE_SITE_ID`, legacy `VITE_NETLIFY_*`)
 
 **Vercel production:** mirror the same keys in the project **Settings → Environment Variables** (deep link from **`/admin`** → Service Links → **Vercel**). Naming and pitfalls are in **[`docs/environment.md`](./docs/environment.md)** (delete **`VITE_AXIOM_*`**; never expose **`AXIOM_*`** to the client bundle). WhatsApp uses **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_APP_SECRET`** (webhook POST signature), **`WHATSAPP_TOKEN`**, and **`WHATSAPP_PHONE_NUMBER_ID`**; email invites use **`RESEND_API_KEY`** (and optional **`RESEND_FROM_EMAIL`**, **`APP_PUBLIC_URL`**) — see that doc and **`.env.example`**.
@@ -32,7 +45,7 @@ npm run dev:react
 Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--host` so LAN devices can reach it if needed.
 
 - **Firebase Auth:** Add your dev host (e.g. `localhost` and the port you use) under Firebase Console → Authentication → Settings → **Authorized domains**.
-- **API routes locally:** `vite.config.ts` proxies **`/api/*`** to **`http://localhost:3000`**. Run **`vercel dev`** in the repo root (serves API + env) on port **3000**, then **`npm run dev:react`** (Vite, port **5173**) in another terminal. Load the same `.env` / `.env.local` vars as production so **`log-client-event`**, **bookmarklet**, joins, and jobs work end-to-end.
+- **API routes locally:** `vite.config.ts` proxies **`/api/*`** to **`http://localhost:3000`**. In one terminal run **`vercel dev --listen 3000`** at the repo root (API + env); in another run **`npm run dev:react`** (Vite, port **5173**). Use the same `.env` / `.env.local` vars as production so **`log-client-event`**, **bookmarklet**, joins, and jobs work end-to-end.
 
 **Other commands**
 
@@ -61,7 +74,7 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
   - `VITE_DEPLOYMENTS_URL` — Admin “Deployments” card (e.g. `https://vercel.com/<team>/<project>/deployments`)
   - `VITE_SITE_ID` — optional; marks `SITE_ID` in **`/api/admin-env-status`**
   - `VITE_NETLIFY_SITE_ID` / `VITE_NETLIFY_PROJECT_SLUG` — optional legacy Netlify deploy badge only
-- **Axiom (client events):** do **not** use `VITE_AXIOM_*`. The app POSTs to **`/api/log-client-event`** with a Firebase ID token; **`AXIOM_TOKEN`** and **`AXIOM_DATASET`** are server-only (Vercel env + local `.env` when running **`vercel dev`**).
+- **Axiom (observability):** ingestion is **direct HTTP** to Axiom (not a Netlify log drain; drains are an Enterprise feature). The browser does **not** embed Axiom tokens: **`src/lib/axiom-logger.ts`** POSTs signed-in events to **`/api/log-client-event`**, which forwards using server-only **`AXIOM_TOKEN`** / **`AXIOM_DATASET`**. Server routes use **`src/api-lib/logger.js`**, which calls the Axiom HTTP API when those vars are set, otherwise **`console.log`** JSON. Do **not** set **`VITE_AXIOM_*`** (unused in bundles). Locally, leaving **`AXIOM_*`** unset avoids polluting the production dataset; logs go to the terminal instead.
 - `src/config/firebase.ts` normalizes/sanitizes client config values and falls back to project defaults when values are missing or malformed.
 
 ## Firebase setup
@@ -87,9 +100,35 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
 
 ## Vercel deployment (bookmarklet)
 
-**Build:** **`vercel.json`** sets **`npm run build:react`**, **`outputDirectory`: `dist/`** (includes `index.html`, `add.html`, hashed assets), **Cron** **`/api/check-upcoming`** at **03:00 UTC**, and **`maxDuration`** **60s** for heavy API routes (including **`/api/whatsapp-webhook`**). **`/api/whatsapp-verify`** uses a **30s** cap. Serverless handlers live under **`api/*.js`**.
+### Vercel migration (from Netlify)
 
-**WhatsApp (optional):** In Meta’s app settings, point the webhook to **`https://<your-domain>/api/whatsapp-webhook`**. After **`WHATSAPP_*`** env vars are set, users can open the profile menu → **WhatsApp**, verify a number, pick a default list, and send **IMDb links** on WhatsApp to add titles (same enrichment path as the bookmarklet, server-side). Unregistered numbers get a short reply with a link to the site.
+The project was migrated from **Netlify** to **Vercel**: former **`netlify/functions/`** handlers live under root **`api/*.js`**. **`src/api-lib/vercel-adapter.js`** keeps Netlify-shaped handler wiring while exposing standard Node **`(req, res)`** to Vercel. **`vercel.json`** replaces Netlify scheduled functions with **Vercel Cron** (e.g. **`/api/check-upcoming`** at **03:00 UTC**). On the **Hobby** plan, **12** serverless function slots are available; this repo defines **11** API routes. **`vercel.json`** sets **`npm run build:react`**, **`outputDirectory`: `dist/`** (includes `index.html`, `add.html`, hashed assets), SPA rewrite (excluding **`/api/*`**), cron, and per-function **`maxDuration`** (**60s** for heavy routes including **`/api/whatsapp-webhook`**; **30s** for **`/api/whatsapp-verify`**).
+
+**Admin “Deployments” card:** set **`VERCEL_API_TOKEN`** and **`VERCEL_PROJECT_ID`** in Vercel env so **`/api/external-status?service=vercel`** can read the latest deployment.
+
+### WhatsApp (optional)
+
+In Meta’s app settings, point the webhook to **`https://<your-domain>/api/whatsapp-webhook`**. After **`WHATSAPP_*`** env vars are set, users can open the profile menu → **WhatsApp**, verify a number, pick a default list, and send **IMDb links** on WhatsApp to add titles (same enrichment path as the bookmarklet, server-side). Unregistered numbers get a short reply with a link to the site.
+
+**Webhook security & limits:**
+
+- **`WHATSAPP_APP_SECRET`** is **required** for POST handling. Every POST must include a valid **`x-hub-signature-256`** HMAC of the **raw** body; missing or invalid signature → **403** with **no Firestore access**.
+- The handler reads the **raw request stream** (not Vercel’s pre-parsed body) so the HMAC matches Meta’s payload.
+- **Per-sender rate limit:** **5** messages per WhatsApp sender per **60** seconds — over the limit returns **200** with no further processing (avoids aggressive Meta retries); events are logged for Axiom as **`whatsapp.rate_limit`**.
+- **`src/api-lib/firestore-guard.js`** runs **`checkFirestoreQuota(db, 10)`** before other Firestore work; if quota is exceeded, the user may receive a WhatsApp reply that the service is temporarily unavailable.
+
+### Firestore read quota guard
+
+**`src/api-lib/firestore-guard.js`** enforces configurable **hourly** and **daily** Firestore **read** budgets for selected serverless routes. It reads/writes **`meta/usageStats`** in a transaction (`readsToday`, `readsThisHour`, `lastResetDate`, `lastResetHour`, `updatedAt`). Limits come from **`FIRESTORE_HOURLY_READ_LIMIT`** (default **5000**) and **`FIRESTORE_DAILY_READ_LIMIT`** (default **45000**). Used by **`whatsapp-webhook`**, **`add-from-imdb`**, **`check-upcoming`**, and **`trigger-upcoming-sync`**.
+
+**`/admin`** shows live progress bars (reads this hour / reads today) from **`meta/usageStats`**.
+
+**When quota is exceeded:** the WhatsApp webhook sends a short reply to the sender; **`add-from-imdb`** returns **503**; **`check-upcoming`** records a **skipped** outcome in **`meta/jobConfig`** and returns a skipped JSON payload; **`trigger-upcoming-sync`** returns **503**.
+
+### External services (email & domain)
+
+- **`maulbogat.com`:** personal domain (Cloudflare Registrar); DNS verified with **Resend** for outbound mail.
+- **Resend:** transactional email (invite flow only). Requires **`RESEND_API_KEY`**. Set **`RESEND_FROM_EMAIL`** to a verified sender (e.g. **`noreply@maulbogat.com`**); if unset, the code falls back to Resend’s test sender (**`onboarding@resend.dev`**) for development.
 
 ### Production missing new UI after a Git push?
 
@@ -125,7 +164,7 @@ For the IMDb bookmarklet to add titles from imdb.com:
 
 Keep **`AXIOM_*` on the server** only; do not reintroduce **`VITE_AXIOM_*`**. If a deploy flags a false positive secret in logs, adjust values or use Vercel’s guidance for omitted patterns.
 
-6. **Upcoming episodes / movies (optional UI):** Vercel **Cron** invokes **`/api/check-upcoming`** on the schedule in **`vercel.json`** (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The app shows dismissible pills for the list you’re viewing. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
+6. **Upcoming episodes / movies (optional UI):** Vercel **Cron** invokes **`/api/check-upcoming`** on the schedule in **`vercel.json`** (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The watchlist **Up next** section (see **Features**) renders those alerts as horizontal cards with poster, detail line, gold date, dismiss, and **`.ics`** download when dated. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
 
    Job enable/disable is controlled in Firestore at `meta/jobConfig.checkUpcomingEnabled` (exposed in `/admin` Jobs section). The schedule remains on; when disabled, scheduled runs exit early.
 
@@ -157,17 +196,22 @@ Keep **`AXIOM_*` on the server** only; do not reintroduce **`VITE_AXIOM_*`**. If
 
 ## Multi-user support
 
-Multiple people can use the app with their own Google accounts, but **new** accounts must be **invited** (email invite → **`/join-app/:inviteId`**) or already present in **`allowedUsers`** (e.g. seeded). Each account has its own **personal lists** (default list + optional extra lists in the subcollection). The bookmarklet adds to the **currently selected** list in the main app (personal or shared). Items go only to lists that user is allowed to write (see Firestore rules).
+Multiple people can use the app with their own Google accounts, but **new** accounts must be **invited** (email invite → **`/join-app/:inviteId`**) or already present in **`allowedUsers`** (e.g. seeded with **`scripts/seed-allowed-users.mjs`**). Each account has its own **personal lists** (default list + optional extra lists in the subcollection). The bookmarklet adds to the **currently selected** list in the main app (personal or shared). Items go only to lists that user is allowed to write (see Firestore rules).
 
-## Shared lists
+## Shared lists & email invites
+
+**Resend** sends app invitations using **`RESEND_API_KEY`** and a verified domain (**`maulbogat.com`**). A single invite email can combine **app allowlist access** and optional **shared list membership** (one **`POST /api/invites`** `action: send` with optional **`listId`**). Invites **expire after seven days**, are **single-use**, and can be **revoked** (**`DELETE /api/invites`**).
+
+**`verificationCodes/{digits}`** (E.164-style doc id used by **`api/whatsapp-verify.js`**) stores short-lived **WhatsApp link codes** (**15-minute** expiry); Admin SDK only, no client access.
 
 Create shared lists that multiple people can add to and update together:
 
 1. **Create:** Use the list dropdown → "+ Create shared list" → enter a name
-2. **Share:** After creation, copy the **`/join/{listId}`** link from the dialog and send it to people who are **already allowed** to use the app (same allowlist as Google sign-in)
+2. **Share:** After creation, copy the **`/join/{listId}`** link from the dialog — recipients still need a **pending email invite** for that list (see below)
 3. **Invite by email:** Manage lists → **Invite someone** — optional shared list attachment; pending invites can be revoked
-4. **Join (link):** Others open **`/join/{listId}`** while signed in to join the list (unchanged)
-5. **Add items:** When viewing a shared list, the bookmarklet adds to that list (sign in and switch to the shared list first)
+4. **Join (link):** Opening **`/join/{listId}`** while signed in calls **`POST /api/join-shared-list`**. The API requires a **valid pending `invites` row** whose **`invitedEmail`** matches the signed-in user and **`listId`** matches the URL — otherwise **403** **`invite_required`**. Accepting an app invite that includes a list grants membership without using this path separately when applicable.
+5. **Join (app invite):** **`/join-app/:inviteId`** — sign in, then **`POST /api/invites`** with **`action: "accept"`** to write **`allowedUsers`** and optional shared list membership.
+6. **Add items:** When viewing a shared list, the bookmarklet adds to that list (sign in and switch to the shared list first)
 
 Deploy Firestore rules: `firebase deploy --only firestore:rules`
 
@@ -175,7 +219,7 @@ Deploy Firestore rules: `firebase deploy --only firestore:rules`
 
 1. **Authentication → Sign-in method** → Google → Enabled
 2. **Authentication → Settings → Authorized domains** → Add your production host (e.g. `watchlist-trailers.vercel.app` or your custom domain) and `localhost` for local dev
-3. **Firestore rules** (in `firestore.rules`) — signed-in users: read/write their **`users/{uid}`** doc and **`users/{uid}/personalLists/*`**; read/write **`sharedLists/{listId}`** only when their uid is in **`members`**; read **`titleRegistry`** and **`upcomingAlerts`** (no client writes there); read their own **`allowedUsers/{email}`** row (document id matches normalized email); read **`invites`** (writes Admin-only). **`syncState`** is Admin-only.
+3. **Firestore rules** (in `firestore.rules`) — signed-in users: read/write their **`users/{uid}`** doc and **`users/{uid}/personalLists/*`**; read/write **`sharedLists/{listId}`** only when their uid is in **`members`**; read **`titleRegistry`** and **`upcomingAlerts`** (no client writes there); read their own **`allowedUsers/{email}`** row (document id matches normalized email); read **`invites`** (writes Admin-only). **`syncState`** and **`verificationCodes`** are Admin-only. **`meta/{docId}`**: **read** only for hardcoded **admin UIDs** (aligned with **`src/config/admin.ts`**); **no client writes** (Admin SDK writes **`jobConfig`**, **`usageStats`**, etc.).
 
 The header shows the signed-in user's email so family members know whose account they're using on shared devices.
 
@@ -256,15 +300,17 @@ Many scripts expect **`TMDB_API_KEY`**, **`FIREBASE_SERVICE_ACCOUNT`** (base64) 
 
 ## Features
 
-- **Watchlist UI (React):** grid of titles with poster, status controls, and **trailer modal** (YouTube embed).
+- **Watchlist UI (React):** grid of titles with poster, status controls, and **trailer modal** (YouTube embed). **Skeleton placeholders** for the grid and filter chrome while list data loads.
+- **Up next:** horizontal **card row** (poster thumbnail, title, episode/release detail, **date in gold**, dismiss, **calendar (`.ics`)** download) for the current list’s **`upcomingAlerts`**. Shows the **first four** titles in a scrollable strip; **expand** reveals a full **grid** with **Show less** to collapse. **Skeleton strip** while alerts load. Section **hidden** when there are no alerts. **`localStorage`** + TanStack Query (**2-hour** stale window) reduce redundant Firestore reads.
+- **Sticky controls toolbar:** after the header and Up next block, the filter toolbar **sticks** to the top of the viewport (**IntersectionObserver** + **`styles.css`** sticky shell).
 - **Personal lists:** default list + extra lists; **manage lists** modal (create/rename/delete, pick default, **invite someone** + pending invites).
-- **Shared lists:** create; share **`/join/:listId`** from the post-create dialog; join while signed in; optional list on email invite; bookmarklet targets the list you’re viewing.
+- **Shared lists:** create; share **`/join/:listId`** from the post-create dialog (**join still requires a matching email invite**); optional list on the same email as app access; bookmarklet targets the list you’re viewing.
 - **App access:** **`allowedUsers`** + **`/join-app/:inviteId`**; profile menu **Bookmarklet** dialog (instructions + drag button; moved out of manage lists).
-- **WhatsApp adds:** verified numbers and per-number default list (**`phoneIndex`** + **`users/{uid}.phoneNumbers`**); inbound messages handled by **`/api/whatsapp-webhook`** (see deployment above).
-- **Admin (`/admin`, admin users only):** catalog/upcoming stats, upcoming job toggle, GitHub backup workflow status, and **Service Links** (production site, Firebase, **Vercel env vars**, **Meta WhatsApp** dev console, **Google Cloud billing**, GitHub, TMDB, Trakt, etc.).
-- **Status tabs:** Recently Added, To Watch (**includes “maybe later”** rows), Watched, Archive — persisted in Firestore.
-- **Filters:** Movies / TV / Both, **genre**, persisted per account in **localStorage** (with session restore).
+- **WhatsApp adds:** verified numbers and per-number default list (**`phoneIndex`** + **`users/{uid}.phoneNumbers`**); inbound messages handled by **`/api/whatsapp-webhook`** (signature, rate limit, and quota guard — see **Vercel deployment**).
+- **Admin (`/admin`, admin users only):** Firestore read **quota usage** bars, catalog/upcoming stats, upcoming job toggle, GitHub backup workflow status, and **Service Links** (production site, Firebase, **Vercel env vars**, **Meta WhatsApp** dev console, **Google Cloud billing**, GitHub, TMDB, Trakt, etc.).
+- **Status tabs:** **All**, **To Watch** (**includes “maybe later”** rows), **Watched**, **Archive** — persisted in Firestore. **Recently Added** is no longer a separate tab; use **sort** options **Date Added (New → Old)** and **Date Added (Old → New)**.
+- **Filters:** Movies / TV / Both (segmented), **genre** as a **single-select dropdown** (Radix Select), **Added by** **segmented control** on **shared lists only**, persisted per account in **localStorage** (with session restore).
 - **Country / region:** set in app for TMDB **watch providers** at add time; **service chips** on cards (e.g. Netflix, Prime).
-- **Upcoming:** dismissible **upcoming alerts** bar for the current list (backed by **`upcomingAlerts`** + scheduled **`check-upcoming`**; optional calendar export when dated).
+- **Hover-only card actions (desktop):** remove and status controls stay hidden until **hover** or keyboard focus inside the card (**`@media (hover: hover)`**); touch devices keep controls available without hover.
 - **Bookmarklet:** add from **imdb.com** via **`add.html`** + **`/api/add-from-imdb`**.
 - **Google sign-in:** same Firebase project as production; remember **authorized domains** for each host/port you use locally.

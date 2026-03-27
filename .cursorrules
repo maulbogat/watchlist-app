@@ -12,3 +12,23 @@ When adding new UI components:
 - Check if a similar pattern already exists before creating a new class
 - Use the existing modal-header, modal-title patterns for dialogs
 - Document any new design tokens added to :root
+
+# Scope
+These rules apply to all files including src/pages/AdminPage.tsx and styles.css admin-* classes.
+
+# Documentation Rules
+After every feature change, new API route, new component, new collection, or infrastructure change:
+- Update README.md to reflect the change (features list, setup instructions, environment variables)
+- Update system-design.md to reflect the change (services table, architecture, data model, API routes, gaps)
+- Update docs/environment.md if any environment variables were added, removed, or changed
+- Update .env.example if any environment variables were added or removed
+
+Do not mark a task as complete without updating documentation.
+
+# Testing Rules
+- When adding a new pure utility function in src/lib/, add corresponding Vitest tests in src/lib/*.test.ts
+- When fixing a bug in an existing tested function, add a test case that covers the bug
+- When adding a new data transformation function in src/data/, add corresponding tests
+- Do not add tests for React components, API functions, or Firestore helpers — these are tested manually
+- Run npm run test:run after any change to tested files and confirm all tests pass
+- Do not break existing tests
