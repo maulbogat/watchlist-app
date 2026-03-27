@@ -882,6 +882,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   flex: 1;
   min-width: 0;
   padding: 2px 6px;
+  padding-left: var(--space-2) !important;
   border: 1px solid rgb(from var(--color-gold) r g b / 0.4);
   background: rgba(0, 0, 0, 0.2);
   color: var(--text);
@@ -926,6 +927,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   flex: 1;
   min-width: 0;
   padding: 0.5rem 0.75rem;
+  padding-left: var(--space-2) !important;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -2437,6 +2439,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   border-color: rgb(from var(--color-gold) r g b / 0.4);
 }
 .country-combobox-input {
+  padding-left: var(--space-2) !important;
   font-size: var(--text-base);
   font-family: var(--font-body);
   color: var(--text);
@@ -2465,6 +2468,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 .country-search {
   width: 100%;
   padding: 0.6rem 0.85rem;
+  padding-left: var(--space-2) !important;
   font-size: var(--text-base);
   font-family: var(--font-body);
   color: var(--text);
@@ -2502,6 +2506,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.85rem;
+  padding-left: var(--space-2) !important;
   font-size: var(--text-base);
   color: var(--muted);
   cursor: pointer;

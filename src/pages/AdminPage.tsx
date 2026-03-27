@@ -48,9 +48,21 @@ function dqRowImdbId(data: Record<string, unknown>, docId: string): string {
   return docId;
 }
 
+function dqRowTitle(data: Record<string, unknown>, docId: string): string {
+  const raw = data.title;
+  if (typeof raw === "string" && raw.trim() !== "") return raw.trim();
+  return docId;
+}
+
 /** Normalize registry id for comparison with `meta/catalogHealthExclusions.missingTmdbId`. */
 function dqImdbIdKey(imdbId: string): string {
   return imdbId.trim().toLowerCase();
+}
+
+function dqParseTmdbIdFromRecord(tid: unknown): number | null {
+  if (typeof tid === "number" && Number.isFinite(tid)) return tid;
+  if (typeof tid === "string" && tid.trim() !== "" && !Number.isNaN(Number(tid))) return Number(tid);
+  return null;
 }
 
 async function loadMissingTmdbIdExclusions(db: ReturnType<typeof getFirestore>): Promise<Set<string>> {
@@ -67,12 +79,6 @@ async function loadMissingTmdbIdExclusions(db: ReturnType<typeof getFirestore>):
     /* missing doc or read error — treat as no exclusions */
   }
   return out;
-}
-
-function dqRowTitle(data: Record<string, unknown>, docId: string): string {
-  const raw = data.title;
-  if (typeof raw === "string" && raw.trim() !== "") return raw.trim();
-  return docId;
 }
 
 function formatDqYear(y: number | string | null): string {
@@ -106,6 +112,23 @@ function AdminDqStatValue({
   }
   const cls = tone === "critical" ? "admin-stat-value--dq-critical" : "admin-stat-value--dq-warn";
   return <div className={`admin-stat-value ${cls}`}>{count}</div>;
+}
+
+type DqPanelDef = {
+  key: DQDetailKey;
+  fieldLabel: string;
+  count: number | "Error";
+  rows: DQTitleRow[] | DQThumbRow[];
+  fixable?: boolean;
+};
+
+function buildDqPanelDefs(d: CatalogStats): DqPanelDef[] {
+  return [
+    { key: "tmdbId", fieldLabel: "tmdbId", count: d.missingTmdbId, rows: d.missingTmdbIdTitles },
+    { key: "thumb", fieldLabel: "thumb", count: d.missingThumb, rows: d.missingThumbTitles, fixable: true },
+    { key: "tmdbMedia", fieldLabel: "tmdbMedia", count: d.missingTmdbMedia, rows: d.missingTmdbMediaTitles },
+    { key: "youtubeId", fieldLabel: "youtubeId", count: d.missingYoutubeId, rows: d.missingYoutubeIdTitles },
+  ];
 }
 
 type UpcomingStats = {
@@ -357,6 +380,26 @@ function vercelStatusBadge(state: string): { label: string; className: string } 
   return { label: s, className: "admin-job-status" };
 }
 
+function AdminVercelDeploymentSummary({ dep }: { dep: VercelDeploymentLast }) {
+  const status = vercelStatusBadge(dep.state);
+  return (
+    <>
+      <div className="admin-job-row admin-job-row--status-line">
+        <span className="admin-stat-label">Status</span>
+        <span className={status.className}>{status.label}</span>
+      </div>
+      <div className="admin-job-row">
+        <span className="admin-stat-label">Created</span>
+        <span className="admin-job-value">{formatDateTime(vercelCreatedToMs(dep.createdAt)) || "—"}</span>
+      </div>
+      <div className="admin-job-row admin-job-row--align-start">
+        <span className="admin-stat-label">Commit</span>
+        <span className="admin-job-value">{truncateCommitMessage(dep.meta?.githubCommitMessage)}</span>
+      </div>
+    </>
+  );
+}
+
 function formatUpcomingLastRunLine(status: string | null | undefined, message: string | null | undefined): string {
   const st = status?.trim();
   const msg = message?.trim();
@@ -376,15 +419,34 @@ function usagePercent(current: number, limit: number): number {
 }
 
 function usageBarColor(percent: number): string {
-  if (percent > 80) return "#e85a5a";
-  if (percent >= 50) return "#e8c96a";
-  return "#6bcf7f";
+  if (percent > 80) return "var(--color-red)";
+  if (percent >= 50) return "var(--color-gold)";
+  return "var(--color-success)";
 }
 
 function formatUsageUpdatedAt(stats: FirestoreUsageStats | null | undefined): string {
   if (!stats?.updatedAt?.trim()) return "N/A";
   const ms = toEpochMs(stats.updatedAt);
   return formatDateTime(ms) || stats.updatedAt;
+}
+
+const DQ_STAT_CARD_COUNT = 5;
+
+async function fetchAdminExternalStatus<T extends { ok?: boolean; error?: string }>(path: string): Promise<T> {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not signed in");
+  const idToken = await user.getIdToken();
+  const res = await fetch(path, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+  const data = (await res.json()) as T;
+  if (!res.ok) {
+    throw new Error(data.error || `Request failed (${res.status})`);
+  }
+  if (data.ok === false && data.error) {
+    throw new Error(data.error);
+  }
+  return data;
 }
 
 export function AdminPage() {
@@ -476,14 +538,7 @@ export function AdminPage() {
           if (dqStrEmpty(rec.thumb)) {
             missingThumb += 1;
             if (missingThumbTitles.length < maxTitles) {
-              const tid = rec.tmdbId;
-              const tmdbId =
-                typeof tid === "number" && Number.isFinite(tid)
-                  ? tid
-                  : typeof tid === "string" && tid.trim() !== "" && !Number.isNaN(Number(tid))
-                    ? Number(tid)
-                    : null;
-              missingThumbTitles.push({ imdbId, title, year, tmdbId });
+              missingThumbTitles.push({ imdbId, title, year, tmdbId: dqParseTmdbIdFromRecord(rec.tmdbId) });
             }
           }
 
@@ -545,7 +600,7 @@ export function AdminPage() {
         setFixingThumbImdbId(null);
       }
     },
-    [catalogStatsQ],
+    [catalogStatsQ.refetch],
   );
 
   const firestoreUsageQ = useQuery<FirestoreUsageStats | null>({
@@ -601,22 +656,7 @@ export function AdminPage() {
     queryKey: ["admin", "external-status", "github"],
     staleTime: 60 * 1000,
     enabled: !authLoading && userIsAdmin,
-    queryFn: async () => {
-      const user = auth.currentUser;
-      if (!user) throw new Error("Not signed in");
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/external-status?service=github", {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      const data = (await res.json()) as GithubBackupStatusResponse & { error?: string };
-      if (!res.ok) {
-        throw new Error(data.error || `Request failed (${res.status})`);
-      }
-      if (data.ok === false && data.error) {
-        throw new Error(data.error);
-      }
-      return data;
-    },
+    queryFn: () => fetchAdminExternalStatus<GithubBackupStatusResponse>("/api/external-status?service=github"),
   });
 
   const vercelDeploymentQ = useQuery<VercelDeploymentStatusResponse>({
@@ -624,22 +664,7 @@ export function AdminPage() {
     staleTime: 0,
     refetchOnMount: "always",
     enabled: !authLoading && userIsAdmin,
-    queryFn: async () => {
-      const user = auth.currentUser;
-      if (!user) throw new Error("Not signed in");
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/external-status?service=vercel", {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      const data = (await res.json()) as VercelDeploymentStatusResponse & { error?: string };
-      if (!res.ok) {
-        throw new Error(data.error || `Request failed (${res.status})`);
-      }
-      if (data.ok === false && data.error) {
-        throw new Error(data.error);
-      }
-      return data;
-    },
+    queryFn: () => fetchAdminExternalStatus<VercelDeploymentStatusResponse>("/api/external-status?service=vercel"),
   });
 
   const [runNowResult, setRunNowResult] = useState<string | null>(null);
@@ -717,12 +742,27 @@ export function AdminPage() {
     },
   });
 
-  const jobErrorText = (() => {
-    if (!jobConfigQ.isError) return null;
-    const err = jobConfigQ.error;
-    if (err instanceof Error && err.message) return err.message;
-    return "Could not load job config.";
-  })();
+  const jobErrorText =
+    jobConfigQ.isError
+      ? jobConfigQ.error instanceof Error && jobConfigQ.error.message
+        ? jobConfigQ.error.message
+        : "Could not load job config."
+      : null;
+
+  const catalogDq = catalogStatsQ.data;
+  const dqStatCards = !catalogStatsQ.isPending
+    ? [
+        { label: "Total titles in catalog", count: catalogDq?.totalTitles ?? "Error", tone: "neutral" as const },
+        { label: "Missing tmdbId", count: catalogDq?.missingTmdbId ?? "Error", tone: "critical" as const },
+        { label: "Missing thumb", count: catalogDq?.missingThumb ?? "Error", tone: "warn" as const },
+        { label: "Missing tmdbMedia", count: catalogDq?.missingTmdbMedia ?? "Error", tone: "warn" as const },
+        { label: "Missing youtubeId", count: catalogDq?.missingYoutubeId ?? "Error", tone: "warn" as const },
+      ]
+    : null;
+  const dqVisiblePanels =
+    catalogDq != null
+      ? buildDqPanelDefs(catalogDq).filter((p) => typeof p.count === "number" && p.count > 0)
+      : [];
 
   if (authLoading) {
     return <div className="react-migration-shell">Loading…</div>;
@@ -783,136 +823,78 @@ export function AdminPage() {
         </div>
         <div className="admin-grid admin-grid--stats">
           {catalogStatsQ.isPending
-            ? Array.from({ length: 5 }).map((_, idx) => (
+            ? Array.from({ length: DQ_STAT_CARD_COUNT }).map((_, idx) => (
                 <div key={`catalog-skeleton-${idx}`} className="admin-card admin-stat-card admin-skeleton" />
               ))
-            : (() => {
-                const d = catalogStatsQ.data;
-                const cards: {
-                  label: string;
-                  count: number | "Error";
-                  tone: "critical" | "warn" | "neutral";
-                }[] = [
-                  { label: "Total titles in catalog", count: d?.totalTitles ?? "Error", tone: "neutral" },
-                  { label: "Missing tmdbId", count: d?.missingTmdbId ?? "Error", tone: "critical" },
-                  { label: "Missing thumb", count: d?.missingThumb ?? "Error", tone: "warn" },
-                  { label: "Missing tmdbMedia", count: d?.missingTmdbMedia ?? "Error", tone: "warn" },
-                  { label: "Missing youtubeId", count: d?.missingYoutubeId ?? "Error", tone: "warn" },
-                ];
-                return cards.map((c) => (
-                  <div key={c.label} className="admin-card admin-stat-card">
-                    <div className="admin-stat-label">{c.label}</div>
-                    <AdminDqStatValue count={c.count} tone={c.tone} />
-                  </div>
-                ));
-              })()}
+            : dqStatCards?.map((c) => (
+                <div key={c.label} className="admin-card admin-stat-card">
+                  <div className="admin-stat-label">{c.label}</div>
+                  <AdminDqStatValue count={c.count} tone={c.tone} />
+                </div>
+              ))}
         </div>
 
-        {!catalogStatsQ.isPending && catalogStatsQ.data
-          ? (() => {
-              const d = catalogStatsQ.data;
-              const panels: {
-                key: DQDetailKey;
-                fieldLabel: string;
-                count: number | "Error";
-                rows: DQTitleRow[] | DQThumbRow[];
-                fixable?: boolean;
-              }[] = [
-                {
-                  key: "tmdbId",
-                  fieldLabel: "tmdbId",
-                  count: d.missingTmdbId,
-                  rows: d.missingTmdbIdTitles,
-                },
-                {
-                  key: "thumb",
-                  fieldLabel: "thumb",
-                  count: d.missingThumb,
-                  rows: d.missingThumbTitles,
-                  fixable: true,
-                },
-                {
-                  key: "tmdbMedia",
-                  fieldLabel: "tmdbMedia",
-                  count: d.missingTmdbMedia,
-                  rows: d.missingTmdbMediaTitles,
-                },
-                {
-                  key: "youtubeId",
-                  fieldLabel: "youtubeId",
-                  count: d.missingYoutubeId,
-                  rows: d.missingYoutubeIdTitles,
-                },
-              ];
-
-              const visible = panels.filter((p) => typeof p.count === "number" && p.count > 0);
-              if (visible.length === 0) return null;
-
+        {dqVisiblePanels.length > 0 ? (
+          <div className="admin-dq-details">
+            {dqVisiblePanels.map((p) => {
+              const open = dqPanelsOpen[p.key];
               return (
-                <div className="admin-dq-details">
-                  {visible.map((p) => {
-                    const open = dqPanelsOpen[p.key];
-                    return (
-                      <div key={p.key} className="admin-dq-detail">
-                        <button
-                          type="button"
-                          className="admin-dq-detail-toggle"
-                          aria-expanded={open}
-                          onClick={() =>
-                            setDqPanelsOpen((prev) => ({ ...prev, [p.key]: !prev[p.key] }))
-                          }
-                        >
-                          <span className="admin-dq-detail-toggle-label">
-                            {p.count} titles missing {p.fieldLabel}
+                <div key={p.key} className="admin-dq-detail">
+                  <button
+                    type="button"
+                    className="admin-dq-detail-toggle"
+                    aria-expanded={open}
+                    onClick={() => setDqPanelsOpen((prev) => ({ ...prev, [p.key]: !prev[p.key] }))}
+                  >
+                    <span className="admin-dq-detail-toggle-label">
+                      {p.count} titles missing {p.fieldLabel}
+                    </span>
+                    <span className="admin-dq-chevron">{open ? "▴ Hide" : "▾ Show"}</span>
+                  </button>
+                  {open ? (
+                    <div className="admin-dq-detail-body">
+                      {p.rows.map((row) => (
+                        <div key={row.imdbId} className="admin-dq-li">
+                          <span className="admin-dq-li-text">
+                            {row.imdbId} · {row.title} ({formatDqYear(row.year)})
                           </span>
-                          <span className="admin-dq-chevron">{open ? "▴ Hide" : "▾ Show"}</span>
-                        </button>
-                        {open ? (
-                          <div className="admin-dq-detail-body">
-                            {p.rows.map((row) => (
-                              <div key={row.imdbId} className="admin-dq-li">
-                                <span className="admin-dq-li-text">
-                                  {row.imdbId} · {row.title} ({formatDqYear(row.year)})
-                                </span>
-                                {p.fixable && "tmdbId" in row ? (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="admin-dq-fix-btn"
-                                    disabled={
-                                      fixingThumbImdbId === row.imdbId ||
-                                      row.tmdbId == null ||
-                                      catalogStatsQ.isFetching
-                                    }
-                                    title={
-                                      row.tmdbId == null
-                                        ? "Needs tmdbId on document before TMDB poster fetch"
-                                        : undefined
-                                    }
-                                    onClick={() => void fixCatalogThumb(row.imdbId)}
-                                  >
-                                    {fixingThumbImdbId === row.imdbId ? (
-                                      <>
-                                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                                        Fix…
-                                      </>
-                                    ) : (
-                                      "Fix"
-                                    )}
-                                  </Button>
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                          {p.fixable && "tmdbId" in row ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="admin-dq-fix-btn"
+                              disabled={
+                                fixingThumbImdbId === row.imdbId ||
+                                row.tmdbId == null ||
+                                catalogStatsQ.isFetching
+                              }
+                              title={
+                                row.tmdbId == null
+                                  ? "Needs tmdbId on document before TMDB poster fetch"
+                                  : undefined
+                              }
+                              onClick={() => void fixCatalogThumb(row.imdbId)}
+                            >
+                              {fixingThumbImdbId === row.imdbId ? (
+                                <>
+                                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                                  Fix…
+                                </>
+                              ) : (
+                                "Fix"
+                              )}
+                            </Button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               );
-            })()
-          : null}
+            })}
+          </div>
+        ) : null}
       </section>
 
       <section className="admin-section">
@@ -1219,30 +1201,9 @@ export function AdminPage() {
                       <code className="admin-deploy-code">VERCEL_PROJECT_ID</code> in Vercel env.
                     </p>
                   ) : null}
-                  {vercelDeploymentQ.data?.lastDeployment ? (() => {
-                    const dep = vercelDeploymentQ.data.lastDeployment;
-                    const status = vercelStatusBadge(dep.state);
-                    return (
-                      <>
-                        <div className="admin-job-row admin-job-row--status-line">
-                          <span className="admin-stat-label">Status</span>
-                          <span className={status.className}>{status.label}</span>
-                        </div>
-                        <div className="admin-job-row">
-                          <span className="admin-stat-label">Created</span>
-                          <span className="admin-job-value">
-                            {formatDateTime(vercelCreatedToMs(dep.createdAt)) || "—"}
-                          </span>
-                        </div>
-                        <div className="admin-job-row admin-job-row--align-start">
-                          <span className="admin-stat-label">Commit</span>
-                          <span className="admin-job-value">
-                            {truncateCommitMessage(dep.meta?.githubCommitMessage)}
-                          </span>
-                        </div>
-                      </>
-                    );
-                  })() : !vercelDeploymentQ.data?.vercelError ? (
+                  {vercelDeploymentQ.data?.lastDeployment ? (
+                    <AdminVercelDeploymentSummary dep={vercelDeploymentQ.data.lastDeployment} />
+                  ) : !vercelDeploymentQ.data?.vercelError ? (
                     <p className="admin-job-result">No deployments returned for this project yet.</p>
                   ) : null}
                   <div className="admin-job-row admin-job-row--actions">

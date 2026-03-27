@@ -113,7 +113,7 @@ export function CountryModal({
                 aria-autocomplete="list"
                 aria-expanded={dropdownOpen}
                 aria-controls="country-dropdown-list"
-                className="country-combobox-input h-auto min-h-0 rounded-none border-0 bg-transparent py-2.5 pr-2 pl-3 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+                className="country-combobox-input h-auto min-h-0 rounded-none border-0 bg-transparent py-2.5 pr-2 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
                 placeholder="Search or select country…"
                 autoComplete="off"
                 value={search}
