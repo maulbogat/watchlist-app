@@ -22,6 +22,7 @@ After every feature change, new API route, new component, new collection, or inf
 - Update system-design.md to reflect the change (services table, architecture, data model, API routes, gaps)
 - Update docs/environment.md if any environment variables were added, removed, or changed
 - Update .env.example if any environment variables were added or removed
+- If a new Firestore composite index is created via the Firebase console, export it with firebase firestore:indexes > firestore.indexes.json and commit the updated file
 
 Do not mark a task as complete without updating documentation.
 
