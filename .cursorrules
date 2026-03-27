@@ -2,7 +2,7 @@
 
 When making any CSS or styling changes:
 - Use design system tokens from styles.css (:root block) instead of hardcoded values
-- Colors: use --color-* variables, never hardcode hex values
+- Color tokens: use --color-* variables from `:root` (--color-gold, --color-red, --color-success, --color-surface-1/2/3, --color-text-muted), never hardcode hex values
 - Spacing: use --space-* variables or multiples of 8px
 - Typography: use --text-* variables for font-size
 - Border radius: use --radius-* variables
@@ -32,3 +32,8 @@ Do not mark a task as complete without updating documentation.
 - Do not add tests for React components, API functions, or Firestore helpers — these are tested manually
 - Run npm run test:run after any change to tested files and confirm all tests pass
 - Do not break existing tests
+
+# MCP / Firestore
+- Firestore MCP is available when vercel dev is not running on port 3000
+- To use Firestore MCP: stop vercel dev first, then restart Cursor
+- MCP gives Cursor direct read/write access to Firestore for debugging

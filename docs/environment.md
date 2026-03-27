@@ -46,7 +46,7 @@ Read at **runtime** by **`api/*.js`** on Vercel (and by **`vercel dev`** / local
 | `FIREBASE_SERVICE_ACCOUNT` | Base64 JSON — Firebase Admin SDK in API routes |
 | `FIRESTORE_HOURLY_READ_LIMIT` | Optional — default **5000**; `checkFirestoreQuota` blocks when estimated reads would exceed this in the current UTC hour (`meta/usageStats`) |
 | `FIRESTORE_DAILY_READ_LIMIT` | Optional — default **45000**; same guard for UTC calendar day |
-| `TMDB_API_KEY` | `check-upcoming`, `trigger-upcoming-sync`, `add-from-imdb`, scripts |
+| `TMDB_API_KEY` | `check-upcoming`, `trigger-upcoming-sync`, `add-from-imdb`, `catalog-health`, scripts |
 | `OMDB_API_KEY` | `add-from-imdb` |
 | `AXIOM_TOKEN` | Server-side Axiom ingest (`log-client-event`, function loggers) |
 | `AXIOM_DATASET` | Axiom dataset name |

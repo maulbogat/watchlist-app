@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAppStore, STATUS_LABELS } from "../store/useAppStore.js";
 import { persistFilterPreferences } from "../lib/storage.js";
 import { getUniqueAddersFromMovies, getUniqueGenresFromMovies } from "../lib/watchlistFilters.js";
@@ -11,9 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-/** Radix Select requires non-empty item values; maps to `currentGenre === ""`. */
-const GENRE_SELECT_ALL_VALUE = "__all_genres__";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/shadcn-utils";
 
 const watchlistSelectContentClass =
   "watchlist-filter-select-content custom-dropdown-content lists-modal-select-popover--no-check z-[1300] min-w-[var(--radix-select-trigger-width)] border border-[var(--border)] bg-[var(--surface2)] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.08]";
@@ -49,7 +48,13 @@ export function WatchlistToolbar({
     currentListMode && typeof currentListMode === "object" && currentListMode.type === "shared";
 
   const genres = getUniqueGenresFromMovies(allMovies);
+  const genresSorted = useMemo(
+    () => [...genres].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })),
+    [genres]
+  );
   const adders = isSharedList ? getUniqueAddersFromMovies(allMovies, currentUser?.uid ?? null) : [];
+
+  const [genrePopoverOpen, setGenrePopoverOpen] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -141,7 +146,22 @@ export function WatchlistToolbar({
     });
   }
 
+  function applyGenre(next: string) {
+    setCurrentGenre(next);
+    persistFilters();
+    setGenrePopoverOpen(false);
+    void logEvent({
+      type: "user.action",
+      action: "filter.change",
+      filterType: "genre",
+      value: next || "all",
+      uid: currentUser?.uid ?? null,
+    }).catch(() => {});
+  }
+
   const spacerH = Math.max(toolbarFlowHeight, 1);
+
+  const showSecondaryRow = genres.length > 0 || adders.length > 1;
 
   return (
     <>
@@ -171,280 +191,288 @@ export function WatchlistToolbar({
             id="content-filters"
             className={`content-filters${toolbarSticky ? " content-filters--toolbar-sticky toolbar--sticky" : ""}`}
           >
-      <div className="tab-group-wrap">
-        <div className="tab-group" role="tablist" aria-label="Watch status">
-          {[
-            { id: "tab-all", status: "all", label: "All" },
-            { id: "tab-to-watch", status: "to-watch", label: STATUS_LABELS["to-watch"] },
-            { id: "tab-watched", status: "watched", label: STATUS_LABELS.watched },
-            { id: "tab-archive", status: "archive", label: STATUS_LABELS.archive },
-          ].map(({ id, status, label }) => {
-            const active = currentStatus === status;
-            return (
-              <button
-                key={status}
-                type="button"
-                id={id}
-                className={`tab${active ? " active" : ""}`}
-                role="tab"
-                aria-selected={active}
-                aria-controls="grid"
-                data-status={status}
-                onClick={() => {
-                  setCurrentStatus(status);
-                  persistFilters();
-                  void logEvent({
-                    type: "user.action",
-                    action: "filter.change",
-                    filterType: "status",
-                    value: status,
-                    uid: currentUser?.uid ?? null,
-                  }).catch(() => {});
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-        <span
-          className={`filter-count${watchlistLoading ? " filter-count--loading" : ""}`}
-          id="filter-count"
-          aria-live={watchlistLoading ? "off" : "polite"}
-          aria-busy={watchlistLoading}
-        >
-          {watchlistLoading ? (
-            <span className="filter-count-pill-skeleton skeleton-shimmer" />
-          ) : typeof visibleCount === "number" ? (
-            `${visibleCount} title${visibleCount === 1 ? "" : "s"}`
-          ) : (
-            ""
-          )}
-        </span>
-      </div>
-      <div className="filter-group" role="radiogroup" aria-label="Filter titles">
-        {[
-          { id: "filter-both", value: "both", label: "Both" },
-          { id: "filter-movies", value: "movie", label: "Movies" },
-          { id: "filter-shows", value: "show", label: "Series" },
-        ].map(({ id, value, label }) => (
-          <span key={value}>
-            <input
-              type="radio"
-              name="typeFilter"
-              id={id}
-              value={value}
-              checked={currentFilter === value}
-              onChange={() => {
-                setCurrentFilter(value as FilterType);
-                persistFilters();
-                void logEvent({
-                  type: "user.action",
-                  action: "filter.change",
-                  filterType: "type",
-                  value,
-                  uid: currentUser?.uid ?? null,
-                }).catch(() => {});
-              }}
-            />
-            <label htmlFor={id}>{label}</label>
-          </span>
-        ))}
-      </div>
-      <div className="sort-wrap">
-        <label htmlFor="sort-select">Sort</label>
-        <Select
-          value={currentSort}
-          onValueChange={(nextSort) => {
-            setCurrentSort(nextSort as SortType);
-            persistFilters();
-            void logEvent({
-              type: "user.action",
-              action: "filter.change",
-              filterType: "sort",
-              value: nextSort,
-              uid: currentUser?.uid ?? null,
-            }).catch(() => {});
-          }}
-        >
-          <SelectTrigger
-            id="sort-select"
-            className={`custom-dropdown-trigger watchlist-toolbar-select-trigger focus-visible:ring-0 shadow-none${currentSort !== "title-asc" ? " watchlist-filter-trigger--active" : ""}`}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent
-            className={watchlistSelectContentClass}
-            position="popper"
-            side="bottom"
-            align="start"
-            sideOffset={8}
-          >
-            <SelectItem value="title-asc" className="custom-dropdown-item">
-              Title (A-Z)
-            </SelectItem>
-            <SelectItem value="release-desc" className="custom-dropdown-item">
-              Release Date (New-Old)
-            </SelectItem>
-            <SelectItem value="added-desc" className="custom-dropdown-item">
-              Date Added (New → Old)
-            </SelectItem>
-            <SelectItem value="added-asc" className="custom-dropdown-item">
-              Date Added (Old → New)
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="search-wrap">
-        <label htmlFor="title-search">Search</label>
-        <input
-          ref={searchInputRef}
-          id="title-search"
-          type="text"
-          className="search-input"
-          placeholder={searchFocused ? "Search titles" : "Search titles · /"}
-          value={currentSearch}
-          onFocus={() => setSearchFocused(true)}
-          onChange={(e) => {
-            setCurrentSearch(e.target.value);
-            persistFilters();
-          }}
-          onBlur={() => {
-            setSearchFocused(false);
-            void logEvent({
-              type: "user.action",
-              action: "filter.change",
-              filterType: "search",
-              value: currentSearch.trim() || "empty",
-              uid: currentUser?.uid ?? null,
-            }).catch(() => {});
-          }}
-        />
-      </div>
-      {adders.length > 1 ? (
-        <div
-          id="added-by-filter-wrap"
-          className={`genre-filter-wrap added-by-filter-wrap tertiary-filter-wrap${currentAddedByUid ? " added-by-filter-wrap--active" : ""}`}
-          style={{ display: "flex" }}
-          role="group"
-          aria-label="Filter by who added the title"
-        >
-          <span className="tertiary-filter-label">Added by</span>
-          <div className="segmented-control" role="radiogroup" aria-label="Added by">
-            <button
-              type="button"
-              className={`segmented-control-btn${!currentAddedByUid ? " active" : ""}`}
-              data-added-by=""
-              aria-pressed={!currentAddedByUid}
-              onClick={() => {
-                setCurrentAddedByUid("");
-                persistFilters();
-                void logEvent({
-                  type: "user.action",
-                  action: "filter.change",
-                  filterType: "addedBy",
-                  value: "all",
-                  uid: currentUser?.uid ?? null,
-                }).catch(() => {});
-              }}
-            >
-              All
-            </button>
-            {adders.map(({ uid, label }) => {
-              const active = currentAddedByUid === uid;
-              return (
-                <button
-                  key={uid}
-                  type="button"
-                  className={`segmented-control-btn${active ? " active" : ""}`}
-                  data-added-by={uid}
-                  aria-pressed={active}
-                  onClick={() => {
-                    setCurrentAddedByUid(uid);
+            <div className="watchlist-toolbar-primary-row">
+              <div className="tab-group-wrap">
+                <div className="tab-group" role="tablist" aria-label="Watch status">
+                  {[
+                    { id: "tab-all", status: "all", label: "All" },
+                    { id: "tab-to-watch", status: "to-watch", label: STATUS_LABELS["to-watch"] },
+                    { id: "tab-watched", status: "watched", label: STATUS_LABELS.watched },
+                    { id: "tab-archive", status: "archive", label: STATUS_LABELS.archive },
+                  ].map(({ id, status, label }) => {
+                    const active = currentStatus === status;
+                    return (
+                      <button
+                        key={status}
+                        type="button"
+                        id={id}
+                        className={`tab${active ? " active" : ""}`}
+                        role="tab"
+                        aria-selected={active}
+                        aria-controls="grid"
+                        data-status={status}
+                        onClick={() => {
+                          setCurrentStatus(status);
+                          persistFilters();
+                          void logEvent({
+                            type: "user.action",
+                            action: "filter.change",
+                            filterType: "status",
+                            value: status,
+                            uid: currentUser?.uid ?? null,
+                          }).catch(() => {});
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span
+                  className={`filter-count${watchlistLoading ? " filter-count--loading" : ""}`}
+                  id="filter-count"
+                  aria-live={watchlistLoading ? "off" : "polite"}
+                  aria-busy={watchlistLoading}
+                >
+                  {watchlistLoading ? (
+                    <span className="filter-count-pill-skeleton skeleton-shimmer" />
+                  ) : typeof visibleCount === "number" ? (
+                    `${visibleCount} title${visibleCount === 1 ? "" : "s"}`
+                  ) : (
+                    ""
+                  )}
+                </span>
+              </div>
+              <div className="filter-group" role="radiogroup" aria-label="Filter titles">
+                {[
+                  { id: "filter-both", value: "both", label: "Both" },
+                  { id: "filter-movies", value: "movie", label: "Movies" },
+                  { id: "filter-shows", value: "show", label: "Series" },
+                ].map(({ id, value, label }) => (
+                  <span key={value}>
+                    <input
+                      type="radio"
+                      name="typeFilter"
+                      id={id}
+                      value={value}
+                      checked={currentFilter === value}
+                      onChange={() => {
+                        setCurrentFilter(value as FilterType);
+                        persistFilters();
+                        void logEvent({
+                          type: "user.action",
+                          action: "filter.change",
+                          filterType: "type",
+                          value,
+                          uid: currentUser?.uid ?? null,
+                        }).catch(() => {});
+                      }}
+                    />
+                    <label htmlFor={id}>{label}</label>
+                  </span>
+                ))}
+              </div>
+              <div className="sort-wrap">
+                <label htmlFor="sort-select">Sort</label>
+                <Select
+                  value={currentSort}
+                  onValueChange={(nextSort) => {
+                    setCurrentSort(nextSort as SortType);
                     persistFilters();
                     void logEvent({
                       type: "user.action",
                       action: "filter.change",
-                      filterType: "addedBy",
-                      value: uid,
+                      filterType: "sort",
+                      value: nextSort,
                       uid: currentUser?.uid ?? null,
                     }).catch(() => {});
                   }}
                 >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-      {genres.length ? (
-        <div id="genre-filter-wrap" className="genre-filter-wrap tertiary-filter-wrap" style={{ display: "flex" }}>
-          <label htmlFor="genre-select" className="tertiary-filter-label">
-            Genre
-          </label>
-          <div className="genre-select-row">
-            <Select
-              value={currentGenre ? currentGenre : GENRE_SELECT_ALL_VALUE}
-              onValueChange={(next) => {
-                const genre = next === GENRE_SELECT_ALL_VALUE ? "" : next;
-                setCurrentGenre(genre);
-                persistFilters();
-                void logEvent({
-                  type: "user.action",
-                  action: "filter.change",
-                  filterType: "genre",
-                  value: genre || "all",
-                  uid: currentUser?.uid ?? null,
-                }).catch(() => {});
-              }}
-            >
-              <SelectTrigger
-                id="genre-select"
-                className="custom-dropdown-trigger watchlist-toolbar-select-trigger watchlist-toolbar-genre-select-trigger focus-visible:ring-0 shadow-none"
-              >
-                <SelectValue placeholder="All Genres" />
-              </SelectTrigger>
-              <SelectContent
-                className={watchlistSelectContentClass}
-                position="popper"
-                side="bottom"
-                align="start"
-                sideOffset={8}
-              >
-                <SelectItem value={GENRE_SELECT_ALL_VALUE} className="custom-dropdown-item">
-                  All Genres
-                </SelectItem>
-                {genres.map((g) => (
-                  <SelectItem key={g} value={g} className="custom-dropdown-item">
-                    {g}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {currentGenre ? (
-              <button
-                type="button"
-                className="genre-clear-btn"
-                aria-label="Clear genre filter"
-                onClick={() => {
-                  setCurrentGenre("");
-                  persistFilters();
-                  void logEvent({
-                    type: "user.action",
-                    action: "filter.change",
-                    filterType: "genre",
-                    value: "all",
-                    uid: currentUser?.uid ?? null,
-                  }).catch(() => {});
-                }}
-              >
-                ×
-              </button>
+                  <SelectTrigger
+                    id="sort-select"
+                    className={`custom-dropdown-trigger watchlist-toolbar-select-trigger focus-visible:ring-0 shadow-none${currentSort !== "title-asc" ? " watchlist-filter-trigger--active" : ""}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    className={watchlistSelectContentClass}
+                    position="popper"
+                    side="bottom"
+                    align="start"
+                    sideOffset={8}
+                  >
+                    <SelectItem value="title-asc" className="custom-dropdown-item">
+                      Title (A-Z)
+                    </SelectItem>
+                    <SelectItem value="release-desc" className="custom-dropdown-item">
+                      Release Date (New-Old)
+                    </SelectItem>
+                    <SelectItem value="added-desc" className="custom-dropdown-item">
+                      Date Added (New → Old)
+                    </SelectItem>
+                    <SelectItem value="added-asc" className="custom-dropdown-item">
+                      Date Added (Old → New)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="search-wrap">
+                <label htmlFor="title-search">Search</label>
+                <input
+                  ref={searchInputRef}
+                  id="title-search"
+                  type="text"
+                  className="search-input"
+                  placeholder={searchFocused ? "Search titles" : "Search titles · /"}
+                  value={currentSearch}
+                  onFocus={() => setSearchFocused(true)}
+                  onChange={(e) => {
+                    setCurrentSearch(e.target.value);
+                    persistFilters();
+                  }}
+                  onBlur={() => {
+                    setSearchFocused(false);
+                    void logEvent({
+                      type: "user.action",
+                      action: "filter.change",
+                      filterType: "search",
+                      value: currentSearch.trim() || "empty",
+                      uid: currentUser?.uid ?? null,
+                    }).catch(() => {});
+                  }}
+                />
+              </div>
+            </div>
+
+            {showSecondaryRow ? (
+              <div className="watchlist-toolbar-secondary-row">
+                {genres.length ? (
+                  <div id="genre-filter-wrap" className="watchlist-toolbar-genre-wrap">
+                    <Popover open={genrePopoverOpen} onOpenChange={setGenrePopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          id="genre-filter-trigger"
+                          className={cn(
+                            "custom-dropdown-trigger watchlist-toolbar-select-trigger watchlist-genre-popover-trigger focus-visible:ring-0 shadow-none",
+                            currentGenre ? "watchlist-genre-popover-trigger--active" : ""
+                          )}
+                          aria-haspopup="listbox"
+                          aria-expanded={genrePopoverOpen}
+                          aria-controls="genre-filter-listbox"
+                        >
+                          <span className="watchlist-genre-popover-trigger-label">
+                            {currentGenre || "All Genres"}
+                          </span>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        id="genre-filter-popover"
+                        align="start"
+                        side="bottom"
+                        sideOffset={8}
+                        avoidCollisions={true}
+                        className="watchlist-genre-popover-content"
+                      >
+                        <div
+                          id="genre-filter-listbox"
+                          role="listbox"
+                          aria-label="Genre"
+                          className="watchlist-genre-popover-list"
+                        >
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={!currentGenre}
+                            className={cn(
+                              "watchlist-genre-option",
+                              !currentGenre ? "watchlist-genre-option--active" : ""
+                            )}
+                            onClick={() => applyGenre("")}
+                          >
+                            All Genres
+                          </button>
+                          {genresSorted.map((g) => {
+                            const active = currentGenre === g;
+                            return (
+                              <button
+                                key={g}
+                                type="button"
+                                role="option"
+                                aria-selected={active}
+                                className={cn(
+                                  "watchlist-genre-option",
+                                  active ? "watchlist-genre-option--active" : ""
+                                )}
+                                onClick={() => applyGenre(g)}
+                              >
+                                {g}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                ) : null}
+                {adders.length > 1 ? (
+                  <div
+                    id="added-by-filter-wrap"
+                    className={`added-by-filter-wrap${currentAddedByUid ? " added-by-filter-wrap--active" : ""}`}
+                    role="group"
+                    aria-label="Filter by who added the title"
+                  >
+                    <span className="tertiary-filter-label">Added by</span>
+                    <div className="segmented-control" role="radiogroup" aria-label="Added by">
+                      <button
+                        type="button"
+                        className={`segmented-control-btn${!currentAddedByUid ? " active" : ""}`}
+                        data-added-by=""
+                        aria-pressed={!currentAddedByUid}
+                        onClick={() => {
+                          setCurrentAddedByUid("");
+                          persistFilters();
+                          void logEvent({
+                            type: "user.action",
+                            action: "filter.change",
+                            filterType: "addedBy",
+                            value: "all",
+                            uid: currentUser?.uid ?? null,
+                          }).catch(() => {});
+                        }}
+                      >
+                        All
+                      </button>
+                      {adders.map(({ uid, label }) => {
+                        const active = currentAddedByUid === uid;
+                        return (
+                          <button
+                            key={uid}
+                            type="button"
+                            className={`segmented-control-btn${active ? " active" : ""}`}
+                            data-added-by={uid}
+                            aria-pressed={active}
+                            onClick={() => {
+                              setCurrentAddedByUid(uid);
+                              persistFilters();
+                              void logEvent({
+                                type: "user.action",
+                                action: "filter.change",
+                                filterType: "addedBy",
+                                value: uid,
+                                uid: currentUser?.uid ?? null,
+                              }).catch(() => {});
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
-          </div>
-        </div>
-      ) : null}
           </div>
         </div>
       </div>

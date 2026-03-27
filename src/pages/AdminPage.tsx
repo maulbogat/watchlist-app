@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "../store/useAppStore.js";
 import { isAdmin } from "../config/admin.js";
@@ -14,11 +15,77 @@ import {
 } from "../firebase.js";
 import { getFirestore, collection, getCountFromServer, getDocs } from "firebase/firestore";
 
+type DQTitleRow = {
+  imdbId: string;
+  title: string;
+  year: number | string | null;
+};
+
+type DQThumbRow = DQTitleRow & { tmdbId: number | null };
+
 type CatalogStats = {
   totalTitles: number | "Error";
   missingTmdbId: number | "Error";
   missingYoutubeId: number | "Error";
+  missingThumb: number | "Error";
+  missingTmdbMedia: number | "Error";
+  missingTmdbIdTitles: DQTitleRow[];
+  missingThumbTitles: DQThumbRow[];
+  missingYoutubeIdTitles: DQTitleRow[];
+  /** Shown in Data Quality detail panel for tmdbMedia gaps (same cap as other lists). */
+  missingTmdbMediaTitles: DQTitleRow[];
 };
+
+type DQDetailKey = "tmdbId" | "thumb" | "tmdbMedia" | "youtubeId";
+
+function dqStrEmpty(v: unknown): boolean {
+  return v == null || String(v).trim() === "";
+}
+
+function dqRowImdbId(data: Record<string, unknown>, docId: string): string {
+  const raw = data.imdbId;
+  if (typeof raw === "string" && raw.trim() !== "") return raw.trim();
+  return docId;
+}
+
+function dqRowTitle(data: Record<string, unknown>, docId: string): string {
+  const raw = data.title;
+  if (typeof raw === "string" && raw.trim() !== "") return raw.trim();
+  return docId;
+}
+
+function formatDqYear(y: number | string | null): string {
+  if (y == null || y === "") return "—";
+  return String(y);
+}
+
+function AdminDqStatValue({
+  count,
+  tone,
+}: {
+  count: number | "Error";
+  tone: "critical" | "warn" | "neutral";
+}) {
+  if (count === "Error") {
+    return (
+      <div className="admin-stat-value admin-stat-value--small" role="status">
+        Error
+      </div>
+    );
+  }
+  if (tone === "neutral") {
+    return <div className="admin-stat-value">{count}</div>;
+  }
+  if (count === 0) {
+    return (
+      <div className="admin-stat-value admin-stat-value--dq-ok" aria-label="OK">
+        ✓
+      </div>
+    );
+  }
+  const cls = tone === "critical" ? "admin-stat-value--dq-critical" : "admin-stat-value--dq-warn";
+  return <div className={`admin-stat-value ${cls}`}>{count}</div>;
+}
 
 type UpcomingStats = {
   activeAlerts: number;
@@ -310,31 +377,108 @@ export function AdminPage() {
     staleTime: 60 * 1000,
     enabled: !authLoading && userIsAdmin,
     queryFn: async () => {
-      const db = getFirestore();
+      const emptyLists = (): Pick<
+        CatalogStats,
+        | "missingTmdbIdTitles"
+        | "missingThumbTitles"
+        | "missingYoutubeIdTitles"
+        | "missingTmdbMediaTitles"
+      > => ({
+        missingTmdbIdTitles: [],
+        missingThumbTitles: [],
+        missingYoutubeIdTitles: [],
+        missingTmdbMediaTitles: [],
+      });
+
       const base: CatalogStats = {
         totalTitles: "Error",
         missingTmdbId: "Error",
         missingYoutubeId: "Error",
+        missingThumb: "Error",
+        missingTmdbMedia: "Error",
+        ...emptyLists(),
       };
 
       try {
+        const db = getFirestore();
         const titleRegistryRef = collection(db, "titleRegistry");
         const totalTitlesSnap = await getCountFromServer(titleRegistryRef);
         base.totalTitles = totalTitlesSnap.data().count;
 
         const projectedRegistryRef =
-          (titleRegistryRef as MaybeSelectable<typeof titleRegistryRef>).select?.("tmdbId", "youtubeId") ??
-          titleRegistryRef;
+          (titleRegistryRef as MaybeSelectable<typeof titleRegistryRef>).select?.(
+            "tmdbId",
+            "youtubeId",
+            "thumb",
+            "tmdbMedia",
+            "title",
+            "year",
+            "imdbId",
+            "type",
+          ) ?? titleRegistryRef;
         const registrySnap = await getDocs(projectedRegistryRef);
         let missingTmdbId = 0;
         let missingYoutubeId = 0;
+        let missingThumb = 0;
+        let missingTmdbMedia = 0;
+        const missingTmdbIdTitles: DQTitleRow[] = [];
+        const missingThumbTitles: DQThumbRow[] = [];
+        const missingYoutubeIdTitles: DQTitleRow[] = [];
+        const missingTmdbMediaTitles: DQTitleRow[] = [];
+        const maxTitles = 20;
+
         registrySnap.forEach((d) => {
           const rec = d.data() as Record<string, unknown>;
-          if (rec.tmdbId == null || rec.tmdbId === "") missingTmdbId += 1;
-          if (rec.youtubeId == null || rec.youtubeId === "") missingYoutubeId += 1;
+          const imdbId = dqRowImdbId(rec, d.id);
+          const title = dqRowTitle(rec, d.id);
+          const year =
+            typeof rec.year === "number" || typeof rec.year === "string" ? (rec.year as number | string) : null;
+
+          const noTmdbId = rec.tmdbId == null || rec.tmdbId === "";
+          if (noTmdbId) {
+            missingTmdbId += 1;
+            if (missingTmdbIdTitles.length < maxTitles) {
+              missingTmdbIdTitles.push({ imdbId, title, year });
+            }
+          }
+
+          if (rec.youtubeId == null || rec.youtubeId === "") {
+            missingYoutubeId += 1;
+            if (missingYoutubeIdTitles.length < maxTitles) {
+              missingYoutubeIdTitles.push({ imdbId, title, year });
+            }
+          }
+
+          if (dqStrEmpty(rec.thumb)) {
+            missingThumb += 1;
+            if (missingThumbTitles.length < maxTitles) {
+              const tid = rec.tmdbId;
+              const tmdbId =
+                typeof tid === "number" && Number.isFinite(tid)
+                  ? tid
+                  : typeof tid === "string" && tid.trim() !== "" && !Number.isNaN(Number(tid))
+                    ? Number(tid)
+                    : null;
+              missingThumbTitles.push({ imdbId, title, year, tmdbId });
+            }
+          }
+
+          if (dqStrEmpty(rec.tmdbMedia)) {
+            missingTmdbMedia += 1;
+            if (missingTmdbMediaTitles.length < maxTitles) {
+              missingTmdbMediaTitles.push({ imdbId, title, year });
+            }
+          }
         });
+
         base.missingTmdbId = missingTmdbId;
         base.missingYoutubeId = missingYoutubeId;
+        base.missingThumb = missingThumb;
+        base.missingTmdbMedia = missingTmdbMedia;
+        base.missingTmdbIdTitles = missingTmdbIdTitles;
+        base.missingThumbTitles = missingThumbTitles;
+        base.missingYoutubeIdTitles = missingYoutubeIdTitles;
+        base.missingTmdbMediaTitles = missingTmdbMediaTitles;
       } catch (err) {
         console.error("Admin catalog/titleRegistry stats failed:", err);
       }
@@ -342,6 +486,43 @@ export function AdminPage() {
       return base;
     },
   });
+
+  const [dqPanelsOpen, setDqPanelsOpen] = useState<Record<DQDetailKey, boolean>>({
+    tmdbId: false,
+    thumb: false,
+    tmdbMedia: false,
+    youtubeId: false,
+  });
+  const [fixingThumbImdbId, setFixingThumbImdbId] = useState<string | null>(null);
+
+  const fixCatalogThumb = useCallback(
+    async (imdbId: string) => {
+      const user = auth.currentUser;
+      if (!user) return;
+      setFixingThumbImdbId(imdbId);
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch("/api/catalog-health", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ imdbId }),
+        });
+        const data = (await res.json()) as { ok?: boolean; error?: string; thumb?: string };
+        if (!res.ok || data.ok === false) {
+          throw new Error(data.error || `Request failed (${res.status})`);
+        }
+        await catalogStatsQ.refetch();
+      } catch (e) {
+        console.error("Catalog thumb fix failed:", e);
+      } finally {
+        setFixingThumbImdbId(null);
+      }
+    },
+    [catalogStatsQ],
+  );
 
   const firestoreUsageQ = useQuery<FirestoreUsageStats | null>({
     queryKey: ["admin", "firestore-usage-stats"],
@@ -556,23 +737,158 @@ export function AdminPage() {
       </section>
 
       <section className="admin-section">
-        <h2>Catalog Stats</h2>
+        <div className="admin-dq-heading-row">
+          <h2>Data Quality</h2>
+          <div className="admin-dq-refresh">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={catalogStatsQ.isPending || catalogStatsQ.isFetching}
+              onClick={() => void catalogStatsQ.refetch()}
+            >
+              {catalogStatsQ.isFetching ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  Refreshing…
+                </>
+              ) : (
+                "Refresh"
+              )}
+            </Button>
+          </div>
+        </div>
         <div className="admin-grid admin-grid--stats">
           {catalogStatsQ.isPending
             ? Array.from({ length: 5 }).map((_, idx) => (
                 <div key={`catalog-skeleton-${idx}`} className="admin-card admin-stat-card admin-skeleton" />
               ))
-            : [
-                { label: "Total titles in catalog", value: catalogStatsQ.data?.totalTitles },
-                { label: "Titles missing tmdbId", value: catalogStatsQ.data?.missingTmdbId },
-                { label: "Titles missing youtubeId", value: catalogStatsQ.data?.missingYoutubeId },
-              ].map((s) => (
-                <div key={s.label} className="admin-card admin-stat-card">
-                  <div className="admin-stat-label">{s.label}</div>
-                  <div className="admin-stat-value">{String(s.value ?? "0")}</div>
-                </div>
-              ))}
+            : (() => {
+                const d = catalogStatsQ.data;
+                const cards: {
+                  label: string;
+                  count: number | "Error";
+                  tone: "critical" | "warn" | "neutral";
+                }[] = [
+                  { label: "Total titles in catalog", count: d?.totalTitles ?? "Error", tone: "neutral" },
+                  { label: "Missing tmdbId", count: d?.missingTmdbId ?? "Error", tone: "critical" },
+                  { label: "Missing thumb", count: d?.missingThumb ?? "Error", tone: "warn" },
+                  { label: "Missing tmdbMedia", count: d?.missingTmdbMedia ?? "Error", tone: "warn" },
+                  { label: "Missing youtubeId", count: d?.missingYoutubeId ?? "Error", tone: "warn" },
+                ];
+                return cards.map((c) => (
+                  <div key={c.label} className="admin-card admin-stat-card">
+                    <div className="admin-stat-label">{c.label}</div>
+                    <AdminDqStatValue count={c.count} tone={c.tone} />
+                  </div>
+                ));
+              })()}
         </div>
+
+        {!catalogStatsQ.isPending && catalogStatsQ.data
+          ? (() => {
+              const d = catalogStatsQ.data;
+              const panels: {
+                key: DQDetailKey;
+                fieldLabel: string;
+                count: number | "Error";
+                rows: DQTitleRow[] | DQThumbRow[];
+                fixable?: boolean;
+              }[] = [
+                {
+                  key: "tmdbId",
+                  fieldLabel: "tmdbId",
+                  count: d.missingTmdbId,
+                  rows: d.missingTmdbIdTitles,
+                },
+                {
+                  key: "thumb",
+                  fieldLabel: "thumb",
+                  count: d.missingThumb,
+                  rows: d.missingThumbTitles,
+                  fixable: true,
+                },
+                {
+                  key: "tmdbMedia",
+                  fieldLabel: "tmdbMedia",
+                  count: d.missingTmdbMedia,
+                  rows: d.missingTmdbMediaTitles,
+                },
+                {
+                  key: "youtubeId",
+                  fieldLabel: "youtubeId",
+                  count: d.missingYoutubeId,
+                  rows: d.missingYoutubeIdTitles,
+                },
+              ];
+
+              const visible = panels.filter((p) => typeof p.count === "number" && p.count > 0);
+              if (visible.length === 0) return null;
+
+              return (
+                <div className="admin-dq-details">
+                  {visible.map((p) => {
+                    const open = dqPanelsOpen[p.key];
+                    return (
+                      <div key={p.key} className="admin-dq-detail">
+                        <button
+                          type="button"
+                          className="admin-dq-detail-toggle"
+                          aria-expanded={open}
+                          onClick={() =>
+                            setDqPanelsOpen((prev) => ({ ...prev, [p.key]: !prev[p.key] }))
+                          }
+                        >
+                          <span className="admin-dq-detail-toggle-label">
+                            {p.count} titles missing {p.fieldLabel}
+                          </span>
+                          <span className="admin-dq-chevron">{open ? "▴ Hide" : "▾ Show"}</span>
+                        </button>
+                        {open ? (
+                          <div className="admin-dq-detail-body">
+                            {p.rows.map((row) => (
+                              <div key={row.imdbId} className="admin-dq-li">
+                                <span className="admin-dq-li-text">
+                                  {row.imdbId} · {row.title} ({formatDqYear(row.year)})
+                                </span>
+                                {p.fixable && "tmdbId" in row ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="admin-dq-fix-btn"
+                                    disabled={
+                                      fixingThumbImdbId === row.imdbId ||
+                                      row.tmdbId == null ||
+                                      catalogStatsQ.isFetching
+                                    }
+                                    title={
+                                      row.tmdbId == null
+                                        ? "Needs tmdbId on document before TMDB poster fetch"
+                                        : undefined
+                                    }
+                                    onClick={() => void fixCatalogThumb(row.imdbId)}
+                                  >
+                                    {fixingThumbImdbId === row.imdbId ? (
+                                      <>
+                                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                                        Fix…
+                                      </>
+                                    ) : (
+                                      "Fix"
+                                    )}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()
+          : null}
       </section>
 
       <section className="admin-section">

@@ -102,7 +102,7 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
 
 ### Vercel migration (from Netlify)
 
-The project was migrated from **Netlify** to **Vercel**: former **`netlify/functions/`** handlers live under root **`api/*.js`**. **`src/api-lib/vercel-adapter.js`** keeps Netlify-shaped handler wiring while exposing standard Node **`(req, res)`** to Vercel. **`vercel.json`** replaces Netlify scheduled functions with **Vercel Cron** (e.g. **`/api/check-upcoming`** at **03:00 UTC**). On the **Hobby** plan, **12** serverless function slots are available; this repo defines **11** API routes. **`vercel.json`** sets **`npm run build:react`**, **`outputDirectory`: `dist/`** (includes `index.html`, `add.html`, hashed assets), SPA rewrite (excluding **`/api/*`**), cron, and per-function **`maxDuration`** (**60s** for heavy routes including **`/api/whatsapp-webhook`**; **30s** for **`/api/whatsapp-verify`**).
+The project was migrated from **Netlify** to **Vercel**: former **`netlify/functions/`** handlers live under root **`api/*.js`**. **`src/api-lib/vercel-adapter.js`** keeps Netlify-shaped handler wiring while exposing standard Node **`(req, res)`** to Vercel. **`vercel.json`** replaces Netlify scheduled functions with **Vercel Cron** (e.g. **`/api/check-upcoming`** at **03:00 UTC**). On the **Hobby** plan, **12** serverless function slots are available; this repo defines **12** API routes. **`vercel.json`** sets **`npm run build:react`**, **`outputDirectory`: `dist/`** (includes `index.html`, `add.html`, hashed assets), SPA rewrite (excluding **`/api/*`**), cron, and per-function **`maxDuration`** (**60s** for heavy routes including **`/api/whatsapp-webhook`**; **30s** for **`/api/whatsapp-verify`**).
 
 **Admin “Deployments” card:** set **`VERCEL_API_TOKEN`** and **`VERCEL_PROJECT_ID`** in Vercel env so **`/api/external-status?service=vercel`** can read the latest deployment.
 
@@ -288,6 +288,9 @@ node scripts/strip-removed-field.js --write
 ## Maintenance scripts (titleRegistry)
 
 - **Registry report** (trailers, thumbs, services): `node scripts/registry-report.js`
+- **Backfill `tmdbMedia` from `type`** (fixed doc list; no TMDB call): `node scripts/backfill-tmdb-media.mjs` (dry run) then `node scripts/backfill-tmdb-media.mjs --write`
+- **Remove legacy attribution fields** (`addedByUid`, `addedByDisplayName`, `addedByPhotoUrl` on fixed `titleRegistry` docs): `node scripts/cleanup-legacy-fields.mjs` then `node scripts/cleanup-legacy-fields.mjs --write`
+- **Backfill missing posters** (`thumb` from TMDB for a fixed doc list; needs `TMDB_API_KEY` in `.env`): `node scripts/backfill-thumb.mjs` then `node scripts/backfill-thumb.mjs --write`
 - **Add by IMDb id** (TMDB enrichment): `node scripts/add-title-by-imdb.js tt12345678`
 - **Delete legacy `catalog` collection** (after migration): `node scripts/delete-legacy-catalog.mjs --write`
 
@@ -309,7 +312,7 @@ Many scripts expect **`TMDB_API_KEY`**, **`FIREBASE_SERVICE_ACCOUNT`** (base64) 
 - **WhatsApp adds:** verified numbers and per-number default list (**`phoneIndex`** + **`users/{uid}.phoneNumbers`**); inbound messages handled by **`/api/whatsapp-webhook`** (signature, rate limit, and quota guard — see **Vercel deployment**).
 - **Admin (`/admin`, admin users only):** Firestore read **quota usage** bars, catalog/upcoming stats, upcoming job toggle, GitHub backup workflow status, and **Service Links** (production site, Firebase, **Vercel env vars**, **Meta WhatsApp** dev console, **Google Cloud billing**, GitHub, TMDB, Trakt, etc.).
 - **Status tabs:** **All**, **To Watch** (**includes “maybe later”** rows), **Watched**, **Archive** — persisted in Firestore. **Recently Added** is no longer a separate tab; use **sort** options **Date Added (New → Old)** and **Date Added (Old → New)**.
-- **Filters:** Movies / TV / Both (segmented), **genre** as a **single-select dropdown** (Radix Select), **Added by** **segmented control** on **shared lists only**, persisted per account in **localStorage** (with session restore).
+- **Filters:** Movies / TV / Both (segmented), **genre** as a **single-select list** (Radix Popover, two-row toolbar with **Added by** on **shared lists only**), persisted per account in **localStorage** (with session restore).
 - **Country / region:** set in app for TMDB **watch providers** at add time; **service chips** on cards (e.g. Netflix, Prime).
 - **Hover-only card actions (desktop):** remove and status controls stay hidden until **hover** or keyboard focus inside the card (**`@media (hover: hover)`**); touch devices keep controls available without hover.
 - **Bookmarklet:** add from **imdb.com** via **`add.html`** + **`/api/add-from-imdb`**.
