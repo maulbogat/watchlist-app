@@ -241,7 +241,7 @@ Requires `serviceAccountKey.json` in project root, or `FIREBASE_SERVICE_ACCOUNT`
 
 ## Export Firestore to JSON (inspect / `grep` / `rg`)
 
-Pull **titleRegistry**, **upcomingAlerts**, **sharedLists**, **users**, and each user’s **personalLists** subcollection into one file:
+Pull **titleRegistry**, **upcomingAlerts**, **sharedLists**, **users**, **allowedUsers**, **invites**, **phoneIndex**, **upcomingChecks**, and each user’s **personalLists** subcollection into one file:
 
 ```bash
 node scripts/backup-firestore.js

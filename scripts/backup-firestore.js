@@ -1,6 +1,7 @@
 /**
  * Full Firestore backup: titleRegistry, upcomingAlerts (optional),
- * sharedLists, users (top-level), and users/{uid}/personalLists.
+ * sharedLists, users (top-level), allowedUsers, invites, phoneIndex,
+ * upcomingChecks, and users/{uid}/personalLists.
  * (Deprecated `catalog` collection is not exported.)
  *
  * Run:
@@ -108,11 +109,16 @@ async function main() {
 
   console.log("Backing up Firestore...");
 
-  const [titleRegistry, sharedLists, users] = await Promise.all([
-    backupCollection("titleRegistry"),
-    backupCollection("sharedLists"),
-    backupCollection("users"),
-  ]);
+  const [titleRegistry, sharedLists, users, allowedUsers, invites, phoneIndex, upcomingChecks] =
+    await Promise.all([
+      backupCollection("titleRegistry"),
+      backupCollection("sharedLists"),
+      backupCollection("users"),
+      backupCollection("allowedUsers"),
+      backupCollection("invites"),
+      backupCollection("phoneIndex"),
+      backupCollection("upcomingChecks"),
+    ]);
 
   const userIds = Object.keys(users);
   const userPersonalLists = await backupUserPersonalLists(userIds);
@@ -124,12 +130,16 @@ async function main() {
 
   const backup = {
     exportedAt: new Date().toISOString(),
-    version: 3,
+    version: 4,
     titleRegistry,
     upcomingAlerts,
     sharedLists,
     users,
     userPersonalLists,
+    allowedUsers,
+    invites,
+    phoneIndex,
+    upcomingChecks,
   };
 
   mkdirSync(join(rootDir, "backups"), { recursive: true });
@@ -144,6 +154,10 @@ async function main() {
   console.log(`  upcomingAlerts: ${noAlerts ? "(skipped)" : `${alertCount} docs`}`);
   console.log(`  sharedLists:    ${Object.keys(sharedLists).length} docs`);
   console.log(`  users:          ${userIds.length} docs`);
+  console.log(`  allowedUsers:   ${Object.keys(allowedUsers).length} docs`);
+  console.log(`  invites:        ${Object.keys(invites).length} docs`);
+  console.log(`  phoneIndex:     ${Object.keys(phoneIndex).length} docs`);
+  console.log(`  upcomingChecks: ${Object.keys(upcomingChecks).length} docs`);
   console.log(`  personalLists:  ${plLists} lists across ${plUsers} users`);
   console.log(`\nBackup written to ${outputPath}`);
   console.log("\nSearch the file, e.g.:  rg 'tt15677150|136311|Shrinking' " + outputPath);

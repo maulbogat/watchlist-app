@@ -45,6 +45,8 @@ Commit and push the `.github/workflows/backup.yml` file. The workflow will run:
 
 ## Restore from backup
 
+**v4 backups** also restore **allowedUsers**, **invites**, **phoneIndex**, and **upcomingChecks**. Overwriting **allowedUsers** or **phoneIndex** changes app access and WhatsApp-linked numbers—read the warning at the top of `scripts/restore-from-backup.js` before running a full restore.
+
 To restore locally (requires Firebase credentials):
 
 ```bash

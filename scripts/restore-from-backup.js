@@ -7,6 +7,13 @@
  * WARNING: This overwrites existing data. Use with caution.
  * Add --dry-run to preview without writing.
  *
+ * =============================================================================
+ * CRITICAL: v4+ backups may include **allowedUsers** and **phoneIndex**. Restoring
+ * those collections overwrites who can access the app and which WhatsApp numbers
+ * are linked to which accounts. Only restore them when you intend to roll back
+ * or clone that state; wrong data can lock people out or break verification.
+ * =============================================================================
+ *
  * Requires: FIREBASE_SERVICE_ACCOUNT env var or serviceAccountKey.json
  */
 import { readFileSync } from "fs";
@@ -76,6 +83,10 @@ async function main() {
   const alertsCount = await restoreCollection("upcomingAlerts", backup.upcomingAlerts || {}, dryRun);
   const sharedCount = await restoreCollection("sharedLists", backup.sharedLists || {}, dryRun);
   const userCount = await restoreCollection("users", backup.users || {}, dryRun);
+  const allowedUsersCount = await restoreCollection("allowedUsers", backup.allowedUsers || {}, dryRun);
+  const invitesCount = await restoreCollection("invites", backup.invites || {}, dryRun);
+  const phoneIndexCount = await restoreCollection("phoneIndex", backup.phoneIndex || {}, dryRun);
+  const upcomingChecksCount = await restoreCollection("upcomingChecks", backup.upcomingChecks || {}, dryRun);
 
   let personalListsCount = 0;
   for (const [uid, lists] of Object.entries(backup.userPersonalLists || {})) {
@@ -93,7 +104,7 @@ async function main() {
   }
 
   console.log(
-    `\nRestored: catalog=${catalogCount}, titleRegistry=${titleRegistryCount}, upcomingAlerts=${alertsCount}, sharedLists=${sharedCount}, users=${userCount}, personalLists=${personalListsCount}`
+    `\nRestored: catalog=${catalogCount}, titleRegistry=${titleRegistryCount}, upcomingAlerts=${alertsCount}, sharedLists=${sharedCount}, users=${userCount}, allowedUsers=${allowedUsersCount}, invites=${invitesCount}, phoneIndex=${phoneIndexCount}, upcomingChecks=${upcomingChecksCount}, personalLists=${personalListsCount}`
   );
   if (dryRun) console.log("\nRun without --dry-run to apply changes.");
 }
