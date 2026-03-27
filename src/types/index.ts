@@ -5,7 +5,7 @@ export type MediaType = "movie" | "show";
 export type StatusKey = "to-watch" | "watched" | "maybe-later" | "archive";
 
 export type FilterType = "both" | "movie" | "show";
-export type SortType = "title-asc" | "release-desc";
+export type SortType = "title-asc" | "release-desc" | "added-desc" | "added-asc";
 
 export type ServicesByRegion = Record<string, string[]>;
 
@@ -30,7 +30,7 @@ export interface WatchlistItem {
   services: string[];
   servicesByRegion: ServicesByRegion | null | undefined;
   tmdbMedia?: string | null;
-  status?: StatusKey | "recently-added";
+  status?: StatusKey;
 }
 
 export interface PersonalList {

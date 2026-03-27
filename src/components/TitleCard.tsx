@@ -145,6 +145,7 @@ export function TitleCard({
   return (
     <div
       className="card"
+      data-watchlist-movie-key={key}
       role="button"
       tabIndex={0}
       aria-label={`Play trailer for ${m.title}`}

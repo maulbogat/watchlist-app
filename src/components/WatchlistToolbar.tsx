@@ -1,15 +1,35 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAppStore, STATUS_LABELS } from "../store/useAppStore.js";
 import { persistFilterPreferences } from "../lib/storage.js";
 import { getUniqueAddersFromMovies, getUniqueGenresFromMovies } from "../lib/watchlistFilters.js";
 import { logEvent } from "../lib/axiom-logger.js";
 import type { FilterType, SortType, WatchlistItem } from "../types/index.js";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+/** Radix Select requires non-empty item values; maps to `currentGenre === ""`. */
+const GENRE_SELECT_ALL_VALUE = "__all_genres__";
+
+const watchlistSelectContentClass =
+  "watchlist-filter-select-content custom-dropdown-content lists-modal-select-popover--no-check z-[1300] min-w-[var(--radix-select-trigger-width)] border border-[var(--border)] bg-[var(--surface2)] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.08]";
 
 interface WatchlistToolbarProps {
   allMovies: WatchlistItem[];
   visibleCount: number;
+  /** Watchlist titles query in flight — replaces title count with a neutral pill. */
+  watchlistLoading?: boolean;
 }
 
-export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarProps) {
+export function WatchlistToolbar({
+  allMovies,
+  visibleCount,
+  watchlistLoading = false,
+}: WatchlistToolbarProps) {
   const currentUser = useAppStore((s) => s.currentUser);
   const currentFilter = useAppStore((s) => s.currentFilter);
   const setCurrentFilter = useAppStore((s) => s.setCurrentFilter);
@@ -31,6 +51,85 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
   const genres = getUniqueGenresFromMovies(allMovies);
   const adders = isSharedList ? getUniqueAddersFromMovies(allMovies, currentUser?.uid ?? null) : [];
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchFocused, setSearchFocused] = useState(false);
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarSticky, setToolbarSticky] = useState(false);
+  const toolbarStickyRef = useRef(toolbarSticky);
+  toolbarStickyRef.current = toolbarSticky;
+  const [toolbarFlowHeight, setToolbarFlowHeight] = useState(0);
+
+  const readToolbarBlockHeight = useCallback(() => {
+    const el = toolbarRef.current;
+    const sen = sentinelRef.current;
+    const shell = shellRef.current;
+    if (!el) return 0;
+    const sticky = toolbarStickyRef.current;
+    const style = getComputedStyle(el);
+    const rootFontPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    let tail: number;
+    if (sticky) {
+      const v = style.getPropertyValue("--toolbar-flow-tail-gap").trim();
+      tail = v.endsWith("rem") ? (parseFloat(v) || 0) * rootFontPx : parseFloat(v) || 0;
+    } else {
+      tail = parseFloat(style.marginBottom) || 0;
+    }
+    let shellPadY = 0;
+    if (sticky && shell) {
+      const sh = getComputedStyle(shell);
+      shellPadY = (parseFloat(sh.paddingTop) || 0) + (parseFloat(sh.paddingBottom) || 0);
+    }
+    return (sen?.offsetHeight ?? 1) + el.offsetHeight + shellPadY + tail;
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = toolbarRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      setToolbarFlowHeight(readToolbarBlockHeight());
+    });
+    ro.observe(el);
+    setToolbarFlowHeight(readToolbarBlockHeight());
+    return () => ro.disconnect();
+  }, [adders.length, genres.length, readToolbarBlockHeight, toolbarSticky]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        const stick = !entry.isIntersecting;
+        setToolbarSticky(stick);
+      },
+      { root: null, rootMargin: "0px", threshold: 0 }
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [readToolbarBlockHeight]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target;
+      if (
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        (el instanceof HTMLElement && el.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   function persistFilters() {
     persistFilterPreferences(currentUser, {
       currentFilter: useAppStore.getState().currentFilter,
@@ -42,12 +141,40 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
     });
   }
 
+  const spacerH = Math.max(toolbarFlowHeight, 1);
+
   return (
-    <div className="content-filters" id="content-filters">
+    <>
+      <div
+        ref={sentinelRef}
+        className="watchlist-toolbar-sentinel"
+        aria-hidden="true"
+      />
+      {toolbarSticky ? (
+        <div
+          className="watchlist-toolbar-scroll-spacer"
+          style={{ height: spacerH }}
+          aria-hidden="true"
+        />
+      ) : null}
+      <div
+        ref={shellRef}
+        className={
+          toolbarSticky
+            ? "watchlist-toolbar-sticky-shell watchlist-toolbar-sticky-shell--stuck"
+            : "watchlist-toolbar-sticky-shell"
+        }
+      >
+        <div className="watchlist-toolbar-sticky-inner">
+          <div
+            ref={toolbarRef}
+            id="content-filters"
+            className={`content-filters${toolbarSticky ? " content-filters--toolbar-sticky toolbar--sticky" : ""}`}
+          >
       <div className="tab-group-wrap">
         <div className="tab-group" role="tablist" aria-label="Watch status">
           {[
-            { id: "tab-recently-added", status: "recently-added", label: "Recently Added" },
+            { id: "tab-all", status: "all", label: "All" },
             { id: "tab-to-watch", status: "to-watch", label: STATUS_LABELS["to-watch"] },
             { id: "tab-watched", status: "watched", label: STATUS_LABELS.watched },
             { id: "tab-archive", status: "archive", label: STATUS_LABELS.archive },
@@ -80,10 +207,19 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
             );
           })}
         </div>
-        <span className="filter-count" id="filter-count" aria-live="polite">
-          {typeof visibleCount === "number"
-            ? `${visibleCount} title${visibleCount === 1 ? "" : "s"}`
-            : ""}
+        <span
+          className={`filter-count${watchlistLoading ? " filter-count--loading" : ""}`}
+          id="filter-count"
+          aria-live={watchlistLoading ? "off" : "polite"}
+          aria-busy={watchlistLoading}
+        >
+          {watchlistLoading ? (
+            <span className="filter-count-pill-skeleton skeleton-shimmer" />
+          ) : typeof visibleCount === "number" ? (
+            `${visibleCount} title${visibleCount === 1 ? "" : "s"}`
+          ) : (
+            ""
+          )}
         </span>
       </div>
       <div className="filter-group" role="radiogroup" aria-label="Filter titles">
@@ -117,13 +253,10 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
       </div>
       <div className="sort-wrap">
         <label htmlFor="sort-select">Sort</label>
-        <select
-          id="sort-select"
-          className="sort-select"
+        <Select
           value={currentSort}
-          onChange={(e) => {
-            const nextSort = e.target.value as SortType;
-            setCurrentSort(nextSort);
+          onValueChange={(nextSort) => {
+            setCurrentSort(nextSort as SortType);
             persistFilters();
             void logEvent({
               type: "user.action",
@@ -134,23 +267,50 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
             }).catch(() => {});
           }}
         >
-          <option value="title-asc">Title (A-Z)</option>
-          <option value="release-desc">Release Date (New-Old)</option>
-        </select>
+          <SelectTrigger
+            id="sort-select"
+            className={`custom-dropdown-trigger watchlist-toolbar-select-trigger focus-visible:ring-0 shadow-none${currentSort !== "title-asc" ? " watchlist-filter-trigger--active" : ""}`}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent
+            className={watchlistSelectContentClass}
+            position="popper"
+            side="bottom"
+            align="start"
+            sideOffset={8}
+          >
+            <SelectItem value="title-asc" className="custom-dropdown-item">
+              Title (A-Z)
+            </SelectItem>
+            <SelectItem value="release-desc" className="custom-dropdown-item">
+              Release Date (New-Old)
+            </SelectItem>
+            <SelectItem value="added-desc" className="custom-dropdown-item">
+              Date Added (New → Old)
+            </SelectItem>
+            <SelectItem value="added-asc" className="custom-dropdown-item">
+              Date Added (Old → New)
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="search-wrap">
         <label htmlFor="title-search">Search</label>
         <input
+          ref={searchInputRef}
           id="title-search"
           type="text"
           className="search-input"
-          placeholder="Search titles"
+          placeholder={searchFocused ? "Search titles" : "Search titles · /"}
           value={currentSearch}
+          onFocus={() => setSearchFocused(true)}
           onChange={(e) => {
             setCurrentSearch(e.target.value);
             persistFilters();
           }}
           onBlur={() => {
+            setSearchFocused(false);
             void logEvent({
               type: "user.action",
               action: "filter.change",
@@ -164,106 +324,130 @@ export function WatchlistToolbar({ allMovies, visibleCount }: WatchlistToolbarPr
       {adders.length > 1 ? (
         <div
           id="added-by-filter-wrap"
-          className="genre-filter-wrap added-by-filter-wrap"
+          className={`genre-filter-wrap added-by-filter-wrap tertiary-filter-wrap${currentAddedByUid ? " added-by-filter-wrap--active" : ""}`}
           style={{ display: "flex" }}
           role="group"
           aria-label="Filter by who added the title"
         >
-          <span className="filter-subrow-label">Added by</span>
-          <button
-            type="button"
-            className={`genre-chip${!currentAddedByUid ? " active" : ""}`}
-            data-added-by=""
-            aria-pressed={!currentAddedByUid}
-            onClick={() => {
-              setCurrentAddedByUid("");
-              persistFilters();
-              void logEvent({
-                type: "user.action",
-                action: "filter.change",
-                filterType: "addedBy",
-                value: "all",
-                uid: currentUser?.uid ?? null,
-              }).catch(() => {});
-            }}
-          >
-            All
-          </button>
-          {adders.map(({ uid, label }) => {
-            const active = currentAddedByUid === uid;
-            return (
-              <button
-                key={uid}
-                type="button"
-                className={`genre-chip${active ? " active" : ""}`}
-                data-added-by={uid}
-                aria-pressed={active}
-                onClick={() => {
-                  setCurrentAddedByUid(uid);
-                  persistFilters();
-                  void logEvent({
-                    type: "user.action",
-                    action: "filter.change",
-                    filterType: "addedBy",
-                    value: uid,
-                    uid: currentUser?.uid ?? null,
-                  }).catch(() => {});
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
+          <span className="tertiary-filter-label">Added by</span>
+          <div className="segmented-control" role="radiogroup" aria-label="Added by">
+            <button
+              type="button"
+              className={`segmented-control-btn${!currentAddedByUid ? " active" : ""}`}
+              data-added-by=""
+              aria-pressed={!currentAddedByUid}
+              onClick={() => {
+                setCurrentAddedByUid("");
+                persistFilters();
+                void logEvent({
+                  type: "user.action",
+                  action: "filter.change",
+                  filterType: "addedBy",
+                  value: "all",
+                  uid: currentUser?.uid ?? null,
+                }).catch(() => {});
+              }}
+            >
+              All
+            </button>
+            {adders.map(({ uid, label }) => {
+              const active = currentAddedByUid === uid;
+              return (
+                <button
+                  key={uid}
+                  type="button"
+                  className={`segmented-control-btn${active ? " active" : ""}`}
+                  data-added-by={uid}
+                  aria-pressed={active}
+                  onClick={() => {
+                    setCurrentAddedByUid(uid);
+                    persistFilters();
+                    void logEvent({
+                      type: "user.action",
+                      action: "filter.change",
+                      filterType: "addedBy",
+                      value: uid,
+                      uid: currentUser?.uid ?? null,
+                    }).catch(() => {});
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : null}
       {genres.length ? (
-        <div id="genre-filter-wrap" className="genre-filter-wrap" style={{ display: "flex" }}>
-          <button
-            type="button"
-            className={`genre-chip${!currentGenre ? " active" : ""}`}
-            data-genre=""
-            aria-pressed={!currentGenre}
-            onClick={() => {
-              setCurrentGenre("");
-              persistFilters();
-              void logEvent({
-                type: "user.action",
-                action: "filter.change",
-                filterType: "genre",
-                value: "all",
-                uid: currentUser?.uid ?? null,
-              }).catch(() => {});
-            }}
-          >
-            All
-          </button>
-          {genres.map((g) => {
-            const active = currentGenre === g;
-            return (
+        <div id="genre-filter-wrap" className="genre-filter-wrap tertiary-filter-wrap" style={{ display: "flex" }}>
+          <label htmlFor="genre-select" className="tertiary-filter-label">
+            Genre
+          </label>
+          <div className="genre-select-row">
+            <Select
+              value={currentGenre ? currentGenre : GENRE_SELECT_ALL_VALUE}
+              onValueChange={(next) => {
+                const genre = next === GENRE_SELECT_ALL_VALUE ? "" : next;
+                setCurrentGenre(genre);
+                persistFilters();
+                void logEvent({
+                  type: "user.action",
+                  action: "filter.change",
+                  filterType: "genre",
+                  value: genre || "all",
+                  uid: currentUser?.uid ?? null,
+                }).catch(() => {});
+              }}
+            >
+              <SelectTrigger
+                id="genre-select"
+                className="custom-dropdown-trigger watchlist-toolbar-select-trigger watchlist-toolbar-genre-select-trigger focus-visible:ring-0 shadow-none"
+              >
+                <SelectValue placeholder="All Genres" />
+              </SelectTrigger>
+              <SelectContent
+                className={watchlistSelectContentClass}
+                position="popper"
+                side="bottom"
+                align="start"
+                sideOffset={8}
+              >
+                <SelectItem value={GENRE_SELECT_ALL_VALUE} className="custom-dropdown-item">
+                  All Genres
+                </SelectItem>
+                {genres.map((g) => (
+                  <SelectItem key={g} value={g} className="custom-dropdown-item">
+                    {g}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {currentGenre ? (
               <button
-                key={g}
                 type="button"
-                className={`genre-chip${active ? " active" : ""}`}
-                data-genre={g}
-                aria-pressed={active}
+                className="genre-clear-btn"
+                aria-label="Clear genre filter"
                 onClick={() => {
-                  setCurrentGenre(g);
+                  setCurrentGenre("");
                   persistFilters();
                   void logEvent({
                     type: "user.action",
                     action: "filter.change",
                     filterType: "genre",
-                    value: g,
+                    value: "all",
                     uid: currentUser?.uid ?? null,
                   }).catch(() => {});
                 }}
               >
-                {g}
+                ×
               </button>
-            );
-          })}
+            ) : null}
+          </div>
         </div>
       ) : null}
-    </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

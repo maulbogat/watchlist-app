@@ -50,9 +50,6 @@ export interface AppState {
   personalLists: PersonalList[];
   setPersonalLists: (personalLists: PersonalList[]) => void;
 
-  upcomingAlertsExpanded: boolean;
-  setUpcomingAlertsExpanded: (upcomingAlertsExpanded: boolean) => void;
-
   userCountryCode: string;
   setUserCountryCode: (userCountryCode: string) => void;
 
@@ -103,9 +100,6 @@ export const useAppStore = create<AppState>()((set) => ({
 
   personalLists: [],
   setPersonalLists: (personalLists) => set({ personalLists }),
-
-  upcomingAlertsExpanded: false,
-  setUpcomingAlertsExpanded: (upcomingAlertsExpanded) => set({ upcomingAlertsExpanded }),
 
   userCountryCode: "IL",
   setUserCountryCode: (userCountryCode) => set({ userCountryCode }),

@@ -41,29 +41,42 @@ export function useWatchlistSessionRestore(
     (async () => {
       const prefs = readFilterPreferences(user);
       if (prefs && !cancelled) {
-        useAppStore.setState((s) => ({
-          currentFilter:
-            prefs.currentFilter === "both" ||
-            prefs.currentFilter === "movie" ||
-            prefs.currentFilter === "show"
-              ? prefs.currentFilter
-              : s.currentFilter,
-          currentStatus:
-            prefs.currentStatus === "to-watch" ||
-            prefs.currentStatus === "watched" ||
-            prefs.currentStatus === "archive" ||
-            prefs.currentStatus === "recently-added"
-              ? prefs.currentStatus
-              : s.currentStatus,
-          currentGenre: typeof prefs.currentGenre === "string" ? prefs.currentGenre : s.currentGenre,
-          currentSort:
-            prefs.currentSort === "title-asc" || prefs.currentSort === "release-desc"
-              ? prefs.currentSort
-              : s.currentSort,
-          currentSearch: typeof prefs.currentSearch === "string" ? prefs.currentSearch : s.currentSearch,
-          currentAddedByUid:
-            typeof prefs.currentAddedByUid === "string" ? prefs.currentAddedByUid : s.currentAddedByUid,
-        }));
+        useAppStore.setState((s) => {
+          let nextStatus = prefs.currentStatus;
+          let nextSort = prefs.currentSort;
+          if (prefs.currentStatus === "recently-added") {
+            nextStatus = "to-watch";
+            nextSort = "added-desc";
+          }
+          const validStatus =
+            nextStatus === "all" ||
+            nextStatus === "to-watch" ||
+            nextStatus === "watched" ||
+            nextStatus === "archive"
+              ? nextStatus
+              : s.currentStatus;
+          const validSort =
+            nextSort === "title-asc" ||
+            nextSort === "release-desc" ||
+            nextSort === "added-desc" ||
+            nextSort === "added-asc"
+              ? nextSort
+              : s.currentSort;
+          return {
+            currentFilter:
+              prefs.currentFilter === "both" ||
+              prefs.currentFilter === "movie" ||
+              prefs.currentFilter === "show"
+                ? prefs.currentFilter
+                : s.currentFilter,
+            currentStatus: validStatus,
+            currentGenre: typeof prefs.currentGenre === "string" ? prefs.currentGenre : s.currentGenre,
+            currentSort: validSort,
+            currentSearch: typeof prefs.currentSearch === "string" ? prefs.currentSearch : s.currentSearch,
+            currentAddedByUid:
+              typeof prefs.currentAddedByUid === "string" ? prefs.currentAddedByUid : s.currentAddedByUid,
+          };
+        });
       }
 
       if (listId) {

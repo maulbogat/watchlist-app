@@ -8,10 +8,32 @@ import { errorMessage } from "../lib/utils.js";
 import { logEvent } from "../lib/axiom-logger.js";
 import { toast } from "@/components/ui/use-toast";
 
+const TITLE_GRID_SKELETON_COUNT = 10;
+
+/** Placeholder grid while watchlist data loads — matches live card layout to avoid jump. */
+export function TitleGridSkeleton() {
+  return (
+    <div className="grid" id="grid" aria-hidden="true">
+      {Array.from({ length: TITLE_GRID_SKELETON_COUNT }, (_, i) => (
+        <div key={i} className="card card--skeleton">
+          <div className="thumb-wrap skeleton-shimmer" />
+          <div className="card-info card-info--skeleton">
+            <span className="skeleton-line skeleton-line--title skeleton-shimmer" />
+            <span className="skeleton-line skeleton-line--meta skeleton-shimmer" />
+            <span className="skeleton-service-row skeleton-shimmer" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface TitleGridProps {
   visibleMovies: WatchlistItem[];
   currentStatus: string;
   totalLoaded: number;
+  /** Trimmed search query — used for dedicated empty copy when search yields no rows. */
+  searchQuery?: string;
   /** Set when viewing a shared list — attributes legacy items to the owner vs members. */
   sharedListOwnerId?: string | null;
   viewerDisplayName?: string | null;
@@ -21,8 +43,9 @@ interface TitleGridProps {
 
 export function TitleGrid({
   visibleMovies,
-  currentStatus,
+  currentStatus: _currentStatus,
   totalLoaded,
+  searchQuery = "",
   sharedListOwnerId = null,
   viewerDisplayName = null,
   viewerPhotoUrl = null,
@@ -116,33 +139,45 @@ export function TitleGrid({
   );
 
   if (!visibleMovies.length) {
-    const messages: Record<string, string> = {
-      "recently-added": "No recently added titles.",
-      "to-watch": "No titles to watch yet.",
-      watched: "No watched titles yet.",
-      archive: "No archived titles yet.",
-    };
-    const base = messages[currentStatus] ?? "No titles match your filters.";
     const listTrulyEmpty = totalLoaded === 0;
-    const withImdb =
-      listTrulyEmpty && currentStatus === "to-watch" ? (
-        <>
-          {isShared ? "This shared list is empty. " : "Your list is empty. "}
-          Add titles from{" "}
-          <a href="/bookmarklet.html" className="empty-state-link">
-            IMDb
-          </a>
-          .
-        </>
-      ) : (
-        base
-      );
-    return (
-      <>
+    const q = searchQuery.trim();
+
+    if (q && !listTrulyEmpty) {
+      return (
         <div className="grid" id="grid">
-          <div className="empty-state">{withImdb}</div>
+          <p className="watchlist-empty-message">
+            No titles match &ldquo;{q}&rdquo;
+          </p>
         </div>
-      </>
+      );
+    }
+
+    if (listTrulyEmpty) {
+      return (
+        <div className="grid" id="grid">
+          <p className="watchlist-empty-message">
+            Your list is empty. Add titles using the{" "}
+            <a href="/bookmarklet.html" className="empty-state-link">
+              bookmarklet
+            </a>{" "}
+            or{" "}
+            <button
+              type="button"
+              className="watchlist-empty-inline-btn"
+              onClick={() => useAppStore.getState().setWhatsAppSettingsOpen(true)}
+            >
+              WhatsApp
+            </button>
+            .
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid" id="grid">
+        <div className="empty-state">No titles match your filters.</div>
+      </div>
     );
   }
 

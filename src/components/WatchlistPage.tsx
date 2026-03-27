@@ -26,7 +26,7 @@ import {
 } from "../lib/watchlistFilters.js";
 import { ListSelector } from "./ListSelector.js";
 import { WatchlistToolbar } from "./WatchlistToolbar.js";
-import { TitleGrid } from "./TitleGrid.js";
+import { TitleGrid, TitleGridSkeleton } from "./TitleGrid.js";
 import { TrailerModal } from "./TrailerModal.js";
 import { ManageListsModal } from "./ManageListsModal.js";
 import { CountryModal } from "./CountryModal.js";
@@ -192,7 +192,7 @@ export function WatchlistPage() {
     user.displayName?.trim() || user.email?.split("@")[0] || null;
 
   const initial = (user.displayName || user.email || "?").charAt(0).toUpperCase();
-  const mainLoading = !listsReady || moviesQ.isPending;
+  const watchlistBlocking = !listsReady || moviesQ.isPending;
 
   const countryLabelRow = useMemo(() => {
     const c = COUNTRIES.find((x) => x.code === userCountryCode);
@@ -397,19 +397,26 @@ export function WatchlistPage() {
         </div>
       </header>
 
-      {!mainLoading && !moviesQ.isError ? (
-        <UpcomingAlertsBar movies={allMovies} />
+      {listsReady && !moviesQ.isError ? (
+        <UpcomingAlertsBar movies={allMovies} watchlistPending={moviesQ.isPending} />
       ) : null}
 
       <main className="content">
-        {mainLoading ? (
-          <div className="grid" id="grid">
-            <div className="empty-state">Loading…</div>
-          </div>
-        ) : moviesQ.isError ? (
+        {moviesQ.isError ? (
           <div className="grid" id="grid">
             <div className="empty-state">Could not load your list.</div>
           </div>
+        ) : watchlistBlocking ? (
+          <>
+            {listsReady ? (
+              <WatchlistToolbar
+                allMovies={allMovies}
+                visibleCount={visibleMovies.length}
+                watchlistLoading
+              />
+            ) : null}
+            <TitleGridSkeleton />
+          </>
         ) : (
           <>
             <WatchlistToolbar
@@ -420,6 +427,7 @@ export function WatchlistPage() {
               visibleMovies={visibleMovies}
               currentStatus={currentStatus}
               totalLoaded={allMovies.length}
+              searchQuery={currentSearch}
               sharedListOwnerId={sharedListOwnerId}
               viewerDisplayName={viewerDisplayNameForCards}
               viewerPhotoUrl={user.photoURL ?? null}

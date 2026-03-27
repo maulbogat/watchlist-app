@@ -1,5 +1,6 @@
 import { GENRE_LIMIT } from "../store/watchlistConstants.js";
 import type { WatchlistItem } from "../types/index.js";
+import { listKey } from "./registry-id.js";
 
 export function isGenrePresentInMovies(movies: WatchlistItem[] | undefined, genre: string): boolean {
   if (!genre) return true;
@@ -65,7 +66,7 @@ export interface FilterState {
   currentAddedByUid?: string;
 }
 
-/** Pure filter pipeline for the grid (type, status, genre, added-by on shared lists, recently-added). */
+/** Pure filter pipeline for the grid (type, status tab, genre, added-by on shared lists, sort). */
 export function filterTitles(movies: WatchlistItem[] | undefined, filters: FilterState): WatchlistItem[] {
   const listMovies = movies || [];
   const search = filters.currentSearch.trim().toLowerCase();
@@ -87,6 +88,25 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
     return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
   }
 
+  const sourceIndexByKey = new Map<string, number>();
+  for (let i = 0; i < listMovies.length; i++) {
+    const m = listMovies[i];
+    if (!m) continue;
+    const k = listKey(m);
+    if (!sourceIndexByKey.has(k)) sourceIndexByKey.set(k, i);
+  }
+
+  function sortByAddedAt(list: WatchlistItem[], ascending: boolean): WatchlistItem[] {
+    return [...list].sort((a, b) => {
+      const aMs = toEpochOrNegInf(a.addedAt);
+      const bMs = toEpochOrNegInf(b.addedAt);
+      const ai = sourceIndexByKey.get(listKey(a)) ?? -1;
+      const bi = sourceIndexByKey.get(listKey(b)) ?? -1;
+      if (aMs !== bMs) return ascending ? aMs - bMs : bMs - aMs;
+      return ascending ? ai - bi : bi - ai;
+    });
+  }
+
   function sortVisibleTitles(list: WatchlistItem[]): WatchlistItem[] {
     if (filters.currentSort === "release-desc") {
       return [...list].sort((a, b) => {
@@ -96,42 +116,22 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
         return String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" });
       });
     }
+    if (filters.currentSort === "added-desc") {
+      return sortByAddedAt(list, false);
+    }
+    if (filters.currentSort === "added-asc") {
+      return sortByAddedAt(list, true);
+    }
     return [...list].sort((a, b) =>
       String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" })
     );
-  }
-
-  if (filters.currentStatus === "recently-added") {
-    const recentCandidates: Array<{ movie: WatchlistItem; index: number; addedAtMs: number }> = [];
-    for (let i = listMovies.length - 1; i >= 0; i--) {
-      const m = listMovies[i];
-      if (!m) continue;
-      const s = m.status || "to-watch";
-      if (s !== "to-watch") continue;
-      if (!matchesSearch(m)) continue;
-      if (!matchesAddedBy(m)) continue;
-      if (filters.currentFilter !== "both" && m.type !== filters.currentFilter) continue;
-      if (filters.currentGenre) {
-        const g = String(m.genre || "");
-        if (
-          !g.split(/\s*\/\s*/).some((s) => s.trim().toLowerCase() === filters.currentGenre.toLowerCase())
-        ) {
-          continue;
-        }
-      }
-      recentCandidates.push({ movie: m, index: i, addedAtMs: toEpochOrNegInf(m.addedAt) });
-    }
-    recentCandidates.sort((a, b) => {
-      if (b.addedAtMs !== a.addedAtMs) return b.addedAtMs - a.addedAtMs;
-      return b.index - a.index;
-    });
-    return recentCandidates.slice(0, 10).map((entry) => entry.movie);
   }
 
   let list =
     filters.currentFilter === "both" ? listMovies : listMovies.filter((m) => m.type === filters.currentFilter);
   list = list.filter((m) => matchesAddedBy(m));
   list = list.filter((m) => {
+    if (filters.currentStatus === "all") return true;
     const s = m.status || "to-watch";
     if (filters.currentStatus === "to-watch") return s === "to-watch" || s === "maybe-later";
     if (filters.currentStatus === "archive") return s === "archive";
