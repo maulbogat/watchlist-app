@@ -298,6 +298,7 @@ node scripts/strip-removed-field.js --write
 ## Maintenance scripts (titleRegistry)
 
 - **Registry report** (trailers, thumbs, services): `node scripts/registry-report.js`
+- **Catalog not on any list** (`titleRegistry` docs never referenced as `registryId` on a list): `node -r dotenv/config scripts/catalog-not-on-any-list.mjs`
 - **Backfill `tmdbMedia` from `type`** (fixed doc list; no TMDB call): `node scripts/backfill-tmdb-media.mjs` (dry run) then `node scripts/backfill-tmdb-media.mjs --write`
 - **Remove legacy attribution fields** (`addedByUid`, `addedByDisplayName`, `addedByPhotoUrl` on fixed `titleRegistry` docs): `node scripts/cleanup-legacy-fields.mjs` then `node scripts/cleanup-legacy-fields.mjs --write`
 - **Backfill missing posters** (`thumb` from TMDB for a fixed doc list; needs `TMDB_API_KEY` in `.env`): `node scripts/backfill-thumb.mjs` then `node scripts/backfill-thumb.mjs --write`
