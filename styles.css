@@ -3175,20 +3175,36 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   margin-top: 0.35rem;
   color: var(--muted);
   font-size: var(--text-sm);
+  font-weight: 500;
   letter-spacing: 0.04em;
 }
 
 .admin-env-switch {
+  display: inline-flex;
+  align-items: center;
+  margin-top: var(--space-3);
   font-size: var(--text-xs);
-  letter-spacing: 0.08em;
+  font-weight: 400;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--color-muted, var(--muted));
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.2s ease, opacity 0.2s ease;
+  opacity: 0.75;
+}
+
+.admin-env-switch::before {
+  content: "·";
+  margin-right: var(--space-2);
+  color: var(--color-text-muted);
+  opacity: 0.55;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .admin-env-switch:hover {
   color: var(--color-accent);
+  opacity: 1;
 }
 
 .admin-section {
@@ -3199,16 +3215,54 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   margin-bottom: 0.65rem;
   font-family: var(--font-title);
   letter-spacing: 0.08em;
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   text-transform: uppercase;
   color: var(--accent);
+}
+
+/* Service Links — collapsible <details> (same section spacing as .admin-section) */
+details.admin-section > summary {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  list-style: none;
+  margin-bottom: 0.65rem;
+}
+
+details.admin-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.admin-section > summary h2 {
+  margin-bottom: 0;
+}
+
+details.admin-section .summary-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted, var(--muted));
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+details.admin-section .summary-chevron svg {
+  width: 16px;
+  height: 16px;
+}
+
+details.admin-section[open] > summary .summary-chevron {
+  transform: rotate(180deg);
 }
 
 /* Upcoming check + GitHub backup + Deployments — responsive columns */
 .admin-section--jobs-deploy .admin-jobs-deploy-grid {
   display: grid;
   gap: 1.25rem;
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (min-width: 768px) {
@@ -3220,14 +3274,22 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 @media (min-width: 1280px) {
   .admin-section--jobs-deploy .admin-jobs-deploy-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
 .admin-jobs-deploy-col {
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.admin-jobs-deploy-col .admin-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
 }
 
 .admin-jobs-deploy-col .admin-deploy-stack {
@@ -3240,7 +3302,7 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   font-size: var(--text-lg);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--muted);
   line-height: 1.2;
 }
 
@@ -3262,11 +3324,17 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .admin-section--jobs-deploy .admin-job-card {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 0.55rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
   padding: 0.85rem 0.95rem;
+}
+
+.admin-section--jobs-deploy .admin-job-card > .admin-job-row--actions {
+  margin-top: auto;
 }
 
 .admin-section--jobs-deploy .admin-job-card .admin-job-result {
@@ -3595,10 +3663,12 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
+  margin-bottom: var(--space-4);
 }
 
 .admin-dq-heading-row h2 {
   margin: 0;
+  color: var(--accent);
 }
 
 .admin-dq-refresh {
@@ -3607,11 +3677,40 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   gap: var(--space-2);
 }
 
+/* Activity — external dashboard link (ghost + gold border; avoids .admin-job-run-btn / primary clash) */
+.admin-dq-refresh .admin-dq-external-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 34px;
+  height: 34px;
+  padding: 0 0.85rem;
+  border: 1px solid rgb(from var(--color-gold) r g b / 0.55);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-gold);
+  font-family: var(--font-title);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-dq-refresh .admin-dq-external-link:hover {
+  background: rgb(from var(--color-gold) r g b / 0.1);
+  border-color: rgb(from var(--color-gold) r g b / 0.65);
+  color: var(--color-gold);
+}
+
 .admin-dq-details {
   margin-top: var(--space-6);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  max-width: 640px;
 }
 
 .admin-dq-detail {
@@ -3768,8 +3867,18 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 .admin-section--jobs-deploy .admin-job-card .admin-job-row--actions .admin-job-actions {
-  flex-wrap: nowrap;
+  display: flex;
+  flex-wrap: wrap;
   width: 100%;
+  min-width: 0;
+}
+
+.admin-section--jobs-deploy
+  .admin-job-card
+  .admin-job-row--actions
+  .admin-job-actions:has(> [data-slot="button"]:nth-child(2))
+  > [data-slot="button"] {
+  flex: 1 1 auto;
   min-width: 0;
 }
 

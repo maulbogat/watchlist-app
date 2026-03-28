@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "../store/useAppStore.js";
 import { isAdmin } from "../config/admin.js";
@@ -130,11 +130,6 @@ function buildDqPanelDefs(d: CatalogStats): DqPanelDef[] {
     { key: "youtubeId", fieldLabel: "youtubeId", count: d.missingYoutubeId, rows: d.missingYoutubeIdTitles },
   ];
 }
-
-type UpcomingStats = {
-  activeAlerts: number;
-  lastCheckTimestamp: string | null;
-};
 
 type JobConfigState = {
   checkUpcomingEnabled: boolean;
@@ -330,19 +325,9 @@ const SERVICE_LINKS: readonly AdminServiceLinkEntry[] = [
     url: "https://trakt.tv/oauth/applications/189759",
   },
   {
-    label: "IMDb",
-    sublabel: "Homepage",
-    url: "https://www.imdb.com/?ref_=hm_nv_home",
-  },
-  {
     label: "Notion",
     sublabel: "Project Management",
     url: "https://www.notion.so/1a114e9ce7a34dcab5cae4e52ef180c2?v=787e39f04dba4825932d2c74fd1aebe0",
-  },
-  {
-    label: "Claude",
-    sublabel: "Chat Thread",
-    url: "https://claude.ai/chat/4e4012e1-2d55-45a2-9eba-0876d2ff2d4d",
   },
   {
     label: "Axiom",
@@ -723,38 +708,6 @@ export function AdminPage() {
     queryFn: getFirestoreUsageStats,
   });
 
-  const upcomingStatsQ = useQuery<UpcomingStats>({
-    queryKey: ["admin", "upcoming-stats"],
-    staleTime: 60 * 1000,
-    enabled: !authLoading && userIsAdmin,
-    queryFn: async () => {
-      const db = getFirestore();
-      const upcomingRef = collection(db, "upcomingAlerts");
-      const projectedUpcomingRef =
-        (upcomingRef as MaybeSelectable<typeof upcomingRef>).select?.("expiresAt", "detectedAt") ?? upcomingRef;
-      const snap = await getDocs(projectedUpcomingRef);
-      const now = Date.now();
-      let activeAlerts = 0;
-      let latestDetectedAt: number | null = null;
-
-      snap.forEach((d) => {
-        const row = d.data() as Record<string, unknown>;
-        const expiresAtMs = toEpochMs(row.expiresAt);
-        if (expiresAtMs != null && expiresAtMs > now) activeAlerts += 1;
-
-        const detectedAtMs = toEpochMs(row.detectedAt);
-        if (detectedAtMs != null && (latestDetectedAt == null || detectedAtMs > latestDetectedAt)) {
-          latestDetectedAt = detectedAtMs;
-        }
-      });
-
-      return {
-        activeAlerts,
-        lastCheckTimestamp: formatDateTime(latestDetectedAt),
-      };
-    },
-  });
-
   const jobConfigQ = useQuery<JobConfigState>({
     queryKey: ["admin", "job-config"],
     staleTime: 0,
@@ -918,335 +871,8 @@ export function AdminPage() {
         </a>
       </header>
 
-      <section className="admin-section">
-        <h2>Service Links</h2>
-        <div className="admin-grid admin-grid--links">
-          {SERVICE_LINKS.map((entry) =>
-            "url" in entry ? (
-              <a
-                key={entry.url}
-                className="admin-card admin-link-card"
-                href={entry.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <span className="admin-link-label">{entry.label}</span>
-                <span className="admin-link-sublabel">{entry.sublabel}</span>
-                <span className="admin-link-ext" aria-hidden="true">
-                  ↗
-                </span>
-              </a>
-            ) : (
-              <div
-                key={entry.links[0]?.url ?? entry.label}
-                className="admin-card admin-link-card admin-link-card--multi"
-              >
-                <span className="admin-link-label">{entry.label}</span>
-                <span className="admin-link-sublabel">{entry.sublabel}</span>
-                <ul className="admin-link-multi-list">
-                  {entry.links.map((row) => (
-                    <li key={row.url}>
-                      <a
-                        className="admin-link-multi-anchor"
-                        href={row.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {row.label}
-                        <span aria-hidden="true"> ↗</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ),
-          )}
-        </div>
-      </section>
-
-      <section className="admin-section">
-        <div className="admin-dq-heading-row">
-          <h2>ACTIVITY (LAST 24H)</h2>
-          <div className="admin-dq-refresh">
-            <Button type="button" variant="outline" className="admin-job-run-btn" asChild>
-              <a href={AXIOM_ACTIVITY_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
-                Axiom dashboard
-                <span aria-hidden="true"> ↗</span>
-              </a>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={axiomActivityQ.isPending || axiomActivityQ.isFetching}
-              onClick={() => void axiomActivityQ.refetch()}
-            >
-              {axiomActivityQ.isFetching ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                  Refreshing…
-                </>
-              ) : (
-                "Refresh"
-              )}
-            </Button>
-          </div>
-        </div>
-        <div className="admin-grid admin-grid--stats">
-          {axiomActivityQ.isPending ? (
-            Array.from({ length: ACTIVITY_STAT_CARD_COUNT }).map((_, idx) => (
-              <div key={`axiom-activity-skeleton-${idx}`} className="admin-card admin-stat-card admin-skeleton" />
-            ))
-          ) : axiomActivityQ.isError ? (
-            <div className="admin-card admin-job-card">
-              <p className="admin-job-result" role="alert">
-                {axiomActivityQ.error instanceof Error
-                  ? axiomActivityQ.error.message
-                  : "Could not load Axiom activity."}
-              </p>
-              <div className="admin-job-row admin-job-row--actions">
-                <Button type="button" variant="outline" onClick={() => void axiomActivityQ.refetch()}>
-                  Retry
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="admin-card admin-stat-card">
-                <div className="admin-stat-label">Firestore reads</div>
-                <div
-                  className={axiomFirestoreReadsValueClass(axiomActivityQ.data.firestoreReads)}
-                  title="Green ≤ 40k, gold > 40k, red > 45k (rolling 24h sum of documentCount)"
-                >
-                  {Math.round(axiomActivityQ.data.firestoreReads).toLocaleString()}
-                </div>
-              </div>
-              <div className="admin-card admin-stat-card">
-                <div className="admin-stat-label">API calls</div>
-                <div className="admin-stat-value">
-                  {Math.round(axiomActivityQ.data.apiCalls).toLocaleString()}
-                </div>
-              </div>
-              <div className="admin-card admin-stat-card">
-                <div className="admin-stat-label">User actions</div>
-                <div className="admin-stat-value">
-                  {Math.round(axiomActivityQ.data.userActions).toLocaleString()}
-                </div>
-              </div>
-              <div className="admin-card admin-stat-card">
-                <div className="admin-stat-label">Titles added</div>
-                <div className="admin-stat-value">
-                  {Math.round(axiomActivityQ.data.titlesAdded).toLocaleString()}
-                </div>
-              </div>
-              <div className="admin-card admin-stat-card">
-                <div className="admin-stat-label">Errors</div>
-                <AxiomActivityErrorsStat count={axiomActivityQ.data.errors} />
-              </div>
-            </>
-          )}
-        </div>
-      </section>
-
-      <section className="admin-section">
-        <div className="admin-dq-heading-row">
-          <h2>Data Quality</h2>
-          <div className="admin-dq-refresh">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={catalogStatsQ.isPending || catalogStatsQ.isFetching}
-              onClick={() => void catalogStatsQ.refetch()}
-            >
-              {catalogStatsQ.isFetching ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                  Refreshing…
-                </>
-              ) : (
-                "Refresh"
-              )}
-            </Button>
-          </div>
-        </div>
-        <div className="admin-grid admin-grid--stats">
-          {catalogStatsQ.isPending
-            ? Array.from({ length: DQ_STAT_CARD_COUNT }).map((_, idx) => (
-                <div key={`catalog-skeleton-${idx}`} className="admin-card admin-stat-card admin-skeleton" />
-              ))
-            : dqStatCards?.map((c) => (
-                <div key={c.label} className="admin-card admin-stat-card">
-                  <div className="admin-stat-label">{c.label}</div>
-                  <AdminDqStatValue count={c.count} tone={c.tone} />
-                </div>
-              ))}
-        </div>
-
-        {dqVisiblePanels.length > 0 ? (
-          <div className="admin-dq-details">
-            {dqVisiblePanels.map((p) => {
-              const open = dqPanelsOpen[p.key];
-              return (
-                <div key={p.key} className="admin-dq-detail">
-                  <button
-                    type="button"
-                    className="admin-dq-detail-toggle"
-                    aria-expanded={open}
-                    onClick={() => setDqPanelsOpen((prev) => ({ ...prev, [p.key]: !prev[p.key] }))}
-                  >
-                    <span className="admin-dq-detail-toggle-label">
-                      {p.count} titles missing {p.fieldLabel}
-                    </span>
-                    <span className="admin-dq-chevron">{open ? "▴ Hide" : "▾ Show"}</span>
-                  </button>
-                  {open ? (
-                    <div className="admin-dq-detail-body">
-                      {p.rows.map((row) => (
-                        <div key={row.imdbId} className="admin-dq-li">
-                          <span className="admin-dq-li-text">
-                            {row.imdbId} · {row.title} ({formatDqYear(row.year)})
-                          </span>
-                          {p.fixable && "tmdbId" in row ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="admin-dq-fix-btn"
-                              disabled={
-                                fixingThumbImdbId === row.imdbId ||
-                                row.tmdbId == null ||
-                                catalogStatsQ.isFetching
-                              }
-                              title={
-                                row.tmdbId == null
-                                  ? "Needs tmdbId on document before TMDB poster fetch"
-                                  : undefined
-                              }
-                              onClick={() => void fixCatalogThumb(row.imdbId)}
-                            >
-                              {fixingThumbImdbId === row.imdbId ? (
-                                <>
-                                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                                  Fix…
-                                </>
-                              ) : (
-                                "Fix"
-                              )}
-                            </Button>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </section>
-
-      <section className="admin-section">
-        <h2>Firestore Usage</h2>
-        <div className="admin-grid admin-grid--stats admin-grid--usage">
-          {firestoreUsageQ.isPending ? (
-            <div className="admin-card admin-job-card admin-skeleton" />
-          ) : firestoreUsageQ.isError ? (
-            <div className="admin-card admin-job-card">
-              <p className="admin-job-result" role="alert">
-                {firestoreUsageQ.error instanceof Error
-                  ? firestoreUsageQ.error.message
-                  : "Could not load usage stats."}
-              </p>
-              <div className="admin-job-row admin-job-row--actions">
-                <Button type="button" variant="outline" onClick={() => void firestoreUsageQ.refetch()}>
-                  Retry
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="admin-card admin-job-card admin-usage-card">
-              {!firestoreUsageQ.data ? (
-                <p className="admin-job-result">No usage data yet (quota doc not created).</p>
-              ) : (
-                <>
-                  <div className="admin-usage-metric">
-                    <div className="admin-usage-metric-head">
-                      <span className="admin-stat-label">Reads this hour</span>
-                      <span className="admin-usage-metric-fraction">
-                        {Math.round(firestoreUsageQ.data.readsThisHour).toLocaleString()} /{" "}
-                        {FIRESTORE_USAGE_HOURLY_LIMIT.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="admin-usage-bar-wrap" aria-hidden="true">
-                      <div
-                        className="admin-usage-bar-fill"
-                        style={{
-                          width: `${usagePercent(firestoreUsageQ.data.readsThisHour, FIRESTORE_USAGE_HOURLY_LIMIT)}%`,
-                          backgroundColor: usageBarColor(
-                            usagePercent(firestoreUsageQ.data.readsThisHour, FIRESTORE_USAGE_HOURLY_LIMIT)
-                          ),
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="admin-usage-metric">
-                    <div className="admin-usage-metric-head">
-                      <span className="admin-stat-label">Reads today</span>
-                      <span className="admin-usage-metric-fraction">
-                        {Math.round(firestoreUsageQ.data.readsToday).toLocaleString()} /{" "}
-                        {FIRESTORE_USAGE_DAILY_LIMIT.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="admin-usage-bar-wrap" aria-hidden="true">
-                      <div
-                        className="admin-usage-bar-fill"
-                        style={{
-                          width: `${usagePercent(firestoreUsageQ.data.readsToday, FIRESTORE_USAGE_DAILY_LIMIT)}%`,
-                          backgroundColor: usageBarColor(
-                            usagePercent(firestoreUsageQ.data.readsToday, FIRESTORE_USAGE_DAILY_LIMIT)
-                          ),
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="admin-job-row">
-                    <span className="admin-stat-label">Last reset</span>
-                    <span className="admin-job-value">{formatUsageUpdatedAt(firestoreUsageQ.data)}</span>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="admin-section">
-        <h2>Upcoming Alerts Stats</h2>
-        <div className="admin-grid admin-grid--stats">
-          {upcomingStatsQ.isPending ? (
-            <>
-              <div className="admin-card admin-stat-card admin-skeleton" />
-              <div className="admin-card admin-stat-card admin-skeleton" />
-            </>
-          ) : (
-            <>
-              <div className="admin-card admin-stat-card">
-                <div className="admin-stat-label">Total active alerts</div>
-                <div className="admin-stat-value">
-                  {upcomingStatsQ.isError ? "Error" : String(upcomingStatsQ.data?.activeAlerts ?? 0)}
-                </div>
-              </div>
-              <div className="admin-card admin-stat-card">
-                <div className="admin-stat-label">Last check timestamp</div>
-                <div className="admin-stat-value admin-stat-value--small">
-                  {upcomingStatsQ.isError ? "Error" : upcomingStatsQ.data?.lastCheckTimestamp || "N/A"}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </section>
-
       <section className="admin-section admin-section--jobs-deploy">
+        <h2>System Status</h2>
         <div className="admin-jobs-deploy-grid">
           <div className="admin-jobs-deploy-col">
             <h2>Upcoming Check Job</h2>
@@ -1265,7 +891,7 @@ export function AdminPage() {
               ) : (
                 <>
                   <div className="admin-job-row admin-job-row--status-line">
-                    <span className="admin-stat-label">Upcoming check enabled</span>
+                    <span className="admin-stat-label">Status</span>
                     <span
                       className={
                         jobConfigQ.data?.checkUpcomingEnabled
@@ -1605,6 +1231,313 @@ export function AdminPage() {
           </div>
         </div>
       </section>
+
+      <section className="admin-section">
+        <div className="admin-dq-heading-row">
+          <h2>ACTIVITY (LAST 24H)</h2>
+          <div className="admin-dq-refresh">
+            <Button type="button" variant="ghost" className="admin-dq-external-link" asChild>
+              <a href={AXIOM_ACTIVITY_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
+                Axiom dashboard
+                <span aria-hidden="true"> ↗</span>
+              </a>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="admin-job-toggle-btn"
+              disabled={axiomActivityQ.isPending || axiomActivityQ.isFetching}
+              onClick={() => void axiomActivityQ.refetch()}
+            >
+              {axiomActivityQ.isFetching ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  Refreshing…
+                </>
+              ) : (
+                "Refresh"
+              )}
+            </Button>
+          </div>
+        </div>
+        <div className="admin-grid admin-grid--stats">
+          {axiomActivityQ.isPending ? (
+            Array.from({ length: ACTIVITY_STAT_CARD_COUNT }).map((_, idx) => (
+              <div key={`axiom-activity-skeleton-${idx}`} className="admin-card admin-stat-card admin-skeleton" />
+            ))
+          ) : axiomActivityQ.isError ? (
+            <div className="admin-card admin-job-card">
+              <p className="admin-job-result" role="alert">
+                {axiomActivityQ.error instanceof Error
+                  ? axiomActivityQ.error.message
+                  : "Could not load Axiom activity."}
+              </p>
+              <div className="admin-job-row admin-job-row--actions">
+                <Button type="button" variant="outline" onClick={() => void axiomActivityQ.refetch()}>
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="admin-card admin-stat-card">
+                <div className="admin-stat-label">Firestore reads</div>
+                <div
+                  className={axiomFirestoreReadsValueClass(axiomActivityQ.data.firestoreReads)}
+                  title="Green ≤ 40k, gold > 40k, red > 45k (rolling 24h sum of documentCount)"
+                >
+                  {Math.round(axiomActivityQ.data.firestoreReads).toLocaleString()}
+                </div>
+              </div>
+              <div className="admin-card admin-stat-card">
+                <div className="admin-stat-label">API calls</div>
+                <div className="admin-stat-value">
+                  {Math.round(axiomActivityQ.data.apiCalls).toLocaleString()}
+                </div>
+              </div>
+              <div className="admin-card admin-stat-card">
+                <div className="admin-stat-label">User actions</div>
+                <div className="admin-stat-value">
+                  {Math.round(axiomActivityQ.data.userActions).toLocaleString()}
+                </div>
+              </div>
+              <div className="admin-card admin-stat-card">
+                <div className="admin-stat-label">Titles added</div>
+                <div className="admin-stat-value">
+                  {Math.round(axiomActivityQ.data.titlesAdded).toLocaleString()}
+                </div>
+              </div>
+              <div className="admin-card admin-stat-card">
+                <div className="admin-stat-label">Errors</div>
+                <AxiomActivityErrorsStat count={axiomActivityQ.data.errors} />
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="admin-section">
+        <h2>Firestore Usage</h2>
+        <div className="admin-grid admin-grid--stats admin-grid--usage">
+          {firestoreUsageQ.isPending ? (
+            <div className="admin-card admin-job-card admin-skeleton" />
+          ) : firestoreUsageQ.isError ? (
+            <div className="admin-card admin-job-card">
+              <p className="admin-job-result" role="alert">
+                {firestoreUsageQ.error instanceof Error
+                  ? firestoreUsageQ.error.message
+                  : "Could not load usage stats."}
+              </p>
+              <div className="admin-job-row admin-job-row--actions">
+                <Button type="button" variant="outline" onClick={() => void firestoreUsageQ.refetch()}>
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="admin-card admin-job-card admin-usage-card">
+              {!firestoreUsageQ.data ? (
+                <p className="admin-job-result">No usage data yet (quota doc not created).</p>
+              ) : (
+                <>
+                  <div className="admin-usage-metric">
+                    <div className="admin-usage-metric-head">
+                      <span className="admin-stat-label">Reads this hour</span>
+                      <span className="admin-usage-metric-fraction">
+                        {Math.round(firestoreUsageQ.data.readsThisHour).toLocaleString()} /{" "}
+                        {FIRESTORE_USAGE_HOURLY_LIMIT.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="admin-usage-bar-wrap" aria-hidden="true">
+                      <div
+                        className="admin-usage-bar-fill"
+                        style={{
+                          width: `${usagePercent(firestoreUsageQ.data.readsThisHour, FIRESTORE_USAGE_HOURLY_LIMIT)}%`,
+                          backgroundColor: usageBarColor(
+                            usagePercent(firestoreUsageQ.data.readsThisHour, FIRESTORE_USAGE_HOURLY_LIMIT)
+                          ),
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="admin-usage-metric">
+                    <div className="admin-usage-metric-head">
+                      <span className="admin-stat-label">Reads today</span>
+                      <span className="admin-usage-metric-fraction">
+                        {Math.round(firestoreUsageQ.data.readsToday).toLocaleString()} /{" "}
+                        {FIRESTORE_USAGE_DAILY_LIMIT.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="admin-usage-bar-wrap" aria-hidden="true">
+                      <div
+                        className="admin-usage-bar-fill"
+                        style={{
+                          width: `${usagePercent(firestoreUsageQ.data.readsToday, FIRESTORE_USAGE_DAILY_LIMIT)}%`,
+                          backgroundColor: usageBarColor(
+                            usagePercent(firestoreUsageQ.data.readsToday, FIRESTORE_USAGE_DAILY_LIMIT)
+                          ),
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="admin-job-row">
+                    <span className="admin-stat-label">Last reset</span>
+                    <span className="admin-job-value">{formatUsageUpdatedAt(firestoreUsageQ.data)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="admin-section">
+        <div className="admin-dq-heading-row">
+          <h2>Data Quality</h2>
+          <div className="admin-dq-refresh">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={catalogStatsQ.isPending || catalogStatsQ.isFetching}
+              onClick={() => void catalogStatsQ.refetch()}
+            >
+              {catalogStatsQ.isFetching ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  Refreshing…
+                </>
+              ) : (
+                "Refresh"
+              )}
+            </Button>
+          </div>
+        </div>
+        <div className="admin-grid admin-grid--stats">
+          {catalogStatsQ.isPending
+            ? Array.from({ length: DQ_STAT_CARD_COUNT }).map((_, idx) => (
+                <div key={`catalog-skeleton-${idx}`} className="admin-card admin-stat-card admin-skeleton" />
+              ))
+            : dqStatCards?.map((c) => (
+                <div key={c.label} className="admin-card admin-stat-card">
+                  <div className="admin-stat-label">{c.label}</div>
+                  <AdminDqStatValue count={c.count} tone={c.tone} />
+                </div>
+              ))}
+        </div>
+
+        {dqVisiblePanels.length > 0 ? (
+          <div className="admin-dq-details">
+            {dqVisiblePanels.map((p) => {
+              const open = dqPanelsOpen[p.key];
+              return (
+                <div key={p.key} className="admin-dq-detail">
+                  <button
+                    type="button"
+                    className="admin-dq-detail-toggle"
+                    aria-expanded={open}
+                    onClick={() => setDqPanelsOpen((prev) => ({ ...prev, [p.key]: !prev[p.key] }))}
+                  >
+                    <span className="admin-dq-detail-toggle-label">
+                      {p.count} titles missing {p.fieldLabel}
+                    </span>
+                    <span className="admin-dq-chevron">{open ? "▴ Hide" : "▾ Show"}</span>
+                  </button>
+                  {open ? (
+                    <div className="admin-dq-detail-body">
+                      {p.rows.map((row) => (
+                        <div key={row.imdbId} className="admin-dq-li">
+                          <span className="admin-dq-li-text">
+                            {row.imdbId} · {row.title} ({formatDqYear(row.year)})
+                          </span>
+                          {p.fixable && "tmdbId" in row ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="admin-dq-fix-btn"
+                              disabled={
+                                fixingThumbImdbId === row.imdbId ||
+                                row.tmdbId == null ||
+                                catalogStatsQ.isFetching
+                              }
+                              title={
+                                row.tmdbId == null
+                                  ? "Needs tmdbId on document before TMDB poster fetch"
+                                  : undefined
+                              }
+                              onClick={() => void fixCatalogThumb(row.imdbId)}
+                            >
+                              {fixingThumbImdbId === row.imdbId ? (
+                                <>
+                                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                                  Fix…
+                                </>
+                              ) : (
+                                "Fix"
+                              )}
+                            </Button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </section>
+
+      <details className="admin-section">
+        <summary>
+          <h2>Service Links</h2>
+          <span className="summary-chevron" aria-hidden>
+            <ChevronDown />
+          </span>
+        </summary>
+        <div className="admin-grid admin-grid--links">
+          {SERVICE_LINKS.map((entry) =>
+            "url" in entry ? (
+              <a
+                key={entry.url}
+                className="admin-card admin-link-card"
+                href={entry.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span className="admin-link-label">{entry.label}</span>
+                <span className="admin-link-sublabel">{entry.sublabel}</span>
+                <span className="admin-link-ext" aria-hidden="true">
+                  ↗
+                </span>
+              </a>
+            ) : (
+              <div
+                key={entry.links[0]?.url ?? entry.label}
+                className="admin-card admin-link-card admin-link-card--multi"
+              >
+                <span className="admin-link-label">{entry.label}</span>
+                <span className="admin-link-sublabel">{entry.sublabel}</span>
+                <ul className="admin-link-multi-list">
+                  {entry.links.map((row) => (
+                    <li key={row.url}>
+                      <a
+                        className="admin-link-multi-anchor"
+                        href={row.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {row.label}
+                        <span aria-hidden="true"> ↗</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ),
+          )}
+        </div>
+      </details>
 
       <footer className="admin-footer">
         <Button type="button" variant="outline" className="admin-back-btn" onClick={() => navigate("/")}>
