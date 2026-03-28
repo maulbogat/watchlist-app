@@ -20,7 +20,7 @@ TV miniseries and docuseries (e.g. *Crime Scene: The Vanishing at the Cecil Hote
 
 ## Fixing bad rows already in Firestore
 
-After deploying the Netlify function:
+After deploying the **`add-from-imdb`** API route (Vercel):
 
 1. Back up: `node scripts/backup-firestore.js`
 2. Refresh metadata + thumb + trailer from IMDb (uses fixed picker + row `type`):  

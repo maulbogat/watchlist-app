@@ -8,8 +8,6 @@
 
 During **`npm run build:react`**, Vite replaces **`import.meta.env.VITE_*`** and embeds those values into **`dist/`**. Anything prefixed with **`VITE_` ships to browsers** — do not put private API tokens, Axiom credentials, or Firebase service account material there.
 
-**Optional legacy Admin badge:** **`VITE_NETLIFY_SITE_ID`** only affects an optional Netlify deploy badge in the client. That UUID is already public in standard badge URLs; treat it as non-secret UI configuration, not as protection for server access.
-
 ## 1. Delete these (required)
 
 | Variable | Reason |
@@ -36,8 +34,6 @@ Vercel injects matching variables into the **build** process. They are compiled 
 | `VITE_APP_ORIGIN` | No | Admin header prod/local switch and related fallbacks; override if needed (code default **`https://watchlist.maulbogat.com`**) |
 | `VITE_DEPLOYMENTS_URL` | No | Admin “Deployments” card link |
 | `VITE_SITE_ID` | No | Optional; **`admin-env-status`** reports whether a site id is configured (not a secret) |
-| `VITE_NETLIFY_SITE_ID` | No | Legacy only — Admin Netlify deploy badge |
-| `VITE_NETLIFY_PROJECT_SLUG` | No | Legacy only — Netlify deploys URL slug |
 | `VITE_SENTRY_DSN` | No | **Sentry** browser SDK — **`src/main.tsx`**; no-op if unset; production-only when set (**`import.meta.env.PROD`**). User context: Firebase **`uid` only** (no email or display name). |
 
 **Optional Vite / CI (production build only):** when **`SENTRY_AUTH_TOKEN`** is set, **`vite.config.ts`** enables **`@sentry/vite-plugin`** and **`build.sourcemap`** so maps upload to Sentry; also set **`SENTRY_ORG`** and **`SENTRY_PROJECT`**. Omit locally if you do not upload source maps.
@@ -70,7 +66,6 @@ Read at **runtime** by **`api/*.js`** on Vercel (and by **`vercel dev`** / local
 | `APP_PUBLIC_URL` | Optional — canonical site URL in WhatsApp replies and **email invite links**; **`VERCEL_URL`** used if unset |
 | `RESEND_API_KEY` | **`/api/invites`** (POST `action: send`) — [Resend](https://resend.com) API key for invitation emails |
 | `RESEND_FROM_EMAIL` | Optional — `From:` for invite mail; defaults to **`onboarding@resend.dev`** (Resend shared testing domain) when unset |
-| `NETLIFY_SITE_ID` | Optional legacy — **`admin-env-status`** fallback; **avoid** setting the same value as a “secret” elsewhere if it already appears verbatim inside **`dist/`** (e.g. duplicated Netlify site UUID) |
 
 Some routes also read **`VITE_APP_ORIGIN`** from **`process.env`** when present (e.g. WhatsApp copy); the SPA normally supplies it via the Vite build only.
 
@@ -95,7 +90,6 @@ Keep **names identical** to Vercel so behavior matches.
 | **Scheduled / manual upcoming sync** | `TMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, deployed Firestore rules |
 | **Client → Axiom** | `AXIOM_*`, `FIREBASE_SERVICE_ACCOUNT` (token verification on **`log-client-event`**) |
 | **Admin Axiom activity (24h)** | `AXIOM_TOKEN` — **`/api/external-status?service=axiom`** (dataset **`watchlist-prod`** in APL) |
-| **Admin Netlify badge (legacy)** | `VITE_NETLIFY_SITE_ID` |
 | **WhatsApp link + inbound messages** | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` |
 | **Email app invites** | `RESEND_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `APP_PUBLIC_URL` (or `VERCEL_URL`); optional `RESEND_FROM_EMAIL` — all via **`/api/invites`** |
 | **Admin GitHub backup status** | `GITHUB_TOKEN` optional for public repo; often required for private — **`/api/external-status?service=github`** |

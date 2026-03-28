@@ -27,7 +27,7 @@ cp .env.example .env
 Then set values in:
 
 - `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional **`FIRESTORE_HOURLY_READ_LIMIT`** / **`FIRESTORE_DAILY_READ_LIMIT`**, optional `AXIOM_*`, optional **`SENTRY_DSN`**, optional **`RESEND_API_KEY`**, optional **`RESEND_FROM_EMAIL`**, optional **`APP_PUBLIC_URL`**, optional **`VERCEL_API_TOKEN`** / **`VERCEL_PROJECT_ID`** (Admin deployment card), optional script toggles)
-- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional **`VITE_SENTRY_DSN`**, optional `VITE_APP_VERSION`, optional `VITE_APP_ORIGIN`, `VITE_DEPLOYMENTS_URL`, `VITE_SITE_ID`, legacy `VITE_NETLIFY_*`)
+- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional **`VITE_SENTRY_DSN`**, optional `VITE_APP_VERSION`, optional `VITE_APP_ORIGIN`, `VITE_DEPLOYMENTS_URL`, `VITE_SITE_ID`)
 
 **Vercel production:** mirror the same keys in the project **Settings → Environment Variables** (deep link from **`/admin`** → Service Links → **Vercel**). Naming and pitfalls are in **[`docs/environment.md`](./docs/environment.md)** (delete **`VITE_AXIOM_*`**; never expose **`AXIOM_*`** to the client bundle). WhatsApp uses **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_APP_SECRET`** (webhook POST signature), **`WHATSAPP_TOKEN`**, and **`WHATSAPP_PHONE_NUMBER_ID`**; email invites use **`RESEND_API_KEY`** (and optional **`RESEND_FROM_EMAIL`**, **`APP_PUBLIC_URL`**) — see that doc and **`.env.example`**.
 
@@ -73,7 +73,6 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
   - `VITE_APP_ORIGIN` — production origin for Admin links (default in code: `https://watchlist.maulbogat.com`)
   - `VITE_DEPLOYMENTS_URL` — Admin “Deployments” card (e.g. `https://vercel.com/<team>/<project>/deployments`)
   - `VITE_SITE_ID` — optional; marks `SITE_ID` in **`/api/admin-env-status`**
-  - `VITE_NETLIFY_SITE_ID` / `VITE_NETLIFY_PROJECT_SLUG` — optional legacy Netlify deploy badge only
 - **Axiom (observability):** ingestion is **direct HTTP** to Axiom (not a Netlify log drain; drains are an Enterprise feature). The browser does **not** embed Axiom tokens: **`src/lib/axiom-logger.ts`** POSTs signed-in events to **`/api/log-client-event`**, which forwards using server-only **`AXIOM_TOKEN`** / **`AXIOM_DATASET`**. Server routes use **`src/api-lib/logger.js`**, which calls the Axiom HTTP API when those vars are set, otherwise **`console.log`** JSON. Do **not** set **`VITE_AXIOM_*`** (unused in bundles). Locally, leaving **`AXIOM_*`** unset avoids polluting the production dataset; logs go to the terminal instead.
 - `src/config/firebase.ts` normalizes/sanitizes client config values and falls back to project defaults when values are missing or malformed.
 

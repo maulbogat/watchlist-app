@@ -31,7 +31,7 @@ function queryFromReq(req) {
 
 /**
  * @param {import('http').IncomingMessage & { query?: Record<string, string | string[]> }} req
- * @returns {import('@netlify/functions').HandlerEvent}
+ * @returns {object}
  */
 function netlifyEventFromReq(req) {
   const headers = { ...req.headers };
@@ -55,7 +55,7 @@ function netlifyEventFromReq(req) {
 
 /**
  * @param {import('http').ServerResponse} res
- * @param {import('@netlify/functions').HandlerResponse} result
+ * @param {object} result
  */
 function sendNetlifyResponse(res, result) {
   if (result == null) {
@@ -76,7 +76,7 @@ function sendNetlifyResponse(res, result) {
 }
 
 /**
- * @param {import('@netlify/functions').Handler} handlerFn
+ * @param {Function} handlerFn
  * @returns {(req: import('http').IncomingMessage, res: import('http').ServerResponse) => Promise<void>}
  */
 function wrapNetlifyHandler(handlerFn) {

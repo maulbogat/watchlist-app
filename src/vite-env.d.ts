@@ -14,9 +14,6 @@ interface ImportMetaEnv {
   readonly VITE_DEPLOYMENTS_URL?: string;
   /** Optional id for `admin-env-status` SITE_ID flag (Vercel project id or any marker). */
   readonly VITE_SITE_ID?: string;
-  /** Legacy Netlify deploy badge only. */
-  readonly VITE_NETLIFY_SITE_ID?: string;
-  readonly VITE_NETLIFY_PROJECT_SLUG?: string;
   /** Sentry browser SDK DSN (client). Omit for a no-op. */
   readonly VITE_SENTRY_DSN?: string;
 }

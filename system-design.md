@@ -42,7 +42,7 @@ This document describes **only what exists in this repository** (static site, Ve
 - **Watchlist toolbar:** **`WatchlistToolbar.tsx`** uses a two-row layout (primary: status tabs, type, sort, search; secondary: genre **Radix Popover** via **`src/components/ui/popover.tsx`**, **Added by** segmented control on shared lists). Genre list styling: **`watchlist-genre-popover-*`** in **`styles.css`**; sort still uses **Radix Select**.
 
 **Migration note (Netlify → Vercel)**  
-Serverless code moved from **`netlify/functions/`** to root **`api/*.js`**. **`src/api-lib/vercel-adapter.js`** preserves Netlify-shaped handler wiring on Vercel’s **`(req, res)`** model. Scheduled jobs use **`vercel.json`** Cron instead of **`netlify.toml`** schedules. Full local dev uses two processes: **`npm run dev:react`** (Vite) and **`vercel dev --listen 3000`** (API + **`process.env`**).
+Serverless code moved from **`netlify/functions/`** to root **`api/*.js`**. **`src/api-lib/vercel-adapter.js`** preserves Netlify-shaped handler wiring on Vercel’s **`(req, res)`** model. Scheduled jobs use **`vercel.json`** Cron only (legacy **`netlify.toml`** was removed from the repo). Full local dev uses two processes: **`npm run dev:react`** (Vite) and **`vercel dev --listen 3000`** (API + **`process.env`**).
 
 **Vercel (`api/*`)**  
 - **Static hosting** for HTML, CSS, JS, SVG assets from **`dist/`**.  
