@@ -70,7 +70,7 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
 - Optional client variables:
   - `VITE_FIREBASE_MEASUREMENT_ID` (Analytics)
   - `VITE_APP_VERSION` (defaults to `1.0.0` when missing)
-  - `VITE_APP_ORIGIN` — production origin for Admin links (default in code: `https://watchlist-trailers.vercel.app`)
+  - `VITE_APP_ORIGIN` — production origin for Admin links (default in code: `https://watchlist.maulbogat.com`)
   - `VITE_DEPLOYMENTS_URL` — Admin “Deployments” card (e.g. `https://vercel.com/<team>/<project>/deployments`)
   - `VITE_SITE_ID` — optional; marks `SITE_ID` in **`/api/admin-env-status`**
   - `VITE_NETLIFY_SITE_ID` / `VITE_NETLIFY_PROJECT_SLUG` — optional legacy Netlify deploy badge only
@@ -129,7 +129,7 @@ In Meta’s app settings, point the webhook to **`https://<your-domain>/api/what
 
 ### External services (email & domain)
 
-- **`maulbogat.com`:** personal domain (Cloudflare Registrar); DNS verified with **Resend** for outbound mail.
+- **`maulbogat.com`:** personal domain (**Cloudflare** Registrar and DNS). The **watchlist** app is served at **`https://watchlist.maulbogat.com`**: the **`watchlist`** hostname is a **CNAME** to **Vercel** (project still builds from this repo). DNS verified with **Resend** for outbound mail on **`maulbogat.com`**.
 - **Resend:** transactional email (invite flow only). Requires **`RESEND_API_KEY`**. Set **`RESEND_FROM_EMAIL`** to a verified sender (e.g. **`noreply@maulbogat.com`**); if unset, the code falls back to Resend’s test sender (**`onboarding@resend.dev`**) for development.
 
 ### Production missing new UI after a Git push?
@@ -220,7 +220,7 @@ Deploy Firestore rules: `firebase deploy --only firestore:rules`
 **Verify in Firebase Console:**
 
 1. **Authentication → Sign-in method** → Google → Enabled
-2. **Authentication → Settings → Authorized domains** → Add your production host (e.g. `watchlist-trailers.vercel.app` or your custom domain) and `localhost` for local dev
+2. **Authentication → Settings → Authorized domains** → Add your production host (`watchlist.maulbogat.com`) and `localhost` for local dev
 3. **Firestore rules** (in `firestore.rules`) — signed-in users: read/write their **`users/{uid}`** doc and **`users/{uid}/personalLists/*`**; read/write **`sharedLists/{listId}`** only when their uid is in **`members`**; read **`titleRegistry`** and **`upcomingAlerts`** (no client writes there); read their own **`allowedUsers/{email}`** row (document id matches normalized email); read **`invites`** (writes Admin-only). **`syncState`** and **`verificationCodes`** are Admin-only. **`meta/{docId}`**: **read** only for hardcoded **admin UIDs** (aligned with **`src/config/admin.ts`**); **no client writes** (Admin SDK writes **`jobConfig`**, **`usageStats`**, etc.).
 
 The header shows the signed-in user's email so family members know whose account they're using on shared devices.

@@ -228,7 +228,7 @@ type SentryIssuesSummaryResponse = {
 };
 
 /** Production site origin (bookmarklet / admin links). Override with VITE_APP_ORIGIN when your host differs. */
-const DEFAULT_APP_ORIGIN = "https://movie-trailer-site.vercel.app";
+const DEFAULT_APP_ORIGIN = "https://watchlist.maulbogat.com";
 const appOrigin = (import.meta.env.VITE_APP_ORIGIN as string | undefined)?.trim() || DEFAULT_APP_ORIGIN;
 const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 const switchHref = isLocal ? `${appOrigin}/admin` : `http://localhost:5173/admin`;

@@ -2,6 +2,8 @@
 
 **Hosting: Vercel** — static app from **`dist/`** plus serverless **`api/*`** (see **`vercel.json`**). Configure values in the dashboard: **Project → Settings → [Environment Variables](https://vercel.com/docs/projects/environment-variables)**. This repo cannot change the dashboard; use this file as the checklist for **which** keys exist, **where** they apply (Vite build vs serverless runtime), and **why**.
 
+**Production URL:** **`https://watchlist.maulbogat.com`**. **Cloudflare** manages the **`maulbogat.com`** zone; the **`watchlist`** subdomain is a **CNAME** to this **Vercel** project. Optional **`VITE_APP_ORIGIN`** should match that origin if set; **`src/pages/AdminPage.tsx`** uses **`https://watchlist.maulbogat.com`** as the built-in default when it is unset.
+
 ## Client bundle vs server secrets
 
 During **`npm run build:react`**, Vite replaces **`import.meta.env.VITE_*`** and embeds those values into **`dist/`**. Anything prefixed with **`VITE_` ships to browsers** — do not put private API tokens, Axiom credentials, or Firebase service account material there.
@@ -31,7 +33,7 @@ Vercel injects matching variables into the **build** process. They are compiled 
 | `VITE_FIREBASE_APP_ID` | Yes | |
 | `VITE_FIREBASE_MEASUREMENT_ID` | No | Analytics |
 | `VITE_APP_VERSION` | No | Shown in client logs |
-| `VITE_APP_ORIGIN` | No | Admin service links / bookmarklet base URL override |
+| `VITE_APP_ORIGIN` | No | Admin header prod/local switch and related fallbacks; override if needed (code default **`https://watchlist.maulbogat.com`**) |
 | `VITE_DEPLOYMENTS_URL` | No | Admin “Deployments” card link |
 | `VITE_SITE_ID` | No | Optional; **`admin-env-status`** reports whether a site id is configured (not a secret) |
 | `VITE_NETLIFY_SITE_ID` | No | Legacy only — Admin Netlify deploy badge |
