@@ -67,7 +67,8 @@
   --border: rgba(255,255,255,0.07);
   /* Modals, Radix select panels, list-selector wrap, avatar menu — visible light edge */
   --modal-dropdown-border: rgba(255, 255, 255, 0.14);
-  --invite-placeholder-gray: rgba(255, 255, 255, 0.5);
+  /* Alias for Tailwind `placeholder:*` on invite fields — same as native ::placeholder */
+  --invite-placeholder-gray: var(--color-text-muted);
   --text: #f0ede8;
   --muted: var(--color-text-muted);
   /* Muted gold (prod-style); aliases design token. */
@@ -109,6 +110,13 @@
   --input: 28 28 34;
   --ring: var(--color-gold);
   --radius: 0.5rem;
+}
+
+/* Native placeholders — softer than value text (--text); opacity 1 avoids browser default fade */
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -935,9 +943,6 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   color: var(--text);
   font-size: var(--text-sm);
 }
-.lists-modal-input::placeholder {
-  color: var(--muted);
-}
 .lists-modal-input:focus {
   outline: none;
   border-color: rgb(from var(--color-gold) r g b / 0.4);
@@ -962,7 +967,7 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   box-shadow: none;
 }
 .lists-modal-select-trigger[data-placeholder] {
-  color: var(--muted);
+  color: var(--color-text-muted);
 }
 .lists-modal-select-trigger svg {
   color: var(--muted);
@@ -1387,10 +1392,6 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   min-height: var(--watchlist-filter-control-height);
   box-sizing: border-box;
   line-height: 1;
-}
-
-.search-input::placeholder {
-  color: var(--muted);
 }
 
 .search-input:focus {
@@ -2445,9 +2446,6 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   font-family: var(--font-body);
   color: var(--text);
 }
-.country-combobox-input::placeholder {
-  color: var(--muted);
-}
 .country-combobox-toggle {
   display: flex;
   align-items: center;
@@ -2481,9 +2479,6 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 }
 .country-search:focus {
   border-color: rgb(from var(--color-gold) r g b / 0.4);
-}
-.country-search::placeholder {
-  color: var(--muted);
 }
 .country-dropdown {
   position: absolute;
@@ -4099,10 +4094,10 @@ a.admin-job-run-btn {
   padding: 0;
 }
 
-/* Invite email placeholder: light gray (matches --invite-placeholder-gray on Input) */
+/* Invite email — explicit !important wins over Tailwind placeholder utilities */
 #invite-email-input::placeholder,
 .lists-modal-invite-email-input::placeholder {
-  color: var(--invite-placeholder-gray) !important;
+  color: var(--color-text-muted) !important;
   opacity: 1 !important;
 }
 .lists-modal-invite-include-wrap {
@@ -4122,11 +4117,7 @@ a.admin-job-run-btn {
 
 #list-name-input::placeholder,
 .list-name-input::placeholder {
-  color: var(--muted) !important;
-  opacity: 1 !important;
-}
-.country-search::placeholder {
-  color: var(--muted) !important;
+  color: var(--color-text-muted) !important;
   opacity: 1 !important;
 }
 

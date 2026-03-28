@@ -33,7 +33,7 @@ const GCS_BACKUP_BUCKET = "movie-trailer-site-backups";
 
 /** APL: dataset `watchlist-prod`, rolling 24h window (matches Admin “Activity” card). */
 const AXIOM_ACTIVITY_APL =
-  "['watchlist-prod'] | where _time > ago(24h) | summarize firestore_reads = sumif(documentCount, type == 'firestore.read'), api_calls = countif(type == 'api.call'), user_actions = countif(type == 'user.action'), errors = countif(type == 'job.failed' or type == 'whatsapp.imdb.error'), titles_added = countif(type == 'title.added')";
+  "['watchlist-prod'] | where _time > ago(24h) | summarize firestore_reads = sumif(documentCount, [`type`] == 'firestore.read'), api_calls = countif([`type`] == 'api.call'), user_actions = countif([`type`] == 'user.action'), errors = countif([`type`] == 'job.failed' or [`type`] == 'whatsapp.imdb.error'), titles_added = countif([`type`] == 'title.added')";
 
 const AXIOM_APL_QUERY_URL = "https://api.axiom.co/v1/datasets/_apl?format=tabular";
 
@@ -359,8 +359,6 @@ async function handleAxiom() {
     });
   }
 
-  const startTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
   let res;
   try {
     res = await fetch(AXIOM_APL_QUERY_URL, {
@@ -371,7 +369,6 @@ async function handleAxiom() {
       },
       body: JSON.stringify({
         apl: AXIOM_ACTIVITY_APL,
-        startTime,
       }),
     });
   } catch (e) {

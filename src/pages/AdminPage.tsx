@@ -213,7 +213,7 @@ type AxiomActivityResponse = {
   period: "24h";
 };
 
-const ACTIVITY_STAT_CARD_COUNT = 5;
+const ACTIVITY_STAT_CARD_COUNT = 4;
 
 /** Admin Sentry card — issues list (same org as Service Links). */
 const SENTRY_ISSUES_HUB_URL = "https://maulbogat.sentry.io/issues/";
@@ -1136,7 +1136,7 @@ export function AdminPage() {
                       <span className="admin-stat-label">Open issues</span>
                       {sentryIssuesQ.data.errorCount === 0 ? (
                         <span className="admin-job-status admin-job-status--on" aria-label="No errors">
-                          ✓ No errors
+                          ✓
                         </span>
                       ) : (
                         <span className="admin-job-status admin-job-status--failure">
@@ -1290,12 +1290,6 @@ export function AdminPage() {
                   title="Green ≤ 40k, gold > 40k, red > 45k (rolling 24h sum of documentCount)"
                 >
                   {Math.round(axiomActivityQ.data.firestoreReads).toLocaleString()}
-                </div>
-              </div>
-              <div className="admin-card admin-stat-card">
-                <div className="admin-stat-label">API calls</div>
-                <div className="admin-stat-value">
-                  {Math.round(axiomActivityQ.data.apiCalls).toLocaleString()}
                 </div>
               </div>
               <div className="admin-card admin-stat-card">
