@@ -691,6 +691,8 @@ flowchart TD
 
 10. **`src/firebase.ts` public surface** — **Resolved / by design (audit).** Module defines internal **`db`** (`initFirestoreWithLocalCache()`) and loads Analytics via dynamic import **without** exporting either. The **`export { … }`** block lists only **named helpers** (auth exports, list CRUD, upcoming, job config, etc.). Import specifiers in TS often use **`./firebase.js`**; Vite resolves **`firebase.ts`**.
 
+11. **Snapshot listeners (Firebase console)** — **Resolved / by design.** Firebase reports ~97 peak snapshot listeners which is expected — these are internal listeners created by the Firestore offline persistence layer (IndexedDB persistentLocalCache) and Firebase Auth, not application-level onSnapshot calls. No onSnapshot exists in application code.
+
 ---
 
 *End of document.*

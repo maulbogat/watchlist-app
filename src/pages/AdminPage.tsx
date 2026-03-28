@@ -217,6 +217,11 @@ const SERVICE_LINKS = [
     url: "https://console.firebase.google.com/u/0/project/movie-trailer-site/firestore/databases/-default-/data/",
   },
   {
+    label: "Google Cloud",
+    sublabel: "Firestore — allowedUsers (GCP console)",
+    url: "https://console.cloud.google.com/firestore/databases/-default-/data/panel/allowedUsers/geo80637@gmail.com?project=movie-trailer-site",
+  },
+  {
     label: "Vercel",
     sublabel: "env vars",
     url: "https://vercel.com/maulbogats-projects/movie-trailer-site/settings/environment-variables",
