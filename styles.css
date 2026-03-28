@@ -1999,6 +1999,13 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   border: 1px solid rgba(201,106,106,0.25);
 }
 
+/* Original language (TMDB) — same metrics as .badge; muted so it does not compete with Film/TV */
+.badge-lang {
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  border: 1px solid var(--border);
+}
+
 /* Modal */
 .modal-bg {
   display: none;

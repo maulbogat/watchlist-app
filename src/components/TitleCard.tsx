@@ -68,6 +68,9 @@ export function TitleCard({
   const yearStr = m.year ? m.year : "—";
   const badgeClass = m.type === "show" ? "badge-show" : "badge-movie";
   const badgeLabel = m.type === "show" ? "TV" : "Film";
+  const langRaw = m.originalLanguage?.trim();
+  const langCode =
+    langRaw && langRaw.toLowerCase() !== "en" ? langRaw.slice(0, 2).toUpperCase() : null;
   const serviceChips = renderServiceChips(servicesForMovie(m, userCountryCode), { limit: 3 });
   const serviceRow = serviceChips ? <div className="service-row" dangerouslySetInnerHTML={{ __html: serviceChips }} /> : null;
 
@@ -237,6 +240,7 @@ export function TitleCard({
         <div className="card-meta">
           <span className="card-meta-main">
             <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
+            {langCode ? <span className="badge badge-lang">{langCode}</span> : null}
             {yearStr} &nbsp;·&nbsp; {m.genre}
           </span>
           {avatarBadge ? (

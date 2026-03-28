@@ -247,7 +247,8 @@ function pickTmdbFindEntry(find, omdbHint) {
  *   thumb: string | null,
  *   genre: string,
  *   youtubeId: string | null,
- *   services: string[]
+ *   services: string[],
+ *   originalLanguage: string | null
  * } | null>}
  */
 async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint, options = {}) {
@@ -294,6 +295,10 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint, options = {
   const genres = (detail.genres || []).map((g) => g.name).filter(Boolean);
   const genre = genres.join(" / ");
 
+  const olRaw = detail.original_language;
+  const originalLanguage =
+    typeof olRaw === "string" && olRaw.trim() ? String(olRaw).trim().toLowerCase() : null;
+
   const youtubeId = pickYoutubeTrailerKey(detail.videos?.results);
 
   let services = [];
@@ -321,6 +326,7 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, omdbHint, options = {
     genre,
     youtubeId,
     services,
+    originalLanguage,
   };
 }
 
@@ -513,6 +519,7 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
           services: Array.isArray(e.services) ? e.services : [],
           tmdbId: e.tmdbId,
           tmdbMedia: e.type === "show" ? "tv" : "movie",
+          ...(e.originalLanguage ? { originalLanguage: e.originalLanguage } : {}),
         };
       }
     } catch (err) {}

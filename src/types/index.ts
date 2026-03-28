@@ -30,6 +30,8 @@ export interface WatchlistItem {
   services: string[];
   servicesByRegion: ServicesByRegion | null | undefined;
   tmdbMedia?: string | null;
+  /** TMDB `original_language` (ISO 639-1), lowercase when from API. */
+  originalLanguage?: string | null;
   status?: StatusKey;
 }
 

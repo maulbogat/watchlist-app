@@ -15,6 +15,24 @@ import { displayListName, errorMessage } from "../lib/utils.js";
 import { logEvent } from "../lib/axiom-logger.js";
 import { getPersonalListMovies, movieKey } from "../firebase.js";
 
+const MODAL_LANG_NAMES: Record<string, string> = {
+  he: "Hebrew",
+  fr: "French",
+  es: "Spanish",
+  de: "German",
+  ko: "Korean",
+  ja: "Japanese",
+  it: "Italian",
+  ar: "Arabic",
+};
+
+function modalOriginalLanguageLabel(code: string | null | undefined): string | null {
+  const raw = typeof code === "string" ? code.trim().toLowerCase() : "";
+  if (!raw || raw === "en") return null;
+  const two = raw.slice(0, 2);
+  return MODAL_LANG_NAMES[two] ?? two.toUpperCase();
+}
+
 export function TrailerModal() {
   const queryClient = useQueryClient();
   const currentUser = useAppStore((s) => s.currentUser);
@@ -205,7 +223,10 @@ export function TrailerModal() {
 
   const currentListButtonLabel = getCurrentListLabel(currentListMode, personalLists, sharedLists);
 
-  const metaParts = [m.year || "", m.genre || ""].filter(Boolean).join(" ");
+  const metaCore = [m.year || "", m.genre || ""].filter(Boolean).join(" ");
+  const langLabel = modalOriginalLanguageLabel(m.originalLanguage);
+  const metaParts =
+    langLabel && metaCore ? `${metaCore} · ${langLabel}` : langLabel && !metaCore ? langLabel : metaCore;
   const serviceChips = renderServiceChips(servicesForMovie(m, userCountryCode));
   const servicePart = serviceChips ? (
     <span dangerouslySetInnerHTML={{ __html: ` <span style="opacity:0.4">·</span> ${serviceChips}` }} />
