@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as Sentry from "@sentry/react";
 import { auth, onAuthStateChanged, syncUserDisplayNameToFirestore } from "../firebase.js";
 import { setBookmarkletCookieWithMode } from "../lib/bookmarkletCookie.js";
 import { clearUpcomingAlertsCache } from "../lib/storage.js";
@@ -15,8 +16,11 @@ export function useAuthUser(): { loading: boolean } {
       setCurrentUser(u);
       setLoading(false);
       if (u) {
+        Sentry.setUser({ id: u.uid });
         const label = u.displayName?.trim() || (u.email ? u.email.split("@")[0] : "") || "";
         void syncUserDisplayNameToFirestore(u.uid, label || null, u.photoURL ?? null);
+      } else {
+        Sentry.setUser(null);
       }
     });
     return () => unsub();

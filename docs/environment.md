@@ -36,6 +36,9 @@ Vercel injects matching variables into the **build** process. They are compiled 
 | `VITE_SITE_ID` | No | Optional; **`admin-env-status`** reports whether a site id is configured (not a secret) |
 | `VITE_NETLIFY_SITE_ID` | No | Legacy only — Admin Netlify deploy badge |
 | `VITE_NETLIFY_PROJECT_SLUG` | No | Legacy only — Netlify deploys URL slug |
+| `VITE_SENTRY_DSN` | No | **Sentry** browser SDK — **`src/main.tsx`**; no-op if unset; production-only when set (**`import.meta.env.PROD`**). User context: Firebase **`uid` only** (no email or display name). |
+
+**Optional Vite / CI (production build only):** when **`SENTRY_AUTH_TOKEN`** is set, **`vite.config.ts`** enables **`@sentry/vite-plugin`** and **`build.sourcemap`** so maps upload to Sentry; also set **`SENTRY_ORG`** and **`SENTRY_PROJECT`**. Omit locally if you do not upload source maps.
 
 ## 3. Server / serverless only (never `VITE_*` for secrets)
 
@@ -50,6 +53,7 @@ Read at **runtime** by **`api/*.js`** on Vercel (and by **`vercel dev`** / local
 | `OMDB_API_KEY` | `add-from-imdb` |
 | `AXIOM_TOKEN` | Server-side Axiom ingest (`log-client-event`, function loggers) |
 | `AXIOM_DATASET` | Axiom dataset name |
+| `SENTRY_DSN` | Optional — **`api/add-from-imdb.js`** and **`api/whatsapp-webhook.js`** only (**`src/api-lib/sentry-node.js`**); no-op if unset |
 | `UPCOMING_SYNC_TRIGGER_SECRET` | Optional — bearer auth for **`/api/trigger-upcoming-sync`** |
 | `GITHUB_TOKEN` | Optional — **`/api/external-status?service=github`** (private repo or higher GitHub API rate limits) |
 | `GITHUB_REPO` | Optional — override `owner/repo` for backup workflow discovery |
@@ -93,5 +97,6 @@ Keep **names identical** to Vercel so behavior matches.
 | **Admin Vercel deployment status** | `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` — **`/api/external-status?service=vercel`** |
 | **Admin GCS backup status** | `FIREBASE_SERVICE_ACCOUNT` — **`/api/external-status?service=gcs`**; IAM on **`movie-trailer-site-backups`** must allow **`storage.objects.list`** for that service account |
 | **GCS Firestore native export** (bucket **`movie-trailer-site-backups`**, Scheduler **`firestore-daily-export`**) | **None** in app env for the scheduled job itself — IAM, lifecycle, and job live in Google Cloud; the **Admin** card reuses **`FIREBASE_SERVICE_ACCOUNT`** as above. |
+| **Sentry (errors)** | Optional **`VITE_SENTRY_DSN`** (client) + optional **`SENTRY_DSN`** (two API routes); optional **`SENTRY_AUTH_TOKEN`**, **`SENTRY_ORG`**, **`SENTRY_PROJECT`** for build-time source map upload |
 
 Nothing in the app expects **`VITE_AXIOM_*`**.

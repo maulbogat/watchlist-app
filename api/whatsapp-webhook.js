@@ -13,6 +13,7 @@ const { checkFirestoreQuota, QuotaExceededError } = require("../src/api-lib/fire
 const { getPhoneIndexEntry, phoneIndexDocId } = require("../src/api-lib/phone-index.js");
 const { sendWhatsAppText } = require("../src/api-lib/whatsapp-graph.js");
 const { netlifyEventFromReq, sendNetlifyResponse } = require("../src/api-lib/vercel-adapter");
+const { captureException } = require("../src/api-lib/sentry-node.js");
 
 const APP_NAME = "watchlist-admin";
 
@@ -244,6 +245,7 @@ exports.handler = async (event) => {
         }
         return json200(event);
       }
+      captureException(e);
       throw e;
     }
 
@@ -334,6 +336,7 @@ exports.handler = async (event) => {
         });
       }
     } catch (e) {
+      captureException(e);
       const msg = e && typeof e === "object" && "message" in e ? String(e.message) : String(e);
       logEvent({ type: "whatsapp.imdb.error", senderMasked: maskPhone(senderDigits), error: msg });
       try {
@@ -371,6 +374,7 @@ module.exports = async (req, res) => {
     const result = await exports.handler(event, {});
     sendNetlifyResponse(res, result);
   } catch (e) {
+    captureException(e);
     console.error(e);
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });

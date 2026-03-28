@@ -52,6 +52,7 @@ const { runSingleTitleSync } = require("../src/api-lib/sync-upcoming-alerts");
 const { registryDocIdFromItem, payloadForRegistry, listKey } = require("../src/api-lib/registry-id.cjs");
 const { createFunctionLogger } = require("../src/api-lib/logger");
 const { checkFirestoreQuota, QuotaExceededError } = require("../src/api-lib/firestore-guard");
+const { captureException } = require("../src/api-lib/sentry-node.js");
 
 const logEvent = createFunctionLogger("add-from-imdb");
 
@@ -850,6 +851,7 @@ exports.handler = async (event, context) => {
   const r = await performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId, watchRegion);
   return jsonRes(r.statusCode, r.body, event);
   } catch (err) {
+    captureException(err);
     const msg = presentableErrorMessage(err);
     console.error("add-from-imdb fatal:", err);
     logEvent({ type: "function.error", error: msg });

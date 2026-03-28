@@ -1,9 +1,46 @@
 import { StrictMode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as Sentry from "@sentry/react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App.js";
 import "../styles.css";
+
+const sentryDsn = (import.meta.env.VITE_SENTRY_DSN as string | undefined)?.trim();
+
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    enabled: import.meta.env.PROD,
+    environment: import.meta.env.MODE,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration({
+        maskAllText: false,
+        blockAllMedia: false,
+      }),
+    ],
+    tracesSampleRate: 0.1,
+    replaysSessionSampleRate: 0.0,
+    replaysOnErrorSampleRate: 0.5,
+  });
+}
+
+const AppRoot = sentryDsn
+  ? Sentry.withErrorBoundary(App, {
+      fallback: () => (
+        <div className="sentry-error-boundary" role="alert">
+          <div className="sentry-error-boundary__inner">
+            <h2 className="sentry-error-boundary__title">Something went wrong</h2>
+            <p className="sentry-error-boundary__text">
+              The error has been reported. Please refresh the page.
+            </p>
+          </div>
+        </div>
+      ),
+      showDialog: false,
+    })
+  : App;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,7 +65,7 @@ if (!rootEl) {
     <StrictMode>
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
-          <App />
+          <AppRoot />
         </QueryClientProvider>
       </BrowserRouter>
     </StrictMode>

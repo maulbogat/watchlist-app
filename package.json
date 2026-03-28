@@ -18,6 +18,8 @@
     "@axiomhq/js": "^1.5.0",
     "@fontsource-variable/geist": "^5.2.8",
     "@google-cloud/storage": "^7.19.0",
+    "@sentry/node": "^10.46.0",
+    "@sentry/react": "^10.46.0",
     "@tanstack/react-query": "^5.62.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -37,6 +39,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^5.1.1",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^22.19.15",
     "@types/react": "^19.2.14",

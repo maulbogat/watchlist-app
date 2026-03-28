@@ -17,6 +17,8 @@ interface ImportMetaEnv {
   /** Legacy Netlify deploy badge only. */
   readonly VITE_NETLIFY_SITE_ID?: string;
   readonly VITE_NETLIFY_PROJECT_SLUG?: string;
+  /** Sentry browser SDK DSN (client). Omit for a no-op. */
+  readonly VITE_SENTRY_DSN?: string;
 }
 
 interface ImportMeta {

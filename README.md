@@ -2,7 +2,7 @@
 
 A personal movie/show watchlist with YouTube trailers, filters, and Firestore. **Architecture, data model, and flows** are documented in **[`system-design.md`](./system-design.md)** (source of truth for how pieces fit together).
 
-**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). **Vercel** hosts **`dist/`** and runs **`api/*.js`** serverless routes (Firebase Admin SDK) for the IMDb add flow, shared-list joins, **email app invites** (single **`/api/invites`** route: GET list, POST `action: send|accept`, DELETE revoke — Resend on send), upcoming-title sync, **WhatsApp** verification + webhook (Meta Cloud API), and other admin/diagnostic endpoints.
+**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). Optional **[Sentry](https://sentry.io/)** error tracking: browser SDK in **`src/main.tsx`** when **`VITE_SENTRY_DSN`** is set (production-only; Firebase **`uid`** only in user context — no email or display name), server **`SENTRY_DSN`** on **`add-from-imdb`** and **`whatsapp-webhook`** only; optional Vite **`@sentry/vite-plugin`** when **`SENTRY_AUTH_TOKEN`** is set for source map upload. **Vercel** hosts **`dist/`** and runs **`api/*.js`** serverless routes (Firebase Admin SDK) for the IMDb add flow, shared-list joins, **email app invites** (single **`/api/invites`** route: GET list, POST `action: send|accept`, DELETE revoke — Resend on send), upcoming-title sync, **WhatsApp** verification + webhook (Meta Cloud API), and other admin/diagnostic endpoints.
 
 ## Design system
 
@@ -26,8 +26,8 @@ cp .env.example .env
 
 Then set values in:
 
-- `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional **`FIRESTORE_HOURLY_READ_LIMIT`** / **`FIRESTORE_DAILY_READ_LIMIT`**, optional `AXIOM_*`, optional **`RESEND_API_KEY`**, optional **`RESEND_FROM_EMAIL`**, optional **`APP_PUBLIC_URL`**, optional **`VERCEL_API_TOKEN`** / **`VERCEL_PROJECT_ID`** (Admin deployment card), optional script toggles)
-- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional `VITE_APP_VERSION`, optional `VITE_APP_ORIGIN`, `VITE_DEPLOYMENTS_URL`, `VITE_SITE_ID`, legacy `VITE_NETLIFY_*`)
+- `.env` for server/scripts vars (`TMDB_API_KEY`, `OMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, optional **`FIRESTORE_HOURLY_READ_LIMIT`** / **`FIRESTORE_DAILY_READ_LIMIT`**, optional `AXIOM_*`, optional **`SENTRY_DSN`**, optional **`RESEND_API_KEY`**, optional **`RESEND_FROM_EMAIL`**, optional **`APP_PUBLIC_URL`**, optional **`VERCEL_API_TOKEN`** / **`VERCEL_PROJECT_ID`** (Admin deployment card), optional script toggles)
+- `.env.local` for client/Vite vars (`VITE_FIREBASE_*`, optional **`VITE_SENTRY_DSN`**, optional `VITE_APP_VERSION`, optional `VITE_APP_ORIGIN`, `VITE_DEPLOYMENTS_URL`, `VITE_SITE_ID`, legacy `VITE_NETLIFY_*`)
 
 **Vercel production:** mirror the same keys in the project **Settings → Environment Variables** (deep link from **`/admin`** → Service Links → **Vercel**). Naming and pitfalls are in **[`docs/environment.md`](./docs/environment.md)** (delete **`VITE_AXIOM_*`**; never expose **`AXIOM_*`** to the client bundle). WhatsApp uses **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_APP_SECRET`** (webhook POST signature), **`WHATSAPP_TOKEN`**, and **`WHATSAPP_PHONE_NUMBER_ID`**; email invites use **`RESEND_API_KEY`** (and optional **`RESEND_FROM_EMAIL`**, **`APP_PUBLIC_URL`**) — see that doc and **`.env.example`**.
 

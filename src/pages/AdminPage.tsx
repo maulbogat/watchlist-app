@@ -307,6 +307,16 @@ const SERVICE_LINKS = [
     /* Avoid embedding the real dataset slug — it may match host secret scanners (e.g. AXIOM_DATASET) and fail the build. */
     url: "https://app.axiom.co/",
   },
+  {
+    label: "Axiom",
+    sublabel: "Dashboards",
+    url: "https://app.axiom.co/maulbogat-riv8/dashboards",
+  },
+  {
+    label: "Axiom",
+    sublabel: "Monitors",
+    url: "https://app.axiom.co/maulbogat-riv8/monitors",
+  },
 ] as const;
 
 const rawViteDeploymentsUrl = (import.meta.env.VITE_DEPLOYMENTS_URL as string | undefined)?.trim();
