@@ -11,8 +11,8 @@
  * gcs — latest Firestore native export folder in `movie-trailer-site-backups` (top-level prefixes).
  *   Uses `FIREBASE_SERVICE_ACCOUNT` with `@google-cloud/storage`. Service account needs
  *   `storage.objects.list` on the bucket (e.g. Storage Object Viewer).
- *   Returns: `lastExportAt`, `folderName`, `status` — `success` (export today or yesterday UTC),
- *   `warning` (older), `unknown` (empty / unparseable).
+ *   Success: `{ ok: true, lastExportAt, folderName, status }` — `success` if newest export
+ *   is within **48 hours**, else `warning`. Failure: `{ ok: false, error }`.
  */
 
 const { initializeApp, cert } = require("firebase-admin/app");
@@ -267,13 +267,26 @@ async function listTopLevelExportPrefixes(bucket) {
   return names;
 }
 
+const GCS_FRESH_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * @param {number} lastExportMs
+ * @returns {"success" | "warning"}
+ */
 function gcsExportHealthStatus(lastExportMs) {
-  if (lastExportMs == null || !Number.isFinite(lastExportMs)) return "unknown";
-  const now = new Date();
-  const startTodayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const startYesterdayUtc = startTodayUtc - 86400000;
-  if (lastExportMs >= startYesterdayUtc) return "success";
-  return "warning";
+  const ageMs = Date.now() - lastExportMs;
+  return ageMs <= GCS_FRESH_WINDOW_MS ? "success" : "warning";
+}
+
+/**
+ * @param {import('@google-cloud/storage').Bucket} bucket
+ * @param {string} folderName
+ * @returns {Promise<number | null>}
+ */
+async function prefixSortOrActivityMs(bucket, folderName) {
+  const parsed = parseExportFolderToUtcMs(folderName);
+  if (parsed != null) return parsed;
+  return newestObjectMsUnderPrefix(bucket, folderName);
 }
 
 async function handleGcs() {
@@ -296,9 +309,6 @@ async function handleGcs() {
   }
 
   const projectId = key.project_id || "movie-trailer-site";
-  const bucketUrl = `https://console.cloud.google.com/storage/browser/${GCS_BACKUP_BUCKET}?project=${encodeURIComponent(
-    projectId
-  )}`;
 
   let storage;
   try {
@@ -308,13 +318,8 @@ async function handleGcs() {
     });
   } catch (e) {
     return json(200, {
-      ok: true,
-      bucket: GCS_BACKUP_BUCKET,
-      bucketUrl,
-      lastExportAt: null,
-      folderName: null,
-      status: "unknown",
-      gcsError: e instanceof Error ? e.message : "Could not init Storage client",
+      ok: false,
+      error: e instanceof Error ? e.message : "Could not init Storage client",
     });
   }
 
@@ -324,37 +329,44 @@ async function handleGcs() {
     const prefixes = await listTopLevelExportPrefixes(bucket);
     if (prefixes.length === 0) {
       return json(200, {
-        ok: true,
-        bucket: GCS_BACKUP_BUCKET,
-        bucketUrl,
-        lastExportAt: null,
-        folderName: null,
-        status: "unknown",
+        ok: false,
+        error: "No export folders found in bucket",
       });
     }
 
-    prefixes.sort((a, b) => {
-      const ma = parseExportFolderToUtcMs(a);
-      const mb = parseExportFolderToUtcMs(b);
+    const withKeys = await Promise.all(
+      prefixes.map(async (folderName) => ({
+        folderName,
+        sortMs: await prefixSortOrActivityMs(bucket, folderName),
+      }))
+    );
+
+    withKeys.sort((a, b) => {
+      const ma = a.sortMs;
+      const mb = b.sortMs;
       if (ma != null && mb != null && ma !== mb) return mb - ma;
       if (ma != null && mb == null) return -1;
       if (ma == null && mb != null) return 1;
-      return b.localeCompare(a);
+      return b.folderName.localeCompare(a.folderName);
     });
 
-    const folderName = prefixes[0];
+    const folderName = withKeys[0].folderName;
     let lastMs = parseExportFolderToUtcMs(folderName);
     if (lastMs == null) {
-      lastMs = await newestObjectMsUnderPrefix(bucket, folderName);
+      lastMs = withKeys[0].sortMs;
+    }
+    if (lastMs == null || !Number.isFinite(lastMs)) {
+      return json(200, {
+        ok: false,
+        error: "Could not determine the most recent export time",
+      });
     }
 
-    const lastExportAt = lastMs != null && Number.isFinite(lastMs) ? new Date(lastMs).toISOString() : null;
+    const lastExportAt = new Date(lastMs).toISOString();
     const status = gcsExportHealthStatus(lastMs);
 
     return json(200, {
       ok: true,
-      bucket: GCS_BACKUP_BUCKET,
-      bucketUrl,
       lastExportAt,
       folderName,
       status,
@@ -362,13 +374,8 @@ async function handleGcs() {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "GCS list failed";
     return json(200, {
-      ok: true,
-      bucket: GCS_BACKUP_BUCKET,
-      bucketUrl,
-      lastExportAt: null,
-      folderName: null,
-      status: "unknown",
-      gcsError: msg,
+      ok: false,
+      error: msg,
     });
   }
 }

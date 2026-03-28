@@ -190,18 +190,16 @@ type VercelDeploymentStatusResponse = {
   vercelHttpStatus?: number;
 };
 
-type GcsBackupHealthStatus = "success" | "warning" | "unknown";
-
+/** Success payload from `GET /api/external-status?service=gcs` (errors throw from `fetchAdminExternalStatus`). */
 type GcsBackupStatusResponse = {
-  ok: boolean;
-  error?: string;
-  bucket?: string;
-  bucketUrl?: string;
-  lastExportAt: string | null;
-  folderName: string | null;
-  status: GcsBackupHealthStatus;
-  gcsError?: string;
+  ok: true;
+  lastExportAt: string;
+  folderName: string;
+  status: "success" | "warning";
 };
+
+const GCS_BACKUP_CONSOLE_URL =
+  "https://console.cloud.google.com/storage/browser/movie-trailer-site-backups";
 
 /** Production site origin (bookmarklet / admin links). Override with VITE_APP_ORIGIN when your host differs. */
 const DEFAULT_APP_ORIGIN = "https://watchlist-trailers.vercel.app";
@@ -408,14 +406,11 @@ function vercelStatusBadge(state: string): { label: string; className: string } 
   return { label: s, className: "admin-job-status" };
 }
 
-function gcsBackupStatusBadge(status: GcsBackupHealthStatus): { label: string; className: string } {
+function gcsBackupStatusBadge(status: "success" | "warning"): { label: string; className: string } {
   if (status === "success") {
     return { label: "SUCCESS", className: "admin-job-status admin-job-status--on" };
   }
-  if (status === "warning") {
-    return { label: "WARNING", className: "admin-job-status admin-job-status--warn" };
-  }
-  return { label: "UNKNOWN", className: "admin-job-status" };
+  return { label: "WARNING", className: "admin-job-status admin-job-status--warn" };
 }
 
 function AdminVercelDeploymentSummary({ dep }: { dep: VercelDeploymentLast }) {
@@ -1219,7 +1214,7 @@ export function AdminPage() {
             </div>
           </div>
           <div className="admin-jobs-deploy-col">
-            <h2>GCS backup</h2>
+            <h2>GCS Backup</h2>
             <div className="admin-card admin-job-card">
               {gcsBackupQ.isPending ? (
                 <p className="admin-job-result">Loading export folder status…</p>
@@ -1234,43 +1229,28 @@ export function AdminPage() {
                 </div>
               ) : (
                 <>
-                  {gcsBackupQ.data?.gcsError ? (
-                    <p className="admin-job-result admin-github-backup-warning">{gcsBackupQ.data.gcsError}</p>
-                  ) : null}
                   <div className="admin-job-row admin-job-row--status-line">
                     <span className="admin-stat-label">Status</span>
-                    <span className={gcsBackupStatusBadge(gcsBackupQ.data?.status ?? "unknown").className}>
-                      {gcsBackupStatusBadge(gcsBackupQ.data?.status ?? "unknown").label}
+                    <span className={gcsBackupStatusBadge(gcsBackupQ.data.status).className}>
+                      {gcsBackupStatusBadge(gcsBackupQ.data.status).label}
                     </span>
                   </div>
                   <div className="admin-job-row">
                     <span className="admin-stat-label">Last export</span>
                     <span className="admin-job-value">
-                      {gcsBackupQ.data?.lastExportAt
-                        ? formatDateTime(toEpochMs(gcsBackupQ.data.lastExportAt)) || gcsBackupQ.data.lastExportAt
-                        : "—"}
+                      {formatDateTime(toEpochMs(gcsBackupQ.data.lastExportAt)) || gcsBackupQ.data.lastExportAt}
                     </span>
                   </div>
                   <div className="admin-job-row admin-job-row--align-start">
                     <span className="admin-stat-label">Folder</span>
                     <span className="admin-job-value admin-job-value--mono-wrap">
-                      {gcsBackupQ.data?.folderName?.trim() ? gcsBackupQ.data.folderName : "—"}
+                      {gcsBackupQ.data.folderName.trim() ? gcsBackupQ.data.folderName : "—"}
                     </span>
                   </div>
-                  {!gcsBackupQ.data?.folderName && !gcsBackupQ.data?.gcsError ? (
-                    <p className="admin-job-result">No export prefixes found in the bucket yet.</p>
-                  ) : null}
                   <div className="admin-job-row admin-job-row--actions">
                     <div className="admin-job-actions">
                       <Button type="button" variant="outline" className="admin-job-run-btn" asChild>
-                        <a
-                          href={
-                            gcsBackupQ.data?.bucketUrl ||
-                            "https://console.cloud.google.com/storage/browser/movie-trailer-site-backups?project=movie-trailer-site"
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
+                        <a href={GCS_BACKUP_CONSOLE_URL} target="_blank" rel="noopener noreferrer">
                           Open bucket
                           <span aria-hidden="true"> ↗</span>
                         </a>

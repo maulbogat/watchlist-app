@@ -43,7 +43,7 @@ Read at **runtime** by **`api/*.js`** on Vercel (and by **`vercel dev`** / local
 
 | Variable | Purpose |
 |----------|---------|
-| `FIREBASE_SERVICE_ACCOUNT` | Base64 JSON — Firebase Admin SDK in API routes |
+| `FIREBASE_SERVICE_ACCOUNT` | Base64 JSON — Firebase Admin SDK in API routes; also used by **`/api/external-status?service=gcs`** (**`@google-cloud/storage`**) if that account can list **`movie-trailer-site-backups`** |
 | `FIRESTORE_HOURLY_READ_LIMIT` | Optional — default **5000**; `checkFirestoreQuota` blocks when estimated reads would exceed this in the current UTC hour (`meta/usageStats`) |
 | `FIRESTORE_DAILY_READ_LIMIT` | Optional — default **45000**; same guard for UTC calendar day |
 | `TMDB_API_KEY` | `check-upcoming`, `trigger-upcoming-sync`, `add-from-imdb`, `catalog-health`, scripts |
@@ -91,6 +91,7 @@ Keep **names identical** to Vercel so behavior matches.
 | **Email app invites** | `RESEND_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `APP_PUBLIC_URL` (or `VERCEL_URL`); optional `RESEND_FROM_EMAIL` — all via **`/api/invites`** |
 | **Admin GitHub backup status** | `GITHUB_TOKEN` optional for public repo; often required for private — **`/api/external-status?service=github`** |
 | **Admin Vercel deployment status** | `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` — **`/api/external-status?service=vercel`** |
-| **GCS Firestore native export** (bucket **`movie-trailer-site-backups`**, Scheduler **`firestore-daily-export`**) | **None** — IAM, lifecycle, and job live in Google Cloud only; no new keys in **`.env`** or Vercel for this path. |
+| **Admin GCS backup status** | `FIREBASE_SERVICE_ACCOUNT` — **`/api/external-status?service=gcs`**; IAM on **`movie-trailer-site-backups`** must allow **`storage.objects.list`** for that service account |
+| **GCS Firestore native export** (bucket **`movie-trailer-site-backups`**, Scheduler **`firestore-daily-export`**) | **None** in app env for the scheduled job itself — IAM, lifecycle, and job live in Google Cloud; the **Admin** card reuses **`FIREBASE_SERVICE_ACCOUNT`** as above. |
 
 Nothing in the app expects **`VITE_AXIOM_*`**.

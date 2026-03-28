@@ -106,6 +106,8 @@ The project was migrated from **Netlify** to **Vercel**: former **`netlify/funct
 
 **Admin “Deployments” card:** set **`VERCEL_API_TOKEN`** and **`VERCEL_PROJECT_ID`** in Vercel env so **`/api/external-status?service=vercel`** can read the latest deployment.
 
+**Admin “GCS Backup” card:** **`/api/external-status?service=gcs`** uses **`@google-cloud/storage`** with **`FIREBASE_SERVICE_ACCOUNT`** to list the **`movie-trailer-site-backups`** bucket and surface the newest export folder (**SUCCESS** if the export is within **48 hours**, **WARNING** if older). Grant the Firebase service account **`storage.objects.list`** on that bucket (for example **Storage Object Viewer**).
+
 ### WhatsApp (optional)
 
 In Meta’s app settings, point the webhook to **`https://<your-domain>/api/whatsapp-webhook`**. After **`WHATSAPP_*`** env vars are set, users can open the profile menu → **WhatsApp**, verify a number, pick a default list, and send **IMDb links** on WhatsApp to add titles (same enrichment path as the bookmarklet, server-side). Unregistered numbers get a short reply with a link to the site.
