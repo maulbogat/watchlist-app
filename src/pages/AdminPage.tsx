@@ -199,6 +199,9 @@ const GCS_BACKUP_CONSOLE_URL =
 /** Admin Activity card — same workspace as Service Links → Axiom Dashboards. */
 const AXIOM_ACTIVITY_DASHBOARD_URL = "https://app.axiom.co/maulbogat-riv8/dashboards";
 
+const FIREBASE_FIRESTORE_USAGE_CONSOLE_URL =
+  "https://console.firebase.google.com/u/0/project/movie-trailer-site/firestore/usage";
+
 /** Success payload from `GET /api/external-status?service=axiom` (errors throw from `fetchAdminExternalStatus`). */
 type AxiomActivityResponse = {
   ok: true;
@@ -1281,7 +1284,7 @@ export function AdminPage() {
           ) : (
             <>
               <div className="admin-card admin-stat-card">
-                <div className="admin-stat-label">Firestore reads</div>
+                <div className="admin-stat-label">API Reads (server)</div>
                 <div
                   className={axiomFirestoreReadsValueClass(axiomActivityQ.data.firestoreReads)}
                   title="Green ≤ 40k, gold > 40k, red > 45k (rolling 24h sum of documentCount)"
@@ -1317,7 +1320,28 @@ export function AdminPage() {
       </section>
 
       <section className="admin-section">
-        <h2>Firestore Usage</h2>
+        <div className="admin-dq-heading-row">
+          <h2>Firestore Usage</h2>
+          <div className="admin-dq-refresh">
+            <Button type="button" variant="ghost" className="admin-dq-external-link" asChild>
+              <a href={FIREBASE_FIRESTORE_USAGE_CONSOLE_URL} target="_blank" rel="noopener noreferrer">
+                Firebase usage
+                <span aria-hidden="true"> ↗</span>
+              </a>
+            </Button>
+          </div>
+        </div>
+        <p
+          style={{
+            color: "var(--color-muted, var(--muted))",
+            fontSize: "var(--text-xs)",
+            margin: "0 0 0.65rem",
+            letterSpacing: "0.04em",
+            lineHeight: 1.35,
+          }}
+        >
+          Counts reads through kill switch guard only — not all reads.
+        </p>
         <div className="admin-grid admin-grid--stats admin-grid--usage">
           {firestoreUsageQ.isPending ? (
             <div className="admin-card admin-job-card admin-skeleton" />
