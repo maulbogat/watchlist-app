@@ -33,7 +33,7 @@ const GCS_BACKUP_BUCKET = "movie-trailer-site-backups";
 
 /** APL: dataset `watchlist-prod`, rolling 24h window (matches Admin “Activity” card). */
 const AXIOM_ACTIVITY_APL =
-  "['watchlist-prod'] | where _time > ago(24h) | summarize firestore_reads = sumif(documentCount, [`type`] == 'firestore.read'), api_calls = countif([`type`] == 'api.call'), user_actions = countif([`type`] == 'user.action'), errors = countif([`type`] == 'job.failed' or [`type`] == 'whatsapp.imdb.error'), titles_added = countif([`type`] == 'title.added')";
+  "['watchlist-prod'] | where _time > ago(24h) | summarize firestore_reads = sumif(documentCount, tostring(type) == 'firestore.read'), api_calls = countif(tostring(type) == 'api.call'), user_actions = countif(tostring(type) == 'user.action'), errors = countif(tostring(type) == 'job.failed' or tostring(type) == 'whatsapp.imdb.error'), titles_added = countif(tostring(type) == 'title.added')";
 
 const AXIOM_APL_QUERY_URL = "https://api.axiom.co/v1/datasets/_apl?format=tabular";
 
@@ -332,14 +332,14 @@ function parseAxiomTabularSummary(data) {
   if (!Array.isArray(fields) || !Array.isArray(columns) || columns.length === 0) {
     return { firestoreReads: 0, apiCalls: 0, userActions: 0, errors: 0, titlesAdded: 0 };
   }
-  const row = columns[0];
-  if (!Array.isArray(row)) return null;
   /** @type {Record<string, number>} */
   const by = {};
   for (let i = 0; i < fields.length; i += 1) {
     const f = fields[i];
     const name = f && typeof f === "object" && "name" in f ? String(f.name) : "";
-    if (name) by[name] = axiomNumber(row[i]);
+    const col = columns[i];
+    const cell = Array.isArray(col) ? col[0] : undefined;
+    if (name) by[name] = axiomNumber(cell);
   }
   return {
     firestoreReads: axiomNumber(by.firestore_reads),
