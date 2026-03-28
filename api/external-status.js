@@ -359,6 +359,8 @@ async function handleAxiom() {
     });
   }
 
+  const startTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
   let res;
   try {
     res = await fetch(AXIOM_APL_QUERY_URL, {
@@ -369,7 +371,7 @@ async function handleAxiom() {
       },
       body: JSON.stringify({
         apl: AXIOM_ACTIVITY_APL,
-        startTime: "-24h",
+        startTime,
       }),
     });
   } catch (e) {
