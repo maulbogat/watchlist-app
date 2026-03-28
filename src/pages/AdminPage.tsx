@@ -228,34 +228,49 @@ type SentryIssuesSummaryResponse = {
 };
 
 /** Production site origin (bookmarklet / admin links). Override with VITE_APP_ORIGIN when your host differs. */
-const DEFAULT_APP_ORIGIN = "https://watchlist-trailers.vercel.app";
+const DEFAULT_APP_ORIGIN = "https://movie-trailer-site.vercel.app";
 const appOrigin = (import.meta.env.VITE_APP_ORIGIN as string | undefined)?.trim() || DEFAULT_APP_ORIGIN;
+const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const switchHref = isLocal ? `${appOrigin}/admin` : `http://localhost:5173/admin`;
+const switchLabel = isLocal ? "Switch to prod" : "Switch to local";
 
-const SERVICE_LINKS = [
+/** Service Links row: single external URL, or grouped entry points under one card. */
+type AdminServiceLinkSingle = { label: string; sublabel: string; url: string };
+type AdminServiceLinkMulti = {
+  label: string;
+  sublabel: string;
+  links: ReadonlyArray<{ label: string; url: string }>;
+};
+type AdminServiceLinkEntry = AdminServiceLinkSingle | AdminServiceLinkMulti;
+
+const SERVICE_LINKS: readonly AdminServiceLinkEntry[] = [
   {
-    label: "Watchlist",
-    sublabel: "Production site",
-    url: `${appOrigin}/`,
-  },
-  {
-    label: "Firebase",
-    sublabel: "Firestore Data",
-    url: "https://console.firebase.google.com/u/0/project/movie-trailer-site/firestore/databases/-default-/data/",
-  },
-  {
-    label: "Google Cloud",
-    sublabel: "Firestore — allowedUsers (GCP console)",
-    url: "https://console.cloud.google.com/firestore/databases/-default-/data/panel/allowedUsers/geo80637@gmail.com?project=movie-trailer-site",
+    label: "Firestore",
+    sublabel: "Database",
+    links: [
+      {
+        label: "Firebase console",
+        url: "https://console.firebase.google.com/u/0/project/movie-trailer-site/firestore/databases/-default-/data/",
+      },
+      {
+        label: "GCP Studio",
+        url: "https://console.cloud.google.com/firestore/databases/-default-/data/panel/allowedUsers/geo80637@gmail.com?project=movie-trailer-site",
+      },
+    ],
   },
   {
     label: "Vercel",
-    sublabel: "env vars",
-    url: "https://vercel.com/maulbogats-projects/movie-trailer-site/settings/environment-variables",
-  },
-  {
-    label: "Vercel",
-    sublabel: "Function logs",
-    url: "https://vercel.com/maulbogats-projects/movie-trailer-site/logs",
+    sublabel: "Hosting",
+    links: [
+      {
+        label: "Env Vars",
+        url: "https://vercel.com/maulbogats-projects/movie-trailer-site/settings/environment-variables",
+      },
+      {
+        label: "Function Logs",
+        url: "https://vercel.com/maulbogats-projects/movie-trailer-site/logs",
+      },
+    ],
   },
   {
     label: "Resend",
@@ -264,33 +279,35 @@ const SERVICE_LINKS = [
   },
   {
     label: "Meta",
-    sublabel: "WhatsApp API",
-    url: "https://developers.facebook.com/apps/1104781941831455/use_cases/customize/wa-settings/?use_case_enum=WHATSAPP_BUSINESS_MESSAGING&product_route=whatsapp-business&business_id=762125852300048&selected_tab=wa-dev-console",
-  },
-  {
-    label: "Meta Business",
-    sublabel: "System users",
-    url: "https://business.facebook.com/latest/settings/system_users?business_id=762125852300048&selected_user_id=61576462286852",
+    sublabel: "WhatsApp",
+    links: [
+      {
+        label: "WhatsApp API",
+        url: "https://developers.facebook.com/apps/1104781941831455/use_cases/customize/wa-settings/?use_case_enum=WHATSAPP_BUSINESS_MESSAGING&product_route=whatsapp-business&business_id=762125852300048&selected_tab=wa-dev-console",
+      },
+      {
+        label: "System Users",
+        url: "https://business.facebook.com/latest/settings/system_users?business_id=762125852300048&selected_user_id=61576462286852",
+      },
+    ],
   },
   {
     label: "Google Cloud",
-    sublabel: "Billing",
-    url: "https://console.cloud.google.com/billing/0145FD-CB6342-6B19AD",
-  },
-  {
-    label: "Google Cloud",
-    sublabel: "Project dashboard",
-    url: "https://console.cloud.google.com/home/dashboard?project=movie-trailer-site",
-  },
-  {
-    label: "Google Cloud Storage",
-    sublabel: "Firestore backups (movie-trailer-site-backups)",
-    url: "https://console.cloud.google.com/storage/browser/movie-trailer-site-backups?project=movie-trailer-site",
-  },
-  {
-    label: "Cloud Scheduler",
-    sublabel: "firestore-daily-export (4am UTC)",
-    url: "https://console.cloud.google.com/cloudscheduler?project=movie-trailer-site",
+    sublabel: "Infrastructure",
+    links: [
+      {
+        label: "Project dashboard",
+        url: "https://console.cloud.google.com/home/dashboard?project=movie-trailer-site",
+      },
+      {
+        label: "Billing",
+        url: "https://console.cloud.google.com/billing/0145FD-CB6342-6B19AD",
+      },
+      {
+        label: "Cloud Scheduler",
+        url: "https://console.cloud.google.com/cloudscheduler?project=movie-trailer-site",
+      },
+    ],
   },
   {
     label: "Cloudflare",
@@ -329,26 +346,19 @@ const SERVICE_LINKS = [
   },
   {
     label: "Axiom",
-    sublabel: "Logs & Monitoring",
-    /* Avoid embedding the real dataset slug — it may match host secret scanners (e.g. AXIOM_DATASET) and fail the build. */
-    url: "https://app.axiom.co/",
+    sublabel: "Observability",
+    links: [
+      {
+        label: "Log Stream",
+        url: "https://app.axiom.co/maulbogat-riv8/stream/watchlist-prod",
+      },
+      {
+        label: "Monitors",
+        url: "https://app.axiom.co/maulbogat-riv8/monitors",
+      },
+    ],
   },
-  {
-    label: "Axiom",
-    sublabel: "Dashboards",
-    url: "https://app.axiom.co/maulbogat-riv8/dashboards",
-  },
-  {
-    label: "Axiom",
-    sublabel: "Monitors",
-    url: "https://app.axiom.co/maulbogat-riv8/monitors",
-  },
-  {
-    label: "Sentry",
-    sublabel: "Issues",
-    url: "https://maulbogat.sentry.io/issues/?project=4511121648058448",
-  },
-] as const;
+];
 
 const rawViteDeploymentsUrl = (import.meta.env.VITE_DEPLOYMENTS_URL as string | undefined)?.trim();
 const deploymentsUrl =
@@ -903,26 +913,54 @@ export function AdminPage() {
       <header className="admin-header">
         <h1>Admin</h1>
         <p className="admin-subtitle">{currentUser?.email || "Unknown email"}</p>
+        <a href={switchHref} className="admin-env-switch" target="_blank" rel="noopener noreferrer">
+          {switchLabel} ↗
+        </a>
       </header>
 
       <section className="admin-section">
         <h2>Service Links</h2>
         <div className="admin-grid admin-grid--links">
-          {SERVICE_LINKS.map((link) => (
-            <a
-              key={link.url}
-              className="admin-card admin-link-card"
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span className="admin-link-label">{link.label}</span>
-              <span className="admin-link-sublabel">{link.sublabel}</span>
-              <span className="admin-link-ext" aria-hidden="true">
-                ↗
-              </span>
-            </a>
-          ))}
+          {SERVICE_LINKS.map((entry) =>
+            "url" in entry ? (
+              <a
+                key={entry.url}
+                className="admin-card admin-link-card"
+                href={entry.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span className="admin-link-label">{entry.label}</span>
+                <span className="admin-link-sublabel">{entry.sublabel}</span>
+                <span className="admin-link-ext" aria-hidden="true">
+                  ↗
+                </span>
+              </a>
+            ) : (
+              <div
+                key={entry.links[0]?.url ?? entry.label}
+                className="admin-card admin-link-card admin-link-card--multi"
+              >
+                <span className="admin-link-label">{entry.label}</span>
+                <span className="admin-link-sublabel">{entry.sublabel}</span>
+                <ul className="admin-link-multi-list">
+                  {entry.links.map((row) => (
+                    <li key={row.url}>
+                      <a
+                        className="admin-link-multi-anchor"
+                        href={row.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {row.label}
+                        <span aria-hidden="true"> ↗</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ),
+          )}
         </div>
       </section>
 

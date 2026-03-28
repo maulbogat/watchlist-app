@@ -3178,6 +3178,19 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   letter-spacing: 0.04em;
 }
 
+.admin-env-switch {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.admin-env-switch:hover {
+  color: var(--color-accent);
+}
+
 .admin-section {
   margin-top: 1.2rem;
 }
@@ -3311,6 +3324,71 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   border-color: rgb(from var(--color-gold) r g b / 0.32);
   background: var(--surface2);
   transform: translateY(-1px);
+}
+
+.admin-link-card.admin-link-card--multi {
+  cursor: default;
+}
+
+.admin-link-card.admin-link-card--multi:hover {
+  border-color: var(--border);
+  background: var(--surface);
+  transform: none;
+}
+
+.admin-link-multi-list {
+  list-style: none;
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
+  margin-block: 0;
+  margin-inline: 0;
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.admin-link-multi-list li {
+  list-style: none;
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+/* Multi-link row: label left, ↗ pinned right (all Service Links multi cards). */
+.admin-link-multi-list .admin-link-multi-anchor,
+.admin-link-multi-list .admin-link-multi-anchor:link,
+.admin-link-multi-list .admin-link-multi-anchor:visited {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: inherit;
+  color: var(--color-accent);
+  text-decoration: none;
+  text-decoration-line: none;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  transition: opacity 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.admin-link-multi-list .admin-link-multi-anchor span[aria-hidden="true"] {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.admin-link-multi-list .admin-link-multi-anchor:hover {
+  opacity: 0.88;
+  text-decoration: underline;
+  text-decoration-line: underline;
+  text-decoration-color: rgb(from var(--color-gold) r g b / 0.45);
+  text-underline-offset: 3px;
 }
 
 .admin-link-label {
