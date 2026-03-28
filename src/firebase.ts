@@ -44,6 +44,7 @@ import type {
 
 type JobConfigState = {
   checkUpcomingEnabled: boolean;
+  githubBackupEnabled: boolean;
   lastRunAt: string | null;
   lastRunStatus: string | null;
   lastRunMessage: string | null;
@@ -1402,6 +1403,7 @@ async function getJobConfigState(): Promise<JobConfigState> {
     }
     return {
       checkUpcomingEnabled: data.config.checkUpcomingEnabled !== false,
+      githubBackupEnabled: data.config.githubBackupEnabled !== false,
       lastRunAt: data.config.lastRunAt ?? null,
       lastRunStatus: data.config.lastRunStatus ?? null,
       lastRunMessage: data.config.lastRunMessage ?? null,
@@ -1436,6 +1438,42 @@ async function setCheckUpcomingEnabledState(enabled: boolean): Promise<JobConfig
     }
     return {
       checkUpcomingEnabled: data.config.checkUpcomingEnabled !== false,
+      githubBackupEnabled: data.config.githubBackupEnabled !== false,
+      lastRunAt: data.config.lastRunAt ?? null,
+      lastRunStatus: data.config.lastRunStatus ?? null,
+      lastRunMessage: data.config.lastRunMessage ?? null,
+      lastRunResult: (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
+    };
+  } catch (err: unknown) {
+    if (err instanceof Error) throw err;
+    throw new Error(String(err || "Failed to update job config."));
+  }
+}
+
+async function setGithubBackupEnabledState(enabled: boolean): Promise<JobConfigState> {
+  try {
+    const res = await fetch("/api/admin-job-config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ githubBackupEnabled: enabled }),
+    });
+    const raw = await res.text();
+    let data: {
+      ok?: boolean;
+      error?: string;
+      config?: Partial<JobConfigState>;
+    } = {};
+    try {
+      data = raw ? (JSON.parse(raw) as typeof data) : {};
+    } catch {
+      // non-json function/proxy error
+    }
+    if (!res.ok || data.ok === false || !data.config) {
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+    return {
+      checkUpcomingEnabled: data.config.checkUpcomingEnabled !== false,
+      githubBackupEnabled: data.config.githubBackupEnabled !== false,
       lastRunAt: data.config.lastRunAt ?? null,
       lastRunStatus: data.config.lastRunStatus ?? null,
       lastRunMessage: data.config.lastRunMessage ?? null,
@@ -1485,6 +1523,7 @@ export {
   getJobConfigState,
   getFirestoreUsageStats,
   setCheckUpcomingEnabledState,
+  setGithubBackupEnabledState,
   getUserPhoneNumbers,
   addUserPhoneNumber,
   removeUserPhoneNumber,

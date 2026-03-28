@@ -102,6 +102,13 @@ async function backupUserPersonalLists(userIds) {
 }
 
 async function main() {
+  const jobConfigSnap = await db.collection("meta").doc("jobConfig").get();
+  const jobCfg = jobConfigSnap.exists ? jobConfigSnap.data() || {} : {};
+  if (jobCfg.githubBackupEnabled === false) {
+    console.log("GitHub backup is disabled — skipping");
+    process.exit(0);
+  }
+
   const args = process.argv.slice(2);
   const noAlerts = args.includes("--no-alerts");
   const outputPath =

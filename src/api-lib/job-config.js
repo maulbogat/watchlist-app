@@ -10,6 +10,7 @@ async function readJobConfig(db) {
   const data = snap.exists ? snap.data() || {} : {};
   return {
     checkUpcomingEnabled: data.checkUpcomingEnabled !== false,
+    githubBackupEnabled: data.githubBackupEnabled !== false,
     lastRunAt: data.lastRunAt || null,
     lastRunStatus: data.lastRunStatus || null,
     lastRunMessage: data.lastRunMessage || null,
@@ -21,6 +22,17 @@ async function setCheckUpcomingEnabled(db, enabled) {
   await jobConfigRef(db).set(
     {
       checkUpcomingEnabled: !!enabled,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+  return readJobConfig(db);
+}
+
+async function setGithubBackupEnabled(db, enabled) {
+  await jobConfigRef(db).set(
+    {
+      githubBackupEnabled: !!enabled,
       updatedAt: new Date().toISOString(),
     },
     { merge: true }
@@ -45,5 +57,6 @@ async function writeCheckUpcomingRunResult(db, payload) {
 module.exports = {
   readJobConfig,
   setCheckUpcomingEnabled,
+  setGithubBackupEnabled,
   writeCheckUpcomingRunResult,
 };

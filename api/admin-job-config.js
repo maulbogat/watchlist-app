@@ -1,6 +1,6 @@
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
-const { readJobConfig, setCheckUpcomingEnabled } = require("../src/api-lib/job-config");
+const { readJobConfig, setCheckUpcomingEnabled, setGithubBackupEnabled } = require("../src/api-lib/job-config");
 
 const APP_NAME = "watchlist-admin";
 
@@ -37,6 +37,7 @@ function toIsoOrNull(value) {
 function normalizeJobConfig(raw) {
   return {
     checkUpcomingEnabled: raw.checkUpcomingEnabled !== false,
+    githubBackupEnabled: raw.githubBackupEnabled !== false,
     lastRunAt: toIsoOrNull(raw.lastRunAt),
     lastRunStatus: raw.lastRunStatus || null,
     lastRunMessage: raw.lastRunMessage || null,
@@ -62,8 +63,21 @@ exports.handler = async (event) => {
 
     if (event.httpMethod === "POST") {
       const body = event.body ? JSON.parse(event.body) : {};
-      const enabled = Boolean(body?.checkUpcomingEnabled);
-      const cfg = await setCheckUpcomingEnabled(db, enabled);
+      const hasUpcoming = typeof body?.checkUpcomingEnabled === "boolean";
+      const hasGithub = typeof body?.githubBackupEnabled === "boolean";
+      if (!hasUpcoming && !hasGithub) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders(),
+          body: JSON.stringify({
+            ok: false,
+            error: "Body must include checkUpcomingEnabled and/or githubBackupEnabled as booleans",
+          }),
+        };
+      }
+      if (hasUpcoming) await setCheckUpcomingEnabled(db, body.checkUpcomingEnabled);
+      if (hasGithub) await setGithubBackupEnabled(db, body.githubBackupEnabled);
+      const cfg = await readJobConfig(db);
       return {
         statusCode: 200,
         headers: corsHeaders(),

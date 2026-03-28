@@ -4,6 +4,8 @@
 
 The daily **GitHub** job runs via GitHub Actions and saves a full Firestore snapshot to `backups/firestore-backup.json`.
 
+**Disable without editing the workflow:** set **`githubBackupEnabled`** to **`false`** on **`meta/jobConfig`** (Admin → System Status → GitHub Backup → Disable). The script exits immediately; the Actions run still completes successfully without updating the JSON file.
+
 ## One-time setup
 
 ### 1. Get your Firebase service account key

@@ -11,6 +11,7 @@ import {
   getFirestoreUsageStats,
   getJobConfigState,
   setCheckUpcomingEnabledState,
+  setGithubBackupEnabledState,
   type FirestoreUsageStats,
 } from "../firebase.js";
 import { getFirestore, collection, doc, getDoc, getCountFromServer, getDocs } from "firebase/firestore";
@@ -133,6 +134,7 @@ function buildDqPanelDefs(d: CatalogStats): DqPanelDef[] {
 
 type JobConfigState = {
   checkUpcomingEnabled: boolean;
+  githubBackupEnabled: boolean;
   lastRunAt: string | null;
   lastRunStatus: string | null;
   lastRunMessage: string | null;
@@ -786,6 +788,16 @@ export function AdminPage() {
     },
   });
 
+  const toggleGithubBackupMutation = useMutation({
+    mutationFn: async (enabled: boolean) => setGithubBackupEnabledState(enabled),
+    onSuccess: () => {
+      void jobConfigQ.refetch();
+    },
+    onError: (err: Error) => {
+      showRunNowResult(err.message || "Failed to update GitHub backup job state");
+    },
+  });
+
   const runNowMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/check-upcoming", {
@@ -1016,6 +1028,24 @@ export function AdminPage() {
                   ) : !githubBackupQ.data?.githubError ? (
                     <p className="admin-job-result">No runs recorded yet for this workflow.</p>
                   ) : null}
+                  {!jobConfigQ.isError ? (
+                    <div className="admin-job-row admin-job-row--status-line">
+                      <span className="admin-stat-label">BACKUP</span>
+                      {jobConfigQ.isPending ? (
+                        <span className="admin-job-value">Loading…</span>
+                      ) : (
+                        <span
+                          className={
+                            jobConfigQ.data?.githubBackupEnabled
+                              ? "admin-job-status admin-job-status--on"
+                              : "admin-job-status admin-job-status--off"
+                          }
+                        >
+                          {jobConfigQ.data?.githubBackupEnabled ? "Enabled" : "Disabled"}
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
                   <div className="admin-job-row admin-job-row--actions">
                     <div className="admin-job-actions">
                       {githubBackupQ.data?.lastRun ? (
@@ -1043,8 +1073,35 @@ export function AdminPage() {
                           <span aria-hidden="true"> ↗</span>
                         </a>
                       </Button>
+                      {!jobConfigQ.isError ? (
+                        <Button
+                          type="button"
+                          className="admin-job-toggle-btn"
+                          variant="outline"
+                          disabled={jobConfigQ.isPending || toggleGithubBackupMutation.isPending}
+                          onClick={() =>
+                            toggleGithubBackupMutation.mutate(!jobConfigQ.data?.githubBackupEnabled)
+                          }
+                        >
+                          {toggleGithubBackupMutation.isPending
+                            ? "Saving…"
+                            : jobConfigQ.data?.githubBackupEnabled
+                              ? "Disable"
+                              : "Enable"}
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
+                  {jobConfigQ.isError ? (
+                    <>
+                      <p className="admin-job-result">{jobErrorText}</p>
+                      <div className="admin-job-row admin-job-row--actions">
+                        <Button type="button" variant="outline" onClick={() => void jobConfigQ.refetch()}>
+                          Retry job config
+                        </Button>
+                      </div>
+                    </>
+                  ) : null}
                 </>
               )}
             </div>

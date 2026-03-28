@@ -167,7 +167,9 @@ Keep **`AXIOM_*` on the server** only; do not reintroduce **`VITE_AXIOM_*`**. If
 
 6. **Upcoming episodes / movies (optional UI):** Vercel **Cron** invokes **`/api/check-upcoming`** on the schedule in **`vercel.json`** (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The watchlist **Up next** section (see **Features**) renders those alerts as horizontal cards with poster, detail line, gold date, dismiss, and **`.ics`** download when dated. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
 
-   Job enable/disable is controlled in Firestore at `meta/jobConfig.checkUpcomingEnabled` (exposed in `/admin` Jobs section). The schedule remains on; when disabled, scheduled runs exit early.
+   Job enable/disable is controlled in Firestore at `meta/jobConfig.checkUpcomingEnabled` (exposed in `/admin` System Status). The schedule remains on; when disabled, scheduled runs exit early.
+
+   The **GitHub Actions** JSON backup (`scripts/backup-firestore.js`) honors `meta/jobConfig.githubBackupEnabled`: when set to **`false`** in Admin, the script logs and exits successfully so the workflow does not rewrite `backups/firestore-backup.json`. The workflow still runs on schedule unless you change it in GitHub.
 
    **If `curl …/api/check-upcoming` errors or times out:** the sync uses a **time budget + Firestore cursor** (`syncState/upcomingAlerts`, Admin-only — deploy updated **`firestore.rules`**). Use **Admin → Run now** (POST **`/api/check-upcoming`**) or cron until logs show **`completed":true`**. **`vercel.json`** sets **`maxDuration`** **60s** for the heaviest API routes.
 
