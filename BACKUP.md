@@ -1,6 +1,8 @@
 # Firestore Backup Setup
 
-The daily backup job runs via GitHub Actions and saves a full Firestore snapshot to `backups/firestore-backup.json`.
+**Two backups:** (1) **GitHub Actions** commits a JSON snapshot to `backups/firestore-backup.json` (this doc). (2) **Google Cloud Storage** holds **native Firestore exports** from **Cloud Scheduler** job **`firestore-daily-export`** (**4:00 UTC** daily) into bucket **`movie-trailer-site-backups`** (**europe-west1**), **OAuth** via **`firestore-scheduler`**; a **30-day** lifecycle rule deletes older objects. Open the bucket and job from **Admin → Service Links** or the GCP console.
+
+The daily **GitHub** job runs via GitHub Actions and saves a full Firestore snapshot to `backups/firestore-backup.json`.
 
 ## One-time setup
 
@@ -67,6 +69,8 @@ node scripts/restore-from-backup.js backups/firestore-backup-2025-03-20.json
 
 Backups are committed to `backups/firestore-backup.json` in the repo. Git history keeps previous versions if you need to roll back.
 
-## Admin page (latest run)
+## Admin page (latest run + GCP links)
 
 Signed-in **admin** users can see the latest GitHub Actions run for **Daily Firestore Backup** on the in-app **Admin** page. The API route **`/api/external-status?service=github`** calls the GitHub API; for **private** repos or steadier rate limits, set optional **`GITHUB_TOKEN`** (PAT with `actions: read`) and optional **`GITHUB_REPO`** (`owner/name`) in Vercel (or local `.env`) environment variables.
+
+**Service Links** on the same page also open **Google Cloud Storage** (**`movie-trailer-site-backups`**) and **Cloud Scheduler** ( **`firestore-daily-export`** ) for the native export path — no app env vars for those (see **`docs/environment.md`**).

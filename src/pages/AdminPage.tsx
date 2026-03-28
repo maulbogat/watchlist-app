@@ -190,6 +190,19 @@ type VercelDeploymentStatusResponse = {
   vercelHttpStatus?: number;
 };
 
+type GcsBackupHealthStatus = "success" | "warning" | "unknown";
+
+type GcsBackupStatusResponse = {
+  ok: boolean;
+  error?: string;
+  bucket?: string;
+  bucketUrl?: string;
+  lastExportAt: string | null;
+  folderName: string | null;
+  status: GcsBackupHealthStatus;
+  gcsError?: string;
+};
+
 /** Production site origin (bookmarklet / admin links). Override with VITE_APP_ORIGIN when your host differs. */
 const DEFAULT_APP_ORIGIN = "https://watchlist-trailers.vercel.app";
 const appOrigin = (import.meta.env.VITE_APP_ORIGIN as string | undefined)?.trim() || DEFAULT_APP_ORIGIN;
@@ -234,6 +247,21 @@ const SERVICE_LINKS = [
     label: "Google Cloud",
     sublabel: "Billing",
     url: "https://console.cloud.google.com/billing/0145FD-CB6342-6B19AD",
+  },
+  {
+    label: "Google Cloud",
+    sublabel: "Project dashboard",
+    url: "https://console.cloud.google.com/home/dashboard?project=movie-trailer-site",
+  },
+  {
+    label: "Google Cloud Storage",
+    sublabel: "Firestore backups (movie-trailer-site-backups)",
+    url: "https://console.cloud.google.com/storage/browser/movie-trailer-site-backups?project=movie-trailer-site",
+  },
+  {
+    label: "Cloud Scheduler",
+    sublabel: "firestore-daily-export (4am UTC)",
+    url: "https://console.cloud.google.com/cloudscheduler?project=movie-trailer-site",
   },
   {
     label: "Cloudflare",
@@ -378,6 +406,16 @@ function vercelStatusBadge(state: string): { label: string; className: string } 
     return { label: "—", className: "admin-job-value" };
   }
   return { label: s, className: "admin-job-status" };
+}
+
+function gcsBackupStatusBadge(status: GcsBackupHealthStatus): { label: string; className: string } {
+  if (status === "success") {
+    return { label: "SUCCESS", className: "admin-job-status admin-job-status--on" };
+  }
+  if (status === "warning") {
+    return { label: "WARNING", className: "admin-job-status admin-job-status--warn" };
+  }
+  return { label: "UNKNOWN", className: "admin-job-status" };
 }
 
 function AdminVercelDeploymentSummary({ dep }: { dep: VercelDeploymentLast }) {
@@ -665,6 +703,13 @@ export function AdminPage() {
     refetchOnMount: "always",
     enabled: !authLoading && userIsAdmin,
     queryFn: () => fetchAdminExternalStatus<VercelDeploymentStatusResponse>("/api/external-status?service=vercel"),
+  });
+
+  const gcsBackupQ = useQuery<GcsBackupStatusResponse>({
+    queryKey: ["admin", "external-status", "gcs"],
+    staleTime: 60 * 1000,
+    enabled: !authLoading && userIsAdmin,
+    queryFn: () => fetchAdminExternalStatus<GcsBackupStatusResponse>("/api/external-status?service=gcs"),
   });
 
   const [runNowResult, setRunNowResult] = useState<string | null>(null);
@@ -1166,6 +1211,85 @@ export function AdminPage() {
                           Workflow & history
                           <span aria-hidden="true"> ↗</span>
                         </a>
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="admin-jobs-deploy-col">
+            <h2>GCS backup</h2>
+            <div className="admin-card admin-job-card">
+              {gcsBackupQ.isPending ? (
+                <p className="admin-job-result">Loading export folder status…</p>
+              ) : gcsBackupQ.isError ? (
+                <div className="admin-job-row admin-job-row--actions">
+                  <p className="admin-job-result">
+                    {gcsBackupQ.error instanceof Error ? gcsBackupQ.error.message : "Could not load status."}
+                  </p>
+                  <Button type="button" variant="outline" onClick={() => void gcsBackupQ.refetch()}>
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {gcsBackupQ.data?.gcsError ? (
+                    <p className="admin-job-result admin-github-backup-warning">{gcsBackupQ.data.gcsError}</p>
+                  ) : null}
+                  <div className="admin-job-row admin-job-row--status-line">
+                    <span className="admin-stat-label">Status</span>
+                    <span className={gcsBackupStatusBadge(gcsBackupQ.data?.status ?? "unknown").className}>
+                      {gcsBackupStatusBadge(gcsBackupQ.data?.status ?? "unknown").label}
+                    </span>
+                  </div>
+                  <div className="admin-job-row">
+                    <span className="admin-stat-label">Last export</span>
+                    <span className="admin-job-value">
+                      {gcsBackupQ.data?.lastExportAt
+                        ? formatDateTime(toEpochMs(gcsBackupQ.data.lastExportAt)) || gcsBackupQ.data.lastExportAt
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="admin-job-row admin-job-row--align-start">
+                    <span className="admin-stat-label">Folder</span>
+                    <span className="admin-job-value admin-job-value--mono-wrap">
+                      {gcsBackupQ.data?.folderName?.trim() ? gcsBackupQ.data.folderName : "—"}
+                    </span>
+                  </div>
+                  {!gcsBackupQ.data?.folderName && !gcsBackupQ.data?.gcsError ? (
+                    <p className="admin-job-result">No export prefixes found in the bucket yet.</p>
+                  ) : null}
+                  <div className="admin-job-row admin-job-row--actions">
+                    <div className="admin-job-actions">
+                      <Button type="button" variant="outline" className="admin-job-run-btn" asChild>
+                        <a
+                          href={
+                            gcsBackupQ.data?.bucketUrl ||
+                            "https://console.cloud.google.com/storage/browser/movie-trailer-site-backups?project=movie-trailer-site"
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open bucket
+                          <span aria-hidden="true"> ↗</span>
+                        </a>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="admin-job-toggle-btn"
+                        disabled={gcsBackupQ.isFetching}
+                        onClick={() => void gcsBackupQ.refetch()}
+                      >
+                        {gcsBackupQ.isFetching ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" aria-hidden />
+                            Refreshing…
+                          </>
+                        ) : (
+                          "Refresh"
+                        )}
                       </Button>
                     </div>
                   </div>

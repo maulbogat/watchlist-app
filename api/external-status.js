@@ -1,5 +1,5 @@
 /**
- * Admin-only external status (query: ?service=github | ?service=vercel).
+ * Admin-only external status (query: ?service=github | ?service=vercel | ?service=gcs).
  * Requires `Authorization: Bearer <Firebase ID token>` and an admin UID.
  *
  * github — latest GitHub Actions run for Firestore backup (`backup.yml`).
@@ -7,11 +7,20 @@
  *
  * vercel — latest deployment for the project.
  *   Env: `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` (503 if either missing).
+ *
+ * gcs — latest Firestore native export folder in `movie-trailer-site-backups` (top-level prefixes).
+ *   Uses `FIREBASE_SERVICE_ACCOUNT` with `@google-cloud/storage`. Service account needs
+ *   `storage.objects.list` on the bucket (e.g. Storage Object Viewer).
+ *   Returns: `lastExportAt`, `folderName`, `status` — `success` (export today or yesterday UTC),
+ *   `warning` (older), `unknown` (empty / unparseable).
  */
 
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
+const { Storage } = require("@google-cloud/storage");
 const { ADMIN_UIDS } = require("../src/api-lib/admin-uids");
+
+const GCS_BACKUP_BUCKET = "movie-trailer-site-backups";
 
 const APP_NAME = "watchlist-admin";
 const WORKFLOW_FILE = "backup.yml";
@@ -196,6 +205,174 @@ async function handleVercel() {
   });
 }
 
+/**
+ * Parse export folder name (e.g. Firestore default `YYYY-MM-DDTHH:MM:SS_…`) to UTC ms, or null.
+ * @param {string} folderName
+ * @returns {number | null}
+ */
+function parseExportFolderToUtcMs(folderName) {
+  if (!folderName || typeof folderName !== "string") return null;
+  const trimmed = folderName.trim();
+  const isoPrefix = trimmed.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/);
+  if (isoPrefix) {
+    const ms = Date.parse(`${isoPrefix[1]}Z`);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  const beforeUs = trimmed.split("_")[0];
+  if (beforeUs && beforeUs !== trimmed) {
+    const ms2 = Date.parse(beforeUs.endsWith("Z") ? beforeUs : `${beforeUs}Z`);
+    if (!Number.isNaN(ms2)) return ms2;
+  }
+  const ms3 = Date.parse(trimmed);
+  if (!Number.isNaN(ms3)) return ms3;
+  return null;
+}
+
+/**
+ * @param {import('@google-cloud/storage').Bucket} bucket
+ * @param {string} folderName
+ * @returns {Promise<number | null>}
+ */
+async function newestObjectMsUnderPrefix(bucket, folderName) {
+  const prefix = `${folderName}/`;
+  const [files] = await bucket.getFiles({ prefix, maxResults: 1, autoPaginate: false });
+  const f = files && files[0];
+  if (!f) return null;
+  const [meta] = await f.getMetadata();
+  const raw = meta.updated || meta.timeCreated;
+  if (!raw) return null;
+  const ms = new Date(raw).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
+ * @param {import('@google-cloud/storage').Bucket} bucket
+ * @returns {Promise<string[]>}
+ */
+async function listTopLevelExportPrefixes(bucket) {
+  const names = [];
+  /** @type {Record<string, unknown>} */
+  let query = { autoPaginate: false, delimiter: "/" };
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const [, nextQuery, apiResponse] = await bucket.getFiles(query);
+    const prefs = apiResponse && Array.isArray(apiResponse.prefixes) ? apiResponse.prefixes : [];
+    for (const p of prefs) {
+      const n = String(p).replace(/\/$/, "").trim();
+      if (n) names.push(n);
+    }
+    if (!nextQuery || typeof nextQuery !== "object") break;
+    query = nextQuery;
+  }
+  return names;
+}
+
+function gcsExportHealthStatus(lastExportMs) {
+  if (lastExportMs == null || !Number.isFinite(lastExportMs)) return "unknown";
+  const now = new Date();
+  const startTodayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const startYesterdayUtc = startTodayUtc - 86400000;
+  if (lastExportMs >= startYesterdayUtc) return "success";
+  return "warning";
+}
+
+async function handleGcs() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw || !String(raw).trim()) {
+    return json(503, {
+      ok: false,
+      error: "FIREBASE_SERVICE_ACCOUNT is not set; it is required to read GCS backup status.",
+    });
+  }
+
+  let key;
+  try {
+    key = JSON.parse(Buffer.from(raw, "base64").toString("utf-8"));
+  } catch (e) {
+    return json(503, {
+      ok: false,
+      error: e instanceof Error ? e.message : "Invalid FIREBASE_SERVICE_ACCOUNT JSON",
+    });
+  }
+
+  const projectId = key.project_id || "movie-trailer-site";
+  const bucketUrl = `https://console.cloud.google.com/storage/browser/${GCS_BACKUP_BUCKET}?project=${encodeURIComponent(
+    projectId
+  )}`;
+
+  let storage;
+  try {
+    storage = new Storage({
+      projectId,
+      credentials: key,
+    });
+  } catch (e) {
+    return json(200, {
+      ok: true,
+      bucket: GCS_BACKUP_BUCKET,
+      bucketUrl,
+      lastExportAt: null,
+      folderName: null,
+      status: "unknown",
+      gcsError: e instanceof Error ? e.message : "Could not init Storage client",
+    });
+  }
+
+  const bucket = storage.bucket(GCS_BACKUP_BUCKET);
+
+  try {
+    const prefixes = await listTopLevelExportPrefixes(bucket);
+    if (prefixes.length === 0) {
+      return json(200, {
+        ok: true,
+        bucket: GCS_BACKUP_BUCKET,
+        bucketUrl,
+        lastExportAt: null,
+        folderName: null,
+        status: "unknown",
+      });
+    }
+
+    prefixes.sort((a, b) => {
+      const ma = parseExportFolderToUtcMs(a);
+      const mb = parseExportFolderToUtcMs(b);
+      if (ma != null && mb != null && ma !== mb) return mb - ma;
+      if (ma != null && mb == null) return -1;
+      if (ma == null && mb != null) return 1;
+      return b.localeCompare(a);
+    });
+
+    const folderName = prefixes[0];
+    let lastMs = parseExportFolderToUtcMs(folderName);
+    if (lastMs == null) {
+      lastMs = await newestObjectMsUnderPrefix(bucket, folderName);
+    }
+
+    const lastExportAt = lastMs != null && Number.isFinite(lastMs) ? new Date(lastMs).toISOString() : null;
+    const status = gcsExportHealthStatus(lastMs);
+
+    return json(200, {
+      ok: true,
+      bucket: GCS_BACKUP_BUCKET,
+      bucketUrl,
+      lastExportAt,
+      folderName,
+      status,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "GCS list failed";
+    return json(200, {
+      ok: true,
+      bucket: GCS_BACKUP_BUCKET,
+      bucketUrl,
+      lastExportAt: null,
+      folderName: null,
+      status: "unknown",
+      gcsError: msg,
+    });
+  }
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders() };
@@ -230,10 +407,13 @@ exports.handler = async (event) => {
   if (service === "vercel") {
     return handleVercel();
   }
+  if (service === "gcs") {
+    return handleGcs();
+  }
 
   return json(400, {
     ok: false,
-    error: 'Missing or invalid query: use ?service=github or ?service=vercel',
+    error: "Missing or invalid query: use ?service=github, ?service=vercel, or ?service=gcs",
   });
 };
 

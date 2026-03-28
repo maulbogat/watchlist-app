@@ -239,7 +239,16 @@ Get your UID: `node scripts/list-users.js` or Firebase Console → Authenticatio
 
 Requires `serviceAccountKey.json` in project root, or `FIREBASE_SERVICE_ACCOUNT` env var.
 
-## Export Firestore to JSON (inspect / `grep` / `rg`)
+## Firestore backups
+
+There are **two** backup paths:
+
+The **GitHub Actions** JSON snapshot and the **Google Cloud Storage** native export complement each other: JSON in the repo for search and review, and GCS for scheduled full-database disaster recovery.
+
+1. **JSON snapshot** — local script and/or **GitHub Actions** commit a searchable **`backups/firestore-backup.json`** (see **[`BACKUP.md`](./BACKUP.md)** for the workflow).
+2. **Native export (Google Cloud Storage)** — **Cloud Scheduler** job **`firestore-daily-export`** runs daily at **4:00 UTC** and writes Firestore export output to bucket **`movie-trailer-site-backups`** (**europe-west1**), authenticated with **OAuth** via the **`firestore-scheduler`** service account. A **30-day** lifecycle rule removes objects older than **30 days**. Open the bucket and scheduler from **Admin → Service Links** (**Google Cloud Storage**, **Cloud Scheduler**) or the GCP console.
+
+### Export Firestore to JSON (inspect / `grep` / `rg`)
 
 Pull **titleRegistry**, **upcomingAlerts**, **sharedLists**, **users**, **allowedUsers**, **invites**, **phoneIndex**, **upcomingChecks**, and each user’s **personalLists** subcollection into one file:
 
@@ -310,7 +319,7 @@ Many scripts expect **`TMDB_API_KEY`**, **`FIREBASE_SERVICE_ACCOUNT`** (base64) 
 - **Shared lists:** create; share **`/join/:listId`** from the post-create dialog (**join still requires a matching email invite**); optional list on the same email as app access; bookmarklet targets the list you’re viewing.
 - **App access:** **`allowedUsers`** + **`/join-app/:inviteId`**; profile menu **Bookmarklet** dialog (instructions + drag button; moved out of manage lists).
 - **WhatsApp adds:** verified numbers and per-number default list (**`phoneIndex`** + **`users/{uid}.phoneNumbers`**); inbound messages handled by **`/api/whatsapp-webhook`** (signature, rate limit, and quota guard — see **Vercel deployment**).
-- **Admin (`/admin`, admin users only):** Firestore read **quota usage** bars, **Data Quality** stats (optional **`meta/catalogHealthExclusions`** doc with **`missingTmdbId`** array to omit known no-TMDB titles from missing-`tmdbId` counts/lists), catalog/upcoming stats, upcoming job toggle, GitHub backup workflow status, and **Service Links** (production site, Firebase, **Vercel env vars**, **Meta WhatsApp** dev console, **Google Cloud billing**, GitHub, TMDB, Trakt, etc.).
+- **Admin (`/admin`, admin users only):** Firestore read **quota usage** bars, **Data Quality** stats (optional **`meta/catalogHealthExclusions`** doc with **`missingTmdbId`** array to omit known no-TMDB titles from missing-`tmdbId` counts/lists), catalog/upcoming stats, upcoming job toggle, GitHub backup workflow status, and **Service Links** (production site, Firebase, **Vercel env vars**, **Meta WhatsApp** dev console, **Google Cloud** billing + **project dashboard** + **Cloud Storage** backup bucket + **Cloud Scheduler** (Firestore export job), GitHub, TMDB, Trakt, etc.).
 - **Status tabs:** **All**, **To Watch** (**includes “maybe later”** rows), **Watched**, **Archive** — persisted in Firestore. **Recently Added** is no longer a separate tab; use **sort** options **Date Added (New → Old)** and **Date Added (Old → New)**.
 - **Filters:** Movies / TV / Both (segmented), **genre** as a **single-select list** (Radix Popover, two-row toolbar with **Added by** on **shared lists only**), persisted per account in **localStorage** (with session restore).
 - **Country / region:** set in app for TMDB **watch providers** at add time; **service chips** on cards (e.g. Netflix, Prime).

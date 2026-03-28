@@ -3172,9 +3172,9 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   }
 }
 
-@media (min-width: 1100px) {
+@media (min-width: 1280px) {
   .admin-section--jobs-deploy .admin-jobs-deploy-grid {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -3688,6 +3688,13 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   border-color: rgba(231, 76, 60, 0.45);
   color: #e74c3c;
   background: rgba(231, 76, 60, 0.1);
+}
+
+/* GCS backup freshness — warning (older than ~2 UTC days), design token */
+.admin-job-status--warn {
+  border-color: rgb(from var(--color-gold) r g b / 0.45);
+  color: var(--color-gold);
+  background: rgb(from var(--color-gold) r g b / 0.1);
 }
 
 .admin-job-toggle-btn {

@@ -91,5 +91,6 @@ Keep **names identical** to Vercel so behavior matches.
 | **Email app invites** | `RESEND_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `APP_PUBLIC_URL` (or `VERCEL_URL`); optional `RESEND_FROM_EMAIL` — all via **`/api/invites`** |
 | **Admin GitHub backup status** | `GITHUB_TOKEN` optional for public repo; often required for private — **`/api/external-status?service=github`** |
 | **Admin Vercel deployment status** | `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` — **`/api/external-status?service=vercel`** |
+| **GCS Firestore native export** (bucket **`movie-trailer-site-backups`**, Scheduler **`firestore-daily-export`**) | **None** — IAM, lifecycle, and job live in Google Cloud only; no new keys in **`.env`** or Vercel for this path. |
 
 Nothing in the app expects **`VITE_AXIOM_*`**.
