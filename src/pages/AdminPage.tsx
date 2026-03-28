@@ -201,6 +201,32 @@ type GcsBackupStatusResponse = {
 const GCS_BACKUP_CONSOLE_URL =
   "https://console.cloud.google.com/storage/browser/movie-trailer-site-backups";
 
+/** Admin Activity card — same workspace as Service Links → Axiom Dashboards. */
+const AXIOM_ACTIVITY_DASHBOARD_URL = "https://app.axiom.co/maulbogat-riv8/dashboards";
+
+/** Success payload from `GET /api/external-status?service=axiom` (errors throw from `fetchAdminExternalStatus`). */
+type AxiomActivityResponse = {
+  ok: true;
+  firestoreReads: number;
+  apiCalls: number;
+  userActions: number;
+  errors: number;
+  titlesAdded: number;
+  period: "24h";
+};
+
+const ACTIVITY_STAT_CARD_COUNT = 5;
+
+/** Admin Sentry card — issues list (same org as Service Links). */
+const SENTRY_ISSUES_HUB_URL = "https://maulbogat.sentry.io/issues/";
+
+/** Success payload from `GET /api/external-status?service=sentry` (errors throw from `fetchAdminExternalStatus`). */
+type SentryIssuesSummaryResponse = {
+  ok: true;
+  errorCount: number;
+  period: "24h";
+};
+
 /** Production site origin (bookmarklet / admin links). Override with VITE_APP_ORIGIN when your host differs. */
 const DEFAULT_APP_ORIGIN = "https://watchlist-trailers.vercel.app";
 const appOrigin = (import.meta.env.VITE_APP_ORIGIN as string | undefined)?.trim() || DEFAULT_APP_ORIGIN;
@@ -317,6 +343,11 @@ const SERVICE_LINKS = [
     sublabel: "Monitors",
     url: "https://app.axiom.co/maulbogat-riv8/monitors",
   },
+  {
+    label: "Sentry",
+    sublabel: "Issues",
+    url: "https://maulbogat.sentry.io/issues/?project=4511121648058448",
+  },
 ] as const;
 
 const rawViteDeploymentsUrl = (import.meta.env.VITE_DEPLOYMENTS_URL as string | undefined)?.trim();
@@ -426,6 +457,29 @@ function gcsBackupStatusBadge(status: "success" | "warning"): { label: string; c
     return { label: "SUCCESS", className: "admin-job-status admin-job-status--on" };
   }
   return { label: "WARNING", className: "admin-job-status admin-job-status--warn" };
+}
+
+/** Firestore read sum vs daily quota bands (green / gold / red). */
+function axiomFirestoreReadsValueClass(n: number): string {
+  if (n > 45000) return "admin-stat-value admin-stat-value--dq-critical";
+  if (n > 40000) return "admin-stat-value admin-stat-value--dq-warn";
+  return "admin-stat-value admin-stat-value--dq-ok";
+}
+
+function axiomErrorsValueDisplay(count: number): { className: string; content: string } {
+  if (count === 0) {
+    return { className: "admin-stat-value admin-stat-value--dq-ok", content: "✓" };
+  }
+  return { className: "admin-stat-value admin-stat-value--dq-critical", content: String(count) };
+}
+
+function AxiomActivityErrorsStat({ count }: { count: number }) {
+  const e = axiomErrorsValueDisplay(count);
+  return (
+    <div className={e.className} aria-label={count === 0 ? "No errors" : undefined}>
+      {e.content}
+    </div>
+  );
 }
 
 function AdminVercelDeploymentSummary({ dep }: { dep: VercelDeploymentLast }) {
@@ -722,6 +776,23 @@ export function AdminPage() {
     queryFn: () => fetchAdminExternalStatus<GcsBackupStatusResponse>("/api/external-status?service=gcs"),
   });
 
+  const axiomActivityQ = useQuery<AxiomActivityResponse>({
+    queryKey: ["admin", "external-status", "axiom"],
+    staleTime: 0,
+    refetchOnMount: "always",
+    enabled: !authLoading && userIsAdmin,
+    queryFn: () => fetchAdminExternalStatus<AxiomActivityResponse>("/api/external-status?service=axiom"),
+  });
+
+  const sentryIssuesQ = useQuery<SentryIssuesSummaryResponse>({
+    queryKey: ["admin", "external-status", "sentry"],
+    staleTime: 0,
+    refetchOnMount: "always",
+    enabled: !authLoading && userIsAdmin,
+    queryFn: () =>
+      fetchAdminExternalStatus<SentryIssuesSummaryResponse>("/api/external-status?service=sentry"),
+  });
+
   const [runNowResult, setRunNowResult] = useState<string | null>(null);
   const runNowTimerRef = useRef<number | null>(null);
   useEffect(() => {
@@ -852,6 +923,89 @@ export function AdminPage() {
               </span>
             </a>
           ))}
+        </div>
+      </section>
+
+      <section className="admin-section">
+        <div className="admin-dq-heading-row">
+          <h2>ACTIVITY (LAST 24H)</h2>
+          <div className="admin-dq-refresh">
+            <Button type="button" variant="outline" className="admin-job-run-btn" asChild>
+              <a href={AXIOM_ACTIVITY_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
+                Axiom dashboard
+                <span aria-hidden="true"> ↗</span>
+              </a>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={axiomActivityQ.isPending || axiomActivityQ.isFetching}
+              onClick={() => void axiomActivityQ.refetch()}
+            >
+              {axiomActivityQ.isFetching ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  Refreshing…
+                </>
+              ) : (
+                "Refresh"
+              )}
+            </Button>
+          </div>
+        </div>
+        <div className="admin-grid admin-grid--stats">
+          {axiomActivityQ.isPending ? (
+            Array.from({ length: ACTIVITY_STAT_CARD_COUNT }).map((_, idx) => (
+              <div key={`axiom-activity-skeleton-${idx}`} className="admin-card admin-stat-card admin-skeleton" />
+            ))
+          ) : axiomActivityQ.isError ? (
+            <div className="admin-card admin-job-card">
+              <p className="admin-job-result" role="alert">
+                {axiomActivityQ.error instanceof Error
+                  ? axiomActivityQ.error.message
+                  : "Could not load Axiom activity."}
+              </p>
+              <div className="admin-job-row admin-job-row--actions">
+                <Button type="button" variant="outline" onClick={() => void axiomActivityQ.refetch()}>
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="admin-card admin-stat-card">
+                <div className="admin-stat-label">Firestore reads</div>
+                <div
+                  className={axiomFirestoreReadsValueClass(axiomActivityQ.data.firestoreReads)}
+                  title="Green ≤ 40k, gold > 40k, red > 45k (rolling 24h sum of documentCount)"
+                >
+                  {Math.round(axiomActivityQ.data.firestoreReads).toLocaleString()}
+                </div>
+              </div>
+              <div className="admin-card admin-stat-card">
+                <div className="admin-stat-label">API calls</div>
+                <div className="admin-stat-value">
+                  {Math.round(axiomActivityQ.data.apiCalls).toLocaleString()}
+                </div>
+              </div>
+              <div className="admin-card admin-stat-card">
+                <div className="admin-stat-label">User actions</div>
+                <div className="admin-stat-value">
+                  {Math.round(axiomActivityQ.data.userActions).toLocaleString()}
+                </div>
+              </div>
+              <div className="admin-card admin-stat-card">
+                <div className="admin-stat-label">Titles added</div>
+                <div className="admin-stat-value">
+                  {Math.round(axiomActivityQ.data.titlesAdded).toLocaleString()}
+                </div>
+              </div>
+              <div className="admin-card admin-stat-card">
+                <div className="admin-stat-label">Errors</div>
+                <AxiomActivityErrorsStat count={axiomActivityQ.data.errors} />
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -1291,6 +1445,71 @@ export function AdminPage() {
                 </>
               )}
             </div>
+          </div>
+          <div className="admin-jobs-deploy-col">
+            <h2>SENTRY — LAST 24H</h2>
+            {sentryIssuesQ.isPending ? (
+              <div className="admin-card admin-job-card admin-skeleton" aria-hidden />
+            ) : (
+              <div className="admin-card admin-job-card">
+                {sentryIssuesQ.isError ? (
+                  <div className="admin-job-row admin-job-row--actions">
+                    <p className="admin-job-result">
+                      {sentryIssuesQ.error instanceof Error
+                        ? sentryIssuesQ.error.message
+                        : "Could not load Sentry status."}
+                    </p>
+                    <Button type="button" variant="outline" onClick={() => void sentryIssuesQ.refetch()}>
+                      Retry
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="admin-job-row admin-job-row--status-line">
+                      <span className="admin-stat-label">Open issues</span>
+                      {sentryIssuesQ.data.errorCount === 0 ? (
+                        <span className="admin-job-status admin-job-status--on" aria-label="No errors">
+                          ✓ No errors
+                        </span>
+                      ) : (
+                        <span className="admin-job-status admin-job-status--failure">
+                          {sentryIssuesQ.data.errorCount.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <p className="admin-job-result">
+                      Unresolved issues with events in the last 24h (up to 100 from the API).
+                    </p>
+                    <div className="admin-job-row admin-job-row--actions">
+                      <div className="admin-job-actions">
+                        <Button type="button" variant="outline" className="admin-job-run-btn" asChild>
+                          <a href={SENTRY_ISSUES_HUB_URL} target="_blank" rel="noopener noreferrer">
+                            Open Sentry
+                            <span aria-hidden="true"> ↗</span>
+                          </a>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="admin-job-toggle-btn"
+                          disabled={sentryIssuesQ.isFetching}
+                          onClick={() => void sentryIssuesQ.refetch()}
+                        >
+                          {sentryIssuesQ.isFetching ? (
+                            <>
+                              <Loader2 className="size-4 animate-spin" aria-hidden />
+                              Refreshing…
+                            </>
+                          ) : (
+                            "Refresh"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           <div className="admin-jobs-deploy-col">
             <h2>Deployments</h2>

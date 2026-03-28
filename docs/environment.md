@@ -51,9 +51,11 @@ Read at **runtime** by **`api/*.js`** on Vercel (and by **`vercel dev`** / local
 | `FIRESTORE_DAILY_READ_LIMIT` | Optional — default **45000**; same guard for UTC calendar day |
 | `TMDB_API_KEY` | `check-upcoming`, `trigger-upcoming-sync`, `add-from-imdb`, `catalog-health`, scripts |
 | `OMDB_API_KEY` | `add-from-imdb` |
-| `AXIOM_TOKEN` | Server-side Axiom ingest (`log-client-event`, function loggers) |
-| `AXIOM_DATASET` | Axiom dataset name |
+| `AXIOM_TOKEN` | Server-side Axiom ingest (`log-client-event`, function loggers) and **`GET /api/external-status?service=axiom`** (Admin **Activity** APL query on **`watchlist-prod`**) |
+| `AXIOM_DATASET` | Axiom dataset name (ingest target in **`src/api-lib/logger.js`**; Admin activity query uses dataset **`watchlist-prod`** in APL, not this env var) |
 | `SENTRY_DSN` | Optional — **`api/add-from-imdb.js`** and **`api/whatsapp-webhook.js`** only (**`src/api-lib/sentry-node.js`**); no-op if unset |
+| `SENTRY_READ_TOKEN` | Optional — **`GET /api/external-status?service=sentry`** (Admin **SENTRY — LAST 24H** card); Sentry API auth with **read** scope; **503** on that route if unset |
+| `SENTRY_PROJECT` | Optional — same route — Sentry **project slug** under org **`maulbogat`** (issues list path). Unset → **`{ ok: false, error }`** (not **503**) |
 | `UPCOMING_SYNC_TRIGGER_SECRET` | Optional — bearer auth for **`/api/trigger-upcoming-sync`** |
 | `GITHUB_TOKEN` | Optional — **`/api/external-status?service=github`** (private repo or higher GitHub API rate limits) |
 | `GITHUB_REPO` | Optional — override `owner/repo` for backup workflow discovery |
@@ -90,6 +92,7 @@ Keep **names identical** to Vercel so behavior matches.
 | **Bookmarklet / `add-from-imdb`** | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY` |
 | **Scheduled / manual upcoming sync** | `TMDB_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, deployed Firestore rules |
 | **Client → Axiom** | `AXIOM_*`, `FIREBASE_SERVICE_ACCOUNT` (token verification on **`log-client-event`**) |
+| **Admin Axiom activity (24h)** | `AXIOM_TOKEN` — **`/api/external-status?service=axiom`** (dataset **`watchlist-prod`** in APL) |
 | **Admin Netlify badge (legacy)** | `VITE_NETLIFY_SITE_ID` |
 | **WhatsApp link + inbound messages** | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` |
 | **Email app invites** | `RESEND_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `APP_PUBLIC_URL` (or `VERCEL_URL`); optional `RESEND_FROM_EMAIL` — all via **`/api/invites`** |
@@ -97,6 +100,6 @@ Keep **names identical** to Vercel so behavior matches.
 | **Admin Vercel deployment status** | `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` — **`/api/external-status?service=vercel`** |
 | **Admin GCS backup status** | `FIREBASE_SERVICE_ACCOUNT` — **`/api/external-status?service=gcs`**; IAM on **`movie-trailer-site-backups`** must allow **`storage.objects.list`** for that service account |
 | **GCS Firestore native export** (bucket **`movie-trailer-site-backups`**, Scheduler **`firestore-daily-export`**) | **None** in app env for the scheduled job itself — IAM, lifecycle, and job live in Google Cloud; the **Admin** card reuses **`FIREBASE_SERVICE_ACCOUNT`** as above. |
-| **Sentry (errors)** | Optional **`VITE_SENTRY_DSN`** (client) + optional **`SENTRY_DSN`** (two API routes); optional **`SENTRY_AUTH_TOKEN`**, **`SENTRY_ORG`**, **`SENTRY_PROJECT`** for build-time source map upload |
+| **Sentry (errors)** | Optional **`VITE_SENTRY_DSN`** (client) + optional **`SENTRY_DSN`** (two API routes); optional **`SENTRY_READ_TOKEN`** + **`SENTRY_PROJECT`** (Admin issues count); optional **`SENTRY_AUTH_TOKEN`**, **`SENTRY_ORG`**, **`SENTRY_PROJECT`** for build-time source map upload |
 
 Nothing in the app expects **`VITE_AXIOM_*`**.

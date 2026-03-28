@@ -1,5 +1,5 @@
 /**
- * Admin-only external status (query: ?service=github | ?service=vercel | ?service=gcs).
+ * Admin-only external status (query: ?service=github | ?service=vercel | ?service=gcs | ?service=axiom | ?service=sentry).
  * Requires `Authorization: Bearer <Firebase ID token>` and an admin UID.
  *
  * github — latest GitHub Actions run for Firestore backup (`backup.yml`).
@@ -13,6 +13,15 @@
  *   `storage.objects.list` on the bucket (e.g. Storage Object Viewer).
  *   Success: `{ ok: true, lastExportAt, folderName, status }` — `success` if newest export
  *   is within **48 hours**, else `warning`. Failure: `{ ok: false, error }`.
+ *
+ * axiom — last **24h** activity summary from dataset **`watchlist-prod`** via Axiom APL.
+ *   POST `https://api.axiom.co/v1/datasets/_apl?format=tabular` (APL API; same query as dataset-scoped `/query` would use if it accepted raw APL).
+ *   Env: `AXIOM_TOKEN` (503 if missing).
+ *   Success: `{ ok: true, firestoreReads, apiCalls, userActions, errors, titlesAdded, period: '24h' }`.
+ *
+ * sentry — unresolved issue count (last **24h**, max **100** from API) for org **`maulbogat`**.
+ *   GET Sentry REST; env: **`SENTRY_READ_TOKEN`** (**503** if missing), **`SENTRY_PROJECT`** (project slug).
+ *   Success: `{ ok: true, errorCount, period: '24h' }`.
  */
 
 const { initializeApp, cert } = require("firebase-admin/app");
@@ -21,6 +30,12 @@ const { Storage } = require("@google-cloud/storage");
 const { ADMIN_UIDS } = require("../src/api-lib/admin-uids");
 
 const GCS_BACKUP_BUCKET = "movie-trailer-site-backups";
+
+/** APL: dataset `watchlist-prod`, rolling 24h window (matches Admin “Activity” card). */
+const AXIOM_ACTIVITY_APL =
+  "['watchlist-prod'] | where _time > ago(24h) | summarize firestore_reads = sumif(documentCount, type == 'firestore.read'), api_calls = countif(type == 'api.call'), user_actions = countif(type == 'user.action'), errors = countif(type == 'job.failed' or type == 'whatsapp.imdb.error'), titles_added = countif(type == 'title.added')";
+
+const AXIOM_APL_QUERY_URL = "https://api.axiom.co/v1/datasets/_apl?format=tabular";
 
 const APP_NAME = "watchlist-admin";
 const WORKFLOW_FILE = "backup.yml";
@@ -289,6 +304,201 @@ async function prefixSortOrActivityMs(bucket, folderName) {
   return newestObjectMsUnderPrefix(bucket, folderName);
 }
 
+/**
+ * @param {unknown} v
+ * @returns {number}
+ */
+function axiomNumber(v) {
+  if (v == null) return 0;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * @param {unknown} data
+ * @returns {{ firestoreReads: number, apiCalls: number, userActions: number, errors: number, titlesAdded: number } | null}
+ */
+function parseAxiomTabularSummary(data) {
+  if (!data || typeof data !== "object") return null;
+  const tables = /** @type {{ tables?: unknown }} */ (data).tables;
+  if (!Array.isArray(tables) || tables.length === 0) {
+    return { firestoreReads: 0, apiCalls: 0, userActions: 0, errors: 0, titlesAdded: 0 };
+  }
+  const t = tables[0];
+  if (!t || typeof t !== "object") return null;
+  const fields = /** @type {{ fields?: unknown, columns?: unknown }} */ (t).fields;
+  const columns = /** @type {{ fields?: unknown, columns?: unknown }} */ (t).columns;
+  if (!Array.isArray(fields) || !Array.isArray(columns) || columns.length === 0) {
+    return { firestoreReads: 0, apiCalls: 0, userActions: 0, errors: 0, titlesAdded: 0 };
+  }
+  const row = columns[0];
+  if (!Array.isArray(row)) return null;
+  /** @type {Record<string, number>} */
+  const by = {};
+  for (let i = 0; i < fields.length; i += 1) {
+    const f = fields[i];
+    const name = f && typeof f === "object" && "name" in f ? String(f.name) : "";
+    if (name) by[name] = axiomNumber(row[i]);
+  }
+  return {
+    firestoreReads: axiomNumber(by.firestore_reads),
+    apiCalls: axiomNumber(by.api_calls),
+    userActions: axiomNumber(by.user_actions),
+    errors: axiomNumber(by.errors),
+    titlesAdded: axiomNumber(by.titles_added),
+  };
+}
+
+async function handleAxiom() {
+  const token = (process.env.AXIOM_TOKEN || "").trim();
+  if (!token) {
+    return json(503, {
+      ok: false,
+      error: "Axiom activity requires AXIOM_TOKEN in the server environment.",
+    });
+  }
+
+  let res;
+  try {
+    res = await fetch(AXIOM_APL_QUERY_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        apl: AXIOM_ACTIVITY_APL,
+        startTime: "-24h",
+      }),
+    });
+  } catch (e) {
+    return json(200, {
+      ok: false,
+      error: e instanceof Error ? e.message : "Axiom request failed",
+    });
+  }
+
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    return json(200, {
+      ok: false,
+      error: "Invalid JSON from Axiom",
+      axiomHttpStatus: res.status,
+    });
+  }
+
+  if (!res.ok) {
+    const msg =
+      (data && typeof data === "object" && data.message && String(data.message)) ||
+      (data && typeof data === "object" && data.error && String(data.error)) ||
+      `Axiom API ${res.status}`;
+    return json(200, {
+      ok: false,
+      error: msg,
+      axiomHttpStatus: res.status,
+    });
+  }
+
+  const parsed = parseAxiomTabularSummary(data);
+  if (!parsed) {
+    return json(200, {
+      ok: false,
+      error: "Could not parse Axiom tabular result",
+    });
+  }
+
+  return json(200, {
+    ok: true,
+    firestoreReads: parsed.firestoreReads,
+    apiCalls: parsed.apiCalls,
+    userActions: parsed.userActions,
+    errors: parsed.errors,
+    titlesAdded: parsed.titlesAdded,
+    period: "24h",
+  });
+}
+
+async function handleSentry() {
+  const token = (process.env.SENTRY_READ_TOKEN || "").trim();
+  if (!token) {
+    return json(503, {
+      ok: false,
+      error: "Sentry issues summary requires SENTRY_READ_TOKEN in the server environment.",
+    });
+  }
+
+  const project = (process.env.SENTRY_PROJECT || "").trim();
+  if (!project) {
+    return json(200, {
+      ok: false,
+      error: "SENTRY_PROJECT is not set; it is required for the Sentry issues API path.",
+    });
+  }
+
+  const qs = new URLSearchParams({
+    query: "is:unresolved",
+    statsPeriod: "24h",
+    limit: "100",
+  });
+  const url = `https://sentry.io/api/0/projects/maulbogat/${encodeURIComponent(project)}/issues/?${qs.toString()}`;
+
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (e) {
+    return json(200, {
+      ok: false,
+      error: e instanceof Error ? e.message : "Sentry request failed",
+    });
+  }
+
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : [];
+  } catch {
+    return json(200, {
+      ok: false,
+      error: "Invalid JSON from Sentry",
+      sentryHttpStatus: res.status,
+    });
+  }
+
+  if (!res.ok) {
+    const msg =
+      (data && typeof data === "object" && data.detail && String(data.detail)) ||
+      (data && typeof data === "object" && data.message && String(data.message)) ||
+      `Sentry API ${res.status}`;
+    return json(200, {
+      ok: false,
+      error: msg,
+      sentryHttpStatus: res.status,
+    });
+  }
+
+  const list = Array.isArray(data) ? data : null;
+  if (!list) {
+    return json(200, {
+      ok: false,
+      error: "Unexpected Sentry response (expected a JSON array of issues)",
+    });
+  }
+
+  return json(200, {
+    ok: true,
+    errorCount: list.length,
+    period: "24h",
+  });
+}
+
 async function handleGcs() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw || !String(raw).trim()) {
@@ -417,10 +627,17 @@ exports.handler = async (event) => {
   if (service === "gcs") {
     return handleGcs();
   }
+  if (service === "axiom") {
+    return handleAxiom();
+  }
+  if (service === "sentry") {
+    return handleSentry();
+  }
 
   return json(400, {
     ok: false,
-    error: "Missing or invalid query: use ?service=github, ?service=vercel, or ?service=gcs",
+    error:
+      "Missing or invalid query: use ?service=github, ?service=vercel, ?service=gcs, ?service=axiom, or ?service=sentry",
   });
 };
 
