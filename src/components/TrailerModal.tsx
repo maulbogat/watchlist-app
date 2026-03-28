@@ -39,10 +39,24 @@ export function TrailerModal() {
   const [addListOpen, setAddListOpen] = useState(false);
   const uid = currentUser?.uid;
   const listsFetched = personalQ.isFetched && sharedQ.isFetched;
-  const listActionBusy = addTitleMutation.isPending || removeTitleFromListMutation.isPending;
+
+  /** Stable key when list *membership* metadata changes — avoid churn from personalLists count optimistic updates. */
+  const listStructureKey = useMemo(() => {
+    const p = personalLists
+      .map((l) => l.id)
+      .slice()
+      .sort()
+      .join("\0");
+    const s = sharedLists
+      .map((l) => l.id)
+      .slice()
+      .sort()
+      .join("\0");
+    return `${p}|${s}`;
+  }, [personalLists, sharedLists]);
 
   const { data: containingLists = new Set<string>(), isLoading: containingLoading } = useQuery({
-    queryKey: ["listsContaining", movieStableKey, uid, personalQ.dataUpdatedAt, sharedQ.dataUpdatedAt],
+    queryKey: ["listsContaining", movieStableKey, uid, listStructureKey],
     queryFn: async () => {
       if (!movie || !uid) return new Set<string>();
       const key = movieKey(movie);
@@ -66,8 +80,14 @@ export function TrailerModal() {
         }
       }
       for (const l of sharedLists) {
-        const items = Array.isArray(l.items) ? l.items : [];
-        if (items.some((row) => movieKey(row) === key)) containing.add(l.id);
+        const sharedCacheKey = ["watchlistMovies", uid, "shared", l.id];
+        const cachedShared = queryClient.getQueryData<WatchlistItem[]>(sharedCacheKey);
+        if (cachedShared) {
+          if (cachedShared.some((x) => movieKey(x) === key)) containing.add(l.id);
+        } else {
+          const items = Array.isArray(l.items) ? l.items : [];
+          if (items.some((row) => movieKey(row) === key)) containing.add(l.id);
+        }
       }
       return containing;
     },
@@ -166,7 +186,6 @@ export function TrailerModal() {
     currentlyInList: boolean
   ) {
     if (!currentUser?.uid) return;
-    if (listActionBusy) return;
     try {
       const key = movieKey(m);
       if (currentlyInList) {
@@ -327,7 +346,6 @@ export function TrailerModal() {
                 className="modal-action-btn modal-add-to-list-trigger"
                 aria-haspopup="true"
                 aria-expanded={addListOpen}
-                disabled={listActionBusy}
                 onClick={onAddListTriggerClick}
               >
                 <span className="modal-action-label modal-list-label">{currentListButtonLabel}</span>
@@ -353,7 +371,6 @@ export function TrailerModal() {
                           type="button"
                           className="modal-action-dropdown-item"
                           role="menuitem"
-                          disabled={listActionBusy}
                           onClick={(e) => {
                             e.stopPropagation();
                             void onToggleListMembership("personal", listId, inList);
@@ -378,7 +395,6 @@ export function TrailerModal() {
                           type="button"
                           className="modal-action-dropdown-item"
                           role="menuitem"
-                          disabled={listActionBusy}
                           onClick={(e) => {
                             e.stopPropagation();
                             void onToggleListMembership("shared", listId, inList);

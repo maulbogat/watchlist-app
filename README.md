@@ -313,7 +313,7 @@ Many scripts expect **`TMDB_API_KEY`**, **`FIREBASE_SERVICE_ACCOUNT`** (base64) 
 
 ## Features
 
-- **Watchlist UI (React):** grid of titles with poster, status controls, and **trailer modal** (YouTube embed). **Skeleton placeholders** for the grid and filter chrome while list data loads.
+- **Watchlist UI (React):** grid of titles with poster, status controls, and **trailer modal** (YouTube embed; **add-to-list** checkmarks stay in sync with list mutations via React Query). **Skeleton placeholders** for the grid and filter chrome while list data loads.
 - **Up next:** horizontal **card row** (poster thumbnail, title, episode/release detail, **date in gold**, dismiss, **calendar (`.ics`)** download) for the current list’s **`upcomingAlerts`**. Shows the **first four** titles in a scrollable strip; **expand** reveals a full **grid** with **Show less** to collapse. **Skeleton strip** while alerts load. Section **hidden** when there are no alerts. **`localStorage`** + TanStack Query (**2-hour** stale window) reduce redundant Firestore reads.
 - **Sticky controls toolbar:** after the header and Up next block, the filter toolbar **sticks** to the top of the viewport (**IntersectionObserver** + **`styles.css`** sticky shell).
 - **Personal lists:** default list + extra lists; **manage lists** modal (create/rename/delete, pick default, **invite someone** + pending invites).

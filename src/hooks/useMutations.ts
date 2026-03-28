@@ -84,9 +84,9 @@ function updateWatchlistCacheForMode(
   const key: QueryKey = ["watchlistMovies", uid, ...modeKey];
   let changed = false;
   queryClient.setQueryData<WatchlistItem[]>(key, (prev) => {
-    if (!prev) return prev;
-    const next = updater(prev);
-    changed = next !== prev;
+    const base = prev ?? [];
+    const next = updater(base);
+    changed = next !== base;
     return next;
   });
   return changed;
@@ -111,6 +111,43 @@ function updateListCountOptimistically(
   queryClient.setQueryData<PersonalList[]>(["personalLists", uid], (prev) => {
     if (!prev) return prev;
     return prev.map((l) => (l.id === listId ? { ...l, count: Math.max(0, (l.count || 0) + delta) } : l));
+  });
+}
+
+/** Trailer modal "lists containing this title" — keep in sync with optimistic watchlist cache updates. */
+function patchListsContainingQueries(
+  queryClient: QueryClient,
+  uid: string,
+  movieKeyStr: string,
+  updater: (set: Set<string>) => void
+): void {
+  for (const query of queryClient.getQueryCache().findAll({
+    predicate: (q) => {
+      const k = q.queryKey;
+      return (
+        Array.isArray(k) && k[0] === "listsContaining" && k[1] === movieKeyStr && k[2] === uid
+      );
+    },
+  })) {
+    const prev = query.state.data;
+    const set = prev instanceof Set ? new Set(prev) : new Set<string>();
+    updater(set);
+    queryClient.setQueryData(query.queryKey, set);
+  }
+}
+
+function invalidateListsContainingForMovie(
+  queryClient: QueryClient,
+  uid: string,
+  movieKeyStr: string
+): void {
+  void queryClient.invalidateQueries({
+    predicate: (q) => {
+      const k = q.queryKey;
+      return (
+        Array.isArray(k) && k[0] === "listsContaining" && k[1] === movieKeyStr && k[2] === uid
+      );
+    },
   });
 }
 
@@ -156,16 +193,19 @@ export function useRemoveTitle() {
         const next = prev.filter((m) => movieKey(m) !== key);
         return next.length === prev.length ? prev : next;
       });
-      if (removed) {
-        const info = modeToListInfo(listMode);
-        if (info.type === "personal") {
-          updateListCountOptimistically(queryClient, uid, info.listId, -1);
-        }
+      const info = modeToListInfo(listMode);
+      if (removed && info.type === "personal") {
+        updateListCountOptimistically(queryClient, uid, info.listId, -1);
       }
+      /* Checkmarks can come from shared metadata while watchlist cache is still empty — always clear containing. */
+      patchListsContainingQueries(queryClient, uid, key, (s) => {
+        s.delete(info.listId);
+      });
       return snapshot;
     },
-    onError: (_err, _vars, snapshot) => {
+    onError: (_err, vars, snapshot) => {
       restoreSnapshot(queryClient, snapshot);
+      invalidateListsContainingForMovie(queryClient, vars.uid, vars.key);
     },
     onSuccess: (_, { uid, listMode }) => {
       if (isSharedMode(listMode)) {
@@ -207,11 +247,15 @@ export function useAddTitleToList() {
         if (info.type === "personal") {
           updateListCountOptimistically(queryClient, uid, info.listId, 1);
         }
+        patchListsContainingQueries(queryClient, uid, movieKey(itemForCache), (s) => {
+          s.add(info.listId);
+        });
       }
       return snapshot;
     },
-    onError: (_err, _vars, snapshot) => {
+    onError: (_err, vars, snapshot) => {
       restoreSnapshot(queryClient, snapshot);
+      invalidateListsContainingForMovie(queryClient, vars.uid, movieKey(vars.item));
     },
     onSuccess: (_, { uid, listMode }) => {
       if (isSharedMode(listMode)) {
@@ -239,15 +283,18 @@ export function useRemoveTitleFromList() {
         const next = prev.filter((m) => movieKey(m) !== key);
         return next.length === prev.length ? prev : next;
       });
-      if (removed) {
-        if (type === "personal") {
-          updateListCountOptimistically(queryClient, uid, listId, -1);
-        }
+      if (removed && type === "personal") {
+        updateListCountOptimistically(queryClient, uid, listId, -1);
       }
+      /* Same as useRemoveTitle: trailer checkmarks may use sharedLists.items without a hydrated watchlist query. */
+      patchListsContainingQueries(queryClient, uid, key, (s) => {
+        s.delete(listId);
+      });
       return snapshot;
     },
-    onError: (_err, _vars, snapshot) => {
+    onError: (_err, vars, snapshot) => {
       restoreSnapshot(queryClient, snapshot);
+      invalidateListsContainingForMovie(queryClient, vars.uid, vars.key);
     },
     onSuccess: (_, { uid, type }) => {
       if (type === "shared") {

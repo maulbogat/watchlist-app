@@ -8,6 +8,8 @@ import type { ListMode, PersonalList, SharedList, WatchlistItem } from "../types
 export function listModeQueryKey(listMode: ListMode | undefined): string[] {
   if (listMode === "personal") return ["personal"];
   if (listMode && typeof listMode === "object" && listMode.type === "personal") {
+    /** Virtual default list id — must match bare `"personal"` mode (see `useWatchlistMovies`). */
+    if (listMode.listId === "personal") return ["personal"];
     return ["personal", listMode.listId];
   }
   if (listMode && typeof listMode === "object" && listMode.type === "shared") {
