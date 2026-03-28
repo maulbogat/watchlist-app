@@ -168,7 +168,7 @@ async function handleSend(event, body) {
     listName = typeof ls.data()?.name === "string" ? ls.data().name.trim() : "";
   }
 
-  const baseUrl = (process.env.APP_PUBLIC_URL || "https://movie-trailer-site.vercel.app").replace(/\/$/, "");
+  const baseUrl = (process.env.APP_PUBLIC_URL || "https://watchlist.maulbogat.com").replace(/\/$/, "");
   const joinUrl = `${baseUrl}/join-app/${inviteId}`;
 
   const textLines = [

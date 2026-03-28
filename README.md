@@ -8,6 +8,7 @@ A personal movie/show watchlist with YouTube trailers, filters, and Firestore. *
 
 **`styles.css`** defines shared tokens in **`:root`** and documents them in the **WATCHLIST DESIGN SYSTEM** comment at the top of the file:
 
+- **Fonts:** **Bebas Neue** / **DM Sans** from Google Fonts (**`index.html`** → **`--font-title`** / **`--font-body`**); **Geist Variable** via **`@fontsource-variable/geist`** for component / shadcn UI (**`@theme`** in **`styles.css`**).
 - **Colors:** `--color-gold`, `--color-red`, `--color-surface-1` / `-2` / `-3`, `--color-text-muted`
 - **Typography:** `--text-xs` … `--text-xl` (five-step scale)
 - **Radius:** `--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-pill`
@@ -33,7 +34,7 @@ Then set values in:
 
 ## Run locally
 
-The watchlist is **React** (`src/`) served by **Vite**. Root **`index.html`** is the Vite entry (`#root` + `/src/main.jsx`). **`npm run build:react`** outputs **`dist/`**, which Vercel publishes (see **`vercel.json`**).
+The watchlist is **React** (`src/`) served by **Vite**. Root **`index.html`** is the Vite entry (`#root` + `/src/main.tsx`). **`npm run build:react`** outputs **`dist/`**, which Vercel publishes (see **`vercel.json`**).
 
 **Requirements:** [Node.js](https://nodejs.org/) **18+** and npm.
 
@@ -107,6 +108,8 @@ The project was migrated from **Netlify** to **Vercel**: former **`netlify/funct
 
 **Admin “GCS Backup” card:** **`/api/external-status?service=gcs`** uses **`@google-cloud/storage`** with **`FIREBASE_SERVICE_ACCOUNT`** to list the **`movie-trailer-site-backups`** bucket and surface the newest export folder (**SUCCESS** if the export is within **48 hours**, **WARNING** if older). Grant the Firebase service account **`storage.objects.list`** on that bucket (for example **Storage Object Viewer**).
 
+**Bookmarklet host:** **`public/bookmarklet.js`** opens **`https://watchlist.maulbogat.com/add.html`** and validates **`postMessage`** from that origin (and **`localhost`** for local **`vercel dev`** / Vite). Keep **`watchlist.maulbogat.com`** in Firebase **Authentication → Authorized domains**; if you change the public URL, edit the script, redeploy, and have users re-drag the bookmark from **`/bookmarklet.html`**.
+
 ### WhatsApp (optional)
 
 In Meta’s app settings, point the webhook to **`https://<your-domain>/api/whatsapp-webhook`**. After **`WHATSAPP_*`** env vars are set, users can open the profile menu → **WhatsApp**, verify a number, pick a default list, and send **IMDb links** on WhatsApp to add titles (same enrichment path as the bookmarklet, server-side). Unregistered numbers get a short reply with a link to the site.
@@ -157,7 +160,7 @@ For the IMDb bookmarklet to add titles from imdb.com:
 5. **Summary (details in `docs/environment.md`):**
    - **Do not** set `VITE_AXIOM_TOKEN` / `VITE_AXIOM_DATASET` (unused; exposes or duplicates server secrets).
    - **`VITE_*` (Firebase, `VITE_APP_VERSION`, Admin URLs)** — required at **build** time on Vercel.
-   - **Server-only** (`FIREBASE_SERVICE_ACCOUNT`, `TMDB_API_KEY`, `OMDB_API_KEY`, `AXIOM_*`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, `WHATSAPP_*`) — for **`api/*`** at **runtime**.
+   - **Server-only** (`FIREBASE_SERVICE_ACCOUNT`, `TMDB_API_KEY`, `OMDB_API_KEY`, `AXIOM_*`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, `WHATSAPP_*`, optional **`GITHUB_TOKEN`** for Admin GitHub Actions status) — for **`api/*`** at **runtime**.
 
    **Do not** put real **`AXIOM_DATASET`** values in **`.env.example`** or client code.
 
@@ -167,9 +170,9 @@ Keep **`AXIOM_*` on the server** only; do not reintroduce **`VITE_AXIOM_*`**. If
 
 6. **Upcoming episodes / movies (optional UI):** Vercel **Cron** invokes **`/api/check-upcoming`** on the schedule in **`vercel.json`** (3:00 UTC) to fill `upcomingAlerts` from **`titleRegistry`** and TMDB. Deploy **`firestore.rules`** so signed-in users can read `upcomingAlerts` and **`titleRegistry`**. The watchlist **Up next** section (see **Features**) renders those alerts as horizontal cards with poster, detail line, gold date, dismiss, and **`.ics`** download when dated. Adding a title via the bookmarklet upserts **`titleRegistry`** and triggers a one-title sync when `tmdbId` is present.
 
-   Job enable/disable is controlled in Firestore at `meta/jobConfig.checkUpcomingEnabled` (exposed in `/admin` System Status). The schedule remains on; when disabled, scheduled runs exit early.
+   **`checkUpcomingEnabled`** and **`githubBackupEnabled`** live on **`meta/jobConfig`** and are read/written via **`GET`/`POST /api/admin-job-config`** (Admin → **System Status**). The Vercel cron schedule stays enabled; when **`checkUpcomingEnabled`** is **`false`**, scheduled **`check-upcoming`** runs exit early after reading config.
 
-   The **GitHub Actions** JSON backup (`scripts/backup-firestore.js`) honors `meta/jobConfig.githubBackupEnabled`: when set to **`false`** in Admin, the script logs and exits successfully so the workflow does not rewrite `backups/firestore-backup.json`. The workflow still runs on schedule unless you change it in GitHub.
+   The **GitHub Actions** JSON backup (`scripts/backup-firestore.js`) honors **`githubBackupEnabled`**: when **`false`**, the script exits successfully without rewriting **`backups/firestore-backup.json`**. The Actions workflow still runs on its schedule unless you change it in GitHub.
 
    **If `curl …/api/check-upcoming` errors or times out:** the sync uses a **time budget + Firestore cursor** (`syncState/upcomingAlerts`, Admin-only — deploy updated **`firestore.rules`**). Use **Admin → Run now** (POST **`/api/check-upcoming`**) or cron until logs show **`completed":true`**. **`vercel.json`** sets **`maxDuration`** **60s** for the heaviest API routes.
 
@@ -324,7 +327,7 @@ Many scripts expect **`TMDB_API_KEY`**, **`FIREBASE_SERVICE_ACCOUNT`** (base64) 
 - **Shared lists:** create; share **`/join/:listId`** from the post-create dialog (**join still requires a matching email invite**); optional list on the same email as app access; bookmarklet targets the list you’re viewing.
 - **App access:** **`allowedUsers`** + **`/join-app/:inviteId`**; profile menu **Bookmarklet** dialog (instructions + drag button; moved out of manage lists).
 - **WhatsApp adds:** verified numbers and per-number default list (**`phoneIndex`** + **`users/{uid}.phoneNumbers`**); inbound messages handled by **`/api/whatsapp-webhook`** (signature, rate limit, and quota guard — see **Vercel deployment**).
-- **Admin (`/admin`, admin users only):** **header** link **Switch to prod** / **Switch to local** (opens the other admin URL in a new tab; prod target uses **`VITE_APP_ORIGIN`**), **ACTIVITY (LAST 24H)** from Axiom (**`/api/external-status?service=axiom`**, dataset **`watchlist-prod`**), **SENTRY — LAST 24H** unresolved issue count (**`?service=sentry`**, needs **`SENTRY_READ_TOKEN`** + **`SENTRY_PROJECT`**), Firestore read **quota usage** bars, **Data Quality** stats (optional **`meta/catalogHealthExclusions`** doc with **`missingTmdbId`** array to omit known no-TMDB titles from missing-`tmdbId` counts/lists), catalog/upcoming stats, upcoming job toggle, GitHub backup workflow status, and **Service Links** (Firebase, **Vercel env vars**, **Meta WhatsApp** dev console, **Google Cloud** billing + **project dashboard** + **Cloud Storage** backup bucket + **Cloud Scheduler** (Firestore export job), GitHub, TMDB, Trakt, etc.).
+- **Admin (`/admin`, admin users only):** **header** link **Switch to prod** / **Switch to local** (opens the other admin URL in a new tab; prod target uses **`VITE_APP_ORIGIN`** or default **`https://watchlist.maulbogat.com`**), **ACTIVITY (LAST 24H)** from Axiom (**`/api/external-status?service=axiom`**, dataset **`watchlist-prod`**), **SENTRY — LAST 24H** unresolved issue count (**`?service=sentry`**, needs **`SENTRY_READ_TOKEN`** + **`SENTRY_PROJECT`**), Firestore read **quota usage** bars, **Data Quality** stats (optional **`meta/catalogHealthExclusions`** doc with **`missingTmdbId`** array to omit known no-TMDB titles from missing-`tmdbId` counts/lists; **`POST /api/catalog-health`** per-title thumb fix), **Upcoming Check Job** card (**`checkUpcomingEnabled`** via **`GET`/`POST /api/admin-job-config`**), **GitHub Backup** card (latest Actions run via **`?service=github`**, optional **`GITHUB_TOKEN`**; **scheduled JSON export** on/off via **`githubBackupEnabled`** on the same job-config API), **GCS** + **Vercel** deployment status cards, and **Service Links** (Firebase, **Vercel env vars**, **Meta WhatsApp** dev console, **Google Cloud** billing + **project dashboard** + **Cloud Storage** backup bucket + **Cloud Scheduler** (Firestore export job), GitHub, TMDB, Trakt, etc.).
 - **Status tabs:** **All**, **To Watch** (**includes “maybe later”** rows), **Watched**, **Archive** — persisted in Firestore. **Recently Added** is no longer a separate tab; use **sort** options **Date Added (New → Old)** and **Date Added (Old → New)**.
 - **Filters:** Movies / TV / Both (segmented), **genre** as a **single-select list** (Radix Popover, two-row toolbar with **Added by** on **shared lists only**), persisted per account in **localStorage** (with session restore).
 - **Country / region:** set in app for TMDB **watch providers** at add time; **service chips** on cards (e.g. Netflix, Prime).

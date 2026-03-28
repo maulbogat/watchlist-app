@@ -8,7 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_MESSAGING_SENDER_ID: string;
   readonly VITE_FIREBASE_APP_ID: string;
   readonly VITE_FIREBASE_MEASUREMENT_ID: string;
-  /** Production origin for Admin links / bookmarklet (default in code: watchlist-trailers.vercel.app). */
+  /** Production origin for Admin “Switch to prod” links (default in code: https://watchlist.maulbogat.com). */
   readonly VITE_APP_ORIGIN?: string;
   /** Admin “Deployments” card (e.g. https://vercel.com/your-team/your-project/deployments). */
   readonly VITE_DEPLOYMENTS_URL?: string;

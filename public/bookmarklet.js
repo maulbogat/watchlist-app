@@ -27,7 +27,6 @@
   function handleMessage(e) {
     var okOrigin =
       e.origin === "https://watchlist.maulbogat.com" ||
-      e.origin === "https://watchlist-trailers.netlify.app" ||
       /^https?:\/\/localhost(:\d+)?$/.test(e.origin);
     if (!okOrigin || !e.data || e.data.type !== "add-result") return;
     clearTimeout(timeoutId);

@@ -166,7 +166,7 @@ function publicAppBaseUrl() {
   if (explicit) return String(explicit).replace(/\/$/, "");
   const v = process.env.VERCEL_URL;
   if (v) return `https://${String(v).replace(/^https?:\/\//, "")}`;
-  return "https://watchlist-trailers.vercel.app";
+  return "https://watchlist.maulbogat.com";
 }
 
 /**

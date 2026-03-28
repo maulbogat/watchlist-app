@@ -14,10 +14,11 @@ This document describes **only what exists in this repository** (static site, Ve
 | **The Movie Database (TMDB)** | Resolve IMDb id → TMDB id; poster; genres/year; **YouTube trailer key** from appended `videos`; **watch providers** by region. | **REST:** `https://api.themoviedb.org/3/...` via Node `https.get` in `api/add-from-imdb.js`. Same pattern in maintenance scripts (e.g. `scripts/sync-services-from-tmdb.js`, `check-upcoming.mjs` uses `fetch`). **Not** called from the browser watchlist UI. | API key query parameter `api_key`. | `TMDB_API_KEY` in Vercel env / `.env` for local scripts / `check-upcoming.mjs`. |
 | **OMDb** | Title metadata by IMDb id; disambiguate movie vs TV when TMDB returns both; fallback row when TMDB has no match. | **REST:** `https://www.omdbapi.com/?i=...&apikey=...` in `add-from-imdb.js` and various scripts. | API key query parameter. | `OMDB_API_KEY` (Vercel + local scripts per README / `.env.example`). |
 | **YouTube** | Trailer playback in modal via iframe embed. | **Browser:** `https://www.youtube-nocookie.com/embed/{youtubeId}?...` and link to `youtube.com/watch`. | None for embed (public video ids). | None. |
-| **Google Fonts** | UI typography (Bebas Neue, DM Sans). | `<link href="https://fonts.googleapis.com/...">` in HTML. | None. | None. |
+| **Google Fonts** | Watchlist title/body faces (**Bebas Neue**, **DM Sans**) via **`styles.css`** **`--font-title`** / **`--font-body`**. | `<link href="https://fonts.googleapis.com/...">` in **`index.html`**. | None. | None. |
+| **Geist (npm)** | **Geist Variable** for shadcn / component UI (`@theme` in **`styles.css`**). | **`@import "@fontsource-variable/geist"`** in **`styles.css`** (bundled by Vite). | None. | None. |
 | **maulbogat.com** | Verified **From** domain for invite email. | DNS at **Cloudflare Registrar**; domain + DNS records verified in **Resend** for outbound mail. | — | — |
 | **Google Cloud Storage** | Daily native **Firestore export** for **disaster recovery**. Bucket **`movie-trailer-site-backups`** (**europe-west1**). **Retention:** **30-day** lifecycle rule auto-deletes old exports. | **Cloud Scheduler** job **`firestore-daily-export`** at **4am UTC** daily (Firestore Admin export API; not this repo’s Vercel app or GitHub Actions JSON workflow). **Restore:** `gcloud firestore import gs://movie-trailer-site-backups/{folder}`. | **OAuth** token via **`firestore-scheduler`** service account. | None (configured in Google Cloud Console only). |
-| **Vercel** | Replaces **Netlify** for this project: static **`dist/`**, **`api/*.js`** serverless routes, **Cron** (**`vercel.json`**), **12** of **12** Hobby-plan function slots in use. | **Browser:** same-origin **`fetch`** to **`/api/*`**. **Server:** handlers wrapped by **`src/api-lib/vercel-adapter.js`** (Netlify-shaped handler compatibility, Node **`req`/`res`**). | Routes verify Firebase ID token where required. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional **`FIRESTORE_HOURLY_READ_LIMIT`**, **`FIRESTORE_DAILY_READ_LIMIT`**, optional **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_APP_SECRET`** (required for webhook POST), **`WHATSAPP_TOKEN`**, **`WHATSAPP_PHONE_NUMBER_ID`**, optional **`RESEND_API_KEY`**, **`RESEND_FROM_EMAIL`**, optional **`APP_PUBLIC_URL`** / **`VERCEL_URL`**, optional **`VERCEL_API_TOKEN`**, **`VERCEL_PROJECT_ID`** (Admin deployment status), optional **`VITE_APP_ORIGIN`**, optional **`SENTRY_DSN`**, optional **`VITE_SENTRY_DSN`**; no `VITE_AXIOM_*`. |
+| **Vercel** | Replaces **Netlify** for this project: static **`dist/`**, **12** **`api/*.js`** serverless routes, **Cron** **`/api/check-upcoming`** (**`vercel.json`** `0 3 * * *` = **03:00 UTC**), **12** of **12** Hobby-plan function slots in use. | **Browser:** same-origin **`fetch`** to **`/api/*`**. **Server:** handlers wrapped by **`src/api-lib/vercel-adapter.js`** (Netlify-shaped handler compatibility, Node **`req`/`res`**). | Routes verify Firebase ID token where required. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional **`FIRESTORE_HOURLY_READ_LIMIT`**, **`FIRESTORE_DAILY_READ_LIMIT`**, optional **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_APP_SECRET`** (required for webhook POST), **`WHATSAPP_TOKEN`**, **`WHATSAPP_PHONE_NUMBER_ID`**, optional **`RESEND_API_KEY`**, **`RESEND_FROM_EMAIL`**, optional **`APP_PUBLIC_URL`** / **`VERCEL_URL`**, optional **`VERCEL_API_TOKEN`**, **`VERCEL_PROJECT_ID`** (Admin deployment status), optional **`GITHUB_TOKEN`** (Admin GitHub Actions card), optional **`VITE_APP_ORIGIN`**, optional **`SENTRY_DSN`**, optional **`VITE_SENTRY_DSN`**; no `VITE_AXIOM_*`. |
 | **Resend** | Transactional email for **app invitations** only (`POST /api/invites` `action: send`). | **Server:** HTTPS `POST https://api.resend.com/emails` from **`src/api-lib/resend-send.js`**. **Not** called from the browser. | API key in `Authorization: Bearer`. | **`RESEND_API_KEY`**; **`RESEND_FROM_EMAIL`** (e.g. **`noreply@maulbogat.com`** when domain verified; code falls back to **`onboarding@resend.dev`** if unset). |
 | **Axiom** | Log search / observability via **direct HTTP ingest** (not a Netlify log drain). | **Client:** **`src/lib/axiom-logger.ts`** → **`POST /api/log-client-event`** (Firebase ID token). **Server:** **`src/api-lib/logger.js`** → Axiom HTTP API when **`AXIOM_TOKEN`** / **`AXIOM_DATASET`** are set; otherwise **`console.log`** JSON. | Client: Firebase ID token. Server: Axiom token. | **`AXIOM_TOKEN`**, **`AXIOM_DATASET`** (server-only; often omitted locally). |
 | **Sentry** | Error tracking and (when enabled) performance traces + **session replay on errors only** for the SPA; server-side capture on **`add-from-imdb`** and **`whatsapp-webhook`** only; **Admin** unresolved-issue count via **`GET /api/external-status?service=sentry`**. | **Client:** **`@sentry/react`** in **`src/main.tsx`** (init only when **`VITE_SENTRY_DSN`** is set; **`enabled`** in **production** builds only), **`Sentry.withErrorBoundary`** around **`App`**, **`useAuthUser`** sets **`Sentry.setUser({ id: uid })`** on sign-in and **`setUser(null)`** on sign-out (**never** email or display name). **Server:** **`@sentry/node`** via **`src/api-lib/sentry-node.js`** when **`SENTRY_DSN`** is set; **`captureException`** in those two API routes’ failure paths. **Admin API:** Sentry REST with **`SENTRY_READ_TOKEN`**. **Build:** optional **`@sentry/vite-plugin`** when **`SENTRY_AUTH_TOKEN`** is set (source maps + **`SENTRY_ORG`** / **`SENTRY_PROJECT`** for the plugin). | DSN-based ingest; read token for issues API; org auth token for source map upload only. | **`VITE_SENTRY_DSN`** (client; optional). **`SENTRY_DSN`** (server; optional). Optional **Admin issues card:** **`SENTRY_READ_TOKEN`**, **`SENTRY_PROJECT`** (API project slug, org **`maulbogat`**). Optional CI/build: **`SENTRY_AUTH_TOKEN`**, **`SENTRY_ORG`**, **`SENTRY_PROJECT`** (Vite plugin). |
@@ -33,10 +34,10 @@ This document describes **only what exists in this repository** (static site, Ve
 - **Watchlist UI — React + TypeScript + Vite:** Root **`index.html`** loads **`#root`** and **`/src/main.tsx`**. **`src/main.tsx`** optionally initializes **Sentry** (**`@sentry/react`**) when **`VITE_SENTRY_DSN`** is set (production-only reporting) and wraps **`App`** with **`Sentry.withErrorBoundary`** (token-based fallback UI in **`styles.css`**). **`npm run dev:react`** / **`npm run build:react`**; Vercel publishes **`dist/`** from **`npm run build:react`** (**`vercel.json`**). **`src/App.tsx`** routes include **`/join/:listId`** (**`JoinPage`**), **`/join-app/:inviteId`** (**`JoinAppPage`**), **`/admin`**, and the signed-in watchlist shell (**`WatchlistAuthGate`** → **`AllowlistGate`** → **`WatchlistPage`**). **`AccessDeniedScreen`** replaces the app when the user is not on **`allowedUsers`** (except **`/join-app/*`** where they can sign in and accept). **`src/firebase.ts`** (Firebase JS SDK from npm, bundled by Vite) initializes App, Auth, Firestore, optional Analytics; list CRUD uses the same module; **`checkUserAllowed`** reads **`allowedUsers`**. **`src/store/useAppStore.ts`** (Zustand) + **`src/store/watchlistConstants.ts`**. **`src/hooks/useWatchlist.ts`** (TanStack Query) loads lists; **`useAuthUser.ts`** → **`onAuthStateChanged`**. **`WatchlistPage.tsx`**: **`ListSelector`**, **`WatchlistToolbar`**, **`ManageListsModal`** (lists + email invites; no in-modal bookmarklet or paste-to-join), auth menu (**WhatsApp** → **`WhatsAppSettings`**, **Bookmarklet** → **`BookmarkletSettings`**), **`CountryModal`**, **`src/components/modals/*.tsx`**, **`UpcomingAlertsBar`**, filters, **`TitleGrid`** / **`TitleCard`**, **`TrailerModal`**. Session restore **`useWatchlistSessionRestore.ts`**; **`src/lib/watchlistFilters.ts`**, **`bookmarkletCookie.ts`**, **`storage.ts`**, **`movieDisplay.ts`**, **`utils.ts`**, **`src/data/lists.ts`**, **`src/hooks/useMutations.ts`**. **`src/main.tsx`** warns if **`#root`** is missing.
 - All routine Firestore access uses the **signed-in user’s** Firebase session and **`firestore.rules`**.  
 - **`add.html`** + **`src/add-main.ts`** — bookmarklet popup: auth, POST **`/api/add-from-imdb`**, `postMessage` handshake.  
-- **`public/bookmarklet.js`** on **imdb.com** opens hosted **`add.html`**. The public production URL is **`https://watchlist.maulbogat.com`** — **Cloudflare** manages **`maulbogat.com`** DNS, and the **`watchlist`** subdomain is a **CNAME** to **Vercel**. The bookmarklet still hardcodes a deployment origin for the popup and **`postMessage`** in **`public/bookmarklet.js`** (see file; may still reference a **`*.vercel.app`** host until updated); it also allows **`localhost`** and legacy Netlify origins for dev.
+- **`public/bookmarklet.js`** on **imdb.com** opens **`https://watchlist.maulbogat.com/add.html?imdbId=…&embed=1`** in a popup (**Cloudflare** DNS for **`maulbogat.com`**; **`watchlist`** **CNAME** → **Vercel**). The script **hardcodes** that production origin for the popup URL and for **`postMessage`** validation (same host only). For local dev it also accepts **`http(s)://localhost`** with any port so **`vercel dev`** / Vite can serve **`add.html`**; users who install the bookmark from **`/bookmarklet.html`** get the deployed script. Changing the public host requires editing **`public/bookmarklet.js`**, redeploying, and updating Firebase **Authentication → Authorized domains**.
 
 **Design system (`styles.css` + Cursor)**  
-- **`styles.css`** **WATCHLIST DESIGN SYSTEM** **`:root`** tokens: **`--color-*`**, **`--text-*`**, **`--radius-*`**, **`--space-*`**, plus **`--watchlist-genre-popover-border`** for the genre filter popover edge.  
+- **`styles.css`** **WATCHLIST DESIGN SYSTEM** **`:root`** tokens: **`--color-*`**, **`--text-*`**, **`--radius-*`**, **`--space-*`**, plus **`--watchlist-genre-popover-border`** for the genre filter popover edge. **Geist Variable** is imported from **`@fontsource-variable/geist`** for the shadcn / **`@theme`** layer; **Bebas Neue** / **DM Sans** load from Google Fonts in **`index.html`** for **`--font-title`** / **`--font-body`**.  
 - Four button bases: **`.btn-primary`**, **`.btn-secondary`**, **`.btn-ghost`**, **`.btn-destructive`** — legacy button class names stay wired through comma-grouped selectors so older rules still layer correctly.  
 - **`.cursorrules`** enforces token/button usage for styling, documents modal/header patterns, and requires README, **system-design.md**, **docs/environment.md**, and **`.env.example`** updates when features, API routes, collections, or env vars change; it also sets Vitest expectations for new pure utilities in **`src/lib/`**.  
 - **Watchlist toolbar:** **`WatchlistToolbar.tsx`** uses a two-row layout (primary: status tabs, type, sort, search; secondary: genre **Radix Popover** via **`src/components/ui/popover.tsx`**, **Added by** segmented control on shared lists). Genre list styling: **`watchlist-genre-popover-*`** in **`styles.css`**; sort still uses **Radix Select**.
@@ -238,7 +239,7 @@ Optional. **Writes:** Admin SDK or Console only (no client writes in rules). **R
 
 ### `upcomingAlerts` / `{docId}`
 
-Top-level collection. **Writes:** Admin SDK only (`check-upcoming` scheduled function, `add-from-imdb` single-title sync). **Reads:** Any signed-in user (`firestore.rules`).
+Top-level collection. **Writes:** Admin SDK only (**`/api/check-upcoming`** — Vercel Cron + manual POST, and **`/api/add-from-imdb`** single-title sync). **Reads:** Any signed-in user (`firestore.rules`).
 
 Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
@@ -340,7 +341,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
 1. User drags bookmarklet from **`public/bookmarklet.html`** (bookmark is a `javascript:` URL that injects **`public/bookmarklet.js`** from the deployed origin).  
 2. On an IMDb title page, user runs bookmarklet: validates pathname `/title/ttxxxx`.  
-3. Script opens popup to `{site}/add.html?imdbId=...&embed=1` (origin hardcoded in **`bookmarklet.js`** — should match **`https://watchlist.maulbogat.com`** once that file is updated alongside Firebase authorized domains).  
+3. Script opens popup to **`https://watchlist.maulbogat.com/add.html?imdbId=…&embed=1`** (origin hardcoded in **`public/bookmarklet.js`**; must stay aligned with Firebase **Authorized domains**).  
 4. **`src/add-main.ts`** validates IMDb id; subscribes to `onAuthStateChanged`.  
 5. If not signed in: show error; `postMessage` to parent/opener; optionally close popup.  
 6. If signed in: read `getUserProfile` for `watch_region`; read optional `listId` from cookie `bookmarklet_list_id` (shared list) and optional `personalListId` from cookie `bookmarklet_personal_list_id` (current personal list’s real subdoc id, set by the main app).  
@@ -406,7 +407,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | Name / file | Responsibility | Reads Firestore | Writes Firestore | External APIs |
 |-------------|----------------|-----------------|------------------|---------------|
 | `index.html` / `src/main.tsx` | Vite entry; optional **Sentry** init + **`withErrorBoundary`** when **`VITE_SENTRY_DSN`** is set; mounts React (`App` → routes → **`WatchlistAuthGate`** / **`JoinPage`** / **`JoinAppPage`** / **`AdminPage`**). | — | — | Google Fonts (from HTML); optional **Sentry** browser SDK |
-| `src/pages/AdminPage.tsx` | Admin-only dashboard: **header** link **Switch to prod** / **Switch to local** (other admin tab; prod URL from **`VITE_APP_ORIGIN`** or default **`https://watchlist.maulbogat.com`**), **ACTIVITY (LAST 24H)** card (**`GET /api/external-status?service=axiom`** — Axiom **`watchlist-prod`** aggregates), **SENTRY — LAST 24H** (**`?service=sentry`** — unresolved issue count), **Data Quality** (**`titleRegistry`** counts + expandable sample rows; optional **`meta/catalogHealthExclusions`** filters missing-`tmdbId` stats; **`POST /api/catalog-health`** per-title thumb fix), Firestore read-quota bars (**`meta/usageStats`** via **`getFirestoreUsageStats`**), upcoming job controls, **GitHub** backup + **GCS** native export + **Vercel** deployment status, **Service Links** (Vercel env vars, Meta WhatsApp console, Google Cloud billing + project dashboard + **GCS** **`movie-trailer-site-backups`** + **Cloud Scheduler** for **`firestore-daily-export`**, Firebase, etc.). | **`titleRegistry`** (client read + **`getCountFromServer`** / **`getDocs`** with field projection), **`meta/usageStats`**, **`meta/catalogHealthExclusions`** (admin UID), `fetch` to admin APIs | — | `fetch` → `external-status`, `admin-job-config`, **`catalog-health`**; external HTTPS links |
+| `src/pages/AdminPage.tsx` | Admin-only dashboard: **header** link **Switch to prod** / **Switch to local** (other admin tab; prod URL from **`VITE_APP_ORIGIN`** or default **`https://watchlist.maulbogat.com`**), **ACTIVITY (LAST 24H)** card (**`GET /api/external-status?service=axiom`** — Axiom **`watchlist-prod`** aggregates), **SENTRY — LAST 24H** (**`?service=sentry`** — unresolved issue count), **Data Quality** (**`titleRegistry`** counts + expandable sample rows; optional **`meta/catalogHealthExclusions`** filters missing-`tmdbId` stats; **`POST /api/catalog-health`** per-title thumb fix), Firestore read-quota bars (**`meta/usageStats`** via **`getFirestoreUsageStats`**), **Upcoming Check Job** (**`checkUpcomingEnabled`** via **`GET`/`POST /api/admin-job-config`**), **GitHub Backup** (workflow status **`?service=github`**, optional server **`GITHUB_TOKEN`**; **scheduled JSON export** on/off via **`githubBackupEnabled`** on same **`admin-job-config`**), **GCS** + **Vercel** deployment status, **Service Links** (Vercel env vars, Meta WhatsApp console, Google Cloud billing + project dashboard + **GCS** **`movie-trailer-site-backups`** + **Cloud Scheduler** for **`firestore-daily-export`**, Firebase, etc.). | **`titleRegistry`** (client read + **`getCountFromServer`** / **`getDocs`** with field projection), **`meta/usageStats`**, **`meta/catalogHealthExclusions`** (admin UID), `fetch` to admin APIs | — | `fetch` → `external-status`, `admin-job-config`, **`catalog-health`**; external HTTPS links |
 | `src/components/WhatsAppSettings.tsx` | Dialog: list linked numbers, default list per number, connect flow; **`fetch`** → **`/api/whatsapp-verify`**. | Via `src/firebase.ts` | Via `src/firebase.ts` (`phoneIndex`, `users.phoneNumbers`) | WhatsApp verify API |
 | `src/components/BookmarkletSettings.tsx` | Dialog: bookmarklet instructions + draggable control (opened from profile menu). | — | — | — |
 | `src/components/AllowlistGate.tsx` | After sign-in, **`checkUserAllowed`** on **`allowedUsers`**; blocks watchlist children when denied. | `allowedUsers` | — | Firebase SDK |
@@ -424,7 +425,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `add.html` | Minimal page for add result. | — | — | — |
 | `src/add-main.ts` | Bookmarklet target: auth gate, call add function. | `getUserProfile` | — | `fetch` → `add-from-imdb` |
 | `public/bookmarklet.html` | Instructions + draggable bookmark. | — | — | — |
-| `public/bookmarklet.js` | On IMDb: open popup, `postMessage` handshake. | — | — | Opens hosted `add.html` (hardcoded production host + localhost for dev) |
+| `public/bookmarklet.js` | On IMDb: open popup, `postMessage` handshake. | — | — | Hardcodes **`https://watchlist.maulbogat.com`** for popup URL and `postMessage` origin; **`localhost`** (any port) for local dev |
 | `api/add-from-imdb.js` | Auth verify, **`checkFirestoreQuota`**, OMDb/TMDB enrichment, merge/write list docs. | Firestore via Admin | `users`, `sharedLists`, `titleRegistry`, `meta/usageStats` (guard) | OMDb, TMDB |
 | `api/join-shared-list.js` | Add member to shared list only when **`invites`** has a pending row for caller email + **`listId`**; consumes invite. | Firestore via Admin | `sharedLists`, `invites` | — |
 | `api/invites.js` | **GET** pending invites; **POST** `action: send` (Resend + **`invites`** doc) or **`accept`** (allowlist + optional shared list); **DELETE** revoke. | Firestore via Admin | `invites`, `allowedUsers`, `sharedLists` | Resend (send only) |
@@ -451,7 +452,7 @@ flowchart LR
     BM["bookmarklet on imdb.com"]
   end
 
-  subgraph VercelAPI["Vercel serverless (11 routes)"]
+  subgraph VercelAPI["Vercel serverless (12 routes)"]
     API_ADD["add-from-imdb"]
     API_JOIN["join-shared-list"]
     API_INV["invites"]
@@ -461,6 +462,7 @@ flowchart LR
     API_JOB["admin-job-config"]
     API_ENV["admin-env-status"]
     API_EXT["external-status"]
+    API_CAT["catalog-health"]
     API_WA_HOOK["whatsapp-webhook"]
     API_WA_VER["whatsapp-verify"]
     Static["Static assets"]
@@ -489,6 +491,7 @@ flowchart LR
   SPA --> API_JOB
   SPA --> API_EXT
   SPA --> API_ENV
+  SPA --> API_CAT
   ADD --> FA
   ADD --> API_ADD
   BM --> ADD
@@ -516,6 +519,9 @@ flowchart LR
   API_INV --> RS
   API_LOG --> FA
   API_LOG --> AX
+  API_CAT --> FS
+  API_CAT --> FA
+  API_CAT --> TMDB
 
   SPA --> YT
 ```
@@ -529,10 +535,11 @@ sequenceDiagram
   participant BM as bookmarklet.js
   participant Popup as add.html + add-main.ts
   participant Auth as Firebase Auth
-  participant NF as Vercel add-from-imdb
+  participant API_ADD as Vercel add-from-imdb
   participant OMDb
   participant TMDB
   participant FS as Firestore
+  participant SPA as Watchlist UI
 
   User->>IMDb: Browse title page
   User->>BM: Run bookmarklet
@@ -540,14 +547,14 @@ sequenceDiagram
   Popup->>Auth: onAuthStateChanged
   Auth-->>Popup: user + getIdToken()
   Popup->>Popup: getUserProfile (country)
-  Popup->>NF: POST JSON + Bearer token
-  NF->>Auth: verifyIdToken
-  NF->>OMDb: GET by imdb id
-  NF->>TMDB: find by imdb id
-  NF->>TMDB: movie/tv detail + videos
-  NF->>TMDB: watch/providers (region)
-  NF->>FS: update users/uid or sharedLists/listId
-  NF-->>Popup: JSON ok/message
+  Popup->>API_ADD: POST JSON + Bearer token
+  API_ADD->>Auth: verifyIdToken
+  API_ADD->>OMDb: GET by imdb id
+  API_ADD->>TMDB: find by imdb id
+  API_ADD->>TMDB: movie/tv detail + videos
+  API_ADD->>TMDB: watch/providers (region)
+  API_ADD->>FS: update users/uid or sharedLists/listId
+  API_ADD-->>Popup: JSON ok/message
   Popup->>BM: postMessage add-result
   BM-->>User: Toast + close popup
 
@@ -679,7 +686,7 @@ flowchart TD
    - **Admin / service account:** **No private key material in git.** Committed code only references the **`FIREBASE_SERVICE_ACCOUNT` env var name** (functions, scripts, docs, `.env.example` with an empty value, GitHub Actions `${{ secrets.FIREBASE_SERVICE_ACCOUNT }}`). **`.gitignore`** includes **`.env`**, **`.env.local`**, **`.env.*.local`**, and **`serviceAccountKey.json`**.  
    - **Verdict:** The **gap about leaking the service account** is **resolved** (appropriate ignores + no credential blobs in tracked files). The **embedded web config** is **intentional** for this project’s public Firebase client settings, not a partial “secret” leak — **forks** should replace defaults or set **`VITE_FIREBASE_*`** for their own Firebase project.
 
-3. **Bookmarklet portability** — **Still exists (audit: Mar 2026).** Public production URL: **`https://watchlist.maulbogat.com`** (**Cloudflare** DNS for **`maulbogat.com`**; **`watchlist`** **CNAME** → **Vercel**). Nothing reads that dynamically in the bookmarklet yet: **`public/bookmarklet.js`** still hardcodes **`https://movie-trailer-site.vercel.app`** for the popup URL and **`postMessage`** allowlist, plus legacy **`watchlist-trailers.netlify.app`** and **`localhost`** (optional port). **`public/bookmarklet.html`** points at the same script host. Update both files (and Firebase **Authorized domains**) when switching the bookmarklet fully to the custom domain.
+3. **Bookmarklet portability** — **Resolved for production domain (audit).** **`public/bookmarklet.js`** uses **`https://watchlist.maulbogat.com`** for the popup URL and for **`postMessage`** origin checks, and accepts **`http://`** or **`https://`** **`localhost`** with any port for local development. The production origin is **not** read from env (by design: the snippet must stay small and tamper-evident on **imdb.com**). **`public/bookmarklet.html`** and **`BookmarkletSettings`** load **`bookmarklet.js`** from the current deployment origin (`/bookmarklet.js`), so users re-drag after script changes. A future hostname change still requires editing **`bookmarklet.js`**, redeploying, and updating Firebase **Authorized domains**.
 
 4. **Bookmarklet target lists** — **Still accurate (audit).** **`api/add-from-imdb.js`** resolves target list from POST body first, then cookies: **`listId`** ← `body.listId` or **`bookmarklet_list_id`**; personal list ← **`bookmarklet_personal_list_id`** or `body.personalListId`. Matches the client setting those cookies (**`src/lib/bookmarkletCookie.ts`**, **`src/add-main.ts`**).
 
