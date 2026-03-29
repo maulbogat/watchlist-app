@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0a0a0a"/>
+
+  <!-- Card back — rotate -18deg around (160, 400) -->
+  <g transform="rotate(-18, 160, 400)">
+    <rect x="80" y="180" width="160" height="220" rx="14" fill="#6B5010"/>
+  </g>
+
+  <!-- Card middle — upright -->
+  <rect x="80" y="180" width="160" height="220" rx="14" fill="#9A7820"/>
+
+  <!-- Card front — rotate +14deg around (160, 400) -->
+  <g transform="rotate(14, 160, 400)">
+    <rect x="80" y="180" width="160" height="220" rx="14" fill="#E8C96A"/>
+    <!-- Play triangle centered at (160, 290) -->
+    <polygon points="128,248 128,332 200,290" fill="#1A1000"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text
+    x="350"
+    y="337"
+    font-family="'Bebas Neue', 'Arial Black', Impact, sans-serif"
+    font-size="130"
+    font-weight="400"
+    fill="#E8C96A"
+    letter-spacing="5"
+  >WATCHLIST</text>
+
+  <!-- Tagline -->
+  <text
+    x="354"
+    y="395"
+    font-family="Arial, sans-serif"
+    font-size="22"
+    fill="#E8C96A"
+    opacity="0.5"
+    letter-spacing="5"
+  >YOUR MOVIES. YOUR SHOWS. YOUR LIST.</text>
+</svg>

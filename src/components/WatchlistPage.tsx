@@ -255,7 +255,7 @@ export function WatchlistPage() {
     <>
       <header>
         <h1>
-          <span id="header-title">My</span> <span>Watchlist</span>
+          <img src="/watchlist-logo.svg" alt="Watchlist" className="watchlist-header-logo" />
         </h1>
         <div className="header-filters">
           <div className="filters">

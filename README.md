@@ -9,7 +9,7 @@ A personal movie/show watchlist with YouTube trailers, filters, and Firestore. *
 **`styles.css`** defines shared tokens in **`:root`** and documents them in the **WATCHLIST DESIGN SYSTEM** comment at the top of the file:
 
 - **Fonts:** **Bebas Neue** / **DM Sans** from Google Fonts (**`index.html`** → **`--font-title`** / **`--font-body`**); **Geist Variable** via **`@fontsource-variable/geist`** for component / shadcn UI (**`@theme`** in **`styles.css`**).
-- **Colors:** `--color-gold`, `--color-red`, `--color-surface-1` / `-2` / `-3`, `--color-text-muted`
+- **Colors:** `--color-gold`, `--color-red`, `--color-surface-1` / `-2` / `-3`, `--color-text-muted`, `--color-bg` (page / splash background; aliases `--color-surface-1`)
 - **Typography:** `--text-xs` … `--text-xl` (five-step scale)
 - **Radius:** `--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-pill`
 - **Spacing:** `--space-1` … `--space-12` (4px-based / 8px-aligned grid)
@@ -34,7 +34,7 @@ Then set values in:
 
 ## Run locally
 
-The watchlist is **React** (`src/`) served by **Vite**. Root **`index.html`** is the Vite entry (`#root` + `/src/main.tsx`). **`npm run build:react`** outputs **`dist/`**, which Vercel publishes (see **`vercel.json`**).
+The watchlist is **React** (`src/`) served by **Vite**. Root **`index.html`** is the Vite entry (`#root` + `/src/main.tsx`), sets **`<title>Watchlist`**, Open Graph / Twitter card tags (production URL **`https://watchlist.maulbogat.com`** + **`/watchlist-og.svg`**), and favicon links (**`/watchlist-mark.svg`**, **`/favicon-32x32.png`**, **`/favicon-16x16.png`**, **`/apple-touch-icon.png`**). **`public/`** holds **`watchlist-logo.svg`** (header mark + wordmark), **`watchlist-mark.svg`**, **`watchlist-og.svg`** (1200×630), and the raster favicons derived from the mark. **`npm run build:react`** outputs **`dist/`**, which Vercel publishes (see **`vercel.json`**).
 
 **Requirements:** [Node.js](https://nodejs.org/) **18+** and npm.
 
@@ -324,7 +324,7 @@ Many scripts expect **`TMDB_API_KEY`**, **`FIREBASE_SERVICE_ACCOUNT`** (base64) 
 
 ## Features
 
-- **Watchlist UI (React):** grid of titles with poster, status controls, and **trailer modal** (YouTube embed; **add-to-list** checkmarks stay in sync with list mutations via React Query). **Original language:** non-English titles show a small **language badge** on cards (ISO code) and a readable name in the modal footer when **`titleRegistry`** has **`originalLanguage`** from TMDB (new adds / re-enrichment). **Skeleton placeholders** for the grid and filter chrome while list data loads.
+- **Watchlist UI (React):** while Firebase Auth initializes (**`useAuthUser`** / **`onAuthStateChanged`**), **`WatchlistAuthGate`** and **`/admin`** (**`AdminRouteShell`**) show a **full-viewport splash** (centered **`/watchlist-mark.svg`**, pulse animation in **`styles.css`**). Grid of titles with poster, status controls, and **trailer modal** (YouTube embed; **add-to-list** checkmarks stay in sync with list mutations via React Query). **Original language:** non-English titles show a small **language badge** on cards (ISO code) and a readable name in the modal footer when **`titleRegistry`** has **`originalLanguage`** from TMDB (new adds / re-enrichment). **Skeleton placeholders** for the grid and filter chrome while list data loads.
 - **Up next:** horizontal **card row** (poster thumbnail, title, episode/release detail, **date in gold**, dismiss, **calendar (`.ics`)** download) for the current list’s **`upcomingAlerts`**. Shows the **first four** titles in a scrollable strip; **expand** reveals a full **grid** with **Show less** to collapse. **Skeleton strip** while alerts load. Section **hidden** when there are no alerts. **`localStorage`** + TanStack Query (**2-hour** stale window) reduce redundant Firestore reads.
 - **Sticky controls toolbar:** after the header and Up next block, the filter toolbar **sticks** to the top of the viewport (**IntersectionObserver** + **`styles.css`** sticky shell).
 - **Personal lists:** default list + extra lists; **manage lists** modal (create/rename/delete, pick default, **invite someone** + pending invites).

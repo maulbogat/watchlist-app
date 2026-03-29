@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 200" width="680" height="200">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;display=swap');
+    </style>
+  </defs>
+  <!-- Card back — rotate -18deg around (95, 168) -->
+  <g transform="rotate(-18, 95, 168)">
+    <rect x="51" y="40" width="88" height="128" rx="8" fill="#8B6E1A"/>
+  </g>
+
+  <!-- Card middle — upright -->
+  <rect x="51" y="40" width="88" height="128" rx="8" fill="#B8952A"/>
+
+  <!-- Card front — rotate +14deg around (95, 168) -->
+  <g transform="rotate(14, 95, 168)">
+    <rect x="51" y="40" width="88" height="128" rx="8" fill="#E8C96A"/>
+    <!-- Play triangle centered at (95, 104) -->
+    <polygon points="74,82 74,126 116,104" fill="#1A1000"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text
+    x="185"
+    y="128"
+    font-family="'Bebas Neue', 'Arial Black', Impact, sans-serif"
+    font-size="64"
+    font-weight="400"
+    fill="#E8C96A"
+    letter-spacing="3"
+  >WATCHLIST</text>
+</svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 180" width="160" height="180">
+  <!-- Card back -->
+  <g transform="rotate(-18, 55, 158)">
+    <rect x="11" y="28" width="88" height="128" rx="8" fill="#8B6E1A"/>
+  </g>
+
+  <!-- Card middle -->
+  <rect x="11" y="28" width="88" height="128" rx="8" fill="#B8952A"/>
+
+  <!-- Card front -->
+  <g transform="rotate(14, 55, 158)">
+    <rect x="11" y="28" width="88" height="128" rx="8" fill="#E8C96A"/>
+    <polygon points="34,70 34,114 76,92" fill="#1A1000"/>
+  </g>
+</svg>

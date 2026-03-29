@@ -1,7 +1,7 @@
 /*
  * WATCHLIST DESIGN SYSTEM
  * ========================
- * Color tokens: --color-gold, --color-red, --color-success, --color-surface-1/2/3, --color-text-muted
+ * Color tokens: --color-gold, --color-red, --color-success, --color-surface-1/2/3, --color-text-muted, --color-bg
  * Typography: --text-xs (0.72rem), --text-sm (0.85rem), --text-base (1rem),
  *             --text-lg (1.15rem), --text-xl (1.5rem)
  * Radius:     --radius-sm (4px), --radius-md (6px), --radius-lg (10px), --radius-pill (999px)
@@ -38,6 +38,7 @@
   --color-surface-2: #131317;
   --color-surface-3: #1c1c22;
   --color-text-muted: #888;
+  --color-bg: var(--color-surface-1);
 
   /* Design system — typography scale (Stage 1: tokens only) */
   --text-xs: 0.72rem;
@@ -340,6 +341,12 @@ header h1 {
 
 header h1 span {
   color: var(--accent);
+}
+
+.watchlist-header-logo {
+  height: 76px;
+  width: auto;
+  display: block;
 }
 
 .header-meta {
@@ -3021,6 +3028,31 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 /* --- React (Vite) migration shell (index.vite.html) --- */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.splash-logo {
+  width: 80px;
+  height: auto;
+  animation: splash-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes splash-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
 .react-migration-shell {
   max-width: 36rem;
   margin: 3rem auto;

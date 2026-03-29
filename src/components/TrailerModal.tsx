@@ -470,14 +470,15 @@ export function TrailerModal() {
               >
                 Watch on YouTube &#x2197;
               </a>
-            ) : imdbUrl ? (
+            ) : null}
+            {imdbUrl ? (
               <a
                 href={imdbUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="modal-action-btn modal-youtube-link"
               >
-                IMDb &#x2197;
+                Open on IMDb &#x2197;
               </a>
             ) : null}
           </div>

@@ -26,6 +26,14 @@ function isAuthError(err: unknown): err is { code?: string; message?: string } {
   return typeof err === "object" && err !== null;
 }
 
+function AuthLoadingSplash() {
+  return (
+    <div className="splash-screen">
+      <img src="/watchlist-mark.svg" alt="Watchlist" className="splash-logo" />
+    </div>
+  );
+}
+
 function WatchlistAuthGate() {
   const { loading: authLoading } = useAuthUser();
   const user = useAppStore((s) => s.currentUser);
@@ -70,7 +78,7 @@ function WatchlistAuthGate() {
   }
 
   if (authLoading) {
-    return <div className="react-migration-shell">Loading…</div>;
+    return <AuthLoadingSplash />;
   }
 
   if (!user) {
@@ -146,7 +154,7 @@ function AdminRouteShell() {
     return null;
   }
   if (authLoading) {
-    return <div className="react-migration-shell">Loading…</div>;
+    return <AuthLoadingSplash />;
   }
   if (!user) {
     return <Navigate to="/" replace />;

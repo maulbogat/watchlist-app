@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#0a0a0c"/>
-  <path d="M12 8v16l12-8z" fill="#e8c96a"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="1000" height="1000"><metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:creator>RealFaviconGenerator</dc:creator><dc:source>https://realfavicongenerator.net</dc:source></rdf:Description></rdf:RDF></metadata><g clip-path="url(#SvgjsClipPath1352)"><rect width="1000" height="1000" fill="#0a0a0a"></rect><g transform="matrix(4.444444444444445,0,0,4.444444444444445,144.44444444444446,100)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 180" width="160" height="180"><g transform="rotate(-18, 55, 168)">
+    <rect x="11" y="30" width="88" height="128" rx="8" fill="#8B6E1A"></rect>
+  </g><rect x="11" y="30" width="88" height="128" rx="8" fill="#B8952A"></rect><g transform="rotate(14, 55, 168)">
+    <rect x="11" y="30" width="88" height="128" rx="8" fill="#E8C96A"></rect>
+    <polygon points="34,72 34,116 76,94" fill="#1A1000"></polygon>
+  </g></svg></g></g><defs><clipPath id="SvgjsClipPath1352"><rect width="1000" height="1000" x="0" y="0" rx="350" ry="350"></rect></clipPath></defs></svg>
