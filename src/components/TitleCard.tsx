@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { renderServiceChips, servicesForMovie } from "../lib/movieDisplay.js";
 import { sanitizePosterUrl } from "../lib/utils.js";
-import { movieKey } from "../firebase.js";
+import { listKey } from "../firebase.js";
 import { STATUS_ORDER, STATUS_LABELS } from "../store/useAppStore.js";
 import type { StatusKey, WatchlistItem } from "../types/index.js";
 
@@ -42,7 +42,7 @@ export function TitleCard({
   onOpenModal,
   onRequestRemove,
 }: TitleCardProps) {
-  const key = movieKey(m);
+  const key = listKey(m);
   const menuOpen = statusOpenKey === key;
   const thumbSrc = sanitizePosterUrl(m.thumb);
   const thumbHTML = thumbSrc ? (
@@ -72,7 +72,9 @@ export function TitleCard({
   const langCode =
     langRaw && langRaw.toLowerCase() !== "en" ? langRaw.slice(0, 2).toUpperCase() : null;
   const serviceChips = renderServiceChips(servicesForMovie(m, userCountryCode), { limit: 3 });
-  const serviceRow = serviceChips ? <div className="service-row" dangerouslySetInnerHTML={{ __html: serviceChips }} /> : null;
+  const serviceRow = serviceChips ? (
+    <div className="service-row" dangerouslySetInnerHTML={{ __html: serviceChips }} />
+  ) : null;
 
   function sharedListAddedByLine(): string {
     const name = m.addedByDisplayName?.trim();
@@ -121,8 +123,7 @@ export function TitleCard({
 
   const s = m.status || "to-watch";
   const displayStatus = s;
-  const statusTabKey =
-    s === "watched" ? "watched" : s === "archive" ? "archive" : "to-watch";
+  const statusTabKey = s === "watched" ? "watched" : s === "archive" ? "archive" : "to-watch";
   const statusIcons: Record<string, ReactElement> = {
     "to-watch": (
       <>
@@ -132,7 +133,10 @@ export function TitleCard({
     ),
     watched: <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />,
     archive: (
-      <path d="M4 7h16M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2M4 7v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7M9 12h6" fill="none" />
+      <path
+        d="M4 7h16M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2M4 7v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7M9 12h6"
+        fill="none"
+      />
     ),
     "maybe-later": (
       <>
@@ -141,7 +145,8 @@ export function TitleCard({
       </>
     ),
   };
-  const iconKey: keyof typeof statusIcons = displayStatus in statusIcons ? (displayStatus as keyof typeof statusIcons) : "to-watch";
+  const iconKey: keyof typeof statusIcons =
+    displayStatus in statusIcons ? (displayStatus as keyof typeof statusIcons) : "to-watch";
 
   const useFill = displayStatus === "watched";
 
@@ -154,7 +159,11 @@ export function TitleCard({
       aria-label={`Play trailer for ${m.title}`}
       onClick={(e) => {
         const t = e.target;
-        if (t instanceof Element && (t.closest(".status-badge-wrap") || t.closest(".card-delete-btn"))) return;
+        if (
+          t instanceof Element &&
+          (t.closest(".status-badge-wrap") || t.closest(".card-delete-btn"))
+        )
+          return;
         onOpenModal(m);
       }}
       onKeyDown={(e) => {

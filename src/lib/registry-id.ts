@@ -33,18 +33,17 @@ export function registryDocIdFromItem(item: Record<string, unknown> | null | und
   return legacyKeyFromTitleYear(item);
 }
 
-export function payloadForRegistry(full: Record<string, unknown> | null | undefined): Record<string, unknown> {
+export function payloadForRegistry(
+  full: Record<string, unknown> | null | undefined
+): Record<string, unknown> {
   if (!full || typeof full !== "object") return {};
   const { status: _s, registryId: _r, ...rest } = full;
   return { ...rest };
 }
 
-export function listKey(m: { registryId?: string; title?: unknown; year?: unknown } | null | undefined): string {
+export function listKey(
+  m: { registryId?: string; title?: unknown; year?: unknown } | null | undefined
+): string {
   if (m?.registryId) return m.registryId;
   return `${m?.title ?? ""}|${m?.year ?? ""}`;
-}
-
-/** @deprecated Use listKey — kept for scripts that still use title|year */
-export function movieKey(m: { registryId?: string; title?: unknown; year?: unknown } | null | undefined): string {
-  return listKey(m);
 }

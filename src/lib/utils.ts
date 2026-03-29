@@ -33,11 +33,21 @@ export function escapeHtml(s: string): string {
 }
 
 /** Normalize Firestore string / Timestamp-shaped values to a YYYY-MM-DD or ISO-ish string for display/rules. */
-export function getUpcomingAirDateString(alert: UpcomingAlert | Record<string, unknown> | null | undefined): string {
-  const d = alert && typeof alert === "object" && "airDate" in alert ? (alert as { airDate?: unknown }).airDate : undefined;
+export function getUpcomingAirDateString(
+  alert: UpcomingAlert | Record<string, unknown> | null | undefined
+): string {
+  const d =
+    alert && typeof alert === "object" && "airDate" in alert
+      ? (alert as { airDate?: unknown }).airDate
+      : undefined;
   if (d == null) return "";
   if (typeof d === "string") return d.trim();
-  if (typeof d === "object" && d !== null && "toDate" in d && typeof (d as { toDate: () => Date }).toDate === "function") {
+  if (
+    typeof d === "object" &&
+    d !== null &&
+    "toDate" in d &&
+    typeof (d as { toDate: () => Date }).toDate === "function"
+  ) {
     try {
       const dt = (d as { toDate: () => Date }).toDate();
       return Number.isNaN(dt.getTime()) ? "" : dt.toISOString().slice(0, 10);
@@ -66,7 +76,9 @@ export function formatUpcomingAirLabel(alert: UpcomingAlert | Record<string, unk
   }
 }
 
-export function upcomingAlertHasRealAirDate(alert: UpcomingAlert | Record<string, unknown>): boolean {
+export function upcomingAlertHasRealAirDate(
+  alert: UpcomingAlert | Record<string, unknown>
+): boolean {
   const s = getUpcomingAirDateString(alert);
   if (!s || s.toUpperCase() === "TBA") return false;
   const raw = s.includes("T") ? s : `${s}T12:00:00`;
@@ -137,7 +149,10 @@ export function buildUpcomingIcsDocument(opts: {
   if (start.length !== 8) return null;
   const endExcl = icsAllDayEndExclusiveYmd(ymd);
   if (!endExcl) return null;
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
   const sum = icsFoldLine(`SUMMARY:${icsEscapeText(title || "Upcoming")}`);
   const uidSafe = String(uid || "upcoming").replace(/[^\w.-]/g, "-");
   const lines = [

@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { auth, getSharedList, getIdTokenForApi, GoogleAuthProvider, signInWithPopup } from "../firebase.js";
+import {
+  auth,
+  getSharedList,
+  getIdTokenForApi,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from "../firebase.js";
 import { useAuthUser } from "../hooks/useAuthUser.js";
 import { useAppStore } from "../store/useAppStore.js";
 import { saveLastList } from "../lib/storage.js";
 import { invalidateUserListQueries } from "../hooks/useWatchlist.js";
 import { errorMessage } from "../lib/utils.js";
+import { toast } from "sonner";
 
 type JoinResponse = { ok?: boolean; name?: string; error?: string };
 
@@ -78,7 +85,7 @@ export function JoinPage() {
       const code =
         e && typeof e === "object" && "code" in e ? String((e as { code: unknown }).code) : "";
       if (code === "auth/cancelled-popup-request" || code === "auth/popup-closed-by-user") return;
-      window.alert(errorMessage(e));
+      toast.error(errorMessage(e));
     }
   }
 
@@ -89,8 +96,12 @@ export function JoinPage() {
       : joinErrRaw;
   const listLoadErrorMessage = sharedListQuery.error ? errorMessage(sharedListQuery.error) : null;
   const notFoundMessage =
-    !loadingList && listId && sharedListQuery.isSuccess && sharedList == null ? "Shared list not found." : null;
-  const err = !listId ? "Invalid invite link." : joinErrorMessage || listLoadErrorMessage || notFoundMessage;
+    !loadingList && listId && sharedListQuery.isSuccess && sharedList == null
+      ? "Shared list not found."
+      : null;
+  const err = !listId
+    ? "Invalid invite link."
+    : joinErrorMessage || listLoadErrorMessage || notFoundMessage;
 
   if (!listId) {
     return (

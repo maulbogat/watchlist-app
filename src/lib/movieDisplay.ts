@@ -2,7 +2,10 @@ import { isPlayableYoutubeTrailerId } from "./youtube-trailer-id.js";
 import type { WatchlistItem } from "../types/index.js";
 
 /** Watch-provider names for TMDB region: prefers servicesByRegion[country], then legacy services. */
-export function servicesForMovie(m: WatchlistItem | Record<string, unknown>, countryCode: string | undefined): string[] {
+export function servicesForMovie(
+  m: WatchlistItem | Record<string, unknown>,
+  countryCode: string | undefined
+): string[] {
   const code = (countryCode || "IL").toString().toUpperCase().slice(0, 2);
   const map = (m as WatchlistItem).servicesByRegion;
   if (map && typeof map === "object" && Array.isArray((map as Record<string, unknown>)[code])) {
@@ -13,7 +16,9 @@ export function servicesForMovie(m: WatchlistItem | Record<string, unknown>, cou
 }
 
 /** Stored TMDB YouTube trailer key — playable only if valid 11-char YouTube id */
-export function hasPlayableTrailerYoutubeId(m: { youtubeId?: string | null } | null | undefined): boolean {
+export function hasPlayableTrailerYoutubeId(
+  m: { youtubeId?: string | null } | null | undefined
+): boolean {
   return isPlayableYoutubeTrailerId(m?.youtubeId);
 }
 

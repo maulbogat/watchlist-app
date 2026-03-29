@@ -31,7 +31,7 @@ This document describes **only what exists in this repository** (static site, Ve
 ## Section 2: Architecture Overview
 
 **Browser (client-side)**  
-- **Watchlist UI — React + TypeScript + Vite:** Root **`index.html`** loads **`#root`** and **`/src/main.tsx`**. **`src/main.tsx`** optionally initializes **Sentry** (**`@sentry/react`**) when **`VITE_SENTRY_DSN`** is set (production-only reporting) and wraps **`App`** with **`Sentry.withErrorBoundary`** (token-based fallback UI in **`styles.css`**). **`npm run dev:react`** / **`npm run build:react`**; Vercel publishes **`dist/`** from **`npm run build:react`** (**`vercel.json`**). **`src/App.tsx`** routes include **`/join/:listId`** (**`JoinPage`**), **`/join-app/:inviteId`** (**`JoinAppPage`**), **`/admin`**, and the signed-in watchlist shell (**`WatchlistAuthGate`** → **`AllowlistGate`** → **`WatchlistPage`**). **`AccessDeniedScreen`** replaces the app when the user is not on **`allowedUsers`** (except **`/join-app/*`** where they can sign in and accept). **`src/firebase.ts`** (Firebase JS SDK from npm, bundled by Vite) initializes App, Auth, Firestore, optional Analytics; list CRUD uses the same module; **`checkUserAllowed`** reads **`allowedUsers`**. **`src/store/useAppStore.ts`** (Zustand) + **`src/store/watchlistConstants.ts`**. **`src/hooks/useWatchlist.ts`** (TanStack Query) loads lists; **`useAuthUser.ts`** → **`onAuthStateChanged`**. **`WatchlistPage.tsx`**: **`ListSelector`**, **`WatchlistToolbar`**, **`ManageListsModal`** (lists + email invites; no in-modal bookmarklet or paste-to-join), auth menu (**WhatsApp** → **`WhatsAppSettings`**, **Bookmarklet** → **`BookmarkletSettings`**), **`CountryModal`**, **`src/components/modals/*.tsx`**, **`UpcomingAlertsBar`**, filters, **`TitleGrid`** / **`TitleCard`**, **`TrailerModal`**. Session restore **`useWatchlistSessionRestore.ts`**; **`src/lib/watchlistFilters.ts`**, **`bookmarkletCookie.ts`**, **`storage.ts`**, **`movieDisplay.ts`**, **`utils.ts`**, **`src/data/lists.ts`**, **`src/hooks/useMutations.ts`**. **`src/main.tsx`** warns if **`#root`** is missing.
+- **Watchlist UI — React + TypeScript + Vite:** Root **`index.html`** loads **`#root`** and **`/src/main.tsx`**. **`src/main.tsx`** mounts **Sonner** **`Toaster`** (**`import { Toaster } from "sonner"`**, **`theme="dark"`**, **`position="bottom-right"`**) next to **`QueryClientProvider`** for **`toast.error` / `toast.success`** (replacing **`window.alert`** in grid, trailer modal, list management, join, onboarding rename). Optionally initializes **Sentry** (**`@sentry/react`**) when **`VITE_SENTRY_DSN`** is set (production-only reporting) and wraps **`App`** with **`Sentry.withErrorBoundary`** (token-based fallback UI in **`styles.css`**). **`npm run dev:react`** / **`npm run build:react`**; Vercel publishes **`dist/`** from **`npm run build:react`** (**`vercel.json`**). **`src/App.tsx`** routes include **`/join/:listId`** (**`JoinPage`**), **`/join-app/:inviteId`** (**`JoinAppPage`**), **`/admin`**, and the signed-in watchlist shell (**`WatchlistAuthGate`** → **`AllowlistGate`** → **`WatchlistPage`**). **`AccessDeniedScreen`** replaces the app when the user is not on **`allowedUsers`** (except **`/join-app/*`** where they can sign in and accept). **`src/firebase.ts`** (Firebase JS SDK from npm, bundled by Vite) initializes App, Auth, Firestore, optional Analytics; list CRUD uses the same module; **`checkUserAllowed`** reads **`allowedUsers`**. **`src/store/useAppStore.ts`** (Zustand) + **`src/store/watchlistConstants.ts`**. **`src/hooks/useWatchlist.ts`** (TanStack Query) loads lists; **`useAuthUser.ts`** → **`onAuthStateChanged`**. **`WatchlistPage.tsx`**: **`ListSelector`**, **`WatchlistToolbar`**, **`ManageListsModal`** (lists + email invites; no in-modal bookmarklet or paste-to-join), auth menu (**WhatsApp** → **`WhatsAppSettings`**, **Bookmarklet** → **`BookmarkletSettings`**), **`CountryModal`**, **`src/components/modals/*.tsx`**, **`UpcomingAlertsBar`**, filters, **`TitleGrid`** / **`TitleCard`**, **`TrailerModal`**. Session restore **`useWatchlistSessionRestore.ts`**; **`src/lib/watchlistFilters.ts`**, **`bookmarkletCookie.ts`**, **`storage.ts`**, **`movieDisplay.ts`**, **`utils.ts`**, **`src/data/lists.ts`**, **`src/hooks/useMutations.ts`**. **`src/main.tsx`** warns if **`#root`** is missing.
 - All routine Firestore access uses the **signed-in user’s** Firebase session and **`firestore.rules`**.  
 - **`add.html`** + **`src/add-main.ts`** — bookmarklet popup: auth, POST **`/api/add-from-imdb`**, `postMessage` handshake.  
 - **`public/bookmarklet.js`** on **imdb.com** opens **`https://watchlist.maulbogat.com/add.html?imdbId=…&embed=1`** in a popup (**Cloudflare** DNS for **`maulbogat.com`**; **`watchlist`** **CNAME** → **Vercel**). The script **hardcodes** that production origin for the popup URL and for **`postMessage`** validation (same host only). For local dev it also accepts **`http(s)://localhost`** with any port so **`vercel dev`** / Vite can serve **`add.html`**; users who install the bookmark from **`/bookmarklet.html`** get the deployed script. Changing the public host requires editing **`public/bookmarklet.js`**, redeploying, and updating Firebase **Authentication → Authorized domains**.
@@ -40,6 +40,7 @@ This document describes **only what exists in this repository** (static site, Ve
 - **`styles.css`** **WATCHLIST DESIGN SYSTEM** **`:root`** tokens: **`--color-*`**, **`--text-*`**, **`--radius-*`**, **`--space-*`**, plus **`--watchlist-genre-popover-border`** for the genre filter popover edge. **Geist Variable** is imported from **`@fontsource-variable/geist`** for the shadcn / **`@theme`** layer; **Bebas Neue** / **DM Sans** load from Google Fonts in **`index.html`** for **`--font-title`** / **`--font-body`**.  
 - Four button bases: **`.btn-primary`**, **`.btn-secondary`**, **`.btn-ghost`**, **`.btn-destructive`** — legacy button class names stay wired through comma-grouped selectors so older rules still layer correctly.  
 - **`.cursorrules`** enforces token/button usage for styling, documents modal/header patterns, and requires README, **system-design.md**, **docs/environment.md**, and **`.env.example`** updates when features, API routes, collections, or env vars change; it also sets Vitest expectations for new pure utilities in **`src/lib/`**.  
+- **Lint / format:** Root **`eslint.config.js`** (flat config): **`@eslint/js`** recommended, **`typescript-eslint`** recommended for **`src/**/*.{ts,tsx}`**, **`eslint-plugin-react-hooks`** (**`recommended-latest`**), **`eslint-plugin-react-refresh`**, **`eslint-plugin-prettier`** + **`eslint-config-prettier`**; **`src/**/*.js`** uses core recommended with Node globals. Ignores **`dist/`**, **`node_modules/`**, **`backups/`**, **`scripts/`**, **`src/components/ui/`**. **`npm run lint`** / **`lint:fix`**. **Prettier** (**`.prettierrc`**, **`.prettierignore`**) — **`npm run format`** / **`format:check`** on **`src/`**.  
 - **Watchlist toolbar:** **`WatchlistToolbar.tsx`** uses a two-row layout (primary: status tabs, type, sort, search; secondary: genre **Radix Popover** via **`src/components/ui/popover.tsx`**, **Added by** segmented control on shared lists). Genre list styling: **`watchlist-genre-popover-*`** in **`styles.css`**; sort still uses **Radix Select**.
 
 **Migration note (Netlify → Vercel)**  
@@ -91,15 +92,30 @@ Legacy collection is **not** used by the app or scripts anymore. **Rules** no lo
 
 Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only (`add-from-imdb`, migration scripts). **Reads:** Any signed-in user.
 
+**Payload shape (merge writes):** **`api/add-from-imdb.js`** calls **`payloadForRegistry`** (**`src/lib/registry-id.ts`** / **`src/api-lib/registry-id.cjs`**) before **`titleRegistry/{id}.set(..., { merge: true })`**. That helper **omits** **`status`** and **`registryId`** from the written object (the document id is the canonical id; status is list-scoped only). All other merged keys are persisted. TMDB-enriched adds set the fields below; **OMDb-only** fallback (no TMDB match) still sets **`imdbId`**, **`title`**, **`year`**, **`type`**, **`genre`**, **`thumb`**, **`youtubeId`** (usually **`null`**), and **`services`** (`[]`) but **does not** set **`tmdbId`**, **`tmdbMedia`**, or **`originalLanguage`** until a later merge. **`servicesByRegion`** is **not** written by **`add-from-imdb`**; it may be merged by scripts (e.g. **`scripts/sync-services-from-tmdb.js`**). Older docs may still carry legacy keys removed by maintenance (**`scripts/cleanup-legacy-fields.mjs`**, etc.).
+
 | Field | Type | Notes |
 |-------|------|--------|
-| (same as former embedded item) | | `title`, `year`, `type`, `genre`, `thumb`, `youtubeId`, `imdbId`, `tmdbId`, `tmdbMedia`, `services`, **`originalLanguage`** (TMDB **`original_language`**, ISO 639-1, when enriched via **`add-from-imdb`**), … |
+| `title` | `string` | Display title from TMDB or OMDb. |
+| `year` | `number` or null | Release / first-air year when parseable. |
+| `type` | `"movie"` \| `"show"` | TV is stored as **`"show"`** (aligned with client **`MediaType`**). |
+| `genre` | `string` | Often **`"Genre1 / Genre2"`** (TMDB); OMDb **`Genre`** string as returned. |
+| `thumb` | `string` (URL) or null | TMDB **`poster_path`** as w500 base URL (**`add-from-imdb`**) or OMDb **`Poster`** when not **`N/A`**. |
+| `youtubeId` | `string` or null | TMDB trailer key; stored only if it matches YouTube’s **11-character** id pattern (**`/^[a-zA-Z0-9_-]{11}$/`** in **`add-from-imdb`**, same idea as **`src/lib/youtube-trailer-id.ts`**). |
+| `imdbId` | `string` | Normalized with **`tt`** prefix in the add flow. |
+| `tmdbId` | `number` | Present when **TMDB** enrichment succeeds; absent / unchanged on OMDb-only rows until merged. |
+| `tmdbMedia` | `"tv"` \| `"movie"` | TMDB media kind for **`tmdbId`** (TV **`show`** → **`"tv"`**). |
+| `services` | `array` of `string` | Watch **provider names** for the user’s **watch region** at add time (TMDB **`watch/providers`**); empty array when unknown or OMDb-only. |
+| `servicesByRegion` | `object` or null | Optional map **`{ "IL": ["Netflix", …], … }`**; populated by maintenance scripts, not by **`add-from-imdb`**. |
+| `originalLanguage` | `string` or null | ISO **639-1**, **lowercase**, from TMDB **`original_language`** when TMDB enrichment runs. |
+
+The field table reflects the **intended** schema from the **`add-from-imdb`** enrichment path. Individual documents may carry **additional** legacy or script-applied keys not listed here — the table is the **write-path contract**, not a guarantee of document shape.
 
 **Maintenance:** **`scripts/backfill-tmdb-media.mjs`** sets missing **`tmdbMedia`** from **`type`** (`movie` → `movie`, `show` → `tv`) for a curated list of docs; default dry run, **`--write`** to merge. **`scripts/backfill-original-language.mjs`** sets missing **`originalLanguage`** from TMDB **`original_language`** for every **`titleRegistry`** doc with a usable **`tmdbId`** (and **`tmdbMedia`** / **`type`** for movie vs TV); uses **`TMDB_API_KEY`** + Admin; default dry run, **`--write`** to merge; **`--force`** overwrites existing **`originalLanguage`**. **`scripts/cleanup-legacy-fields.mjs`** removes **`addedByUid`**, **`addedByDisplayName`**, **`addedByPhotoUrl`** from a fixed set of registry docs via Admin **`update`** + **`FieldValue.delete()`**; default dry run, **`--write`** to apply. **`scripts/backfill-thumb.mjs`** fills missing **`thumb`** from TMDB **`poster_path`** (w500) for a fixed list; uses **`TMDB_API_KEY`** and Admin from **`.env`** / **`serviceAccountKey.json`**; default dry run, **`--write`** to merge.
 
-**`registryId` algorithm:** **`src/lib/registry-id.ts`** (client) / **`src/api-lib/registry-id.cjs`** (functions) — prefer normalized IMDb id (`tt…`), else `tmdb-tv-{id}` / `tmdb-movie-{id}`, else deterministic `legacy-{hash}` from `title|year`.
+**`registryId` (document id) and list keys:** The id is **`registryDocIdFromItem`** in **`src/lib/registry-id.ts`** (client) / **`src/api-lib/registry-id.cjs`** (API): prefer normalized IMDb id (`tt…`), else **`tmdb-tv-{id}`** / **`tmdb-movie-{id}`** when **`tmdbId`** is known, else deterministic **`legacy-{hash}`** from **`title|year`**. For **status arrays** (**`watched`**, **`maybeLater`**, **`archive`**) and legacy rows, the same module’s **`listKey`** returns **`registryId`** when the row has it, otherwise **`title|year`**. The old **`movieKey`** export was removed; **`listKey`** is the single helper.
 
-**List rows** in `users` / `sharedLists` / `personalLists` store **`{ registryId: "<id>" }`** only (after migration). Status arrays use the same string as the key (`registryId`). Per-user display overrides can attach here or on list rows in a future version.
+**List rows** in **`sharedLists`** / **`personalLists`** use the canonical **`{ registryId, addedAt }`** shape after migration (shared rows may add **`addedBy*`** — see **List row in Firestore** below). Status arrays use the **`listKey`** string (usually equal to **`registryId`**). Per-user display overrides can attach here or on list rows in a future version.
 
 ---
 
@@ -112,6 +128,8 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 | `countryName` | `string` | Human-readable country name for UI. |
 | `upcomingDismissals` | `map` | Optional. Keys = alert **fingerprints** (e.g. `136311_3_9`, `12345_sequel_999`); values = ISO date string when the user dismissed that pill. Used so dismissed upcoming notifications stay hidden until a new fingerprint appears. |
 | `phoneNumbers` | `array` of string | Optional. **Digits-only** ids (same as **`phoneIndex`** document ids) for WhatsApp-linked numbers; maintained with **`arrayUnion` / `arrayRemove`** when linking or removing in **`WhatsAppSettings`**. |
+| `displayName` | `string` or null | Denormalized from Firebase Auth via **`syncUserDisplayNameToFirestore`** in **`src/firebase.ts`**. Used for **“added by”** display on shared lists. Readable by **any signed-in user** per **`firestore.rules`**. |
+| `photoURL` | `string` or null | Synced from Firebase Auth **`photoURL`**. Used for avatar display on shared lists. |
 
 **Legacy (removed after migration):** `items`, `watched`, `maybeLater`, `archive`, `listName` on the user root doc were moved into the default `personalLists` subdoc. The client and `add-from-imdb` run a one-time migration; optional bulk script: `scripts/migrate-personal-items-to-subcollection.mjs`.
 
@@ -266,28 +284,26 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 
 ### List row in Firestore (`items` array)
 
-**Current (normalized):** `{ "registryId": "tt1234567" }` (or `tmdb-tv-…` / `legacy-…`). Metadata lives in **`titleRegistry/{registryId}`**; the client merges on read (`src/firebase.ts` → `hydrateListItemsFromRegistry`). List rows persist **`addedAt`** (ISO string) when writing via `rowToStore` / `ensureAddedAt`.
+**Current (canonical normalized shape):** **`{ registryId, addedAt }`** — **`registryId`** is the stable id (`tt…`, `tmdb-tv-…` / `tmdb-movie-…`, or `legacy-…`). Metadata lives in **`titleRegistry/{registryId}`**; the client merges on read (**`src/firebase.ts`** → **`hydrateListItemsFromRegistry`**). **`addedAt`** (ISO string) is set when writing via **`rowToStore`** / **`ensureAddedAt`**.
 
-**Legacy (pre-migration):** full embedded objects with the same fields as **`titleRegistry`** docs; still supported until `scripts/migrate-to-title-registry.mjs` is run.
-
-**Registry / hydrated fields** (from `titleRegistry` or legacy embed):
+**Shared list `items` only:** Rows written by **`add-from-imdb.js`** using **`toStoredRegistryRef`** may **also** include optional denormalized member fields (not used on **personal** list rows):
 
 | Field | Type | Notes |
 |-------|------|--------|
-| `registryId` | `string` | Present on hydrated client objects; not stored in `titleRegistry` payload (doc id is the id). |
-| `title` | `string` | |
-| `year` | `number` or null | |
-| `type` | `"movie"` \| `"show"` | TV uses `"show"`. |
-| `genre` | `string` | Often `"Genre1 / Genre2"`. |
-| `thumb` | `string` (URL) or null | TMDB poster or OMDb poster. |
-| `youtubeId` | `string` or null | Must match 11-char pattern to be “playable” (`src/lib/youtube-trailer-id.ts`). |
-| `imdbId` | `string` | Normalized with `tt` prefix in add flow. |
-| `tmdbId` | `number` | When TMDB enrichment succeeds. |
-| `services` | `array` of string | Provider display names for a region (legacy / default). |
-| `servicesByRegion` | `object` | Optional map `{ "IL": [...], ... }`; may be populated by maintenance scripts or future client code (not written by current SPA). |
-| `tmdbMedia` | `string` | `"tv"` \| `"movie"` for TMDB dedupe / upcoming sync. |
+| `addedByUid` | `string` or null | Firebase **`uid`** of the member who added the title to the shared list. |
+| `addedByDisplayName` | `string` or null | Denormalized display name at write time. |
+| `addedByPhotoUrl` | `string` or null | Denormalized photo URL at write time. |
 
-**Runtime-only:** `status` (`to-watch` \| `watched` \| `maybe-later` \| `archive`) is **computed in memory** when loading lists, from `watched` / `maybeLater` / `archive` key arrays (`listKey` / `registryId`).
+**Legacy (pre-migration):** full embedded objects with the same fields as **`titleRegistry`** docs; still supported until **`scripts/migrate-to-title-registry.mjs`** is run.
+
+**Registry / hydrated fields** (from `titleRegistry` or legacy embed): On the wire, **`titleRegistry`** documents follow the **Field** table under **`titleRegistry` / `{registryId}`** above (plus optional keys from merges/scripts). After **`hydrateListItemsFromRegistry`** (**`src/firebase.ts`**), each row also carries:
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `registryId` | `string` | Present on hydrated client objects; not stored inside the registry document body (**`payloadForRegistry`** strips it; doc id is canonical). |
+| `addedAt` | `string` (ISO) | On list rows from **`rowToStore`** / **`ensureAddedAt`**; may appear on merged registry reads when present on list rows. |
+
+**Runtime-only:** `status` (`to-watch` \| `watched` \| `maybe-later` \| `archive`) is **computed in memory** when loading lists, from `watched` / `maybeLater` / `archive` key arrays keyed by **`listKey`** (see **`titleRegistry`** section above).
 
 ---
 

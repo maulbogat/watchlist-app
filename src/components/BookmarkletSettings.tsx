@@ -1,5 +1,11 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { VisuallyHidden } from "radix-ui";
 
 interface BookmarkletSettingsProps {
@@ -49,7 +55,9 @@ export function BookmarkletSettings({ open, onOpenChange }: BookmarkletSettingsP
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <DialogHeader className="modal-header">
-              <DialogTitle className="modal-title font-title tracking-widest">Bookmarklet</DialogTitle>
+              <DialogTitle className="modal-title font-title tracking-widest">
+                Bookmarklet
+              </DialogTitle>
               <DialogDescription asChild>
                 <VisuallyHidden.Root>
                   Drag the bookmarklet button to your browser bar to add titles from IMDb.
@@ -60,8 +68,8 @@ export function BookmarkletSettings({ open, onOpenChange }: BookmarkletSettingsP
               <section className="lists-modal-section">
                 <h3 className="lists-modal-section-title">Add from IMDb</h3>
                 <p className="lists-modal-description">
-                  Drag this button to your bookmarks bar, then open any IMDb title page and click it to add the
-                  title to your current list (same as the hosted bookmarklet page).
+                  Drag this button to your bookmarks bar, then open any IMDb title page and click it
+                  to add the title to your current list (same as the hosted bookmarklet page).
                 </p>
                 <p className="lists-modal-description">
                   You can also open{" "}

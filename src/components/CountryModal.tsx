@@ -1,7 +1,13 @@
 import { useEffect, useState, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/shadcn-utils";
 import { COUNTRIES } from "../countries.js";
@@ -187,7 +193,12 @@ export function CountryModal({
                 Cancel
               </Button>
             ) : null}
-            <Button type="button" className="country-save-btn" id="country-save-btn" onClick={handleSave}>
+            <Button
+              type="button"
+              className="country-save-btn"
+              id="country-save-btn"
+              onClick={handleSave}
+            >
               Save
             </Button>
           </div>

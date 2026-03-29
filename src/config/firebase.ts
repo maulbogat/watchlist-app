@@ -52,21 +52,31 @@ function resolveAuthDomain(rawAuthDomain: unknown, rawProjectId: unknown): strin
   // Prefer deterministic project-based authDomain in production to avoid bad env values.
   if (import.meta.env.PROD) return fallback;
   // Guard against masked/invalid values (e.g. ********.com) making Firebase iframe URL illegal.
-  if (!authDomain || authDomain.includes("*") || !/^[a-z0-9.-]+$/i.test(authDomain)) return fallback;
+  if (!authDomain || authDomain.includes("*") || !/^[a-z0-9.-]+$/i.test(authDomain))
+    return fallback;
   return authDomain;
 }
 
-const projectId = resolveString(import.meta.env.VITE_FIREBASE_PROJECT_ID, DEFAULT_FIREBASE_WEB_CONFIG.projectId);
+const projectId = resolveString(
+  import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  DEFAULT_FIREBASE_WEB_CONFIG.projectId
+);
 
 export const firebaseConfig: FirebaseOptions = {
   apiKey: resolveString(import.meta.env.VITE_FIREBASE_API_KEY, DEFAULT_FIREBASE_WEB_CONFIG.apiKey),
   authDomain: resolveAuthDomain(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, projectId),
   projectId,
-  storageBucket: resolveString(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, DEFAULT_FIREBASE_WEB_CONFIG.storageBucket),
+  storageBucket: resolveString(
+    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    DEFAULT_FIREBASE_WEB_CONFIG.storageBucket
+  ),
   messagingSenderId: resolveString(
     import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
     DEFAULT_FIREBASE_WEB_CONFIG.messagingSenderId
   ),
   appId: resolveString(import.meta.env.VITE_FIREBASE_APP_ID, DEFAULT_FIREBASE_WEB_CONFIG.appId),
-  measurementId: resolveString(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, DEFAULT_FIREBASE_WEB_CONFIG.measurementId),
+  measurementId: resolveString(
+    import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+    DEFAULT_FIREBASE_WEB_CONFIG.measurementId
+  ),
 };

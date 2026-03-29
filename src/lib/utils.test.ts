@@ -123,7 +123,9 @@ describe("upcomingAlertHasRealAirDate", () => {
 
 describe("compactUpcomingDetail", () => {
   it("converts season/episode/name format", () => {
-    expect(compactUpcomingDetail("Season 3, Episode 9 — Daddy Issues")).toBe("S3 E9 · Daddy Issues");
+    expect(compactUpcomingDetail("Season 3, Episode 9 — Daddy Issues")).toBe(
+      "S3 E9 · Daddy Issues"
+    );
   });
 
   it("converts season/episode without name", () => {
@@ -224,7 +226,9 @@ describe("buildUpcomingIcsDocument", () => {
 
   it("returns null for missing/invalid ymd", () => {
     expect(buildUpcomingIcsDocument({ ymd: "", title: "A", detail: "", uid: "u1" })).toBeNull();
-    expect(buildUpcomingIcsDocument({ ymd: "20260317", title: "A", detail: "", uid: "u1" })).toBeNull();
+    expect(
+      buildUpcomingIcsDocument({ ymd: "20260317", title: "A", detail: "", uid: "u1" })
+    ).toBeNull();
   });
 
   it("omits DESCRIPTION when detail is empty", () => {

@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPortal, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/shadcn-utils";
 
@@ -125,11 +132,21 @@ export function ListNameModal({
         </p>
         <div className="list-name-modal-actions">
           {allowCancel ? (
-            <Button type="button" variant="outline" className="country-save-btn list-name-secondary-btn" onClick={close}>
+            <Button
+              type="button"
+              variant="outline"
+              className="country-save-btn list-name-secondary-btn"
+              onClick={close}
+            >
               Cancel
             </Button>
           ) : null}
-          <Button type="button" className="country-save-btn" id="list-name-save-btn" onClick={submit}>
+          <Button
+            type="button"
+            className="country-save-btn"
+            id="list-name-save-btn"
+            onClick={submit}
+          >
             Save
           </Button>
         </div>

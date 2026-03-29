@@ -100,25 +100,6 @@ function toEpochMs(value) {
  * @param {FirebaseFirestore.Firestore} db
  * @param {number} tmdbId
  * @param {'tv'|'movie'} media
- * @returns {Promise<number | null>}
- */
-async function readUpcomingLastCheckedAtMs(db, tmdbId, media) {
-  const docId = upcomingCheckDocId(tmdbId, media);
-  const snap = await db
-    .collection(UPCOMING_CHECKS_COLLECTION)
-    .where("__name__", "==", docId)
-    .select("lastCheckedAt")
-    .limit(1)
-    .get();
-  if (snap.empty) return null;
-  const data = snap.docs[0]?.data() || {};
-  return toEpochMs(data.lastCheckedAt);
-}
-
-/**
- * @param {FirebaseFirestore.Firestore} db
- * @param {number} tmdbId
- * @param {'tv'|'movie'} media
  * @returns {Promise<{
  *   lastCheckedAt: string | null,
  *   lastCheckedAtMs: number | null,
@@ -160,25 +141,6 @@ async function readUpcomingCheckState(db, tmdbId, media) {
     hasCollection,
     collectionId,
   };
-}
-
-/**
- * @param {FirebaseFirestore.Firestore} db
- * @param {number} tmdbId
- * @param {'tv'|'movie'} media
- * @returns {Promise<void>}
- */
-async function writeUpcomingLastCheckedAt(db, tmdbId, media) {
-  const ref = db.collection(UPCOMING_CHECKS_COLLECTION).doc(upcomingCheckDocId(tmdbId, media));
-  await ref.set(
-    {
-      tmdbId,
-      media,
-      lastCheckedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    { merge: true }
-  );
 }
 
 /**
@@ -227,7 +189,10 @@ function movieSkipDecision(checkState) {
     return { skip: false };
   }
   if (checkState.hasCollection) {
-    if (checkState.lastCheckedAtMs != null && Date.now() - checkState.lastCheckedAtMs < THIRTY_DAYS_MS) {
+    if (
+      checkState.lastCheckedAtMs != null &&
+      Date.now() - checkState.lastCheckedAtMs < THIRTY_DAYS_MS
+    ) {
       return {
         skip: true,
         caseLabel: "case2_released_with_collection",
@@ -446,7 +411,11 @@ async function deleteStaleAlertsForRow(db, catalogTmdbId, media, activeDocIds) {
  */
 async function deleteExpiredAlerts(db) {
   const today = new Date().toISOString().slice(0, 10);
-  const snap = await db.collection(COLLECTION).select("expiresAt").where("expiresAt", "<", today).get();
+  const snap = await db
+    .collection(COLLECTION)
+    .select("expiresAt")
+    .where("expiresAt", "<", today)
+    .get();
   if (snap.empty) return 0;
   let deleted = 0;
   let batch = db.batch();
@@ -475,7 +444,9 @@ async function pruneAlertsOutsideCatalog(db, rowsOrSet) {
     rowsOrSet instanceof Set
       ? rowsOrSet
       : new Set(
-          (Array.isArray(rowsOrSet) ? rowsOrSet : []).map((r) => `${r.tmdbId}|${r.isTv ? "tv" : "movie"}`)
+          (Array.isArray(rowsOrSet) ? rowsOrSet : []).map(
+            (r) => `${r.tmdbId}|${r.isTv ? "tv" : "movie"}`
+          )
         );
   const snap = await db.collection(COLLECTION).select("catalogTmdbId", "media").get();
   if (snap.empty) return 0;
@@ -534,7 +505,13 @@ async function runFullCatalogSync(db, apiKey, catalogItems) {
   }
   const pruned = await pruneAlertsOutsideCatalog(db, rows);
   const expiredRemoved = await deleteExpiredAlerts(db);
-  return { rowsChecked: rows.length, alertsUpserted: upserted, writesSkipped, pruned, expiredRemoved };
+  return {
+    rowsChecked: rows.length,
+    alertsUpserted: upserted,
+    writesSkipped,
+    pruned,
+    expiredRemoved,
+  };
 }
 
 /**
@@ -547,7 +524,10 @@ async function runFullCatalogSync(db, apiKey, catalogItems) {
  * @returns {Promise<{ rowsChecked: number, alertsUpserted: number, pruned: number, expiredRemoved: number }>}
  */
 async function runFullRegistrySync(db, apiKey) {
-  const regSnap = await db.collection("titleRegistry").select("tmdbId", "tmdbMedia", "type", "title").get();
+  const regSnap = await db
+    .collection("titleRegistry")
+    .select("tmdbId", "tmdbMedia", "type", "title")
+    .get();
   const regItems = regSnap.docs.map((d) => d.data());
   return runFullCatalogSync(db, apiKey, regItems);
 }
@@ -601,7 +581,10 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
 
   let expiredRemoved = 0;
   if (lastRegistryDocId === null) {
-    expiredRemoved = await firestoreOpWithRetry(() => deleteExpiredAlerts(db), "deleteExpiredAlerts");
+    expiredRemoved = await firestoreOpWithRetry(
+      () => deleteExpiredAlerts(db),
+      "deleteExpiredAlerts"
+    );
   }
 
   /**
@@ -700,7 +683,10 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
         "upcomingChecks.get"
       );
       if (rowMedia === "tv") {
-        if (checkState.lastCheckedAtMs != null && Date.now() - checkState.lastCheckedAtMs < SEVEN_DAYS_MS) {
+        if (
+          checkState.lastCheckedAtMs != null &&
+          Date.now() - checkState.lastCheckedAtMs < SEVEN_DAYS_MS
+        ) {
           rowsSkipped++;
           logEvent({
             type: "title.checked",
@@ -749,7 +735,10 @@ async function runRegistrySyncWithTimeBudget(db, apiKey, maxMs = 25000) {
         () => deleteStaleAlertsForRow(db, row.tmdbId, rowMedia, ids),
         "deleteStaleAlertsForRow"
       );
-      const upsertResult = await firestoreOpWithRetry(() => upsertAlerts(db, built), "upsertAlerts");
+      const upsertResult = await firestoreOpWithRetry(
+        () => upsertAlerts(db, built),
+        "upsertAlerts"
+      );
       upserted += upsertResult.written;
       writesSkipped += upsertResult.skipped;
       await firestoreOpWithRetry(

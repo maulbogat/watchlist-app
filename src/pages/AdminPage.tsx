@@ -14,7 +14,14 @@ import {
   setGithubBackupEnabledState,
   type FirestoreUsageStats,
 } from "../firebase.js";
-import { getFirestore, collection, doc, getDoc, getCountFromServer, getDocs } from "firebase/firestore";
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  getCountFromServer,
+  getDocs,
+} from "firebase/firestore";
 
 type DQTitleRow = {
   imdbId: string;
@@ -62,11 +69,14 @@ function dqImdbIdKey(imdbId: string): string {
 
 function dqParseTmdbIdFromRecord(tid: unknown): number | null {
   if (typeof tid === "number" && Number.isFinite(tid)) return tid;
-  if (typeof tid === "string" && tid.trim() !== "" && !Number.isNaN(Number(tid))) return Number(tid);
+  if (typeof tid === "string" && tid.trim() !== "" && !Number.isNaN(Number(tid)))
+    return Number(tid);
   return null;
 }
 
-async function loadMissingTmdbIdExclusions(db: ReturnType<typeof getFirestore>): Promise<Set<string>> {
+async function loadMissingTmdbIdExclusions(
+  db: ReturnType<typeof getFirestore>
+): Promise<Set<string>> {
   const out = new Set<string>();
   try {
     const exSnap = await getDoc(doc(db, "meta", "catalogHealthExclusions"));
@@ -126,9 +136,25 @@ type DqPanelDef = {
 function buildDqPanelDefs(d: CatalogStats): DqPanelDef[] {
   return [
     { key: "tmdbId", fieldLabel: "tmdbId", count: d.missingTmdbId, rows: d.missingTmdbIdTitles },
-    { key: "thumb", fieldLabel: "thumb", count: d.missingThumb, rows: d.missingThumbTitles, fixable: true },
-    { key: "tmdbMedia", fieldLabel: "tmdbMedia", count: d.missingTmdbMedia, rows: d.missingTmdbMediaTitles },
-    { key: "youtubeId", fieldLabel: "youtubeId", count: d.missingYoutubeId, rows: d.missingYoutubeIdTitles },
+    {
+      key: "thumb",
+      fieldLabel: "thumb",
+      count: d.missingThumb,
+      rows: d.missingThumbTitles,
+      fixable: true,
+    },
+    {
+      key: "tmdbMedia",
+      fieldLabel: "tmdbMedia",
+      count: d.missingTmdbMedia,
+      rows: d.missingTmdbMediaTitles,
+    },
+    {
+      key: "youtubeId",
+      fieldLabel: "youtubeId",
+      count: d.missingYoutubeId,
+      rows: d.missingYoutubeIdTitles,
+    },
   ];
 }
 
@@ -229,8 +255,10 @@ type SentryIssuesSummaryResponse = {
 
 /** Production site origin (bookmarklet / admin links). Override with VITE_APP_ORIGIN when your host differs. */
 const DEFAULT_APP_ORIGIN = "https://watchlist.maulbogat.com";
-const appOrigin = (import.meta.env.VITE_APP_ORIGIN as string | undefined)?.trim() || DEFAULT_APP_ORIGIN;
-const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const appOrigin =
+  (import.meta.env.VITE_APP_ORIGIN as string | undefined)?.trim() || DEFAULT_APP_ORIGIN;
+const isLocal =
+  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 const switchHref = isLocal ? `${appOrigin}/admin` : `http://localhost:5173/admin`;
 const switchLabel = isLocal ? "Switch to prod" : "Switch to local";
 
@@ -492,17 +520,24 @@ function AdminVercelDeploymentSummary({ dep }: { dep: VercelDeploymentLast }) {
       </div>
       <div className="admin-job-row">
         <span className="admin-stat-label">Created</span>
-        <span className="admin-job-value">{formatDateTime(vercelCreatedToMs(dep.createdAt)) || "—"}</span>
+        <span className="admin-job-value">
+          {formatDateTime(vercelCreatedToMs(dep.createdAt)) || "—"}
+        </span>
       </div>
       <div className="admin-job-row admin-job-row--align-start">
         <span className="admin-stat-label">Commit</span>
-        <span className="admin-job-value">{truncateCommitMessage(dep.meta?.githubCommitMessage)}</span>
+        <span className="admin-job-value">
+          {truncateCommitMessage(dep.meta?.githubCommitMessage)}
+        </span>
       </div>
     </>
   );
 }
 
-function formatUpcomingLastRunLine(status: string | null | undefined, message: string | null | undefined): string {
+function formatUpcomingLastRunLine(
+  status: string | null | undefined,
+  message: string | null | undefined
+): string {
   const st = status?.trim();
   const msg = message?.trim();
   if (!st && !msg) return "N/A";
@@ -534,7 +569,9 @@ function formatUsageUpdatedAt(stats: FirestoreUsageStats | null | undefined): st
 
 const DQ_STAT_CARD_COUNT = 5;
 
-async function fetchAdminExternalStatus<T extends { ok?: boolean; error?: string }>(path: string): Promise<T> {
+async function fetchAdminExternalStatus<T extends { ok?: boolean; error?: string }>(
+  path: string
+): Promise<T> {
   const user = auth.currentUser;
   if (!user) throw new Error("Not signed in");
   const idToken = await user.getIdToken();
@@ -599,7 +636,7 @@ export function AdminPage() {
             "title",
             "year",
             "imdbId",
-            "type",
+            "type"
           ) ?? titleRegistryRef;
         const registrySnap = await getDocs(projectedRegistryRef);
         const missingTmdbIdExcluded = await loadMissingTmdbIdExclusions(db);
@@ -618,11 +655,12 @@ export function AdminPage() {
           const imdbId = dqRowImdbId(rec, d.id);
           const title = dqRowTitle(rec, d.id);
           const year =
-            typeof rec.year === "number" || typeof rec.year === "string" ? (rec.year as number | string) : null;
+            typeof rec.year === "number" || typeof rec.year === "string"
+              ? (rec.year as number | string)
+              : null;
 
           const noTmdbId = rec.tmdbId == null || rec.tmdbId === "";
-          const skipTmdbGap =
-            noTmdbId && missingTmdbIdExcluded.has(dqImdbIdKey(imdbId));
+          const skipTmdbGap = noTmdbId && missingTmdbIdExcluded.has(dqImdbIdKey(imdbId));
           if (noTmdbId && !skipTmdbGap) {
             missingTmdbId += 1;
             if (missingTmdbIdTitles.length < maxTitles) {
@@ -640,7 +678,12 @@ export function AdminPage() {
           if (dqStrEmpty(rec.thumb)) {
             missingThumb += 1;
             if (missingThumbTitles.length < maxTitles) {
-              missingThumbTitles.push({ imdbId, title, year, tmdbId: dqParseTmdbIdFromRecord(rec.tmdbId) });
+              missingThumbTitles.push({
+                imdbId,
+                title,
+                year,
+                tmdbId: dqParseTmdbIdFromRecord(rec.tmdbId),
+              });
             }
           }
 
@@ -702,7 +745,7 @@ export function AdminPage() {
         setFixingThumbImdbId(null);
       }
     },
-    [catalogStatsQ.refetch],
+    [catalogStatsQ.refetch]
   );
 
   const firestoreUsageQ = useQuery<FirestoreUsageStats | null>({
@@ -726,7 +769,8 @@ export function AdminPage() {
     queryKey: ["admin", "external-status", "github"],
     staleTime: 60 * 1000,
     enabled: !authLoading && userIsAdmin,
-    queryFn: () => fetchAdminExternalStatus<GithubBackupStatusResponse>("/api/external-status?service=github"),
+    queryFn: () =>
+      fetchAdminExternalStatus<GithubBackupStatusResponse>("/api/external-status?service=github"),
   });
 
   const vercelDeploymentQ = useQuery<VercelDeploymentStatusResponse>({
@@ -734,14 +778,18 @@ export function AdminPage() {
     staleTime: 0,
     refetchOnMount: "always",
     enabled: !authLoading && userIsAdmin,
-    queryFn: () => fetchAdminExternalStatus<VercelDeploymentStatusResponse>("/api/external-status?service=vercel"),
+    queryFn: () =>
+      fetchAdminExternalStatus<VercelDeploymentStatusResponse>(
+        "/api/external-status?service=vercel"
+      ),
   });
 
   const gcsBackupQ = useQuery<GcsBackupStatusResponse>({
     queryKey: ["admin", "external-status", "gcs"],
     staleTime: 60 * 1000,
     enabled: !authLoading && userIsAdmin,
-    queryFn: () => fetchAdminExternalStatus<GcsBackupStatusResponse>("/api/external-status?service=gcs"),
+    queryFn: () =>
+      fetchAdminExternalStatus<GcsBackupStatusResponse>("/api/external-status?service=gcs"),
   });
 
   const axiomActivityQ = useQuery<AxiomActivityResponse>({
@@ -749,7 +797,8 @@ export function AdminPage() {
     staleTime: 0,
     refetchOnMount: "always",
     enabled: !authLoading && userIsAdmin,
-    queryFn: () => fetchAdminExternalStatus<AxiomActivityResponse>("/api/external-status?service=axiom"),
+    queryFn: () =>
+      fetchAdminExternalStatus<AxiomActivityResponse>("/api/external-status?service=axiom"),
   });
 
   const sentryIssuesQ = useQuery<SentryIssuesSummaryResponse>({
@@ -846,21 +895,40 @@ export function AdminPage() {
     },
   });
 
-  const jobErrorText =
-    jobConfigQ.isError
-      ? jobConfigQ.error instanceof Error && jobConfigQ.error.message
-        ? jobConfigQ.error.message
-        : "Could not load job config."
-      : null;
+  const jobErrorText = jobConfigQ.isError
+    ? jobConfigQ.error instanceof Error && jobConfigQ.error.message
+      ? jobConfigQ.error.message
+      : "Could not load job config."
+    : null;
 
   const catalogDq = catalogStatsQ.data;
   const dqStatCards = !catalogStatsQ.isPending
     ? [
-        { label: "Total titles in catalog", count: catalogDq?.totalTitles ?? "Error", tone: "neutral" as const },
-        { label: "Missing tmdbId", count: catalogDq?.missingTmdbId ?? "Error", tone: "critical" as const },
-        { label: "Missing thumb", count: catalogDq?.missingThumb ?? "Error", tone: "warn" as const },
-        { label: "Missing tmdbMedia", count: catalogDq?.missingTmdbMedia ?? "Error", tone: "warn" as const },
-        { label: "Missing youtubeId", count: catalogDq?.missingYoutubeId ?? "Error", tone: "warn" as const },
+        {
+          label: "Total titles in catalog",
+          count: catalogDq?.totalTitles ?? "Error",
+          tone: "neutral" as const,
+        },
+        {
+          label: "Missing tmdbId",
+          count: catalogDq?.missingTmdbId ?? "Error",
+          tone: "critical" as const,
+        },
+        {
+          label: "Missing thumb",
+          count: catalogDq?.missingThumb ?? "Error",
+          tone: "warn" as const,
+        },
+        {
+          label: "Missing tmdbMedia",
+          count: catalogDq?.missingTmdbMedia ?? "Error",
+          tone: "warn" as const,
+        },
+        {
+          label: "Missing youtubeId",
+          count: catalogDq?.missingYoutubeId ?? "Error",
+          tone: "warn" as const,
+        },
       ]
     : null;
   const dqVisiblePanels =
@@ -898,7 +966,11 @@ export function AdminPage() {
                 <>
                   <p className="admin-job-result">{jobErrorText}</p>
                   <div className="admin-job-row admin-job-row--actions">
-                    <Button type="button" variant="outline" onClick={() => void jobConfigQ.refetch()}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void jobConfigQ.refetch()}
+                    >
                       Retry
                     </Button>
                   </div>
@@ -926,7 +998,10 @@ export function AdminPage() {
                   <div className="admin-job-row">
                     <span className="admin-stat-label">Result</span>
                     <span className="admin-job-value">
-                      {formatUpcomingLastRunLine(jobConfigQ.data?.lastRunStatus, jobConfigQ.data?.lastRunMessage)}
+                      {formatUpcomingLastRunLine(
+                        jobConfigQ.data?.lastRunStatus,
+                        jobConfigQ.data?.lastRunMessage
+                      )}
                     </span>
                   </div>
                   <div className="admin-job-row admin-job-row--actions">
@@ -945,7 +1020,9 @@ export function AdminPage() {
                         className="admin-job-toggle-btn"
                         variant="outline"
                         disabled={toggleJobMutation.isPending || runNowMutation.isPending}
-                        onClick={() => toggleJobMutation.mutate(!jobConfigQ.data?.checkUpcomingEnabled)}
+                        onClick={() =>
+                          toggleJobMutation.mutate(!jobConfigQ.data?.checkUpcomingEnabled)
+                        }
                       >
                         {toggleJobMutation.isPending
                           ? "Saving…"
@@ -968,9 +1045,15 @@ export function AdminPage() {
               ) : githubBackupQ.isError ? (
                 <div className="admin-job-row admin-job-row--actions">
                   <p className="admin-job-result">
-                    {githubBackupQ.error instanceof Error ? githubBackupQ.error.message : "Could not load status."}
+                    {githubBackupQ.error instanceof Error
+                      ? githubBackupQ.error.message
+                      : "Could not load status."}
                   </p>
-                  <Button type="button" variant="outline" onClick={() => void githubBackupQ.refetch()}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void githubBackupQ.refetch()}
+                  >
                     Retry
                   </Button>
                 </div>
@@ -983,7 +1066,8 @@ export function AdminPage() {
                         ? ` (HTTP ${githubBackupQ.data.githubHttpStatus})`
                         : ""}
                       . For private repos or higher rate limits, set{" "}
-                      <code className="admin-deploy-code">GITHUB_TOKEN</code> in Vercel (Actions: read).
+                      <code className="admin-deploy-code">GITHUB_TOKEN</code> in Vercel (Actions:
+                      read).
                     </p>
                   ) : null}
                   {githubBackupQ.data?.lastRun ? (
@@ -1049,7 +1133,12 @@ export function AdminPage() {
                   <div className="admin-job-row admin-job-row--actions">
                     <div className="admin-job-actions">
                       {githubBackupQ.data?.lastRun ? (
-                        <Button type="button" className="admin-job-run-btn" variant="outline" asChild>
+                        <Button
+                          type="button"
+                          className="admin-job-run-btn"
+                          variant="outline"
+                          asChild
+                        >
                           <a
                             href={githubBackupQ.data.lastRun.html_url}
                             target="_blank"
@@ -1060,7 +1149,12 @@ export function AdminPage() {
                           </a>
                         </Button>
                       ) : null}
-                      <Button type="button" variant="outline" className="admin-job-toggle-btn" asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="admin-job-toggle-btn"
+                        asChild
+                      >
                         <a
                           href={
                             githubBackupQ.data?.actionsUrl ||
@@ -1096,7 +1190,11 @@ export function AdminPage() {
                     <>
                       <p className="admin-job-result">{jobErrorText}</p>
                       <div className="admin-job-row admin-job-row--actions">
-                        <Button type="button" variant="outline" onClick={() => void jobConfigQ.refetch()}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void jobConfigQ.refetch()}
+                        >
                           Retry job config
                         </Button>
                       </div>
@@ -1114,7 +1212,9 @@ export function AdminPage() {
               ) : gcsBackupQ.isError ? (
                 <div className="admin-job-row admin-job-row--actions">
                   <p className="admin-job-result">
-                    {gcsBackupQ.error instanceof Error ? gcsBackupQ.error.message : "Could not load status."}
+                    {gcsBackupQ.error instanceof Error
+                      ? gcsBackupQ.error.message
+                      : "Could not load status."}
                   </p>
                   <Button type="button" variant="outline" onClick={() => void gcsBackupQ.refetch()}>
                     Retry
@@ -1131,7 +1231,8 @@ export function AdminPage() {
                   <div className="admin-job-row">
                     <span className="admin-stat-label">Last export</span>
                     <span className="admin-job-value">
-                      {formatDateTime(toEpochMs(gcsBackupQ.data.lastExportAt)) || gcsBackupQ.data.lastExportAt}
+                      {formatDateTime(toEpochMs(gcsBackupQ.data.lastExportAt)) ||
+                        gcsBackupQ.data.lastExportAt}
                     </span>
                   </div>
                   <div className="admin-job-row admin-job-row--align-start">
@@ -1183,7 +1284,11 @@ export function AdminPage() {
                         ? sentryIssuesQ.error.message
                         : "Could not load Sentry status."}
                     </p>
-                    <Button type="button" variant="outline" onClick={() => void sentryIssuesQ.refetch()}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void sentryIssuesQ.refetch()}
+                    >
                       Retry
                     </Button>
                   </div>
@@ -1192,7 +1297,10 @@ export function AdminPage() {
                     <div className="admin-job-row admin-job-row--status-line">
                       <span className="admin-stat-label">Open issues</span>
                       {sentryIssuesQ.data.errorCount === 0 ? (
-                        <span className="admin-job-status admin-job-status--on" aria-label="No errors">
+                        <span
+                          className="admin-job-status admin-job-status--on"
+                          aria-label="No errors"
+                        >
                           ✓
                         </span>
                       ) : (
@@ -1206,7 +1314,12 @@ export function AdminPage() {
                     </p>
                     <div className="admin-job-row admin-job-row--actions">
                       <div className="admin-job-actions">
-                        <Button type="button" variant="outline" className="admin-job-run-btn" asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="admin-job-run-btn"
+                          asChild
+                        >
                           <a href={SENTRY_ISSUES_HUB_URL} target="_blank" rel="noopener noreferrer">
                             Open Sentry
                             <span aria-hidden="true"> ↗</span>
@@ -1247,7 +1360,11 @@ export function AdminPage() {
                       ? vercelDeploymentQ.error.message
                       : "Could not load status."}
                   </p>
-                  <Button type="button" variant="outline" onClick={() => void vercelDeploymentQ.refetch()}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void vercelDeploymentQ.refetch()}
+                  >
                     Retry
                   </Button>
                 </div>
@@ -1266,11 +1383,18 @@ export function AdminPage() {
                   {vercelDeploymentQ.data?.lastDeployment ? (
                     <AdminVercelDeploymentSummary dep={vercelDeploymentQ.data.lastDeployment} />
                   ) : !vercelDeploymentQ.data?.vercelError ? (
-                    <p className="admin-job-result">No deployments returned for this project yet.</p>
+                    <p className="admin-job-result">
+                      No deployments returned for this project yet.
+                    </p>
                   ) : null}
                   <div className="admin-job-row admin-job-row--actions">
                     <div className="admin-job-actions">
-                      <Button type="button" variant="outline" className="admin-job-toggle-btn" asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="admin-job-toggle-btn"
+                        asChild
+                      >
                         <a href={deploymentsUrl} target="_blank" rel="noopener noreferrer">
                           Open deployments
                           <span aria-hidden="true"> ↗</span>
@@ -1280,9 +1404,10 @@ export function AdminPage() {
                   </div>
                   {!hasCustomDeploymentsUrl ? (
                     <p className="admin-job-result">
-                      Optional: set <code className="admin-deploy-code">VITE_DEPLOYMENTS_URL</code> for a custom
-                      deployments page link; optional <code className="admin-deploy-code">VITE_SITE_ID</code> for
-                      server env diagnostics.
+                      Optional: set <code className="admin-deploy-code">VITE_DEPLOYMENTS_URL</code>{" "}
+                      for a custom deployments page link; optional{" "}
+                      <code className="admin-deploy-code">VITE_SITE_ID</code> for server env
+                      diagnostics.
                     </p>
                   ) : null}
                 </>
@@ -1323,7 +1448,10 @@ export function AdminPage() {
         <div className="admin-grid admin-grid--stats">
           {axiomActivityQ.isPending ? (
             Array.from({ length: ACTIVITY_STAT_CARD_COUNT }).map((_, idx) => (
-              <div key={`axiom-activity-skeleton-${idx}`} className="admin-card admin-stat-card admin-skeleton" />
+              <div
+                key={`axiom-activity-skeleton-${idx}`}
+                className="admin-card admin-stat-card admin-skeleton"
+              />
             ))
           ) : axiomActivityQ.isError ? (
             <div className="admin-card admin-job-card">
@@ -1333,7 +1461,11 @@ export function AdminPage() {
                   : "Could not load Axiom activity."}
               </p>
               <div className="admin-job-row admin-job-row--actions">
-                <Button type="button" variant="outline" onClick={() => void axiomActivityQ.refetch()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void axiomActivityQ.refetch()}
+                >
                   Retry
                 </Button>
               </div>
@@ -1375,7 +1507,11 @@ export function AdminPage() {
           <h2>Firestore Usage</h2>
           <div className="admin-dq-refresh">
             <Button type="button" variant="ghost" className="admin-dq-external-link" asChild>
-              <a href={FIREBASE_FIRESTORE_USAGE_CONSOLE_URL} target="_blank" rel="noopener noreferrer">
+              <a
+                href={FIREBASE_FIRESTORE_USAGE_CONSOLE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Firebase usage
                 <span aria-hidden="true"> ↗</span>
               </a>
@@ -1404,7 +1540,11 @@ export function AdminPage() {
                   : "Could not load usage stats."}
               </p>
               <div className="admin-job-row admin-job-row--actions">
-                <Button type="button" variant="outline" onClick={() => void firestoreUsageQ.refetch()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void firestoreUsageQ.refetch()}
+                >
                   Retry
                 </Button>
               </div>
@@ -1429,7 +1569,10 @@ export function AdminPage() {
                         style={{
                           width: `${usagePercent(firestoreUsageQ.data.readsThisHour, FIRESTORE_USAGE_HOURLY_LIMIT)}%`,
                           backgroundColor: usageBarColor(
-                            usagePercent(firestoreUsageQ.data.readsThisHour, FIRESTORE_USAGE_HOURLY_LIMIT)
+                            usagePercent(
+                              firestoreUsageQ.data.readsThisHour,
+                              FIRESTORE_USAGE_HOURLY_LIMIT
+                            )
                           ),
                         }}
                       />
@@ -1449,7 +1592,10 @@ export function AdminPage() {
                         style={{
                           width: `${usagePercent(firestoreUsageQ.data.readsToday, FIRESTORE_USAGE_DAILY_LIMIT)}%`,
                           backgroundColor: usageBarColor(
-                            usagePercent(firestoreUsageQ.data.readsToday, FIRESTORE_USAGE_DAILY_LIMIT)
+                            usagePercent(
+                              firestoreUsageQ.data.readsToday,
+                              FIRESTORE_USAGE_DAILY_LIMIT
+                            )
                           ),
                         }}
                       />
@@ -1457,7 +1603,9 @@ export function AdminPage() {
                   </div>
                   <div className="admin-job-row">
                     <span className="admin-stat-label">Last reset</span>
-                    <span className="admin-job-value">{formatUsageUpdatedAt(firestoreUsageQ.data)}</span>
+                    <span className="admin-job-value">
+                      {formatUsageUpdatedAt(firestoreUsageQ.data)}
+                    </span>
                   </div>
                 </>
               )}
@@ -1490,7 +1638,10 @@ export function AdminPage() {
         <div className="admin-grid admin-grid--stats">
           {catalogStatsQ.isPending
             ? Array.from({ length: DQ_STAT_CARD_COUNT }).map((_, idx) => (
-                <div key={`catalog-skeleton-${idx}`} className="admin-card admin-stat-card admin-skeleton" />
+                <div
+                  key={`catalog-skeleton-${idx}`}
+                  className="admin-card admin-stat-card admin-skeleton"
+                />
               ))
             : dqStatCards?.map((c) => (
                 <div key={c.label} className="admin-card admin-stat-card">
@@ -1609,13 +1760,18 @@ export function AdminPage() {
                   ))}
                 </ul>
               </div>
-            ),
+            )
           )}
         </div>
       </details>
 
       <footer className="admin-footer">
-        <Button type="button" variant="outline" className="admin-back-btn" onClick={() => navigate("/")}>
+        <Button
+          type="button"
+          variant="outline"
+          className="admin-back-btn"
+          onClick={() => navigate("/")}
+        >
           ← Back to Watchlist
         </Button>
       </footer>

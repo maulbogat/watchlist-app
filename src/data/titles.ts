@@ -1,7 +1,7 @@
 import {
   addToPersonalList,
   addToSharedList,
-  movieKey,
+  listKey,
   removeFromPersonalList,
   removeFromSharedList,
   removeTitle,
@@ -11,7 +11,11 @@ import {
 } from "../firebase.js";
 import type { ListMode, StatusKey, WatchlistItem } from "../types/index.js";
 
-export async function addTitleToList(uid: string, listMode: ListMode, item: WatchlistItem): Promise<void> {
+export async function addTitleToList(
+  uid: string,
+  listMode: ListMode,
+  item: WatchlistItem
+): Promise<void> {
   if (typeof listMode === "object" && listMode.type === "shared") {
     await addToSharedList(listMode.listId, item, uid);
     return;
@@ -23,7 +27,11 @@ export async function addTitleToList(uid: string, listMode: ListMode, item: Watc
   await addToPersonalList(uid, "personal", item);
 }
 
-export async function removeTitleFromList(uid: string, listMode: ListMode, key: string): Promise<void> {
+export async function removeTitleFromList(
+  uid: string,
+  listMode: ListMode,
+  key: string
+): Promise<void> {
   if (typeof listMode === "object" && listMode.type === "shared") {
     await removeFromSharedList(listMode.listId, key);
     return;
@@ -52,21 +60,21 @@ export async function setTitleStatus(
   await setStatus(uid, key, status);
 }
 
-/** Convenience: set status from a hydrated row (uses `movieKey`). */
+/** Convenience: set status from a hydrated row (uses `listKey`). */
 export async function setTitleStatusForMovie(
   uid: string,
   listMode: ListMode,
   movie: WatchlistItem,
   status: StatusKey
 ): Promise<void> {
-  return setTitleStatus(uid, listMode, movieKey(movie), status);
+  return setTitleStatus(uid, listMode, listKey(movie), status);
 }
 
-/** Convenience: remove using a hydrated row (uses `movieKey`). */
+/** Convenience: remove using a hydrated row (uses `listKey`). */
 export async function removeTitleFromListForMovie(
   uid: string,
   listMode: ListMode,
   movie: WatchlistItem
 ): Promise<void> {
-  return removeTitleFromList(uid, listMode, movieKey(movie));
+  return removeTitleFromList(uid, listMode, listKey(movie));
 }

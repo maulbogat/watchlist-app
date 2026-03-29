@@ -1,9 +1,5 @@
 import { useEffect, useRef } from "react";
-import {
-  getLastListFromStorage,
-  readFilterPreferences,
-  saveLastList,
-} from "../lib/storage.js";
+import { getLastListFromStorage, readFilterPreferences, saveLastList } from "../lib/storage.js";
 import { useAppStore } from "../store/useAppStore.js";
 import type { User } from "firebase/auth";
 import { getSharedList } from "../firebase.js";
@@ -70,11 +66,15 @@ export function useWatchlistSessionRestore(
                 ? prefs.currentFilter
                 : s.currentFilter,
             currentStatus: validStatus,
-            currentGenre: typeof prefs.currentGenre === "string" ? prefs.currentGenre : s.currentGenre,
+            currentGenre:
+              typeof prefs.currentGenre === "string" ? prefs.currentGenre : s.currentGenre,
             currentSort: validSort,
-            currentSearch: typeof prefs.currentSearch === "string" ? prefs.currentSearch : s.currentSearch,
+            currentSearch:
+              typeof prefs.currentSearch === "string" ? prefs.currentSearch : s.currentSearch,
             currentAddedByUid:
-              typeof prefs.currentAddedByUid === "string" ? prefs.currentAddedByUid : s.currentAddedByUid,
+              typeof prefs.currentAddedByUid === "string"
+                ? prefs.currentAddedByUid
+                : s.currentAddedByUid,
           };
         });
       }
@@ -111,7 +111,9 @@ export function useWatchlistSessionRestore(
             ) {
               sharedHit = fetched;
             }
-          } catch (_) {}
+          } catch {
+            /* ignore: list id may be invalid or inaccessible */
+          }
         }
         if (sharedHit && !cancelled) {
           const mode = { type: "shared" as const, listId: sharedHit.id, name: sharedHit.name };
@@ -163,7 +165,9 @@ export function useWatchlistSessionRestore(
           ) {
             sharedHit = fetched;
           }
-        } catch (_) {}
+        } catch {
+          /* ignore: list id may be invalid or inaccessible */
+        }
       }
       if (!cancelled && sharedHit) {
         const mode = {

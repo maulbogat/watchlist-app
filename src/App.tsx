@@ -10,7 +10,14 @@ import { JoinPage } from "./pages/JoinPage.js";
 import { JoinAppPage } from "./pages/JoinAppPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
 import { logEvent } from "./lib/axiom-logger.js";
-import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import { useAppStore } from "./store/useAppStore.js";
 import { usePersonalLists, useSharedLists } from "./hooks/useWatchlist.js";
 import { Toaster } from "@/components/ui/toaster";
@@ -71,10 +78,10 @@ function WatchlistAuthGate() {
       <div className="react-migration-shell">
         <h1 className="react-migration-title">My Watchlist</h1>
         <p className="react-migration-meta react-migration-signin-note">
-          Firebase Auth uses a <strong>separate session per origin</strong> (host + port). If you open
-          this app on another URL than <code>{window.location.host}</code>, sign in again there. If
-          sign-in fails with <code>auth/unauthorized-domain</code>, add that host in Firebase Console →
-          Authentication → Authorized domains.
+          Firebase Auth uses a <strong>separate session per origin</strong> (host + port). If you
+          open this app on another URL than <code>{window.location.host}</code>, sign in again
+          there. If sign-in fails with <code>auth/unauthorized-domain</code>, add that host in
+          Firebase Console → Authentication → Authorized domains.
         </p>
         <p className="react-migration-meta">
           Lists, filters, grid, and trailer modal. Production build is deployed to Vercel.

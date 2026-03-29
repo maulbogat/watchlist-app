@@ -165,11 +165,7 @@ export function WatchlistToolbar({
 
   return (
     <>
-      <div
-        ref={sentinelRef}
-        className="watchlist-toolbar-sentinel"
-        aria-hidden="true"
-      />
+      <div ref={sentinelRef} className="watchlist-toolbar-sentinel" aria-hidden="true" />
       {toolbarSticky ? (
         <div
           className="watchlist-toolbar-scroll-spacer"

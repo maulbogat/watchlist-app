@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  auth,
-  getIdTokenForApi,
-  GoogleAuthProvider,
-  signInWithPopup,
-} from "../firebase.js";
+import { auth, getIdTokenForApi, GoogleAuthProvider, signInWithPopup } from "../firebase.js";
 import { useAuthUser } from "../hooks/useAuthUser.js";
 import { useAppStore } from "../store/useAppStore.js";
 import { saveLastList } from "../lib/storage.js";
@@ -74,7 +69,8 @@ export function JoinAppPage() {
           return;
         }
         await invalidateUserListQueries(queryClient, user.uid);
-        const lid = data.listId != null && String(data.listId).trim() ? String(data.listId).trim() : null;
+        const lid =
+          data.listId != null && String(data.listId).trim() ? String(data.listId).trim() : null;
         if (lid) {
           const mode = { type: "shared" as const, listId: lid, name: "" };
           setCurrentListMode(mode);

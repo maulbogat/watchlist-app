@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UpcomingAlert, WatchlistItem } from "../types/index.js";
-import { auth, fetchUpcomingAlertsForItems, movieKey } from "../firebase.js";
+import { auth, fetchUpcomingAlertsForItems, listKey } from "../firebase.js";
 import { getStatusData, updateDismissals } from "../data/user.js";
-import { clearUpcomingAlertsCache, readUpcomingAlertsCache, writeUpcomingAlertsCache } from "../lib/storage.js";
+import {
+  clearUpcomingAlertsCache,
+  readUpcomingAlertsCache,
+  writeUpcomingAlertsCache,
+} from "../lib/storage.js";
 import { useAppStore } from "../store/useAppStore.js";
 import { UPCOMING_ADD_CAL_ICON_SVG } from "../store/watchlistConstants.js";
 import {
@@ -24,7 +28,7 @@ const UP_NEXT_STRIP_MAX = 4;
 
 function useUpcomingAlertsQuery(uid: string | undefined, movies: WatchlistItem[] | undefined) {
   const ids = useMemo(() => {
-    const keys = (movies || []).map((m) => movieKey(m)).filter(Boolean);
+    const keys = (movies || []).map((m) => listKey(m)).filter(Boolean);
     keys.sort();
     return keys.join(",");
   }, [movies]);
@@ -54,7 +58,10 @@ function useUpcomingAlertsQuery(uid: string | undefined, movies: WatchlistItem[]
   });
 }
 
-function findWatchlistMovieForAlert(movies: WatchlistItem[], a: UpcomingAlert): WatchlistItem | null {
+function findWatchlistMovieForAlert(
+  movies: WatchlistItem[],
+  a: UpcomingAlert
+): WatchlistItem | null {
   const tid = a.catalogTmdbId ?? a.tmdbId;
   if (tid == null) return null;
   const n = Number(tid);
@@ -65,7 +72,10 @@ function findWatchlistMovieForAlert(movies: WatchlistItem[], a: UpcomingAlert): 
     a.alertType === "new_episode" ||
     a.alertType === "new_season";
   const isMovieAlert =
-    a.media === "movie" || a.type === "movie" || a.alertType === "upcoming_movie" || a.alertType === "sequel";
+    a.media === "movie" ||
+    a.type === "movie" ||
+    a.alertType === "upcoming_movie" ||
+    a.alertType === "sequel";
   const hit = movies.find((m) => {
     if (m.tmdbId == null || Number(m.tmdbId) !== n) return false;
     if (isTvAlert) return m.type === "show";
@@ -83,7 +93,13 @@ interface UpNextAlertCardProps {
   onRequestOpen: (movie: WatchlistItem | null) => void;
 }
 
-function UpNextAlertCard({ a, userUid, matchedMovie, layout, onRequestOpen }: UpNextAlertCardProps) {
+function UpNextAlertCard({
+  a,
+  userUid,
+  matchedMovie,
+  layout,
+  onRequestOpen,
+}: UpNextAlertCardProps) {
   const queryClient = useQueryClient();
   const ymd = getUpcomingAirDateYmd(a);
   const dateLabel = formatUpcomingAirLabel(a);
@@ -305,11 +321,7 @@ export function UpcomingAlertsBar({ movies, watchlistPending = false }: Upcoming
         <div className="up-next-views">
           {stripExpanded ? (
             <div key="up-next-expanded" className="up-next-expanded-wrap up-next-view-animate">
-              <div
-                className="up-next-expanded-grid"
-                role="list"
-                aria-labelledby="up-next-heading"
-              >
+              <div className="up-next-expanded-grid" role="list" aria-labelledby="up-next-heading">
                 {rows.map(({ a, movie }) => (
                   <UpNextAlertCard
                     key={a.fingerprint}
@@ -363,14 +375,14 @@ export function UpcomingAlertsBar({ movies, watchlistPending = false }: Upcoming
                       className="up-next-more-card"
                       onClick={() => setStripExpanded(true)}
                     >
-                      <span className="up-next-more-card-label">
-                        and {restCount} more →
-                      </span>
+                      <span className="up-next-more-card-label">and {restCount} more →</span>
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className={`up-next-strip-outer${showEndFade ? " up-next-strip-outer--fade" : ""}`}>
+                <div
+                  className={`up-next-strip-outer${showEndFade ? " up-next-strip-outer--fade" : ""}`}
+                >
                   <div
                     ref={stripRef}
                     className="up-next-strip"

@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App.js";
+import { Toaster } from "sonner";
 import "../styles.css";
 
 const sentryDsn = (import.meta.env.VITE_SENTRY_DSN as string | undefined)?.trim();
@@ -67,6 +68,7 @@ if (!rootEl) {
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <AppRoot />
+          <Toaster theme="dark" position="bottom-right" />
         </QueryClientProvider>
       </BrowserRouter>
     </StrictMode>

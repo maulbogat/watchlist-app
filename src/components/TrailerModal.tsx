@@ -3,7 +3,11 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { StatusKey, WatchlistItem } from "../types/index.js";
 import { useAppStore, STATUS_ORDER, STATUS_LABELS, CHECK_SVG } from "../store/useAppStore.js";
-import { hasPlayableTrailerYoutubeId, renderServiceChips, servicesForMovie } from "../lib/movieDisplay.js";
+import {
+  hasPlayableTrailerYoutubeId,
+  renderServiceChips,
+  servicesForMovie,
+} from "../lib/movieDisplay.js";
 import { usePersonalLists, useSharedLists } from "../hooks/useWatchlist.js";
 import {
   useAddTitleToList,
@@ -13,7 +17,8 @@ import {
 import { getCurrentListLabel } from "../data/lists.js";
 import { displayListName, errorMessage } from "../lib/utils.js";
 import { logEvent } from "../lib/axiom-logger.js";
-import { getPersonalListMovies, movieKey } from "../firebase.js";
+import { getPersonalListMovies, listKey } from "../firebase.js";
+import { toast } from "sonner";
 
 const MODAL_LANG_NAMES: Record<string, string> = {
   he: "Hebrew",
@@ -51,7 +56,7 @@ export function TrailerModal() {
   const sharedLists = useMemo(() => sharedQ.data ?? [], [sharedQ.data]);
 
   /** Close dropdowns when switching titles, not when the same row gets a new object (e.g. status). */
-  const movieStableKey = movie ? movieKey(movie) : null;
+  const movieStableKey = movie ? listKey(movie) : null;
 
   const [statusOpen, setStatusOpen] = useState(false);
   const [addListOpen, setAddListOpen] = useState(false);
@@ -77,7 +82,7 @@ export function TrailerModal() {
     queryKey: ["listsContaining", movieStableKey, uid, listStructureKey],
     queryFn: async () => {
       if (!movie || !uid) return new Set<string>();
-      const key = movieKey(movie);
+      const key = listKey(movie);
       const containing = new Set<string>();
       for (const l of personalLists) {
         const listId = l.id;
@@ -93,7 +98,7 @@ export function TrailerModal() {
             listMovies = [];
           }
         }
-        if (listMovies.some((x) => movieKey(x) === key)) {
+        if (listMovies.some((x) => listKey(x) === key)) {
           containing.add(listId);
         }
       }
@@ -101,10 +106,10 @@ export function TrailerModal() {
         const sharedCacheKey = ["watchlistMovies", uid, "shared", l.id];
         const cachedShared = queryClient.getQueryData<WatchlistItem[]>(sharedCacheKey);
         if (cachedShared) {
-          if (cachedShared.some((x) => movieKey(x) === key)) containing.add(l.id);
+          if (cachedShared.some((x) => listKey(x) === key)) containing.add(l.id);
         } else {
           const items = Array.isArray(l.items) ? l.items : [];
-          if (items.some((row) => movieKey(row) === key)) containing.add(l.id);
+          if (items.some((row) => listKey(row) === key)) containing.add(l.id);
         }
       }
       return containing;
@@ -164,8 +169,7 @@ export function TrailerModal() {
 
   async function onPickStatus(st: StatusKey) {
     if (!currentUser?.uid) return;
-    const current =
-      raw === "watched" ? "watched" : raw === "archive" ? "archive" : "to-watch";
+    const current = raw === "watched" ? "watched" : raw === "archive" ? "archive" : "to-watch";
     if (st === current) {
       setStatusOpen(false);
       return;
@@ -174,7 +178,7 @@ export function TrailerModal() {
       await setTitleStatusMutation.mutateAsync({
         uid: currentUser.uid,
         listMode: currentListMode,
-        key: movieKey(m),
+        key: listKey(m),
         status: st,
       });
       setCurrentModalMovie({ ...m, status: st });
@@ -187,7 +191,7 @@ export function TrailerModal() {
       }).catch(() => {});
     } catch (err: unknown) {
       console.error(err);
-      window.alert(errorMessage(err) || "Failed to update.");
+      toast.error(errorMessage(err) || "Failed to update.");
     }
     setStatusOpen(false);
   }
@@ -205,19 +209,22 @@ export function TrailerModal() {
   ) {
     if (!currentUser?.uid) return;
     try {
-      const key = movieKey(m);
+      const key = listKey(m);
       if (currentlyInList) {
         await removeTitleFromListMutation.mutateAsync({ uid: currentUser.uid, listId, key, type });
       } else {
         await addTitleMutation.mutateAsync({
           uid: currentUser.uid,
-          listMode: type === "personal" ? { type: "personal", listId } : { type: "shared", listId, name: "" },
+          listMode:
+            type === "personal"
+              ? { type: "personal", listId }
+              : { type: "shared", listId, name: "" },
           item: m,
         });
       }
     } catch (err: unknown) {
       console.error(err);
-      window.alert(errorMessage(err) || "Failed to update list.");
+      toast.error(errorMessage(err) || "Failed to update list.");
     }
   }
 
@@ -226,10 +233,16 @@ export function TrailerModal() {
   const metaCore = [m.year || "", m.genre || ""].filter(Boolean).join(" ");
   const langLabel = modalOriginalLanguageLabel(m.originalLanguage);
   const metaParts =
-    langLabel && metaCore ? `${metaCore} · ${langLabel}` : langLabel && !metaCore ? langLabel : metaCore;
+    langLabel && metaCore
+      ? `${metaCore} · ${langLabel}`
+      : langLabel && !metaCore
+        ? langLabel
+        : metaCore;
   const serviceChips = renderServiceChips(servicesForMovie(m, userCountryCode));
   const servicePart = serviceChips ? (
-    <span dangerouslySetInnerHTML={{ __html: ` <span style="opacity:0.4">·</span> ${serviceChips}` }} />
+    <span
+      dangerouslySetInnerHTML={{ __html: ` <span style="opacity:0.4">·</span> ${serviceChips}` }}
+    />
   ) : null;
 
   const hasTrailer = hasPlayableTrailerYoutubeId(m);
@@ -251,7 +264,13 @@ export function TrailerModal() {
           >
             {m.title}
           </span>
-          <button type="button" className="modal-close" id="modal-close" aria-label="Close" onClick={close}>
+          <button
+            type="button"
+            className="modal-close"
+            id="modal-close"
+            aria-label="Close"
+            onClick={close}
+          >
             &#x2715;
           </button>
         </div>
@@ -369,7 +388,9 @@ export function TrailerModal() {
                 aria-expanded={addListOpen}
                 onClick={onAddListTriggerClick}
               >
-                <span className="modal-action-label modal-list-label">{currentListButtonLabel}</span>
+                <span className="modal-action-label modal-list-label">
+                  {currentListButtonLabel}
+                </span>
               </button>
               <div
                 className={`modal-action-dropdown-panel modal-add-to-list-panel${addListOpen ? " open" : ""}`}

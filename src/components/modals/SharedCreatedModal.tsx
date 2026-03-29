@@ -1,4 +1,11 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPortal, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/shadcn-utils";
 
 export interface SharedCreatedModalProps {
@@ -7,7 +14,11 @@ export interface SharedCreatedModalProps {
   onClose: () => void;
 }
 
-export function SharedCreatedModal({ open, elevatedStack = false, onClose }: SharedCreatedModalProps) {
+export function SharedCreatedModal({
+  open,
+  elevatedStack = false,
+  onClose,
+}: SharedCreatedModalProps) {
   if (!open) return null;
 
   const blockOutsideDismiss = elevatedStack;
@@ -41,15 +52,18 @@ export function SharedCreatedModal({ open, elevatedStack = false, onClose }: Sha
       }}
     >
       <DialogHeader className="modal-header">
-        <DialogTitle className="modal-title font-title tracking-widest">Shared list created</DialogTitle>
+        <DialogTitle className="modal-title font-title tracking-widest">
+          Shared list created
+        </DialogTitle>
         <DialogDescription className="text-[0.95rem] leading-snug text-[var(--muted)]">
-          To add someone to this list, use the <strong>Invite someone</strong> form below and select this list.
+          To add someone to this list, use the <strong>Invite someone</strong> form below and select
+          this list.
         </DialogDescription>
       </DialogHeader>
       <div className="shared-modal-body" id="shared-modal-body">
         <p className="lists-modal-description text-[0.9rem]">
-          They must already be allowed to use the app. They will receive an email with a link to accept access and join
-          this list.
+          They must already be allowed to use the app. They will receive an email with a link to
+          accept access and join this list.
         </p>
       </div>
     </DialogContent>

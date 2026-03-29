@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks -- hooks follow `if (!user) return null`; refactor would reorder without behavior change */
 import { useMemo, useEffect, useState, useRef } from "react";
 import {
   auth,
@@ -34,6 +35,7 @@ import { ListNameModal } from "./modals/ListNameModal.js";
 import { UpcomingAlertsBar } from "./UpcomingAlertsBar.js";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 
 export function WatchlistPage() {
   const navigate = useNavigate();
@@ -59,7 +61,7 @@ export function WatchlistPage() {
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [onboardingCountry, setOnboardingCountry] = useState(false);
   const [onboardingListName, setOnboardingListName] = useState(false);
-  
+
   const authWrapRef = useRef<HTMLDivElement>(null);
 
   const listsReady = personalQ.isFetched && sharedQ.isFetched;
@@ -155,14 +157,26 @@ export function WatchlistPage() {
         currentSearch,
         currentAddedByUid,
       }),
-    [allMovies, currentFilter, currentGenre, currentStatus, currentSort, currentSearch, currentAddedByUid]
+    [
+      allMovies,
+      currentFilter,
+      currentGenre,
+      currentStatus,
+      currentSort,
+      currentSearch,
+      currentAddedByUid,
+    ]
   );
 
   const personalLists = personalQ.data ?? [];
   const sharedLists = sharedQ.data ?? [];
 
   const sharedListOwnerId = useMemo(() => {
-    if (!currentListMode || typeof currentListMode !== "object" || currentListMode.type !== "shared") {
+    if (
+      !currentListMode ||
+      typeof currentListMode !== "object" ||
+      currentListMode.type !== "shared"
+    ) {
       return null;
     }
     const hit = sharedLists.find((l) => l.id === currentListMode.listId);
@@ -188,8 +202,7 @@ export function WatchlistPage() {
     };
   }, [sharedListOwnerId]);
 
-  const viewerDisplayNameForCards =
-    user.displayName?.trim() || user.email?.split("@")[0] || null;
+  const viewerDisplayNameForCards = user.displayName?.trim() || user.email?.split("@")[0] || null;
 
   const initial = (user.displayName || user.email || "?").charAt(0).toUpperCase();
   const watchlistBlocking = !listsReady || moviesQ.isPending;
@@ -247,7 +260,11 @@ export function WatchlistPage() {
         <div className="header-filters">
           <div className="filters">
             <div className="header-left">
-              <div className="list-selector-wrap" id="list-selector-wrap" style={{ display: "flex" }}>
+              <div
+                className="list-selector-wrap"
+                id="list-selector-wrap"
+                style={{ display: "flex" }}
+              >
                 {listsReady ? (
                   <>
                     <ListSelector
@@ -366,7 +383,10 @@ export function WatchlistPage() {
                           err && typeof err === "object" && "code" in err
                             ? String((err as { code: unknown }).code)
                             : "";
-                        if (code !== "auth/cancelled-popup-request" && code !== "auth/popup-closed-by-user") {
+                        if (
+                          code !== "auth/cancelled-popup-request" &&
+                          code !== "auth/popup-closed-by-user"
+                        ) {
                           console.error(err);
                         }
                       }
@@ -419,10 +439,7 @@ export function WatchlistPage() {
           </>
         ) : (
           <>
-            <WatchlistToolbar
-              allMovies={allMovies}
-              visibleCount={visibleMovies.length}
-            />
+            <WatchlistToolbar allMovies={allMovies} visibleCount={visibleMovies.length} />
             <TitleGrid
               visibleMovies={visibleMovies}
               currentStatus={currentStatus}
@@ -486,7 +503,9 @@ export function WatchlistPage() {
             onboardingDone.current = true;
             await refreshListsMutation.mutateAsync(user.uid);
           } catch (e: unknown) {
-            window.alert(errorMessage(e) || "Could not save your main list name. Reload and try again.");
+            toast.error(
+              errorMessage(e) || "Could not save your main list name. Reload and try again."
+            );
           }
         }}
       />

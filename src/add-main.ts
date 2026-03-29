@@ -88,7 +88,9 @@ if (!imdbId || !/^tt\d+$/.test(nImdb ?? "") || !statusEl || !backLink) {
       const backendError =
         data.error ||
         data.errorMessage ||
-        (!res.ok ? `Request failed (${res.status}${res.statusText ? ` ${res.statusText}` : ""})` : "");
+        (!res.ok
+          ? `Request failed (${res.status}${res.statusText ? ` ${res.statusText}` : ""})`
+          : "");
 
       if (window.self !== window.top) {
         window.parent.postMessage(

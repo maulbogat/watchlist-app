@@ -37,9 +37,12 @@ export function useAuthUser(): { loading: boolean } {
   useEffect(() => {
     if (!currentUser) return;
     // Firebase ID tokens expire; refresh cookie periodically while app is open.
-    const id = window.setInterval(() => {
-      void setBookmarkletCookieWithMode(currentUser, useAppStore.getState().currentListMode);
-    }, 15 * 60 * 1000);
+    const id = window.setInterval(
+      () => {
+        void setBookmarkletCookieWithMode(currentUser, useAppStore.getState().currentListMode);
+      },
+      15 * 60 * 1000
+    );
     return () => window.clearInterval(id);
   }, [currentUser]);
 

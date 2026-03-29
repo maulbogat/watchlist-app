@@ -2,7 +2,10 @@ import { GENRE_LIMIT } from "../store/watchlistConstants.js";
 import type { WatchlistItem } from "../types/index.js";
 import { listKey } from "./registry-id.js";
 
-export function isGenrePresentInMovies(movies: WatchlistItem[] | undefined, genre: string): boolean {
+export function isGenrePresentInMovies(
+  movies: WatchlistItem[] | undefined,
+  genre: string
+): boolean {
   if (!genre) return true;
   const g = genre.toLowerCase();
   return (movies || []).some((m) => {
@@ -35,7 +38,10 @@ export function getUniqueAddersFromMovies(
     .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
 }
 
-export function isAddedByPresentInMovies(movies: WatchlistItem[] | undefined, addedByUid: string): boolean {
+export function isAddedByPresentInMovies(
+  movies: WatchlistItem[] | undefined,
+  addedByUid: string
+): boolean {
   if (!addedByUid.trim()) return true;
   return (movies || []).some((m) => m.addedByUid === addedByUid);
 }
@@ -67,14 +73,19 @@ export interface FilterState {
 }
 
 /** Pure filter pipeline for the grid (type, status tab, genre, added-by on shared lists, sort). */
-export function filterTitles(movies: WatchlistItem[] | undefined, filters: FilterState): WatchlistItem[] {
+export function filterTitles(
+  movies: WatchlistItem[] | undefined,
+  filters: FilterState
+): WatchlistItem[] {
   const listMovies = movies || [];
   const search = filters.currentSearch.trim().toLowerCase();
   const addedBy = (filters.currentAddedByUid ?? "").trim();
 
   function matchesSearch(movie: WatchlistItem): boolean {
     if (!search) return true;
-    return String(movie.title || "").toLowerCase().includes(search);
+    return String(movie.title || "")
+      .toLowerCase()
+      .includes(search);
   }
 
   function matchesAddedBy(movie: WatchlistItem): boolean {
@@ -128,7 +139,9 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
   }
 
   let list =
-    filters.currentFilter === "both" ? listMovies : listMovies.filter((m) => m.type === filters.currentFilter);
+    filters.currentFilter === "both"
+      ? listMovies
+      : listMovies.filter((m) => m.type === filters.currentFilter);
   list = list.filter((m) => matchesAddedBy(m));
   list = list.filter((m) => {
     if (filters.currentStatus === "all") return true;
@@ -140,7 +153,9 @@ export function filterTitles(movies: WatchlistItem[] | undefined, filters: Filte
   if (filters.currentGenre) {
     list = list.filter((m) => {
       const g = String(m.genre || "");
-      return g.split(/\s*\/\s*/).some((s) => s.trim().toLowerCase() === filters.currentGenre.toLowerCase());
+      return g
+        .split(/\s*\/\s*/)
+        .some((s) => s.trim().toLowerCase() === filters.currentGenre.toLowerCase());
     });
   }
   if (search) {

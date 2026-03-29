@@ -1,5 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPortal, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/shadcn-utils";
 
 export interface DeleteConfirmModalProps {
@@ -61,10 +68,20 @@ export function DeleteConfirmModal({
       </DialogHeader>
       <div className="delete-confirm-body">
         <div className="delete-confirm-actions">
-          <Button type="button" variant="outline" className="delete-confirm-cancel" onClick={onCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            className="delete-confirm-cancel"
+            onClick={onCancel}
+          >
             Cancel
           </Button>
-          <Button type="button" variant="destructive" className="delete-confirm-delete" onClick={onConfirm}>
+          <Button
+            type="button"
+            variant="destructive"
+            className="delete-confirm-delete"
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </Button>
         </div>

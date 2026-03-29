@@ -5,10 +5,22 @@ import { useAppStore } from "../store/useAppStore.js";
 import { getCurrentListLabel, getCurrentListValue } from "../data/lists.js";
 import type { ListMode, PersonalList, SharedList } from "../types/index.js";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const iconPerson = (
-  <svg className="custom-dropdown-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+  <svg
+    className="custom-dropdown-icon"
+    viewBox="0 0 24 24"
+    width="16"
+    height="16"
+    aria-hidden="true"
+  >
     <path
       fill="currentColor"
       d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
@@ -17,7 +29,13 @@ const iconPerson = (
 );
 
 const iconGroup = (
-  <svg className="custom-dropdown-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+  <svg
+    className="custom-dropdown-icon"
+    viewBox="0 0 24 24"
+    width="16"
+    height="16"
+    aria-hidden="true"
+  >
     <path
       fill="currentColor"
       d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"
@@ -79,7 +97,11 @@ export function ListSelector({ personalLists, sharedLists, onManageLists }: List
     <div className="custom-dropdown" id="list-selector" data-open="false">
       <div className="list-controls-pair">
         <Select value={currentVal} onValueChange={selectValue}>
-          <SelectTrigger className="custom-dropdown-trigger" id="list-selector-trigger" title="Switch list">
+          <SelectTrigger
+            className="custom-dropdown-trigger"
+            id="list-selector-trigger"
+            title="Switch list"
+          >
             <SelectValue>
               <span className="custom-dropdown-value">{label}</span>
             </SelectValue>
@@ -123,4 +145,3 @@ export function ListSelector({ personalLists, sharedLists, onManageLists }: List
     </div>
   );
 }
-

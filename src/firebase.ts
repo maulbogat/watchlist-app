@@ -26,10 +26,15 @@ import {
   deleteField,
   writeBatch,
 } from "firebase/firestore";
-import type { DocumentData, DocumentReference, DocumentSnapshot, Firestore } from "firebase/firestore";
+import type {
+  DocumentData,
+  DocumentReference,
+  DocumentSnapshot,
+  Firestore,
+} from "firebase/firestore";
 
 import { firebaseConfig } from "./config/firebase.js";
-import { listKey as movieKey } from "./lib/registry-id.js";
+import { listKey } from "./lib/registry-id.js";
 import { logEvent } from "./lib/axiom-logger.js";
 import type {
   FirestoreListRow,
@@ -106,7 +111,7 @@ function initFirestoreWithLocalCache(): Firestore {
   const globalObj = globalThis as typeof globalThis & { [globalKey]?: Firestore };
   if (globalObj[globalKey]) return globalObj[globalKey];
 
-  function useExistingFirestore(): Firestore {
+  function reuseExistingFirestoreDb(): Firestore {
     const existing = getFirestore(app);
     globalObj[globalKey] = existing;
     return existing;
@@ -119,10 +124,12 @@ function initFirestoreWithLocalCache(): Firestore {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err ?? "");
     if (/initializeFirestore\(\) has already been called with different options/i.test(message)) {
-      return useExistingFirestore();
+      return reuseExistingFirestoreDb();
     }
     const code =
-      err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code ?? "") : "";
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code?: unknown }).code ?? "")
+        : "";
     if (code !== "failed-precondition" && code !== "unimplemented") {
       throw err;
     }
@@ -131,9 +138,14 @@ function initFirestoreWithLocalCache(): Firestore {
       globalObj[globalKey] = memoryDb;
       return memoryDb;
     } catch (fallbackErr: unknown) {
-      const fallbackMessage = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr ?? "");
-      if (/initializeFirestore\(\) has already been called with different options/i.test(fallbackMessage)) {
-        return useExistingFirestore();
+      const fallbackMessage =
+        fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr ?? "");
+      if (
+        /initializeFirestore\(\) has already been called with different options/i.test(
+          fallbackMessage
+        )
+      ) {
+        return reuseExistingFirestoreDb();
       }
       throw fallbackErr;
     }
@@ -211,7 +223,9 @@ function ensureAddedAt(value: unknown): string {
 
 const REGISTRY_READ_BATCH = 30;
 
-async function bulkGetTitleRegistryDocData(ids: readonly string[]): Promise<Map<string, DocumentData>> {
+async function bulkGetTitleRegistryDocData(
+  ids: readonly string[]
+): Promise<Map<string, DocumentData>> {
   const unique = [...new Set(ids.filter(Boolean).map((id) => String(id)))];
   const map = new Map<string, DocumentData>();
   for (let i = 0; i < unique.length; i += REGISTRY_READ_BATCH) {
@@ -256,13 +270,18 @@ async function hydrateListItemsFromRegistry(
     const rid = String(r.registryId);
     const fromRegistry: DocumentData = regMap.get(rid) ?? {};
     /** Inline fields saved on the list row (legacy / partial rows) fill gaps if registry is missing. */
-    const { registryId: _ignore, status: _st, ...inline } = r as ListRowForHydrate & {
+    const {
+      registryId: _ignore,
+      status: _st,
+      ...inline
+    } = r as ListRowForHydrate & {
       registryId?: string;
       status?: unknown;
     };
     const meta: Record<string, unknown> = { ...inline, ...fromRegistry };
     /** List row: `addedBy*` denormalized on shared list items; titleRegistry must not override. */
-    if (typeof inline.addedByUid === "string" && inline.addedByUid.trim()) meta.addedByUid = inline.addedByUid.trim();
+    if (typeof inline.addedByUid === "string" && inline.addedByUid.trim())
+      meta.addedByUid = inline.addedByUid.trim();
     else delete meta.addedByUid;
     const rowAddedByName = addedByDisplayNameFromListRow(r);
     const rowAddedByPhoto = addedByPhotoUrlFromListRow(r);
@@ -296,7 +315,9 @@ async function hydrateListItemsFromRegistry(
           ? Number(meta.tmdbId)
           : null,
       tmdbMedia: meta.tmdbMedia != null ? String(meta.tmdbMedia) : null,
-      services: Array.isArray(meta.services) ? (meta.services as unknown[]).map((s) => String(s)) : [],
+      services: Array.isArray(meta.services)
+        ? (meta.services as unknown[]).map((s) => String(s))
+        : [],
       servicesByRegion:
         meta.servicesByRegion != null && typeof meta.servicesByRegion === "object"
           ? (meta.servicesByRegion as WatchlistItem["servicesByRegion"])
@@ -317,7 +338,11 @@ async function hydrateListItemsFromRegistry(
     else if (archiveSet.has(k)) status = "archive";
     // Legacy embedded rows: shape varies; runtime matches historical Firestore embeds.
     const legacyMeta = m as Record<string, unknown>;
-    out.push({ ...legacyMeta, addedAt: normalizeAddedAt(legacyMeta.addedAt), status } as WatchlistItem);
+    out.push({
+      ...legacyMeta,
+      addedAt: normalizeAddedAt(legacyMeta.addedAt),
+      status,
+    } as WatchlistItem);
   }
 
   const rawCount = (items || []).filter((m) => m != null).length;
@@ -336,7 +361,8 @@ async function hydrateListItemsFromRegistry(
 function rowToStore(movie: WatchlistItem | FirestoreListRow | null | undefined): FirestoreListRow {
   if (!movie || typeof movie !== "object") return {};
   const rec = movie as Record<string, unknown>;
-  if (movie.registryId) return { registryId: movie.registryId, addedAt: ensureAddedAt(rec.addedAt) };
+  if (movie.registryId)
+    return { registryId: movie.registryId, addedAt: ensureAddedAt(rec.addedAt) };
   const { status: _status, ...clean } = movie as FirestoreListRow & { status?: unknown };
   return { ...clean, addedAt: ensureAddedAt((clean as Record<string, unknown>).addedAt) };
 }
@@ -362,7 +388,8 @@ async function migrateLegacyPersonalListIfNeeded(uid: string): Promise<void> {
   if (!userSnap.exists()) return;
   const data = userSnap.data() ?? {};
 
-  let defId = typeof data.defaultPersonalListId === "string" ? data.defaultPersonalListId.trim() : "";
+  const defId =
+    typeof data.defaultPersonalListId === "string" ? data.defaultPersonalListId.trim() : "";
   if (defId) {
     const plSnap = await getDoc(doc(db, "users", uid, "personalLists", defId));
     if (plSnap.exists()) return;
@@ -542,8 +569,9 @@ function photoUrlFromUserDoc(d: DocumentData | undefined): string | null {
   const rec = d as Record<string, unknown>;
   const a = rec.photoURL;
   const b = rec.photoUrl;
-  const s =
-    (typeof a === "string" && a.trim() ? a : typeof b === "string" && b.trim() ? b : "").trim();
+  const s = (
+    typeof a === "string" && a.trim() ? a : typeof b === "string" && b.trim() ? b : ""
+  ).trim();
   return s || null;
 }
 
@@ -577,7 +605,9 @@ async function readUserDocForAddedBy(ref: DocumentReference): Promise<DocumentSn
 }
 
 /** One read per distinct `addedByUid` (parallel). */
-async function bulkGetAddedByUserFieldsForUids(uids: string[]): Promise<Map<string, AddedByUserFields>> {
+async function bulkGetAddedByUserFieldsForUids(
+  uids: string[]
+): Promise<Map<string, AddedByUserFields>> {
   const uniq = [...new Set(uids.filter((id) => typeof id === "string" && id.length > 0))];
   const map = new Map<string, AddedByUserFields>();
   await Promise.all(
@@ -635,9 +665,17 @@ async function getUserPublicPhotoUrl(uid: string): Promise<string | null> {
   }
 }
 
-async function setUserCountry(uid: string, countryCode: string, countryName: string | null | undefined): Promise<void> {
+async function setUserCountry(
+  uid: string,
+  countryCode: string,
+  countryName: string | null | undefined
+): Promise<void> {
   const ref = doc(db, "users", uid);
-  await setDoc(ref, { country: countryCode, countryName: countryName || countryCode }, { merge: true });
+  await setDoc(
+    ref,
+    { country: countryCode, countryName: countryName || countryCode },
+    { merge: true }
+  );
 }
 
 async function setStatus(uid: string, key: string, status: string): Promise<void> {
@@ -653,7 +691,8 @@ async function setStatus(uid: string, key: string, status: string): Promise<void
     await setDoc(ref, removeFromAll, { merge: true });
     return;
   }
-  const addTo = status === "watched" ? "watched" : status === "maybe-later" ? "maybeLater" : "archive";
+  const addTo =
+    status === "watched" ? "watched" : status === "maybe-later" ? "maybeLater" : "archive";
   await setDoc(ref, { ...removeFromAll, [addTo]: arrayUnion(key) }, { merge: true });
 }
 
@@ -664,7 +703,7 @@ async function removeTitle(uid: string, key: string): Promise<void> {
   const snap = await getDoc(ref);
   const data: DocumentData = snap.exists() ? snap.data() : {};
   const rawItems = Array.isArray(data.items) ? (data.items as FirestoreListRow[]) : [];
-  const items = rawItems.filter((m) => movieKey(m) !== key);
+  const items = rawItems.filter((m) => listKey(m) !== key);
   await setDoc(
     ref,
     {
@@ -705,10 +744,7 @@ async function getSharedList(listId: string): Promise<SharedList | null> {
 
 async function getSharedListsForUser(uid: string): Promise<SharedList[]> {
   const startedAt = Date.now();
-  const q = query(
-    collection(db, "sharedLists"),
-    where("members", "array-contains", uid)
-  );
+  const q = query(collection(db, "sharedLists"), where("members", "array-contains", uid));
   const snap = await getDocs(q);
   const lists = snap.docs.map((d) => sharedListFromFirestoreDoc(d.id, d.data()));
   void logEvent({
@@ -760,7 +796,8 @@ async function setSharedListStatus(listId: string, key: string, status: string):
     await setDoc(ref, removeFromAll, { merge: true });
     return;
   }
-  const addTo = status === "watched" ? "watched" : status === "maybe-later" ? "maybeLater" : "archive";
+  const addTo =
+    status === "watched" ? "watched" : status === "maybe-later" ? "maybeLater" : "archive";
   await setDoc(ref, { ...removeFromAll, [addTo]: arrayUnion(key) }, { merge: true });
 }
 
@@ -769,7 +806,7 @@ async function removeFromSharedList(listId: string, key: string): Promise<void> 
   const snap = await getDoc(ref);
   const data: DocumentData = snap.exists() ? snap.data() : {};
   const rawItems = Array.isArray(data.items) ? (data.items as FirestoreListRow[]) : [];
-  const items = rawItems.filter((m) => movieKey(m) !== key);
+  const items = rawItems.filter((m) => listKey(m) !== key);
   await setDoc(
     ref,
     {
@@ -782,14 +819,20 @@ async function removeFromSharedList(listId: string, key: string): Promise<void> 
   );
 }
 
-async function addToSharedList(listId: string, movie: WatchlistItem, addedByUid: string): Promise<void> {
+async function addToSharedList(
+  listId: string,
+  movie: WatchlistItem,
+  addedByUid: string
+): Promise<void> {
   const ref = doc(db, "sharedLists", listId);
   const snap = await getDoc(ref);
   if (!snap.exists()) throw new Error("Shared list not found");
   const data = snap.data();
-  const items: FirestoreListRow[] = Array.isArray(data.items) ? [...(data.items as FirestoreListRow[])] : [];
-  const key = movieKey(movie);
-  const exists = items.some((m) => movieKey(m) === key);
+  const items: FirestoreListRow[] = Array.isArray(data.items)
+    ? [...(data.items as FirestoreListRow[])]
+    : [];
+  const key = listKey(movie);
+  const exists = items.some((m) => listKey(m) === key);
   if (exists) return;
   const base = rowToStore(movie);
   const cur = auth.currentUser;
@@ -805,23 +848,28 @@ async function addToSharedList(listId: string, movie: WatchlistItem, addedByUid:
   }
   items.push(row);
   const watched = new Set((Array.isArray(data.watched) ? data.watched : []).map((k) => String(k)));
-  const maybeLater = new Set((Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k)));
+  const maybeLater = new Set(
+    (Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k))
+  );
   const archive = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
   const s = movie.status || "to-watch";
   if (s === "watched") watched.add(key);
   else if (s === "maybe-later") maybeLater.add(key);
   else if (s === "archive") archive.add(key);
-  await setDoc(ref, { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] }, { merge: true });
+  await setDoc(
+    ref,
+    { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] },
+    { merge: true }
+  );
   // Keep `users/{uid}` in sync for other features; list rows carry denormalized attribution.
   if (cur && cur.uid === addedByUid) {
-    const label =
-      cur.displayName?.trim() || (cur.email ? cur.email.split("@")[0] : "") || "";
+    const label = cur.displayName?.trim() || (cur.email ? cur.email.split("@")[0] : "") || "";
     void syncUserDisplayNameToFirestore(addedByUid, label || null, cur.photoURL ?? null);
   }
 }
 
 async function addToPersonalList(uid: string, listId: string, movie: WatchlistItem): Promise<void> {
-  const key = movieKey(movie);
+  const key = listKey(movie);
   const s = movie.status || "to-watch";
   if (listId === "personal") {
     const resolved = await resolveDefaultPersonalListId(uid);
@@ -829,31 +877,55 @@ async function addToPersonalList(uid: string, listId: string, movie: WatchlistIt
     const ref = doc(db, "users", uid, "personalLists", resolved);
     const snap = await getDoc(ref);
     const data: DocumentData = snap.exists() ? snap.data() : {};
-    const items: FirestoreListRow[] = Array.isArray(data.items) ? [...(data.items as FirestoreListRow[])] : [];
-    if (items.some((m) => movieKey(m) === key)) return;
+    const items: FirestoreListRow[] = Array.isArray(data.items)
+      ? [...(data.items as FirestoreListRow[])]
+      : [];
+    if (items.some((m) => listKey(m) === key)) return;
     items.push(rowToStore(movie));
-    const watched = new Set((Array.isArray(data.watched) ? data.watched : []).map((k) => String(k)));
-    const maybeLater = new Set((Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k)));
-    const archive = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
+    const watched = new Set(
+      (Array.isArray(data.watched) ? data.watched : []).map((k) => String(k))
+    );
+    const maybeLater = new Set(
+      (Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k))
+    );
+    const archive = new Set(
+      (Array.isArray(data.archive) ? data.archive : []).map((k) => String(k))
+    );
     if (s === "watched") watched.add(key);
     else if (s === "maybe-later") maybeLater.add(key);
     else if (s === "archive") archive.add(key);
-    await setDoc(ref, { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] }, { merge: true });
+    await setDoc(
+      ref,
+      { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] },
+      { merge: true }
+    );
   } else {
     const ref = doc(db, "users", uid, "personalLists", listId);
     const snap = await getDoc(ref);
     if (!snap.exists()) throw new Error("Personal list not found");
     const data = snap.data();
-    const items: FirestoreListRow[] = Array.isArray(data.items) ? [...(data.items as FirestoreListRow[])] : [];
-    if (items.some((m) => movieKey(m) === key)) return;
+    const items: FirestoreListRow[] = Array.isArray(data.items)
+      ? [...(data.items as FirestoreListRow[])]
+      : [];
+    if (items.some((m) => listKey(m) === key)) return;
     items.push(rowToStore(movie));
-    const watched = new Set((Array.isArray(data.watched) ? data.watched : []).map((k) => String(k)));
-    const maybeLater = new Set((Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k)));
-    const archive = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
+    const watched = new Set(
+      (Array.isArray(data.watched) ? data.watched : []).map((k) => String(k))
+    );
+    const maybeLater = new Set(
+      (Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k))
+    );
+    const archive = new Set(
+      (Array.isArray(data.archive) ? data.archive : []).map((k) => String(k))
+    );
     if (s === "watched") watched.add(key);
     else if (s === "maybe-later") maybeLater.add(key);
     else if (s === "archive") archive.add(key);
-    await setDoc(ref, { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] }, { merge: true });
+    await setDoc(
+      ref,
+      { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] },
+      { merge: true }
+    );
   }
 }
 
@@ -884,7 +956,8 @@ async function getPersonalLists(uid: string): Promise<PersonalList[]> {
     await migrateLegacyPersonalListIfNeeded(uid);
     const userSnap = await getDoc(doc(db, "users", uid));
     const data: DocumentData = userSnap.exists() ? userSnap.data() : {};
-    const defaultId = typeof data.defaultPersonalListId === "string" ? data.defaultPersonalListId.trim() : "";
+    const defaultId =
+      typeof data.defaultPersonalListId === "string" ? data.defaultPersonalListId.trim() : "";
     const lists: PersonalList[] = [];
     if (defaultId) {
       const plSnap = await getDoc(doc(db, "users", uid, "personalLists", defaultId));
@@ -961,9 +1034,15 @@ async function getPersonalListMovies(uid: string, listId: string): Promise<Watch
     const data = snap.data();
     // personalLists `items` are list rows (registry refs or legacy embeds), same union as hydrate input.
     const items = (Array.isArray(data.items) ? data.items : []) as ListRowForHydrate[];
-    const watchedSet = new Set((Array.isArray(data.watched) ? data.watched : []).map((k) => String(k)));
-    const maybeLaterSet = new Set((Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k)));
-    const archiveSet = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
+    const watchedSet = new Set(
+      (Array.isArray(data.watched) ? data.watched : []).map((k) => String(k))
+    );
+    const maybeLaterSet = new Set(
+      (Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k))
+    );
+    const archiveSet = new Set(
+      (Array.isArray(data.archive) ? data.archive : []).map((k) => String(k))
+    );
     const movies = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
     void logEvent({
       type: "firestore.read",
@@ -986,7 +1065,12 @@ async function getPersonalListMovies(uid: string, listId: string): Promise<Watch
   }
 }
 
-async function setPersonalListStatus(uid: string, listId: string, key: string, status: string): Promise<void> {
+async function setPersonalListStatus(
+  uid: string,
+  listId: string,
+  key: string,
+  status: string
+): Promise<void> {
   if (listId === "personal") {
     await setStatus(uid, key, status);
     return;
@@ -1001,7 +1085,8 @@ async function setPersonalListStatus(uid: string, listId: string, key: string, s
     await setDoc(ref, removeFromAll, { merge: true });
     return;
   }
-  const addTo = status === "watched" ? "watched" : status === "maybe-later" ? "maybeLater" : "archive";
+  const addTo =
+    status === "watched" ? "watched" : status === "maybe-later" ? "maybeLater" : "archive";
   await setDoc(ref, { ...removeFromAll, [addTo]: arrayUnion(key) }, { merge: true });
 }
 
@@ -1014,7 +1099,7 @@ async function removeFromPersonalList(uid: string, listId: string, key: string):
   const snap = await getDoc(ref);
   const data: DocumentData = snap.exists() ? snap.data() : {};
   const rawItems = Array.isArray(data.items) ? (data.items as FirestoreListRow[]) : [];
-  const items = rawItems.filter((m) => movieKey(m) !== key);
+  const items = rawItems.filter((m) => listKey(m) !== key);
   await setDoc(
     ref,
     {
@@ -1031,7 +1116,7 @@ async function renamePersonalList(uid: string, listId: string, newName: string):
   const name = String(newName || "").trim();
   if (!name) throw new Error("Name cannot be empty");
   if (listId === "personal") {
-    let id = await resolveDefaultPersonalListId(uid);
+    const id = await resolveDefaultPersonalListId(uid);
     if (!id) {
       const newId = randomId() + randomId();
       await setDoc(doc(db, "users", uid, "personalLists", newId), {
@@ -1160,7 +1245,10 @@ async function fetchUpcomingAlertsForItems(
 /**
  * Persist dismissal fingerprint on users/{uid}.upcomingDismissals.{fingerprint}
  */
-async function dismissUpcomingAlert(uid: string | null | undefined, fingerprint: string | null | undefined): Promise<void> {
+async function dismissUpcomingAlert(
+  uid: string | null | undefined,
+  fingerprint: string | null | undefined
+): Promise<void> {
   if (!uid || !fingerprint) return;
   const day = new Date().toISOString().slice(0, 10);
   const ref = doc(db, "users", uid);
@@ -1407,7 +1495,8 @@ async function getJobConfigState(): Promise<JobConfigState> {
       lastRunAt: data.config.lastRunAt ?? null,
       lastRunStatus: data.config.lastRunStatus ?? null,
       lastRunMessage: data.config.lastRunMessage ?? null,
-      lastRunResult: (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
+      lastRunResult:
+        (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
     };
   } catch (err: unknown) {
     if (err instanceof Error) throw err;
@@ -1442,7 +1531,8 @@ async function setCheckUpcomingEnabledState(enabled: boolean): Promise<JobConfig
       lastRunAt: data.config.lastRunAt ?? null,
       lastRunStatus: data.config.lastRunStatus ?? null,
       lastRunMessage: data.config.lastRunMessage ?? null,
-      lastRunResult: (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
+      lastRunResult:
+        (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
     };
   } catch (err: unknown) {
     if (err instanceof Error) throw err;
@@ -1477,7 +1567,8 @@ async function setGithubBackupEnabledState(enabled: boolean): Promise<JobConfigS
       lastRunAt: data.config.lastRunAt ?? null,
       lastRunStatus: data.config.lastRunStatus ?? null,
       lastRunMessage: data.config.lastRunMessage ?? null,
-      lastRunResult: (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
+      lastRunResult:
+        (data.config.lastRunResult as Record<string, unknown> | null | undefined) ?? null,
     };
   } catch (err: unknown) {
     if (err instanceof Error) throw err;
@@ -1491,7 +1582,7 @@ export {
   GoogleAuthProvider,
   fbSignOut,
   onAuthStateChanged,
-  movieKey,
+  listKey,
   getStatusData,
   getUserProfile,
   syncUserDisplayNameToFirestore,

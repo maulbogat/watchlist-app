@@ -20,6 +20,7 @@ These rules apply to all files including src/pages/AdminPage.tsx and styles.css 
 After every feature change, new API route, new component, new collection, or infrastructure change:
 - Update README.md to reflect the change (features list, setup instructions, environment variables)
 - Update system-design.md to reflect the change (services table, architecture, data model, API routes, gaps)
+- Whenever a Firestore collection is **added** or **removed**, or **fields are added or removed** on an existing collection, update the corresponding **collection / field documentation in system-design.md Section 3** in the **same commit** as the schema change
 - Update docs/environment.md if any environment variables were added, removed, or changed
 - Update .env.example if any environment variables were added or removed
 - If a new Firestore composite index is created via the Firebase console, export it with firebase firestore:indexes > firestore.indexes.json and commit the updated file

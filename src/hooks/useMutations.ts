@@ -2,8 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { invalidateUserListQueries, listModeQueryKey } from "./useWatchlist.js";
 import { addTitleToList, removeTitleFromList, setTitleStatus } from "../data/titles.js";
-import { auth, movieKey, removeFromPersonalList, removeFromSharedList } from "../firebase.js";
-import type { ListMode, PersonalList, SharedList, StatusKey, WatchlistItem } from "../types/index.js";
+import { auth, listKey, removeFromPersonalList, removeFromSharedList } from "../firebase.js";
+import type {
+  ListMode,
+  PersonalList,
+  SharedList,
+  StatusKey,
+  WatchlistItem,
+} from "../types/index.js";
 
 interface SetTitleStatusVars {
   uid: string;
@@ -59,7 +65,9 @@ function modeToListInfo(listMode: ListMode): { type: "personal" | "shared"; list
 function captureSnapshot(queryClient: QueryClient, uid: string): MutationSnapshot {
   return {
     uid,
-    watchlistQueries: queryClient.getQueriesData<WatchlistItem[]>({ queryKey: ["watchlistMovies", uid] }),
+    watchlistQueries: queryClient.getQueriesData<WatchlistItem[]>({
+      queryKey: ["watchlistMovies", uid],
+    }),
     personalLists: queryClient.getQueryData<PersonalList[]>(["personalLists", uid]),
     sharedLists: queryClient.getQueryData<SharedList[]>(["sharedLists", uid]),
   };
@@ -110,7 +118,9 @@ function updateListCountOptimistically(
 ): void {
   queryClient.setQueryData<PersonalList[]>(["personalLists", uid], (prev) => {
     if (!prev) return prev;
-    return prev.map((l) => (l.id === listId ? { ...l, count: Math.max(0, (l.count || 0) + delta) } : l));
+    return prev.map((l) =>
+      l.id === listId ? { ...l, count: Math.max(0, (l.count || 0) + delta) } : l
+    );
   });
 }
 
@@ -118,15 +128,13 @@ function updateListCountOptimistically(
 function patchListsContainingQueries(
   queryClient: QueryClient,
   uid: string,
-  movieKeyStr: string,
+  listKeyStr: string,
   updater: (set: Set<string>) => void
 ): void {
   for (const query of queryClient.getQueryCache().findAll({
     predicate: (q) => {
       const k = q.queryKey;
-      return (
-        Array.isArray(k) && k[0] === "listsContaining" && k[1] === movieKeyStr && k[2] === uid
-      );
+      return Array.isArray(k) && k[0] === "listsContaining" && k[1] === listKeyStr && k[2] === uid;
     },
   })) {
     const prev = query.state.data;
@@ -139,14 +147,12 @@ function patchListsContainingQueries(
 function invalidateListsContainingForMovie(
   queryClient: QueryClient,
   uid: string,
-  movieKeyStr: string
+  listKeyStr: string
 ): void {
   void queryClient.invalidateQueries({
     predicate: (q) => {
       const k = q.queryKey;
-      return (
-        Array.isArray(k) && k[0] === "listsContaining" && k[1] === movieKeyStr && k[2] === uid
-      );
+      return Array.isArray(k) && k[0] === "listsContaining" && k[1] === listKeyStr && k[2] === uid;
     },
   });
 }
@@ -162,7 +168,7 @@ export function useSetTitleStatus() {
       updateWatchlistCacheForMode(queryClient, uid, listMode, (prev) => {
         let changed = false;
         const next = prev.map((m) => {
-          if (movieKey(m) !== key) return m;
+          if (listKey(m) !== key) return m;
           if ((m.status || "to-watch") === status) return m;
           changed = true;
           return { ...m, status };
@@ -185,12 +191,13 @@ export function useSetTitleStatus() {
 export function useRemoveTitle() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ uid, listMode, key }: RemoveTitleVars) => removeTitleFromList(uid, listMode, key),
+    mutationFn: ({ uid, listMode, key }: RemoveTitleVars) =>
+      removeTitleFromList(uid, listMode, key),
     onMutate: async ({ uid, listMode, key }) => {
       await queryClient.cancelQueries({ queryKey: ["watchlistMovies", uid] });
       const snapshot = captureSnapshot(queryClient, uid);
       const removed = updateWatchlistCacheForMode(queryClient, uid, listMode, (prev) => {
-        const next = prev.filter((m) => movieKey(m) !== key);
+        const next = prev.filter((m) => listKey(m) !== key);
         return next.length === prev.length ? prev : next;
       });
       const info = modeToListInfo(listMode);
@@ -215,7 +222,11 @@ export function useRemoveTitle() {
   });
 }
 
-function enrichItemForSharedAdd(uid: string, listMode: ListMode, item: WatchlistItem): WatchlistItem {
+function enrichItemForSharedAdd(
+  uid: string,
+  listMode: ListMode,
+  item: WatchlistItem
+): WatchlistItem {
   if (!isSharedMode(listMode)) return item;
   const u = auth.currentUser;
   if (u?.uid !== uid) return { ...item, addedByUid: uid };
@@ -232,14 +243,15 @@ function enrichItemForSharedAdd(uid: string, listMode: ListMode, item: Watchlist
 export function useAddTitleToList() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ uid, listMode, item }: AddTitleToListVars) => addTitleToList(uid, listMode, item),
+    mutationFn: ({ uid, listMode, item }: AddTitleToListVars) =>
+      addTitleToList(uid, listMode, item),
     onMutate: async ({ uid, listMode, item }) => {
       await queryClient.cancelQueries({ queryKey: ["watchlistMovies", uid] });
       const snapshot = captureSnapshot(queryClient, uid);
       const itemForCache = enrichItemForSharedAdd(uid, listMode, item);
       const added = updateWatchlistCacheForMode(queryClient, uid, listMode, (prev) => {
-        const key = movieKey(itemForCache);
-        if (prev.some((m) => movieKey(m) === key)) return prev;
+        const key = listKey(itemForCache);
+        if (prev.some((m) => listKey(m) === key)) return prev;
         return [...prev, itemForCache];
       });
       if (added) {
@@ -247,7 +259,7 @@ export function useAddTitleToList() {
         if (info.type === "personal") {
           updateListCountOptimistically(queryClient, uid, info.listId, 1);
         }
-        patchListsContainingQueries(queryClient, uid, movieKey(itemForCache), (s) => {
+        patchListsContainingQueries(queryClient, uid, listKey(itemForCache), (s) => {
           s.add(info.listId);
         });
       }
@@ -255,7 +267,7 @@ export function useAddTitleToList() {
     },
     onError: (_err, vars, snapshot) => {
       restoreSnapshot(queryClient, snapshot);
-      invalidateListsContainingForMovie(queryClient, vars.uid, movieKey(vars.item));
+      invalidateListsContainingForMovie(queryClient, vars.uid, listKey(vars.item));
     },
     onSuccess: (_, { uid, listMode }) => {
       if (isSharedMode(listMode)) {
@@ -269,7 +281,9 @@ export function useRemoveTitleFromList() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ uid, listId, key, type }: RemoveTitleFromListVars) =>
-      type === "personal" ? removeFromPersonalList(uid, listId, key) : removeFromSharedList(listId, key),
+      type === "personal"
+        ? removeFromPersonalList(uid, listId, key)
+        : removeFromSharedList(listId, key),
     onMutate: async ({ uid, listId, key, type }) => {
       await queryClient.cancelQueries({ queryKey: ["watchlistMovies", uid] });
       const snapshot = captureSnapshot(queryClient, uid);
@@ -280,7 +294,7 @@ export function useRemoveTitleFromList() {
             ? "personal"
             : { type: "personal", listId };
       const removed = updateWatchlistCacheForMode(queryClient, uid, targetMode, (prev) => {
-        const next = prev.filter((m) => movieKey(m) !== key);
+        const next = prev.filter((m) => listKey(m) !== key);
         return next.length === prev.length ? prev : next;
       });
       if (removed && type === "personal") {

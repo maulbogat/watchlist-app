@@ -26,7 +26,10 @@ export async function fetchWatchlistMovies(
   return loadList({ uid } as User, listMode);
 }
 
-type ListQueryOpts = Omit<UseQueryOptions<WatchlistItem[], Error>, "queryKey" | "queryFn" | "enabled"> & {
+type ListQueryOpts = Omit<
+  UseQueryOptions<WatchlistItem[], Error>,
+  "queryKey" | "queryFn" | "enabled"
+> & {
   enabled?: boolean;
 };
 
@@ -48,7 +51,10 @@ export function useWatchlistMovies(
   });
 }
 
-type PersonalOpts = Omit<UseQueryOptions<PersonalList[], Error>, "queryKey" | "queryFn" | "enabled"> & {
+type PersonalOpts = Omit<
+  UseQueryOptions<PersonalList[], Error>,
+  "queryKey" | "queryFn" | "enabled"
+> & {
   enabled?: boolean;
 };
 
@@ -84,7 +90,10 @@ export function useSharedLists(
   });
 }
 
-export function invalidateUserListQueries(queryClient: QueryClient, uid: string | undefined): Promise<void> | void {
+export function invalidateUserListQueries(
+  queryClient: QueryClient,
+  uid: string | undefined
+): Promise<void> | void {
   if (!uid) return;
   return queryClient.invalidateQueries({
     predicate: (q) => {

@@ -2,7 +2,7 @@
 
 A personal movie/show watchlist with YouTube trailers, filters, and Firestore. **Architecture, data model, and flows** are documented in **[`system-design.md`](./system-design.md)** (source of truth for how pieces fit together).
 
-**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). Optional **[Sentry](https://sentry.io/)** error tracking: browser SDK in **`src/main.tsx`** when **`VITE_SENTRY_DSN`** is set (production-only; Firebase **`uid`** only in user context — no email or display name), server **`SENTRY_DSN`** on **`add-from-imdb`** and **`whatsapp-webhook`** only; optional Vite **`@sentry/vite-plugin`** when **`SENTRY_AUTH_TOKEN`** is set for source map upload. **Vercel** hosts **`dist/`** and runs **`api/*.js`** serverless routes (Firebase Admin SDK) for the IMDb add flow, shared-list joins, **email app invites** (single **`/api/invites`** route: GET list, POST `action: send|accept`, DELETE revoke — Resend on send), upcoming-title sync, **WhatsApp** verification + webhook (Meta Cloud API), and other admin/diagnostic endpoints.
+**Stack:** React 19 + Vite 6 (`src/`), Zustand + TanStack Query, **[Sonner](https://sonner.emilkowal.ski/)** toasts (**`<Toaster />`** in **`src/main.tsx`**, `theme="dark"`, `position="bottom-right"`) for user-visible errors/success instead of **`window.alert`**, client Firestore/Auth via **`src/firebase.ts`** + **`src/config/firebase.ts`** (reads `VITE_FIREBASE_*` from Vite env). Optional **[Sentry](https://sentry.io/)** error tracking: browser SDK in **`src/main.tsx`** when **`VITE_SENTRY_DSN`** is set (production-only; Firebase **`uid`** only in user context — no email or display name), server **`SENTRY_DSN`** on **`add-from-imdb`** and **`whatsapp-webhook`** only; optional Vite **`@sentry/vite-plugin`** when **`SENTRY_AUTH_TOKEN`** is set for source map upload. **Vercel** hosts **`dist/`** and runs **`api/*.js`** serverless routes (Firebase Admin SDK) for the IMDb add flow, shared-list joins, **email app invites** (single **`/api/invites`** route: GET list, POST `action: send|accept`, DELETE revoke — Resend on send), upcoming-title sync, **WhatsApp** verification + webhook (Meta Cloud API), and other admin/diagnostic endpoints.
 
 ## Design system
 
@@ -56,6 +56,10 @@ Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--
 | `npm run build:react` | Production bundle → `dist/` |
 | `npm run preview:react` | Serve `dist/` locally |
 | `npm run test:run` | Run Vitest test suite once |
+| `npm run lint` | ESLint (`eslint.config.js` flat config on `src/`) |
+| `npm run lint:fix` | ESLint with `--fix` |
+| `npm run format` | Prettier write (`src/`, `.prettierrc`) |
+| `npm run format:check` | Prettier check only |
 
 ## Environment configuration
 

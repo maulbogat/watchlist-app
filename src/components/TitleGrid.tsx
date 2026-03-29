@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { TitleCard } from "./TitleCard.js";
 import { useAppStore } from "../store/useAppStore.js";
 import { useRemoveTitle, useSetTitleStatus } from "../hooks/useMutations.js";
-import { movieKey } from "../firebase.js";
+import { listKey } from "../firebase.js";
 import type { StatusKey, WatchlistItem } from "../types/index.js";
 import { errorMessage } from "../lib/utils.js";
 import { logEvent } from "../lib/axiom-logger.js";
 import { toast } from "@/components/ui/use-toast";
+import { toast as sonnerToast } from "sonner";
 
 const TITLE_GRID_SKELETON_COUNT = 10;
 
@@ -54,9 +55,7 @@ export function TitleGrid({
   const currentUser = useAppStore((s) => s.currentUser);
   const currentListMode = useAppStore((s) => s.currentListMode);
   const isShared =
-    currentListMode &&
-    typeof currentListMode === "object" &&
-    currentListMode.type === "shared";
+    currentListMode && typeof currentListMode === "object" && currentListMode.type === "shared";
   const userCountryCode = useAppStore((s) => s.userCountryCode);
   const setCurrentModalMovie = useAppStore((s) => s.setCurrentModalMovie);
   const setTitleStatusMutation = useSetTitleStatus();
@@ -79,7 +78,7 @@ export function TitleGrid({
         await setTitleStatusMutation.mutateAsync({
           uid: currentUser.uid,
           listMode: currentListMode,
-          key: movieKey(movie),
+          key: listKey(movie),
           status,
         });
         void logEvent({
@@ -91,7 +90,7 @@ export function TitleGrid({
         }).catch(() => {});
       } catch (err: unknown) {
         console.error(err);
-        window.alert(errorMessage(err) || "Failed to update.");
+        sonnerToast.error(errorMessage(err) || "Failed to update.");
       }
     },
     [currentUser?.uid, currentListMode, setTitleStatusMutation]
@@ -116,11 +115,11 @@ export function TitleGrid({
           await removeTitleMutation.mutateAsync({
             uid: currentUser.uid,
             listMode: currentListMode,
-            key: movieKey(movie),
+            key: listKey(movie),
           });
         } catch (err: unknown) {
           console.error(err);
-          window.alert(errorMessage(err) || "Failed to remove.");
+          sonnerToast.error(errorMessage(err) || "Failed to remove.");
         }
       }, 4000);
 
@@ -145,9 +144,7 @@ export function TitleGrid({
     if (q && !listTrulyEmpty) {
       return (
         <div className="grid" id="grid">
-          <p className="watchlist-empty-message">
-            No titles match &ldquo;{q}&rdquo;
-          </p>
+          <p className="watchlist-empty-message">No titles match &ldquo;{q}&rdquo;</p>
         </div>
       );
     }
@@ -186,7 +183,7 @@ export function TitleGrid({
       <div className="grid" id="grid">
         {visibleMovies.map((m) => (
           <TitleCard
-            key={movieKey(m)}
+            key={listKey(m)}
             movie={m}
             showAddedBy={isShared}
             viewerUid={currentUser?.uid ?? null}

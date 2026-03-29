@@ -8,7 +8,11 @@ const UPCOMING_CACHE_TTL_MS = 2 * 60 * 60 * 1000;
 
 export function saveLastList(user: User | null, mode: ListMode): void {
   const val =
-    mode === "personal" ? "personal" : typeof mode === "object" && mode?.listId ? mode.listId : "personal";
+    mode === "personal"
+      ? "personal"
+      : typeof mode === "object" && mode?.listId
+        ? mode.listId
+        : "personal";
   try {
     if (user) localStorage.setItem(`watchlist_lastList_${user.uid}`, val);
   } catch {
