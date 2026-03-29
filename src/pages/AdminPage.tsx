@@ -292,11 +292,11 @@ const SERVICE_LINKS: readonly AdminServiceLinkEntry[] = [
     links: [
       {
         label: "Env Vars",
-        url: "https://vercel.com/maulbogats-projects/movie-trailer-site/settings/environment-variables",
+        url: "https://vercel.com/maulbogats-projects/watchlist/settings/environment-variables",
       },
       {
         label: "Function Logs",
-        url: "https://vercel.com/maulbogats-projects/movie-trailer-site/logs",
+        url: "https://vercel.com/maulbogats-projects/watchlist/logs",
       },
     ],
   },
@@ -345,7 +345,7 @@ const SERVICE_LINKS: readonly AdminServiceLinkEntry[] = [
   {
     label: "GitHub",
     sublabel: "Project Repository",
-    url: "https://github.com/maulbogat/movie-trailer-site",
+    url: "https://github.com/maulbogat/watchlist",
   },
   {
     label: "TMDB",
@@ -1158,7 +1158,7 @@ export function AdminPage() {
                         <a
                           href={
                             githubBackupQ.data?.actionsUrl ||
-                            "https://github.com/maulbogat/movie-trailer-site/actions/workflows/backup.yml"
+                            "https://github.com/maulbogat/watchlist/actions/workflows/backup.yml"
                           }
                           target="_blank"
                           rel="noopener noreferrer"

@@ -56,7 +56,7 @@ Read at **runtime** by **`api/*.js`** on Vercel (and by **`vercel dev`** / local
 | `SENTRY_PROJECT` | Optional — same route — Sentry **project slug** under org **`maulbogat`** (issues list path). Unset → **`{ ok: false, error }`** (not **503**) |
 | `UPCOMING_SYNC_TRIGGER_SECRET` | Optional — bearer auth for **`/api/trigger-upcoming-sync`** |
 | `GITHUB_TOKEN` | Optional — **`/api/external-status?service=github`** (private repo or higher GitHub API rate limits) |
-| `GITHUB_REPO` | Optional — override `owner/repo` for backup workflow discovery |
+| `GITHUB_REPO` | Optional — override `owner/repo` for backup workflow discovery; **`/api/external-status?service=github`** defaults to **`maulbogat/watchlist`** when unset |
 | `VERCEL_API_TOKEN` | **`/api/external-status?service=vercel`** — Vercel API bearer token (Admin deployments card) |
 | `VERCEL_PROJECT_ID` | Same route — Vercel **Project ID** (Settings → General). Both `VERCEL_*` required or the route returns **503** |
 | `WHATSAPP_VERIFY_TOKEN` | **`/api/whatsapp-webhook`** — Meta webhook verification (GET) |

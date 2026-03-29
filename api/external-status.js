@@ -3,7 +3,7 @@
  * Requires `Authorization: Bearer <Firebase ID token>` and an admin UID.
  *
  * github — latest GitHub Actions run for Firestore backup (`backup.yml`).
- *   Env: optional `GITHUB_TOKEN`, optional `GITHUB_REPO` (default `maulbogat/movie-trailer-site`).
+ *   Env: optional `GITHUB_TOKEN`, optional `GITHUB_REPO` (default `maulbogat/watchlist`).
  *
  * vercel — latest deployment for the project.
  *   Env: `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` (503 if either missing).
@@ -71,7 +71,7 @@ function json(statusCode, body) {
  * @param {import('@netlify/functions').HandlerEvent} event
  */
 async function handleGithub() {
-  const repo = (process.env.GITHUB_REPO || "maulbogat/movie-trailer-site").trim();
+  const repo = (process.env.GITHUB_REPO || "maulbogat/watchlist").trim();
   const ghToken = (process.env.GITHUB_TOKEN || "").trim();
   const apiUrl = `https://api.github.com/repos/${repo}/actions/workflows/${encodeURIComponent(
     WORKFLOW_FILE
@@ -80,7 +80,7 @@ async function handleGithub() {
   const headers = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "movie-trailer-site-external-status",
+    "User-Agent": "watchlist-external-status",
   };
   if (ghToken) {
     headers.Authorization = `Bearer ${ghToken}`;

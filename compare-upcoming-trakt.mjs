@@ -34,7 +34,7 @@ const TMDB_BASE = "https://api.themoviedb.org/3";
 const TRAKT_BASE = "https://api.trakt.tv";
 const FETCH_TIMEOUT_MS = 15_000;
 const RATE_MS = 350;
-const USER_AGENT = "movie-trailer-site/compare-upcoming-trakt (local; https://github.com/trakt/trakt-api)";
+const USER_AGENT = "watchlist/compare-upcoming-trakt (local; https://github.com/trakt/trakt-api)";
 
 let requestTurn = Promise.resolve();
 

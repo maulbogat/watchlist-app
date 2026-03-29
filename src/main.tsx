@@ -61,7 +61,7 @@ if (!rootEl) {
     "max-width:36rem;margin:2rem auto;padding:1rem 1.25rem;font-family:system-ui,sans-serif;line-height:1.5;color:#f5f5f5;background:#2a1515;border:1px solid #a44;";
   note.innerHTML = `<strong>React did not mount.</strong> This page has no <code>#root</code>. Run <code>npm run dev:react</code> from the project root and open the URL Vite prints (or use the built <code>dist/index.html</code>).`;
   document.body.prepend(note);
-  console.error("movie-trailer-site: missing #root — wrong HTML entry or empty shell.");
+  console.error("watchlist: missing #root — wrong HTML entry or empty shell.");
 } else {
   createRoot(rootEl).render(
     <StrictMode>
