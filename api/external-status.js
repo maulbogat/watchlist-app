@@ -3,7 +3,7 @@
  * Requires `Authorization: Bearer <Firebase ID token>` and an admin UID.
  *
  * github — latest GitHub Actions run for Firestore backup (`backup.yml`).
- *   Env: optional `GITHUB_TOKEN`, optional `GITHUB_REPO` (default `maulbogat/watchlist`).
+ *   Env: optional `GITHUB_TOKEN`, optional `GITHUB_REPO` (default `maulbogat/watchlist-app`).
  *
  * vercel — latest deployment for the project.
  *   Env: `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` (503 if either missing).
@@ -71,7 +71,7 @@ function json(statusCode, body) {
  * @param {import('@netlify/functions').HandlerEvent} event
  */
 async function handleGithub() {
-  const repo = (process.env.GITHUB_REPO || "maulbogat/watchlist").trim();
+  const repo = (process.env.GITHUB_REPO || "maulbogat/watchlist-app").trim();
   const ghToken = (process.env.GITHUB_TOKEN || "").trim();
   const apiUrl = `https://api.github.com/repos/${repo}/actions/workflows/${encodeURIComponent(
     WORKFLOW_FILE

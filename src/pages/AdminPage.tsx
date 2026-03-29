@@ -345,7 +345,7 @@ const SERVICE_LINKS: readonly AdminServiceLinkEntry[] = [
   {
     label: "GitHub",
     sublabel: "Project Repository",
-    url: "https://github.com/maulbogat/watchlist",
+    url: "https://github.com/maulbogat/watchlist-app",
   },
   {
     label: "TMDB",
@@ -1158,7 +1158,7 @@ export function AdminPage() {
                         <a
                           href={
                             githubBackupQ.data?.actionsUrl ||
-                            "https://github.com/maulbogat/watchlist/actions/workflows/backup.yml"
+                            "https://github.com/maulbogat/watchlist-app/actions/workflows/backup.yml"
                           }
                           target="_blank"
                           rel="noopener noreferrer"

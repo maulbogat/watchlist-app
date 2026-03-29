@@ -73,6 +73,6 @@ Backups are committed to `backups/firestore-backup.json` in the repo. Git histor
 
 ## Admin page (latest run + GCP links)
 
-Signed-in **admin** users can see the latest GitHub Actions run for **Daily Firestore Backup** on the in-app **Admin** page. The API route **`/api/external-status?service=github`** calls the GitHub API (default repository **`maulbogat/watchlist`** when **`GITHUB_REPO`** is unset); for **private** repos or steadier rate limits, set optional **`GITHUB_TOKEN`** (PAT with `actions: read`) and optional **`GITHUB_REPO`** (`owner/name`) in Vercel (or local `.env`) environment variables.
+Signed-in **admin** users can see the latest GitHub Actions run for **Daily Firestore Backup** on the in-app **Admin** page. The API route **`/api/external-status?service=github`** calls the GitHub API (default repository **`maulbogat/watchlist-app`** when **`GITHUB_REPO`** is unset); for **private** repos or steadier rate limits, set optional **`GITHUB_TOKEN`** (PAT with `actions: read`) and optional **`GITHUB_REPO`** (`owner/name`) in Vercel (or local `.env`) environment variables.
 
 **Service Links** on the same page also open **Google Cloud Storage** (**`movie-trailer-site-backups`**) and **Cloud Scheduler** ( **`firestore-daily-export`** ) for the native export path — no app env vars for those (see **`docs/environment.md`**).
