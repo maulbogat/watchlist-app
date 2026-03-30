@@ -3195,13 +3195,14 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   display: block;
 }
 
+/* ~matches main watchlist title: .watchlist-header-logo height 76px (4.75rem @ 16px) */
 .admin-header h1 {
   font-family: var(--font-title);
-  font-size: clamp(3rem, 8vw, 6rem);
+  font-size: clamp(2.25rem, 5vw, 4.75rem);
   font-weight: 700;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
   line-height: 1;
+  margin: 0;
   color: var(--accent);
 }
 
@@ -3252,44 +3253,6 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   font-size: var(--text-xl);
   text-transform: uppercase;
   color: var(--accent);
-}
-
-/* Service Links — collapsible <details> (same section spacing as .admin-section) */
-details.admin-section > summary {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-  list-style: none;
-  margin-bottom: 0.65rem;
-}
-
-details.admin-section > summary::-webkit-details-marker {
-  display: none;
-}
-
-details.admin-section > summary h2 {
-  margin-bottom: 0;
-}
-
-details.admin-section .summary-chevron {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-muted, var(--muted));
-  line-height: 1;
-  transition: transform 0.2s ease;
-}
-
-details.admin-section .summary-chevron svg {
-  width: 16px;
-  height: 16px;
-}
-
-details.admin-section[open] > summary .summary-chevron {
-  transform: rotate(180deg);
 }
 
 /* Upcoming check + GitHub backup + Deployments — responsive columns */
@@ -3406,6 +3369,49 @@ details.admin-section[open] > summary .summary-chevron {
 .admin-grid--links,
 .admin-grid--stats {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+/* Match first Data Quality stat row: five equal columns; orphan card occupies first column only. */
+.admin-grid--dq-stats-row {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.admin-grid--dq-stats-row > .admin-orphan-stat-cell {
+  grid-column: 1 / 2;
+  min-width: 0;
+}
+
+@media (max-width: 1040px) {
+  .admin-grid--dq-stats-row {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .admin-grid--dq-stats-row > .admin-orphan-stat-cell {
+    grid-column: auto;
+  }
+}
+
+.admin-grid--dq-stats-row + .admin-grid--dq-stats-row {
+  margin-top: var(--space-3);
+}
+
+.admin-dq-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  font-size: 0.92em;
+  color: var(--text);
+  background: var(--color-surface-2);
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-sm);
+}
+
+.admin-orphan-truncated {
+  margin-bottom: var(--space-2);
+}
+
+.admin-orphan-detail-body {
+  max-height: min(22rem, 50vh);
+  overflow-y: auto;
 }
 
 .admin-card {
@@ -3745,6 +3751,20 @@ details.admin-section[open] > summary .summary-chevron {
   flex-direction: column;
   gap: var(--space-2);
   max-width: 640px;
+}
+
+.admin-dq-details.admin-dq-details--grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  max-width: none;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .admin-dq-details.admin-dq-details--grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-dq-detail {

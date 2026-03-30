@@ -98,5 +98,7 @@ Keep **names identical** to Vercel so behavior matches.
 | **Admin GCS backup status** | `FIREBASE_SERVICE_ACCOUNT` — **`/api/external-status?service=gcs`**; IAM on **`movie-trailer-site-backups`** must allow **`storage.objects.list`** for that service account |
 | **GCS Firestore native export** (bucket **`movie-trailer-site-backups`**, Scheduler **`firestore-daily-export`**) | **None** in app env for the scheduled job itself — IAM, lifecycle, and job live in Google Cloud; the **Admin** card reuses **`FIREBASE_SERVICE_ACCOUNT`** as above. |
 | **Sentry (errors)** | Optional **`VITE_SENTRY_DSN`** (client) + optional **`SENTRY_DSN`** (two API routes); optional **`SENTRY_READ_TOKEN`** + **`SENTRY_PROJECT`** (Admin issues count); optional **`SENTRY_AUTH_TOKEN`**, **`SENTRY_ORG`**, **`SENTRY_PROJECT`** for build-time source map upload |
+| **Admin orphan catalog titles** | `FIREBASE_SERVICE_ACCOUNT` — **`GET /api/admin-catalog-orphans`** (Firebase ID token + admin UID) |
+| **Local script: My list + Our list report** | `FIREBASE_SERVICE_ACCOUNT` or **`serviceAccountKey.json`**, plus **`WATCHLIST_MY_LIST_UID`** (Firebase Auth **`uid`** for the account whose default personal list is “My list”) — **`scripts/list-my-list-and-our-list-titles.mjs`** only; not read by the deployed app |
 
 Nothing in the app expects **`VITE_AXIOM_*`**.

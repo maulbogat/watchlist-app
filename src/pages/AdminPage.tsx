@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "../store/useAppStore.js";
 import { isAdmin } from "../config/admin.js";
@@ -45,6 +45,26 @@ type CatalogStats = {
 };
 
 type DQDetailKey = "tmdbId" | "thumb" | "tmdbMedia" | "youtubeId";
+
+type DqPanelOpenKey = DQDetailKey | "orphans";
+
+/** Collapsible panel order under Data Quality: thumb → tmdbMedia → youtubeId → tmdbId, then orphans. */
+const DQ_COLLAPSIBLE_PANEL_ORDER: readonly DQDetailKey[] = [
+  "thumb",
+  "tmdbMedia",
+  "youtubeId",
+  "tmdbId",
+];
+
+type CatalogOrphansResponse = {
+  ok: true;
+  count: number;
+  registryDocCount: number;
+  referencedDistinctCount: number;
+  orphans: { registryId: string; title: string; year: number | string | null }[];
+  truncated: boolean;
+  omitted: number;
+};
 
 function dqStrEmpty(v: unknown): boolean {
   return v == null || String(v).trim() === "";
@@ -132,6 +152,26 @@ type DqPanelDef = {
   rows: DQTitleRow[] | DQThumbRow[];
   fixable?: boolean;
 };
+
+type DqGridItem =
+  | { kind: "panel"; def: DqPanelDef }
+  | { kind: "orphans" };
+
+function buildDqGridItems(
+  visiblePanels: DqPanelDef[],
+  includeOrphansCollapsible: boolean
+): DqGridItem[] {
+  const byKey = new Map<DQDetailKey, DqPanelDef>(
+    visiblePanels.map((p) => [p.key, p] as const)
+  );
+  const items: DqGridItem[] = [];
+  for (const key of DQ_COLLAPSIBLE_PANEL_ORDER) {
+    const def = byKey.get(key);
+    if (def) items.push({ kind: "panel", def });
+  }
+  if (includeOrphansCollapsible) items.push({ kind: "orphans" });
+  return items;
+}
 
 function buildDqPanelDefs(d: CatalogStats): DqPanelDef[] {
   return [
@@ -711,11 +751,19 @@ export function AdminPage() {
     },
   });
 
-  const [dqPanelsOpen, setDqPanelsOpen] = useState<Record<DQDetailKey, boolean>>({
+  const catalogOrphansQ = useQuery<CatalogOrphansResponse>({
+    queryKey: ["admin", "catalog-orphans"],
+    staleTime: 60 * 1000,
+    enabled: !authLoading && userIsAdmin,
+    queryFn: () => fetchAdminExternalStatus<CatalogOrphansResponse>("/api/admin-catalog-orphans"),
+  });
+
+  const [dqPanelsOpen, setDqPanelsOpen] = useState<Record<DqPanelOpenKey, boolean>>({
     tmdbId: false,
     thumb: false,
     tmdbMedia: false,
     youtubeId: false,
+    orphans: false,
   });
   const [fixingThumbImdbId, setFixingThumbImdbId] = useState<string | null>(null);
 
@@ -935,6 +983,13 @@ export function AdminPage() {
     catalogDq != null
       ? buildDqPanelDefs(catalogDq).filter((p) => typeof p.count === "number" && p.count > 0)
       : [];
+
+  const includeOrphansCollapsible =
+    !catalogOrphansQ.isPending &&
+    !catalogOrphansQ.isError &&
+    catalogOrphansQ.data.count > 0;
+
+  const dqGridItems = buildDqGridItems(dqVisiblePanels, includeOrphansCollapsible);
 
   if (authLoading) {
     return <div className="react-migration-shell">Loading…</div>;
@@ -1621,10 +1676,17 @@ export function AdminPage() {
             <Button
               type="button"
               variant="outline"
-              disabled={catalogStatsQ.isPending || catalogStatsQ.isFetching}
-              onClick={() => void catalogStatsQ.refetch()}
+              disabled={
+                catalogStatsQ.isPending ||
+                catalogStatsQ.isFetching ||
+                catalogOrphansQ.isPending ||
+                catalogOrphansQ.isFetching
+              }
+              onClick={() => {
+                void Promise.all([catalogStatsQ.refetch(), catalogOrphansQ.refetch()]);
+              }}
             >
-              {catalogStatsQ.isFetching ? (
+              {catalogStatsQ.isFetching || catalogOrphansQ.isFetching ? (
                 <>
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                   Refreshing…
@@ -1635,7 +1697,7 @@ export function AdminPage() {
             </Button>
           </div>
         </div>
-        <div className="admin-grid admin-grid--stats">
+        <div className="admin-grid admin-grid--stats admin-grid--dq-stats-row">
           {catalogStatsQ.isPending
             ? Array.from({ length: DQ_STAT_CARD_COUNT }).map((_, idx) => (
                 <div
@@ -1651,31 +1713,65 @@ export function AdminPage() {
               ))}
         </div>
 
-        {dqVisiblePanels.length > 0 ? (
-          <div className="admin-dq-details">
-            {dqVisiblePanels.map((p) => {
-              const open = dqPanelsOpen[p.key];
-              return (
-                <div key={p.key} className="admin-dq-detail">
+        <div className="admin-grid admin-grid--stats admin-grid--dq-stats-row">
+          <div className="admin-orphan-stat-cell">
+            <div className="admin-card admin-stat-card">
+              <div className="admin-stat-label">Not on any list</div>
+              {catalogOrphansQ.isPending ? (
+                <div className="admin-stat-value admin-stat-value--small" aria-busy="true">
+                  …
+                </div>
+              ) : catalogOrphansQ.isError ? (
+                <div
+                  className="admin-stat-value admin-stat-value--small"
+                  title={catalogOrphansQ.error?.message ?? "Error"}
+                >
+                  Error
+                </div>
+              ) : catalogOrphansQ.data.count === 0 ? (
+                <div className="admin-stat-value admin-stat-value--dq-ok" aria-label="None">
+                  ✓
+                </div>
+              ) : (
+                <div className="admin-stat-value admin-stat-value--dq-warn">
+                  {catalogOrphansQ.data.count}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {dqGridItems.length > 0 ? (
+          <div className="admin-dq-details admin-dq-details--grid">
+            {dqGridItems.map((item) =>
+              item.kind === "panel" ? (
+                <div key={item.def.key} className="admin-dq-detail">
                   <button
                     type="button"
                     className="admin-dq-detail-toggle"
-                    aria-expanded={open}
-                    onClick={() => setDqPanelsOpen((prev) => ({ ...prev, [p.key]: !prev[p.key] }))}
+                    aria-expanded={dqPanelsOpen[item.def.key]}
+                    onClick={() =>
+                      setDqPanelsOpen((prev) => ({
+                        ...prev,
+                        [item.def.key]: !prev[item.def.key],
+                      }))
+                    }
                   >
                     <span className="admin-dq-detail-toggle-label">
-                      {p.count} titles missing {p.fieldLabel}
+                      {item.def.count} titles missing {item.def.fieldLabel}
                     </span>
-                    <span className="admin-dq-chevron">{open ? "▴ Hide" : "▾ Show"}</span>
+                    <span className="admin-dq-chevron">
+                      {dqPanelsOpen[item.def.key] ? "▴ Hide" : "▾ Show"}
+                    </span>
                   </button>
-                  {open ? (
+                  {dqPanelsOpen[item.def.key] ? (
                     <div className="admin-dq-detail-body">
-                      {p.rows.map((row) => (
+                      {item.def.rows.map((row) => (
                         <div key={row.imdbId} className="admin-dq-li">
                           <span className="admin-dq-li-text">
                             {row.imdbId} · {row.title} ({formatDqYear(row.year)})
                           </span>
-                          {p.fixable && "tmdbId" in row ? (
+                          {item.def.fixable && "tmdbId" in row ? (
                             <Button
                               type="button"
                               variant="outline"
@@ -1708,19 +1804,54 @@ export function AdminPage() {
                     </div>
                   ) : null}
                 </div>
-              );
-            })}
+              ) : catalogOrphansQ.data ? (
+                <div key="orphans" className="admin-dq-detail">
+                  <button
+                    type="button"
+                    className="admin-dq-detail-toggle"
+                    aria-expanded={dqPanelsOpen.orphans}
+                    onClick={() =>
+                      setDqPanelsOpen((prev) => ({ ...prev, orphans: !prev.orphans }))
+                    }
+                  >
+                    <span className="admin-dq-detail-toggle-label">
+                      {catalogOrphansQ.data.count} titles not on any list
+                    </span>
+                    <span className="admin-dq-chevron">
+                      {dqPanelsOpen.orphans ? "▴ Hide" : "▾ Show"}
+                    </span>
+                  </button>
+                  {dqPanelsOpen.orphans ? (
+                    <div className="admin-dq-detail-body admin-orphan-detail-body">
+                      {catalogOrphansQ.data.truncated ? (
+                        <p className="admin-subtitle admin-orphan-truncated">
+                          Showing first {catalogOrphansQ.data.orphans.length} of{" "}
+                          {catalogOrphansQ.data.count}
+                          {catalogOrphansQ.data.omitted > 0
+                            ? ` (${catalogOrphansQ.data.omitted} omitted in this response)`
+                            : ""}
+                          . For the full list, run{" "}
+                          <code className="admin-dq-code">node scripts/catalog-not-on-any-list.mjs</code>.
+                        </p>
+                      ) : null}
+                      {catalogOrphansQ.data.orphans.map((row) => (
+                        <div key={row.registryId} className="admin-dq-li">
+                          <span className="admin-dq-li-text">
+                            {row.registryId} · {row.title} ({formatDqYear(row.year)})
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null
+            )}
           </div>
         ) : null}
       </section>
 
-      <details className="admin-section">
-        <summary>
-          <h2>Service Links</h2>
-          <span className="summary-chevron" aria-hidden>
-            <ChevronDown />
-          </span>
-        </summary>
+      <section className="admin-section">
+        <h2>Service Links</h2>
         <div className="admin-grid admin-grid--links">
           {SERVICE_LINKS.map((entry) =>
             "url" in entry ? (
@@ -1763,7 +1894,7 @@ export function AdminPage() {
             )
           )}
         </div>
-      </details>
+      </section>
 
       <footer className="admin-footer">
         <Button
