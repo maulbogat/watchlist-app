@@ -9,7 +9,7 @@ export interface TitleCardProps {
   movie: WatchlistItem;
   /** When true, show who added the title (shared lists). */
   showAddedBy?: boolean;
-  /** Current viewer — used for "Added by you" when `addedByUid` matches. */
+  /** Current viewer — used for “Added by you” when `addedByUid` matches. */
   viewerUid?: string | null;
   /** Display name or email local part — legacy shared items when you are the list owner. */
   viewerDisplayName?: string | null;
@@ -25,6 +25,10 @@ export interface TitleCardProps {
   onStatusChange: (movie: WatchlistItem, status: StatusKey) => void;
   onOpenModal: (movie: WatchlistItem) => void;
   onRequestRemove: (movie: WatchlistItem) => void;
+  /** Whether this title is currently favorited by the viewer. */
+  isFavorite?: boolean;
+  /** Called when the heart button is clicked. Undefined = heart button not shown. */
+  onToggleFavorite?: () => void;
 }
 
 export function TitleCard({
@@ -41,6 +45,8 @@ export function TitleCard({
   onStatusChange,
   onOpenModal,
   onRequestRemove,
+  isFavorite = false,
+  onToggleFavorite,
 }: TitleCardProps) {
   const key = listKey(m);
   const menuOpen = statusOpenKey === key;
@@ -162,7 +168,9 @@ export function TitleCard({
         const t = e.target;
         if (
           t instanceof Element &&
-          (t.closest(".status-badge-wrap") || t.closest(".card-delete-btn"))
+          (t.closest(".status-badge-wrap") ||
+            t.closest(".card-delete-btn") ||
+            t.closest(".btn-favorite"))
         )
           return;
         onOpenModal(m);
@@ -238,6 +246,21 @@ export function TitleCard({
           </div>
         </div>
         {thumbHTML}
+        {onToggleFavorite && (m.status === "watched" || m.status === "archive") ? (
+          <button
+            type="button"
+            className={`btn-favorite${isFavorite ? " btn-favorite--active" : ""}`}
+            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+            title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onToggleFavorite();
+            }}
+          >
+            {isFavorite ? "♥" : "♡"}
+          </button>
+        ) : null}
         <div className="thumb-overlay" />
         <div className="play-btn">
           <svg viewBox="0 0 24 24">

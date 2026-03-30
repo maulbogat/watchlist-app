@@ -1,7 +1,13 @@
+import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UseQueryOptions, QueryClient } from "@tanstack/react-query";
 import type { User } from "firebase/auth";
-import { getPersonalLists, getSharedListsForUser } from "../firebase.js";
+import {
+  getPersonalLists,
+  getSharedListsForUser,
+  getFavorites,
+  subscribeFavorites,
+} from "../firebase.js";
 import { loadList } from "../data/lists.js";
 import type { ListMode, PersonalList, SharedList, WatchlistItem } from "../types/index.js";
 
@@ -138,4 +144,30 @@ export function useInvalidateUserListQueries(): (uid: string | undefined) => voi
   return (uid) => {
     void invalidateUserListQueries(queryClient, uid);
   };
+}
+
+/**
+ * Subscribes to the current user's favorites in real time.
+ * Returns a Set<string> of favorited registryIds.
+ * Uses TanStack Query for caching + onSnapshot for live updates.
+ */
+export function useFavorites(uid: string | undefined): Set<string> {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!uid) return;
+    const unsub = subscribeFavorites(uid, (favorites) => {
+      queryClient.setQueryData(["favorites", uid], favorites);
+    });
+    return unsub;
+  }, [uid, queryClient]);
+
+  const { data } = useQuery({
+    queryKey: ["favorites", uid],
+    queryFn: () => getFavorites(uid!),
+    enabled: Boolean(uid),
+    staleTime: 60 * 1000,
+  });
+
+  return data ?? new Set<string>();
 }

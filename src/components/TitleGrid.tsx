@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { TitleCard } from "./TitleCard.js";
 import { useAppStore } from "../store/useAppStore.js";
-import { useRemoveTitle, useSetTitleStatus } from "../hooks/useMutations.js";
+import { useRemoveTitle, useSetTitleStatus, useToggleFavorite } from "../hooks/useMutations.js";
+import { useFavorites } from "../hooks/useWatchlist.js";
 import { listKey } from "../firebase.js";
 import type { StatusKey, WatchlistItem } from "../types/index.js";
 import { errorMessage } from "../lib/utils.js";
@@ -60,6 +61,8 @@ export function TitleGrid({
   const setCurrentModalMovie = useAppStore((s) => s.setCurrentModalMovie);
   const setTitleStatusMutation = useSetTitleStatus();
   const removeTitleMutation = useRemoveTitle();
+  const toggleFavoriteMutation = useToggleFavorite();
+  const favorites = useFavorites(currentUser?.uid);
 
   const [statusOpenKey, setStatusOpenKey] = useState<string | null>(null);
 
@@ -206,6 +209,20 @@ export function TitleGrid({
               setCurrentModalMovie(movie);
             }}
             onRequestRemove={scheduleRemove}
+            isFavorite={favorites.has(listKey(m))}
+            {...(currentUser?.uid
+              ? {
+                  onToggleFavorite: () => {
+                    const registryId = listKey(m);
+                    const nowFavorite = !favorites.has(registryId);
+                    void toggleFavoriteMutation.mutateAsync({
+                      uid: currentUser.uid,
+                      registryId,
+                      isFavorite: nowFavorite,
+                    });
+                  },
+                }
+              : {})}
           />
         ))}
       </div>

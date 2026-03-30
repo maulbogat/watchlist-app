@@ -25,6 +25,7 @@ import {
   arrayRemove,
   deleteField,
   writeBatch,
+  onSnapshot,
 } from "firebase/firestore";
 import type {
   DocumentData,
@@ -1582,6 +1583,56 @@ async function setGithubBackupEnabledState(enabled: boolean): Promise<JobConfigS
     if (err instanceof Error) throw err;
     throw new Error(String(err || "Failed to update job config."));
   }
+}
+
+/**
+ * Toggle a title's favorite state for a user.
+ * isFavorite=true sets `favorites.{registryId}: true`; false deletes the key.
+ */
+export async function toggleFavorite(
+  uid: string,
+  registryId: string,
+  isFavorite: boolean
+): Promise<void> {
+  const ref = doc(db, "users", uid);
+  if (isFavorite) {
+    await updateDoc(ref, { [`favorites.${registryId}`]: true });
+  } else {
+    await updateDoc(ref, { [`favorites.${registryId}`]: deleteField() });
+  }
+}
+
+/** Read favorites for a user — returns Set<string> of registryIds. */
+export async function getFavorites(uid: string): Promise<Set<string>> {
+  const ref = doc(db, "users", uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return new Set();
+  const favMap = snap.data()?.favorites;
+  if (!favMap || typeof favMap !== "object" || Array.isArray(favMap)) return new Set();
+  return new Set(Object.keys(favMap));
+}
+
+/**
+ * Subscribe to real-time favorites updates for a user.
+ * Returns an unsubscribe function.
+ */
+export function subscribeFavorites(
+  uid: string,
+  callback: (favorites: Set<string>) => void
+): () => void {
+  const ref = doc(db, "users", uid);
+  return onSnapshot(ref, (snap) => {
+    if (!snap.exists()) {
+      callback(new Set());
+      return;
+    }
+    const favMap = snap.data()?.favorites;
+    if (!favMap || typeof favMap !== "object" || Array.isArray(favMap)) {
+      callback(new Set());
+      return;
+    }
+    callback(new Set(Object.keys(favMap)));
+  });
 }
 
 /**

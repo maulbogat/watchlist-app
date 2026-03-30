@@ -8,6 +8,7 @@ import {
   removeFromPersonalList,
   removeFromSharedList,
   updateRegistryListStatus,
+  toggleFavorite,
 } from "../firebase.js";
 import type {
   ListMode,
@@ -323,6 +324,36 @@ export function useRemoveTitleFromList() {
         scheduleSharedBackgroundSync(queryClient, uid);
       }
       void updateRegistryListStatus(key, null).catch(() => {});
+    },
+  });
+}
+
+interface ToggleFavoriteVars {
+  uid: string;
+  registryId: string;
+  isFavorite: boolean;
+}
+
+export function useToggleFavorite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uid, registryId, isFavorite }: ToggleFavoriteVars) =>
+      toggleFavorite(uid, registryId, isFavorite),
+    onMutate: async ({ uid, registryId, isFavorite }) => {
+      await queryClient.cancelQueries({ queryKey: ["favorites", uid] });
+      const previous = queryClient.getQueryData<Set<string>>(["favorites", uid]);
+      queryClient.setQueryData<Set<string>>(["favorites", uid], (prev) => {
+        const next = new Set(prev ?? []);
+        if (isFavorite) next.add(registryId);
+        else next.delete(registryId);
+        return next;
+      });
+      return { previous, uid };
+    },
+    onError: (_err, _vars, context) => {
+      if (context) {
+        queryClient.setQueryData(["favorites", context.uid], context.previous);
+      }
     },
   });
 }

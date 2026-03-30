@@ -5,6 +5,7 @@ import {
   fbSignOut,
   getUserPublicPhotoUrl,
   GoogleAuthProvider,
+  listKey,
   renamePersonalList,
   signInWithPopup,
 } from "../firebase.js";
@@ -18,6 +19,7 @@ import {
   useSharedLists,
   useWatchlistMovies,
   useArchiveMovies,
+  useFavorites,
   invalidateUserListQueries,
 } from "../hooks/useWatchlist.js";
 import { useWatchlistSessionRestore } from "../hooks/useWatchlistSessionRestore.js";
@@ -54,6 +56,7 @@ export function WatchlistPage() {
   const currentSearch = useAppStore((s) => s.currentSearch);
   const userCountryCode = useAppStore((s) => s.userCountryCode);
   const setUserCountryCode = useAppStore((s) => s.setUserCountryCode);
+  const showFavoritesOnly = useAppStore((s) => s.showFavoritesOnly);
 
   const [manageListsOpen, setManageListsOpen] = useState(false);
   const [authMenuOpen, setAuthMenuOpen] = useState(false);
@@ -128,6 +131,7 @@ export function WatchlistPage() {
 
   const activeQ = isArchiveTab ? archiveQ : moviesQ;
   const allMovies = activeQ.data ?? [];
+  const favorites = useFavorites(user?.uid);
 
   useEffect(() => {
     if (!currentGenre) return;
@@ -155,26 +159,28 @@ export function WatchlistPage() {
     prevSharedListIdRef.current = sid;
   }, [currentListMode]);
 
-  const visibleMovies = useMemo(
-    () =>
-      filterTitles(allMovies, {
-        currentFilter,
-        currentGenre,
-        currentStatus,
-        currentSort,
-        currentSearch,
-        currentAddedByUid,
-      }),
-    [
-      allMovies,
+  const visibleMovies = useMemo(() => {
+    const base = filterTitles(allMovies, {
       currentFilter,
       currentGenre,
       currentStatus,
       currentSort,
       currentSearch,
       currentAddedByUid,
-    ]
-  );
+    });
+    if (!showFavoritesOnly) return base;
+    return base.filter((m) => favorites.has(listKey(m)));
+  }, [
+    allMovies,
+    currentFilter,
+    currentGenre,
+    currentStatus,
+    currentSort,
+    currentSearch,
+    currentAddedByUid,
+    showFavoritesOnly,
+    favorites,
+  ]);
 
   const personalLists = personalQ.data ?? [];
   const sharedLists = sharedQ.data ?? [];

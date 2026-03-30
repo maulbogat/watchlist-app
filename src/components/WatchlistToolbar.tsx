@@ -43,6 +43,8 @@ export function WatchlistToolbar({
   const currentAddedByUid = useAppStore((s) => s.currentAddedByUid);
   const setCurrentAddedByUid = useAppStore((s) => s.setCurrentAddedByUid);
   const currentListMode = useAppStore((s) => s.currentListMode);
+  const showFavoritesOnly = useAppStore((s) => s.showFavoritesOnly);
+  const setShowFavoritesOnly = useAppStore((s) => s.setShowFavoritesOnly);
 
   const isSharedList =
     currentListMode && typeof currentListMode === "object" && currentListMode.type === "shared";
@@ -311,6 +313,27 @@ export function WatchlistToolbar({
                     </SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="toolbar-favorites-wrap">
+                <button
+                  type="button"
+                  className={`btn-favorite toolbar-favorite-btn${showFavoritesOnly ? " btn-favorite--active" : ""}`}
+                  aria-pressed={showFavoritesOnly}
+                  aria-label={showFavoritesOnly ? "Show all titles" : "Show favorites only"}
+                  title={showFavoritesOnly ? "Show all titles" : "Show favorites only"}
+                  onClick={() => {
+                    setShowFavoritesOnly(!showFavoritesOnly);
+                    void logEvent({
+                      type: "user.action",
+                      action: "filter.change",
+                      filterType: "favorites",
+                      value: (!showFavoritesOnly).toString(),
+                      uid: currentUser?.uid ?? null,
+                    }).catch(() => {});
+                  }}
+                >
+                  {showFavoritesOnly ? "♥" : "♡"}
+                </button>
               </div>
               <div className="search-wrap">
                 <label htmlFor="title-search">Search</label>

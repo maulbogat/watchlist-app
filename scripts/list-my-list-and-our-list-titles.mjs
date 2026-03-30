@@ -9,8 +9,9 @@
  *   node -r dotenv/config scripts/list-my-list-and-our-list-titles.mjs
  *
  * Env:
- *   - `WATCHLIST_MY_LIST_UID` (required) — Firebase Auth `uid` whose `users/{uid}.defaultPersonalListId`
- *     personal list is “My list” (or the first `personalLists` doc named like “my list” if default id missing).
+ *   - `WATCHLIST_MY_LIST_UID` (required) — Firebase Auth `uid` who owns **My list**.
+ *   - `WATCHLIST_PERSONAL_LIST_ID` (optional) — `personalLists` doc id when “My list” is not the default.
+ *     Resolution: explicit id → list named “My list” → `defaultPersonalListId` (see `scripts/lib/resolve-my-list-ref.mjs`).
  *   - `FIREBASE_SERVICE_ACCOUNT` (base64) or `serviceAccountKey.json` in project root.
  *
  * Writes: `backups/my-list-and-our-list-titles.txt` (plus stdout).
@@ -22,6 +23,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { FieldPath } from "firebase-admin/firestore";
 import { getDb } from "./lib/admin-init.mjs";
+import { resolveMyListPersonalRef } from "./lib/resolve-my-list-ref.mjs";
 
 const require = createRequire(import.meta.url);
 const { collectRegistryIdsFromItems } = require("../src/api-lib/catalog-orphan-scan.cjs");
@@ -81,30 +83,11 @@ async function main() {
 
   const db = getDb();
 
-  const uref = db.collection("users").doc(uid);
-  const uSnap = await uref.get();
-  if (!uSnap.exists) {
-    console.error(`users/${uid} does not exist.`);
-    process.exit(1);
-  }
-  const udata = uSnap.data() || {};
-  let myListRef = null;
-  const defaultId =
-    typeof udata.defaultPersonalListId === "string" ? udata.defaultPersonalListId.trim() : "";
-  if (defaultId) {
-    myListRef = uref.collection("personalLists").doc(defaultId);
-  } else {
-    const plSnap = await uref.collection("personalLists").get();
-    const hit = plSnap.docs.find((d) => {
-      const n = normName(d.data()?.name);
-      return n === "my list" || n.includes("my list");
-    });
-    if (hit) myListRef = hit.ref;
-  }
-  if (!myListRef) {
-    console.error(
-      "Could not resolve My list: set users.defaultPersonalListId or name a personal list “My list”."
-    );
+  let myListRef;
+  try {
+    myListRef = await resolveMyListPersonalRef(db, uid);
+  } catch (e) {
+    console.error(e.message || e);
     process.exit(1);
   }
   const myListSnap = await myListRef.get();

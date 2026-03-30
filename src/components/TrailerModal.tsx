@@ -8,11 +8,12 @@ import {
   renderServiceChips,
   servicesForMovie,
 } from "../lib/movieDisplay.js";
-import { usePersonalLists, useSharedLists } from "../hooks/useWatchlist.js";
+import { usePersonalLists, useSharedLists, useFavorites } from "../hooks/useWatchlist.js";
 import {
   useAddTitleToList,
   useRemoveTitleFromList,
   useSetTitleStatus,
+  useToggleFavorite,
 } from "../hooks/useMutations.js";
 import { getCurrentListLabel } from "../data/lists.js";
 import { displayListName, errorMessage } from "../lib/utils.js";
@@ -48,6 +49,8 @@ export function TrailerModal() {
   const setTitleStatusMutation = useSetTitleStatus();
   const addTitleMutation = useAddTitleToList();
   const removeTitleFromListMutation = useRemoveTitleFromList();
+  const toggleFavoriteMutation = useToggleFavorite();
+  const favorites = useFavorites(currentUser?.uid);
 
   const personalQ = usePersonalLists(currentUser?.uid, { enabled: Boolean(currentUser?.uid) });
   const sharedQ = useSharedLists(currentUser?.uid, { enabled: Boolean(currentUser?.uid) });
@@ -344,6 +347,22 @@ export function TrailerModal() {
           <div className="modal-footer-meta">
             {metaParts}
             {servicePart}
+            {uid && (tabKey === "watched" || tabKey === "archive") ? (
+              <button
+                type="button"
+                className={`btn-favorite modal-favorite-btn${favorites.has(listKey(m)) ? " btn-favorite--active" : ""}`}
+                aria-label={favorites.has(listKey(m)) ? "Remove from favorites" : "Add to favorites"}
+                title={favorites.has(listKey(m)) ? "Remove from favorites" : "Add to favorites"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const registryId = listKey(m);
+                  const nowFavorite = !favorites.has(registryId);
+                  void toggleFavoriteMutation.mutateAsync({ uid, registryId, isFavorite: nowFavorite });
+                }}
+              >
+                {favorites.has(listKey(m)) ? "♥" : "♡"}
+              </button>
+            ) : null}
           </div>
           <div className="modal-footer-actions">
             <div className="modal-action-dropdown" data-dropdown="status">

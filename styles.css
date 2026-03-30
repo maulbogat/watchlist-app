@@ -1790,7 +1790,8 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 /* Desktop / hover-capable: hide remove + status controls until hover (touch unchanged). */
 @media (hover: hover) {
   .card .card-delete-btn,
-  .card .status-badge-wrap {
+  .card .status-badge-wrap,
+  .card .btn-favorite {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
@@ -1798,8 +1799,10 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
 
   .card:hover .card-delete-btn,
   .card:hover .status-badge-wrap,
+  .card:hover .btn-favorite,
   .card:focus-within .card-delete-btn,
   .card:focus-within .status-badge-wrap,
+  .card:focus-within .btn-favorite,
   .card .status-badge-wrap:has(.status-dropdown.open) {
     opacity: 1;
     pointer-events: auto;
@@ -2177,6 +2180,55 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   background: rgba(201,106,106,0.4);
   color: var(--accent2);
   border-color: rgba(201,106,106,0.6);
+}
+.btn-favorite {
+  width: calc(32px * var(--card-scale));
+  height: calc(32px * var(--card-scale));
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.5);
+  color: var(--muted);
+  font-size: calc(1rem * var(--card-scale));
+  line-height: 1;
+  cursor: pointer;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn-favorite:hover {
+  background: rgba(0,0,0,0.7);
+  color: var(--color-gold);
+  border-color: rgb(from var(--color-gold) r g b / 0.5);
+}
+.btn-favorite--active {
+  background: rgb(from var(--color-gold) r g b / 0.25);
+  color: var(--color-gold);
+  border-color: rgb(from var(--color-gold) r g b / 0.5);
+}
+.card .btn-favorite {
+  position: absolute;
+  bottom: calc(8px * var(--card-scale));
+  left: calc(8px * var(--card-scale));
+  z-index: 3;
+}
+.modal-favorite-btn {
+  margin-left: var(--space-2);
+  width: 28px;
+  height: 28px;
+  font-size: 1rem;
+  flex-shrink: 0;
+  align-self: center;
+}
+.toolbar-favorite-btn {
+  width: 36px;
+  height: 36px;
+  font-size: 1.1rem;
+}
+.toolbar-favorites-wrap {
+  display: flex;
+  align-items: center;
 }
 .status-dropdown {
   position: absolute;

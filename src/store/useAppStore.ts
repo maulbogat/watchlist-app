@@ -62,6 +62,10 @@ export interface AppState {
   /** Set when sign-in fails app allowlist (full-screen gate in App). */
   accessDenied: null | "not_invited" | "no_email";
   setAccessDenied: (reason: null | "not_invited" | "no_email") => void;
+
+  /** When true, the toolbar favorites filter is active — grid shows only favorited titles. */
+  showFavoritesOnly: boolean;
+  setShowFavoritesOnly: (showFavoritesOnly: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -112,6 +116,9 @@ export const useAppStore = create<AppState>()((set) => ({
 
   accessDenied: null,
   setAccessDenied: (accessDenied) => set({ accessDenied }),
+
+  showFavoritesOnly: false,
+  setShowFavoritesOnly: (showFavoritesOnly) => set({ showFavoritesOnly }),
 }));
 
 export {
