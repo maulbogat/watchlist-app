@@ -621,10 +621,40 @@ const ORPHAN_ROW_EXIT_MS = 300;
 /** Matches `MAX_ORPHANS_IN_RESPONSE` in `api/admin/[segment].js` (catalog-orphans). */
 const ADMIN_CATALOG_ORPHANS_CAP = 1500;
 
+const ADMIN_CATALOG_ORPHANS_SESSION_KEY = "watchlist-admin-catalog-orphans-v1";
+
+function readCatalogOrphansSession(): CatalogOrphansResponse | undefined {
+  try {
+    const raw = sessionStorage.getItem(ADMIN_CATALOG_ORPHANS_SESSION_KEY);
+    if (!raw) return undefined;
+    const p = JSON.parse(raw) as CatalogOrphansResponse;
+    if (p?.ok !== true || typeof p.count !== "number" || !Array.isArray(p.orphans)) return undefined;
+    return p;
+  } catch {
+    return undefined;
+  }
+}
+
+function persistCatalogOrphansSession(queryClient: QueryClient): void {
+  try {
+    const d = queryClient.getQueryData<CatalogOrphansResponse>(["admin", "catalog-orphans"]);
+    if (d?.ok) sessionStorage.setItem(ADMIN_CATALOG_ORPHANS_SESSION_KEY, JSON.stringify(d));
+  } catch {
+    /* sessionStorage quota / private mode */
+  }
+}
+
+/** After exit animation, drop the row from the cached list (no orphan rescan). */
+function removeOrphanRowFromCatalogOrphansCache(queryClient: QueryClient, registryId: string): void {
+  queryClient.setQueryData<CatalogOrphansResponse>(["admin", "catalog-orphans"], (prev) => {
+    if (!prev?.ok) return prev;
+    return { ...prev, orphans: prev.orphans.filter((o) => o.registryId !== registryId) };
+  });
+}
+
 /**
- * Decrement orphan stats immediately after a successful delete so the stat card and
- * "N titles not on any list" stay in sync with user expectation. The `orphans` list
- * is left unchanged until refetch so the row can finish its exit animation.
+ * Decrement orphan stats immediately after a successful delete so counts stay in sync.
+ * The `orphans` list is left unchanged until exit animation finishes.
  */
 function applyOrphanDeletedToCatalogOrphansCache(queryClient: QueryClient): void {
   queryClient.setQueryData<CatalogOrphansResponse>(["admin", "catalog-orphans"], (prev) => {
@@ -668,6 +698,12 @@ export function AdminPage() {
   const { loading: authLoading } = useAuthUser();
   const currentUser = useAppStore((s) => s.currentUser);
   const userIsAdmin = isAdmin(currentUser?.uid);
+
+  const [catalogOrphansInitial] = useState<CatalogOrphansResponse | undefined>(() =>
+    readCatalogOrphansSession()
+  );
+  const [orphanScanBusy, setOrphanScanBusy] = useState(false);
+  const [orphanScanError, setOrphanScanError] = useState<string | null>(null);
 
   const catalogStatsQ = useQuery<CatalogStats>({
     queryKey: ["admin", "catalog-stats"],
@@ -788,10 +824,24 @@ export function AdminPage() {
 
   const catalogOrphansQ = useQuery<CatalogOrphansResponse>({
     queryKey: ["admin", "catalog-orphans"],
-    staleTime: 60 * 1000,
-    enabled: !authLoading && userIsAdmin,
+    enabled: false,
+    ...(catalogOrphansInitial ? { initialData: catalogOrphansInitial } : {}),
     queryFn: () => fetchAdminExternalStatus<CatalogOrphansResponse>("/api/admin/catalog-orphans"),
   });
+
+  const runCatalogOrphansScan = useCallback(async () => {
+    setOrphanScanError(null);
+    setOrphanScanBusy(true);
+    try {
+      const data = await fetchAdminExternalStatus<CatalogOrphansResponse>("/api/admin/catalog-orphans");
+      queryClient.setQueryData(["admin", "catalog-orphans"], data);
+      persistCatalogOrphansSession(queryClient);
+    } catch (e) {
+      setOrphanScanError(e instanceof Error ? e.message : "Scan failed");
+    } finally {
+      setOrphanScanBusy(false);
+    }
+  }, [queryClient]);
 
   const [dqPanelsOpen, setDqPanelsOpen] = useState<Record<DqPanelOpenKey, boolean>>({
     tmdbId: false,
@@ -836,16 +886,10 @@ export function AdminPage() {
       if (prevTimer) clearTimeout(prevTimer);
       const t = setTimeout(() => {
         orphanExitTimersRef.current.delete(registryId);
-        void (async () => {
-          try {
-            await Promise.all([
-              queryClient.invalidateQueries({ queryKey: ["admin", "catalog-orphans"] }),
-              queryClient.invalidateQueries({ queryKey: ["admin", "catalog-stats"] }),
-            ]);
-          } finally {
-            setOrphanExitingIds((prev) => prev.filter((id) => id !== registryId));
-          }
-        })();
+        removeOrphanRowFromCatalogOrphansCache(queryClient, registryId);
+        persistCatalogOrphansSession(queryClient);
+        void queryClient.invalidateQueries({ queryKey: ["admin", "catalog-stats"] });
+        setOrphanExitingIds((prev) => prev.filter((id) => id !== registryId));
       }, ORPHAN_ROW_EXIT_MS);
       orphanExitTimersRef.current.set(registryId, t);
     },
@@ -1071,12 +1115,9 @@ export function AdminPage() {
       ? buildDqPanelDefs(catalogDq).filter((p) => typeof p.count === "number" && p.count > 0)
       : [];
 
-  const includeOrphansCollapsible =
-    !catalogOrphansQ.isPending &&
-    !catalogOrphansQ.isError &&
-    (catalogOrphansQ.data.count > 0 || orphanExitingIds.length > 0);
-
-  const dqGridItems = buildDqGridItems(dqVisiblePanels, includeOrphansCollapsible);
+  const dqGridItems = buildDqGridItems(dqVisiblePanels, userIsAdmin);
+  const catalogOrphansData = catalogOrphansQ.data;
+  const hasCatalogOrphansScanResult = catalogOrphansData?.ok === true;
 
   if (authLoading) {
     return <div className="react-migration-shell">Loading…</div>;
@@ -1761,17 +1802,12 @@ export function AdminPage() {
             <Button
               type="button"
               variant="outline"
-              disabled={
-                catalogStatsQ.isPending ||
-                catalogStatsQ.isFetching ||
-                catalogOrphansQ.isPending ||
-                catalogOrphansQ.isFetching
-              }
+              disabled={catalogStatsQ.isPending || catalogStatsQ.isFetching}
               onClick={() => {
-                void Promise.all([catalogStatsQ.refetch(), catalogOrphansQ.refetch()]);
+                void catalogStatsQ.refetch();
               }}
             >
-              {catalogStatsQ.isFetching || catalogOrphansQ.isFetching ? (
+              {catalogStatsQ.isFetching ? (
                 <>
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                   Refreshing…
@@ -1796,34 +1832,6 @@ export function AdminPage() {
                   <AdminDqStatValue count={c.count} tone={c.tone} />
                 </div>
               ))}
-        </div>
-
-        <div className="admin-grid admin-grid--stats admin-grid--dq-stats-row">
-          <div className="admin-orphan-stat-cell">
-            <div className="admin-card admin-stat-card">
-              <div className="admin-stat-label">Not on any list</div>
-              {catalogOrphansQ.isPending ? (
-                <div className="admin-stat-value admin-stat-value--small" aria-busy="true">
-                  …
-                </div>
-              ) : catalogOrphansQ.isError ? (
-                <div
-                  className="admin-stat-value admin-stat-value--small"
-                  title={catalogOrphansQ.error?.message ?? "Error"}
-                >
-                  Error
-                </div>
-              ) : catalogOrphansQ.data.count === 0 ? (
-                <div className="admin-stat-value admin-stat-value--dq-ok" aria-label="None">
-                  ✓
-                </div>
-              ) : (
-                <div className="admin-stat-value admin-stat-value--dq-warn">
-                  {catalogOrphansQ.data.count}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
         {dqGridItems.length > 0 ? (
@@ -1889,7 +1897,7 @@ export function AdminPage() {
                     </div>
                   ) : null}
                 </div>
-              ) : catalogOrphansQ.data ? (
+              ) : hasCatalogOrphansScanResult && catalogOrphansData ? (
                 <div key="orphans" className="admin-dq-detail">
                   <button
                     type="button"
@@ -1900,7 +1908,7 @@ export function AdminPage() {
                     }
                   >
                     <span className="admin-dq-detail-toggle-label">
-                      {catalogOrphansQ.data.count} titles not on any list
+                      {catalogOrphansData.count} titles not on any list
                     </span>
                     <span className="admin-dq-chevron">
                       {dqPanelsOpen.orphans ? "▴ Hide" : "▾ Show"}
@@ -1908,18 +1916,18 @@ export function AdminPage() {
                   </button>
                   {dqPanelsOpen.orphans ? (
                     <div className="admin-dq-detail-body admin-orphan-detail-body">
-                      {catalogOrphansQ.data.truncated ? (
+                      {catalogOrphansData.truncated ? (
                         <p className="admin-subtitle admin-orphan-truncated">
-                          Showing first {catalogOrphansQ.data.orphans.length} of{" "}
-                          {catalogOrphansQ.data.count}
-                          {catalogOrphansQ.data.omitted > 0
-                            ? ` (${catalogOrphansQ.data.omitted} omitted in this response)`
+                          Showing first {catalogOrphansData.orphans.length} of{" "}
+                          {catalogOrphansData.count}
+                          {catalogOrphansData.omitted > 0
+                            ? ` (${catalogOrphansData.omitted} omitted in this response)`
                             : ""}
                           . For the full list, run{" "}
                           <code className="admin-dq-code">node scripts/catalog-not-on-any-list.mjs</code>.
                         </p>
                       ) : null}
-                      {catalogOrphansQ.data.orphans.map((row) => {
+                      {catalogOrphansData.orphans.map((row) => {
                         const isRowDeleting =
                           deleteRegistryOrphanM.isPending &&
                           deleteRegistryOrphanM.variables === row.registryId;
@@ -1962,7 +1970,37 @@ export function AdminPage() {
                     </div>
                   ) : null}
                 </div>
-              ) : null
+              ) : (
+                <div key="orphans" className="admin-dq-detail admin-dq-detail--orphan-pending">
+                  <div
+                    className="admin-dq-orphan-scan-row"
+                    role="status"
+                    aria-busy={orphanScanBusy}
+                    aria-live="polite"
+                  >
+                    <span className="admin-dq-detail-toggle-label">titles not on any list</span>
+                    {orphanScanBusy ? (
+                      <Loader2
+                        className="admin-dq-orphan-scan-spinner"
+                        aria-label="Scan in progress"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn-secondary admin-dq-orphan-scan-btn"
+                        onClick={() => void runCatalogOrphansScan()}
+                      >
+                        Scan now
+                      </button>
+                    )}
+                  </div>
+                  {orphanScanError ? (
+                    <p className="admin-dq-orphan-scan-error" role="alert">
+                      {orphanScanError}
+                    </p>
+                  ) : null}
+                </div>
+              )
             )}
           </div>
         ) : null}
