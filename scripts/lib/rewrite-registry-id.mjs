@@ -27,15 +27,13 @@ export async function rewriteRegistryIdEverywhere(db, oldId, newId) {
       if (!a.includes(oldId)) return a;
       return [...new Set(a.map((k) => (k === oldId ? newId : k)))];
     };
-    await ref.set(
-      {
-        items: nextItems,
-        watched: mapStatus(data.watched),
-        maybeLater: mapStatus(data.maybeLater),
-        archive: mapStatus(data.archive),
-      },
-      { merge: true }
-    );
+    const patch = {
+      items: nextItems,
+      watched: mapStatus(data.watched),
+      maybeLater: mapStatus(data.maybeLater),
+    };
+    if (Array.isArray(data.archive)) patch.archive = mapStatus(data.archive);
+    await ref.set(patch, { merge: true });
   }
 
   const users = await db.collection("users").get();

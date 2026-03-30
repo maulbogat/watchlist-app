@@ -188,7 +188,6 @@ async function main() {
   const listItems = Array.isArray(listData.items) ? [...listData.items] : [];
   const listWatched = new Set(listData.watched || []);
   const listMaybeLater = new Set(listData.maybeLater || []);
-  const listArchive = new Set(listData.archive || []);
 
   const key = rid;
   const existingKeys = new Set(listItems.map((m) => (m.registryId ? m.registryId : listKey(m))));
@@ -206,7 +205,6 @@ async function main() {
         items: listItems,
         watched: [...listWatched],
         maybeLater: [...listMaybeLater],
-        archive: [...listArchive],
       },
       { merge: true }
     );

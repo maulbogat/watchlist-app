@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type QueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/shadcn-utils";
@@ -159,17 +154,13 @@ type DqPanelDef = {
   fixable?: boolean;
 };
 
-type DqGridItem =
-  | { kind: "panel"; def: DqPanelDef }
-  | { kind: "orphans" };
+type DqGridItem = { kind: "panel"; def: DqPanelDef } | { kind: "orphans" };
 
 function buildDqGridItems(
   visiblePanels: DqPanelDef[],
   includeOrphansCollapsible: boolean
 ): DqGridItem[] {
-  const byKey = new Map<DQDetailKey, DqPanelDef>(
-    visiblePanels.map((p) => [p.key, p] as const)
-  );
+  const byKey = new Map<DQDetailKey, DqPanelDef>(visiblePanels.map((p) => [p.key, p] as const));
   const items: DqGridItem[] = [];
   for (const key of DQ_COLLAPSIBLE_PANEL_ORDER) {
     const def = byKey.get(key);
@@ -628,7 +619,8 @@ function readCatalogOrphansSession(): CatalogOrphansResponse | undefined {
     const raw = sessionStorage.getItem(ADMIN_CATALOG_ORPHANS_SESSION_KEY);
     if (!raw) return undefined;
     const p = JSON.parse(raw) as CatalogOrphansResponse;
-    if (p?.ok !== true || typeof p.count !== "number" || !Array.isArray(p.orphans)) return undefined;
+    if (p?.ok !== true || typeof p.count !== "number" || !Array.isArray(p.orphans))
+      return undefined;
     return p;
   } catch {
     return undefined;
@@ -645,7 +637,10 @@ function persistCatalogOrphansSession(queryClient: QueryClient): void {
 }
 
 /** After exit animation, drop the row from the cached list (no orphan rescan). */
-function removeOrphanRowFromCatalogOrphansCache(queryClient: QueryClient, registryId: string): void {
+function removeOrphanRowFromCatalogOrphansCache(
+  queryClient: QueryClient,
+  registryId: string
+): void {
   queryClient.setQueryData<CatalogOrphansResponse>(["admin", "catalog-orphans"], (prev) => {
     if (!prev?.ok) return prev;
     return { ...prev, orphans: prev.orphans.filter((o) => o.registryId !== registryId) };
@@ -833,7 +828,9 @@ export function AdminPage() {
     setOrphanScanError(null);
     setOrphanScanBusy(true);
     try {
-      const data = await fetchAdminExternalStatus<CatalogOrphansResponse>("/api/admin/catalog-orphans");
+      const data = await fetchAdminExternalStatus<CatalogOrphansResponse>(
+        "/api/admin/catalog-orphans"
+      );
       queryClient.setQueryData(["admin", "catalog-orphans"], data);
       persistCatalogOrphansSession(queryClient);
     } catch (e) {
@@ -852,6 +849,10 @@ export function AdminPage() {
   });
   const [fixingThumbImdbId, setFixingThumbImdbId] = useState<string | null>(null);
   const [orphanExitingIds, setOrphanExitingIds] = useState<string[]>([]);
+  /** Each row keeps its spinner until its own delete request settles (supports parallel deletes). */
+  const [orphanDeleteInFlightIds, setOrphanDeleteInFlightIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const orphanExitTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
@@ -878,6 +879,20 @@ export function AdminPage() {
       if (!res.ok || data.ok === false) {
         throw new Error(data.error || `Request failed (${res.status})`);
       }
+    },
+    onMutate: (registryId) => {
+      setOrphanDeleteInFlightIds((prev) => {
+        const next = new Set(prev);
+        next.add(registryId);
+        return next;
+      });
+    },
+    onSettled: (_data, _err, registryId) => {
+      setOrphanDeleteInFlightIds((prev) => {
+        const next = new Set(prev);
+        next.delete(registryId);
+        return next;
+      });
     },
     onSuccess: (_void, registryId) => {
       applyOrphanDeletedToCatalogOrphansCache(queryClient);
@@ -949,7 +964,9 @@ export function AdminPage() {
     staleTime: 60 * 1000,
     enabled: !authLoading && userIsAdmin,
     queryFn: () =>
-      fetchAdminExternalStatus<GithubBackupStatusResponse>("/api/admin/external-status?service=github"),
+      fetchAdminExternalStatus<GithubBackupStatusResponse>(
+        "/api/admin/external-status?service=github"
+      ),
   });
 
   const vercelDeploymentQ = useQuery<VercelDeploymentStatusResponse>({
@@ -986,7 +1003,9 @@ export function AdminPage() {
     refetchOnMount: "always",
     enabled: !authLoading && userIsAdmin,
     queryFn: () =>
-      fetchAdminExternalStatus<SentryIssuesSummaryResponse>("/api/admin/external-status?service=sentry"),
+      fetchAdminExternalStatus<SentryIssuesSummaryResponse>(
+        "/api/admin/external-status?service=sentry"
+      ),
   });
 
   const [runNowResult, setRunNowResult] = useState<string | null>(null);
@@ -1836,141 +1855,177 @@ export function AdminPage() {
 
         {dqGridItems.length > 0 ? (
           <div className="admin-dq-details admin-dq-details--grid">
-            {dqGridItems.map((item) =>
-              item.kind === "panel" ? (
-                <div key={item.def.key} className="admin-dq-detail">
-                  <button
-                    type="button"
-                    className="admin-dq-detail-toggle"
-                    aria-expanded={dqPanelsOpen[item.def.key]}
-                    onClick={() =>
-                      setDqPanelsOpen((prev) => ({
-                        ...prev,
-                        [item.def.key]: !prev[item.def.key],
-                      }))
-                    }
-                  >
-                    <span className="admin-dq-detail-toggle-label">
-                      {item.def.count} titles missing {item.def.fieldLabel}
-                    </span>
-                    <span className="admin-dq-chevron">
-                      {dqPanelsOpen[item.def.key] ? "▴ Hide" : "▾ Show"}
-                    </span>
-                  </button>
-                  {dqPanelsOpen[item.def.key] ? (
-                    <div className="admin-dq-detail-body">
-                      {item.def.rows.map((row) => (
-                        <div key={row.imdbId} className="admin-dq-li">
-                          <span className="admin-dq-li-text">
-                            {row.imdbId} · {row.title} ({formatDqYear(row.year)})
-                          </span>
-                          {item.def.fixable && "tmdbId" in row ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="admin-dq-fix-btn"
-                              disabled={
-                                fixingThumbImdbId === row.imdbId ||
-                                row.tmdbId == null ||
-                                catalogStatsQ.isFetching
-                              }
-                              title={
-                                row.tmdbId == null
-                                  ? "Needs tmdbId on document before TMDB poster fetch"
-                                  : undefined
-                              }
-                              onClick={() => void fixCatalogThumb(row.imdbId)}
-                            >
-                              {fixingThumbImdbId === row.imdbId ? (
-                                <>
-                                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                                  Fix…
-                                </>
-                              ) : (
-                                "Fix"
-                              )}
-                            </Button>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : hasCatalogOrphansScanResult && catalogOrphansData ? (
-                <div key="orphans" className="admin-dq-detail">
-                  <button
-                    type="button"
-                    className="admin-dq-detail-toggle"
-                    aria-expanded={dqPanelsOpen.orphans}
-                    onClick={() =>
-                      setDqPanelsOpen((prev) => ({ ...prev, orphans: !prev.orphans }))
-                    }
-                  >
-                    <span className="admin-dq-detail-toggle-label">
-                      {catalogOrphansData.count} titles not on any list
-                    </span>
-                    <span className="admin-dq-chevron">
-                      {dqPanelsOpen.orphans ? "▴ Hide" : "▾ Show"}
-                    </span>
-                  </button>
-                  {dqPanelsOpen.orphans ? (
-                    <div className="admin-dq-detail-body admin-orphan-detail-body">
-                      {catalogOrphansData.truncated ? (
-                        <p className="admin-subtitle admin-orphan-truncated">
-                          Showing first {catalogOrphansData.orphans.length} of{" "}
-                          {catalogOrphansData.count}
-                          {catalogOrphansData.omitted > 0
-                            ? ` (${catalogOrphansData.omitted} omitted in this response)`
-                            : ""}
-                          . For the full list, run{" "}
-                          <code className="admin-dq-code">node scripts/catalog-not-on-any-list.mjs</code>.
-                        </p>
-                      ) : null}
-                      {catalogOrphansData.orphans.map((row) => {
-                        const isRowDeleting =
-                          deleteRegistryOrphanM.isPending &&
-                          deleteRegistryOrphanM.variables === row.registryId;
-                        const isRowExiting = orphanExitingIds.includes(row.registryId);
-                        return (
-                          <div
-                            key={row.registryId}
-                            className={cn(
-                              "admin-dq-li",
-                              "admin-dq-li--orphan",
-                              isRowDeleting && "admin-dq-li--orphan-deleting",
-                              isRowExiting && "admin-dq-li--orphan-exiting"
-                            )}
-                          >
+            {dqGridItems.map((item) => {
+              if (item.kind === "panel") {
+                const panelCount = item.def.count;
+                const panelExpandable = typeof panelCount === "number" && panelCount > 0;
+                const panelBodyOpen = panelExpandable
+                  ? dqPanelsOpen[item.def.key]
+                  : item.def.rows.length > 0;
+                return (
+                  <div key={item.def.key} className="admin-dq-detail">
+                    {panelExpandable ? (
+                      <button
+                        type="button"
+                        className="admin-dq-detail-toggle"
+                        aria-expanded={dqPanelsOpen[item.def.key]}
+                        onClick={() =>
+                          setDqPanelsOpen((prev) => ({
+                            ...prev,
+                            [item.def.key]: !prev[item.def.key],
+                          }))
+                        }
+                      >
+                        <span className="admin-dq-detail-toggle-label">
+                          {item.def.count} titles missing {item.def.fieldLabel}
+                        </span>
+                        <span className="admin-dq-chevron">
+                          {dqPanelsOpen[item.def.key] ? "▴ Hide" : "▾ Show"}
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="admin-dq-detail-toggle--static" role="status">
+                        <span className="admin-dq-detail-toggle-label">
+                          {item.def.count} titles missing {item.def.fieldLabel}
+                        </span>
+                      </div>
+                    )}
+                    {panelBodyOpen ? (
+                      <div className="admin-dq-detail-body">
+                        {item.def.rows.map((row) => (
+                          <div key={row.imdbId} className="admin-dq-li">
                             <span className="admin-dq-li-text">
-                              {row.registryId} · {row.title} ({formatDqYear(row.year)})
+                              {row.imdbId} · {row.title} ({formatDqYear(row.year)})
                             </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className={cn(
-                                "admin-dq-orphan-delete",
-                                isRowDeleting && "admin-dq-orphan-delete--busy"
-                              )}
-                              disabled={isRowDeleting || isRowExiting}
-                              aria-label={`Remove ${row.title} from catalog`}
-                              title="Remove from catalog"
-                              onClick={() => deleteRegistryOrphanM.mutate(row.registryId)}
-                            >
-                              {isRowDeleting ? (
-                                <Loader2 className="size-4 admin-dq-orphan-delete__spinner" aria-hidden />
-                              ) : (
-                                <Trash2 className="size-4" aria-hidden />
-                              )}
-                            </Button>
+                            {item.def.fixable && "tmdbId" in row ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="admin-dq-fix-btn"
+                                disabled={
+                                  fixingThumbImdbId === row.imdbId ||
+                                  row.tmdbId == null ||
+                                  catalogStatsQ.isFetching
+                                }
+                                title={
+                                  row.tmdbId == null
+                                    ? "Needs tmdbId on document before TMDB poster fetch"
+                                    : undefined
+                                }
+                                onClick={() => void fixCatalogThumb(row.imdbId)}
+                              >
+                                {fixingThumbImdbId === row.imdbId ? (
+                                  <>
+                                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                                    Fix…
+                                  </>
+                                ) : (
+                                  "Fix"
+                                )}
+                              </Button>
+                            ) : null}
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              }
+              if (hasCatalogOrphansScanResult && catalogOrphansData) {
+                const orphanCount = catalogOrphansData.count;
+                const orphanExpandable = orphanCount > 0;
+                const orphanBodyOpen = orphanExpandable
+                  ? dqPanelsOpen.orphans
+                  : catalogOrphansData.orphans.length > 0;
+                return (
+                  <div key="orphans" className="admin-dq-detail">
+                    {orphanExpandable ? (
+                      <button
+                        type="button"
+                        className="admin-dq-detail-toggle"
+                        aria-expanded={dqPanelsOpen.orphans}
+                        onClick={() =>
+                          setDqPanelsOpen((prev) => ({ ...prev, orphans: !prev.orphans }))
+                        }
+                      >
+                        <span className="admin-dq-detail-toggle-label">
+                          {catalogOrphansData.count} titles not on any list
+                        </span>
+                        <span className="admin-dq-chevron">
+                          {dqPanelsOpen.orphans ? "▴ Hide" : "▾ Show"}
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="admin-dq-detail-toggle--static" role="status">
+                        <span className="admin-dq-detail-toggle-label">
+                          {catalogOrphansData.count} titles not on any list
+                        </span>
+                      </div>
+                    )}
+                    {orphanBodyOpen ? (
+                      <div className="admin-dq-detail-body admin-orphan-detail-body">
+                        {catalogOrphansData.truncated ? (
+                          <p className="admin-subtitle admin-orphan-truncated">
+                            Showing first {catalogOrphansData.orphans.length} of{" "}
+                            {catalogOrphansData.count}
+                            {catalogOrphansData.omitted > 0
+                              ? ` (${catalogOrphansData.omitted} omitted in this response)`
+                              : ""}
+                            . For the full list, run{" "}
+                            <code className="admin-dq-code">
+                              node scripts/catalog-not-on-any-list.mjs
+                            </code>
+                            .
+                          </p>
+                        ) : null}
+                        {catalogOrphansData.orphans.map((row) => {
+                          const isRowDeleting = orphanDeleteInFlightIds.has(row.registryId);
+                          const isRowExiting = orphanExitingIds.includes(row.registryId);
+                          return (
+                            <div
+                              key={row.registryId}
+                              className={cn(
+                                "admin-dq-li",
+                                "admin-dq-li--orphan",
+                                isRowDeleting && "admin-dq-li--orphan-deleting",
+                                isRowExiting && "admin-dq-li--orphan-exiting"
+                              )}
+                            >
+                              <span className="admin-dq-li-text">
+                                {row.registryId} · {row.title} ({formatDqYear(row.year)})
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  "admin-dq-orphan-delete",
+                                  isRowDeleting && "admin-dq-orphan-delete--busy"
+                                )}
+                                disabled={isRowDeleting || isRowExiting}
+                                aria-label={`Remove ${row.title} from catalog`}
+                                title="Remove from catalog"
+                                onClick={() => deleteRegistryOrphanM.mutate(row.registryId)}
+                              >
+                                {isRowDeleting ? (
+                                  <Loader2
+                                    className="size-4 admin-dq-orphan-delete__spinner"
+                                    aria-hidden
+                                  />
+                                ) : (
+                                  <Trash2 className="size-4" aria-hidden />
+                                )}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              }
+              return (
                 <div key="orphans" className="admin-dq-detail admin-dq-detail--orphan-pending">
                   <div
                     className="admin-dq-orphan-scan-row"
@@ -2000,8 +2055,8 @@ export function AdminPage() {
                     </p>
                   ) : null}
                 </div>
-              )
-            )}
+              );
+            })}
           </div>
         ) : null}
       </section>

@@ -91,18 +91,15 @@ async function migrateListDocument(ref) {
   const mergedItems = dedupeItemsByRegistry(newItems);
   const watched = remapStatus(d.watched, keyMap);
   const maybeLater = remapStatus(d.maybeLater, keyMap);
-  const archive = remapStatus(d.archive, keyMap);
 
   if (!dryRun) {
-    await ref.set(
-      {
-        items: mergedItems,
-        watched,
-        maybeLater,
-        archive,
-      },
-      { merge: true }
-    );
+    const patch = {
+      items: mergedItems,
+      watched,
+      maybeLater,
+    };
+    if (Array.isArray(d.archive)) patch.archive = remapStatus(d.archive, keyMap);
+    await ref.set(patch, { merge: true });
   }
   return { updated: true, path: ref.path, itemCount: mergedItems.length };
 }

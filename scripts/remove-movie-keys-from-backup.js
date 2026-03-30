@@ -1,7 +1,7 @@
 /**
  * Remove titles from titleRegistry and every user / shared / personal list.
  * Matching keys in REMOVE_KEYS: `title|year` (listKey) and/or registry doc ids (e.g. tt…, legacy-…).
- * Strips matching keys from items, watched, maybeLater, archive and nested string arrays.
+ * Strips matching keys from items, watched, maybeLater, legacy archive, and nested string arrays.
  *
  * Run: node scripts/remove-movie-keys-from-backup.js [backup.json]
  * Edit REMOVE_KEYS below, then run.

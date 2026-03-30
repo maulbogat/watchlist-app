@@ -80,7 +80,6 @@ async function main() {
       items: newItems,
       watched: FieldValue.arrayRemove(...toRemove),
       maybeLater: FieldValue.arrayRemove(...toRemove),
-      archive: FieldValue.arrayRemove(...toRemove),
     });
     console.log(`Removed ${toRemove.length} duplicates from user ${uid}`);
   }

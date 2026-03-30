@@ -2143,10 +2143,6 @@ body:has(#bookmarklet-settings-modal[data-state="open"]) [data-slot="dialog-over
   background: rgba(136,136,136,0.25);
   color: var(--muted);
 }
-.status-badge.status-archive {
-  background: rgba(201,106,106,0.2);
-  color: var(--accent2);
-}
 .status-badge svg {
   width: calc(18px * var(--card-scale));
   height: calc(18px * var(--card-scale));
@@ -3806,8 +3802,9 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   max-width: 100%;
 }
 
-/* Same header strip height: collapsed toggles, expanded toggles, and orphan scan row. */
+/* Same header strip height: toggles (interactive or static), orphan scan row. */
 .admin-dq-details.admin-dq-details--grid > .admin-dq-detail > .admin-dq-detail-toggle,
+.admin-dq-details.admin-dq-details--grid > .admin-dq-detail > .admin-dq-detail-toggle--static,
 .admin-dq-details.admin-dq-details--grid > .admin-dq-detail > .admin-dq-orphan-scan-row {
   box-sizing: border-box;
   min-height: calc(var(--space-3) * 2 + 1.45 * var(--text-sm));
@@ -3844,6 +3841,28 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 
 .admin-dq-detail-toggle:hover {
   background: rgb(from var(--color-gold) r g b / 0.06);
+}
+
+/* Non-expandable row (0 items): same layout as toggle, no chevron or hover. */
+.admin-dq-detail-toggle--static {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: default;
+  box-sizing: border-box;
+}
+
+.admin-dq-detail-toggle--static:hover {
+  background: transparent;
 }
 
 .admin-dq-detail-toggle-label {

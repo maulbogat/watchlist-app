@@ -3,9 +3,9 @@
  * Move all items from the user's default personal list into a shared list (default name: "Our list").
  * - Dedupes by registry id (list key).
  * - Upserts titleRegistry for legacy embedded rows (no registryId).
- * - Rows already on the shared list keep their existing shared watch/maybe/archive state.
- * - Rows only on personal get personal watch state (archive > watched > maybe-later > to-watch).
- * - Orphan keys in personal watched/maybeLater/archive (not in items) are added as { registryId }.
+ * - Rows already on the shared list keep their existing shared watch/maybe-later state.
+ * - Rows only on personal get personal watch state (watched > maybe-later > to-watch).
+ * - Orphan keys in personal watched/maybeLater (not in items) are added as { registryId }.
  *
  * After a successful --write run, the default personal list's items + status arrays are cleared
  * (list doc and name remain).
@@ -17,6 +17,7 @@
  * uid can be omitted if USER_UID is set.
  */
 import "dotenv/config";
+import { FieldValue } from "firebase-admin/firestore";
 import { getDb } from "./lib/admin-init.mjs";
 import { listKey, registryDocIdFromItem, payloadForRegistry } from "../lib/registry-id.js";
 
@@ -29,15 +30,8 @@ function parseArgs() {
   return { write, uid, sharedName };
 }
 
-function personalStatusForKey(key, pW, pM, pA) {
-  if (pA.has(key)) return "archive";
-  if (pW.has(key)) return "watched";
-  if (pM.has(key)) return "maybe-later";
-  return "to-watch";
-}
-
-/** One bucket per key: archive > watched > maybe-later > to-watch */
-function normalizeStatusSets(items, w, m, a) {
+/** One bucket per key: watched > maybe-later > to-watch */
+function normalizeStatusSets(items, w, m) {
   const keys = new Set();
   for (const row of items) {
     const k = listKey(row);
@@ -45,13 +39,11 @@ function normalizeStatusSets(items, w, m, a) {
   }
   const nw = new Set();
   const nm = new Set();
-  const na = new Set();
   for (const k of keys) {
-    if (a.has(k)) na.add(k);
-    else if (w.has(k)) nw.add(k);
+    if (w.has(k)) nw.add(k);
     else if (m.has(k)) nm.add(k);
   }
-  return { watched: nw, maybeLater: nm, archive: na };
+  return { watched: nw, maybeLater: nm };
 }
 
 async function resolveSharedListId(db, name) {
@@ -110,7 +102,6 @@ async function main() {
   const personalItems = Array.isArray(personal.items) ? personal.items : [];
   const pW = new Set(personal.watched || []);
   const pM = new Set(personal.maybeLater || []);
-  const pA = new Set(personal.archive || []);
 
   const { id: sharedId, name: resolvedSharedName } = await resolveSharedListId(db, sharedName);
   const shRef = db.collection("sharedLists").doc(sharedId);
@@ -121,7 +112,6 @@ async function main() {
   let items = Array.isArray(sh.items) ? [...sh.items] : [];
   let sW = new Set(sh.watched || []);
   let sM = new Set(sh.maybeLater || []);
-  let sA = new Set(sh.archive || []);
 
   const existingKeys = new Set(items.map((m) => listKey(m)));
   const registryWrites = [];
@@ -144,9 +134,6 @@ async function main() {
       if (rid === canonicalKey && legacy !== canonicalKey) keysToCheck.add(legacy);
     }
     for (const k of keysToCheck) {
-      if (pA.has(k)) return "archive";
-    }
-    for (const k of keysToCheck) {
       if (pW.has(k)) return "watched";
     }
     for (const k of keysToCheck) {
@@ -162,8 +149,7 @@ async function main() {
     existingKeys.add(key);
     addedCount++;
     const st = personalStatusForRowKey(key);
-    if (st === "archive") sA.add(key);
-    else if (st === "watched") sW.add(key);
+    if (st === "watched") sW.add(key);
     else if (st === "maybe-later") sM.add(key);
   }
 
@@ -178,28 +164,26 @@ async function main() {
     }
   }
 
-  addOrphanKeys(pA, (k) => sA.add(k));
   addOrphanKeys(pW, (k) => sW.add(k));
   addOrphanKeys(pM, (k) => sM.add(k));
 
   /* Keep any shared status key that somehow lacks an items row (avoid silent drops). */
-  for (const k of [...sW, ...sM, ...sA]) {
+  for (const k of [...sW, ...sM]) {
     if (k && !existingKeys.has(k)) {
       items.push({ registryId: k });
       existingKeys.add(k);
     }
   }
 
-  const normalized = normalizeStatusSets(items, sW, sM, sA);
+  const normalized = normalizeStatusSets(items, sW, sM);
   sW = normalized.watched;
   sM = normalized.maybeLater;
-  sA = normalized.archive;
 
   console.log(`User: ${uid}`);
   console.log(`Personal list: "${personalName}" (${defId}) — ${personalItems.length} items`);
   console.log(`Shared list: "${resolvedSharedName}" (${sharedId}) — was ${(sh.items || []).length} items, +${addedCount} new → ${items.length} total`);
   console.log(`Registry upserts (legacy rows): ${registryWrites.length}`);
-  console.log(`Status counts — watched: ${sW.size}, maybeLater: ${sM.size}, archive: ${sA.size}`);
+  console.log(`Status counts — watched: ${sW.size}, maybeLater: ${sM.size}`);
   console.log(write ? "MODE: WRITE" : "MODE: dry-run (pass --write to apply)");
 
   if (!write) return;
@@ -211,7 +195,7 @@ async function main() {
       items,
       watched: [...sW],
       maybeLater: [...sM],
-      archive: [...sA],
+      archive: FieldValue.delete(),
     },
     { merge: true }
   );
@@ -221,7 +205,7 @@ async function main() {
       items: [],
       watched: [],
       maybeLater: [],
-      archive: [],
+      archive: FieldValue.delete(),
     },
     { merge: true }
   );

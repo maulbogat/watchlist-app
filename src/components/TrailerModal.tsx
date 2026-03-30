@@ -153,7 +153,7 @@ export function TrailerModal() {
 
   const m = movie;
   const raw = m.status || "to-watch";
-  const tabKey = raw === "watched" ? "watched" : raw === "archive" ? "archive" : "to-watch";
+  const tabKey = raw === "watched" ? "watched" : "to-watch";
 
   function close() {
     setStatusOpen(false);
@@ -169,7 +169,7 @@ export function TrailerModal() {
 
   async function onPickStatus(st: StatusKey) {
     if (!currentUser?.uid) return;
-    const current = raw === "watched" ? "watched" : raw === "archive" ? "archive" : "to-watch";
+    const current = raw === "watched" ? "watched" : "to-watch";
     if (st === current) {
       setStatusOpen(false);
       return;

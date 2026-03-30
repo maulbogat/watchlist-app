@@ -1,6 +1,6 @@
 /**
  * Remove titleRegistry docs and list rows that have no numeric tmdbId (null, "", or invalid).
- * Strips matching registryId / title|year from watched / maybeLater / archive.
+ * Strips matching registryId / title|year from watched / maybeLater.
  *
  * Run: node scripts/remove-items-without-tmdb-id.js [backup.json] [--dry-run]
  * Default: backups/firestore-backup-migrated.json
@@ -26,7 +26,7 @@ function hasTmdbId(m) {
   return !Number.isNaN(n);
 }
 
-const STATUS_FIELDS = ["watched", "maybeLater", "archive"];
+const STATUS_FIELDS = ["watched", "maybeLater"];
 
 function keysForRow(m, trMap) {
   const ks = new Set();

@@ -42,7 +42,9 @@ async function purgeFromDocument(ref, data, registryIds, matches, title, year) {
     maybeLater.length !== (data.maybeLater || []).length ||
     archive.length !== (data.archive || []).length;
   if (changed) {
-    await ref.set({ items: newItems, watched, maybeLater, archive }, { merge: true });
+    const payload = { items: newItems, watched, maybeLater };
+    if (Array.isArray(data.archive)) payload.archive = archive;
+    await ref.set(payload, { merge: true });
   }
 }
 

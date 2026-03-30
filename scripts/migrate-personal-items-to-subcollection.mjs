@@ -70,7 +70,6 @@ async function migrateUser(db, uid, userRef, data) {
     items,
     watched,
     maybeLater,
-    archive,
     createdAt: new Date().toISOString(),
   });
   await userRef.update({

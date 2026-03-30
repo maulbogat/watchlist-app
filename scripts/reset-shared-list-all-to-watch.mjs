@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Put every title on a shared list on the "To Watch" tab: keep `items` unchanged and clear
- * `watched`, `maybeLater`, and `archive` (those arrays drive the other tabs).
+ * `watched` and `maybeLater` (those arrays drive Watched / maybe-later state).
  *
  * Usage:
  *   node -r dotenv/config scripts/reset-shared-list-all-to-watch.mjs --dry-run "Our list"
@@ -10,6 +10,7 @@
  * List name is matched like other scripts (substring / case-insensitive).
  */
 import "dotenv/config";
+import { FieldValue } from "firebase-admin/firestore";
 import { getDb } from "./lib/admin-init.mjs";
 
 function parseArgs() {
@@ -42,7 +43,7 @@ async function main() {
 
   console.log(`Shared list: "${name}" (${id})`);
   console.log(`  items: ${items.length}`);
-  console.log(`  watched: ${w.length}, maybeLater: ${m.length}, archive: ${a.length}`);
+  console.log(`  watched: ${w.length}, maybeLater: ${m.length}${a.length ? `, legacy archive keys: ${a.length} (field removed on write)` : ""}`);
   console.log(write ? "MODE: WRITE" : "MODE: dry-run (pass --write to apply)");
 
   if (!write) return;
@@ -51,7 +52,7 @@ async function main() {
     {
       watched: [],
       maybeLater: [],
-      archive: [],
+      archive: FieldValue.delete(),
     },
     { merge: true }
   );

@@ -67,7 +67,6 @@ async function main() {
   const userItems = Array.isArray(userData.items) ? userData.items : [];
   const userWatched = new Set(userData.watched || []);
   const userMaybeLater = new Set(userData.maybeLater || []);
-  const userArchive = new Set(userData.archive || []);
 
   if (userItems.length === 0) {
     console.error("User list is empty");
@@ -89,7 +88,6 @@ async function main() {
   const listItems = Array.isArray(listData.items) ? [...listData.items] : [];
   const listWatched = new Set(listData.watched || []);
   const listMaybeLater = new Set(listData.maybeLater || []);
-  const listArchive = new Set(listData.archive || []);
   const existingKeys = new Set(listItems.map((m) => movieKey(m)));
 
   let added = 0;
@@ -101,7 +99,6 @@ async function main() {
     existingKeys.add(key);
     if (userWatched.has(key)) listWatched.add(key);
     else if (userMaybeLater.has(key)) listMaybeLater.add(key);
-    else if (userArchive.has(key)) listArchive.add(key);
     added++;
   }
 
@@ -110,7 +107,6 @@ async function main() {
       items: listItems,
       watched: [...listWatched],
       maybeLater: [...listMaybeLater],
-      archive: [...listArchive],
     },
     { merge: true }
   );

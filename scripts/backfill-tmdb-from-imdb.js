@@ -139,7 +139,7 @@ async function enrichFromTmdb(imdbId, apiKey, watchRegion, itemTypeHint) {
 
 function replaceKeyEverywhere(backup, oldKey, newKey) {
   if (!oldKey || oldKey === newKey) return;
-  const fields = ["watched", "maybeLater", "archive"];
+  const fields = ["watched", "maybeLater"];
 
   function patchDoc(doc) {
     if (!doc || typeof doc !== "object") return;

@@ -52,7 +52,6 @@ async function main() {
   const listItems = Array.isArray(listData.items) ? listData.items : [];
   const listWatched = new Set(listData.watched || []);
   const listMaybeLater = new Set(listData.maybeLater || []);
-  const listArchive = new Set(listData.archive || []);
 
   const members = listData.members || [];
   if (!members.length) {
@@ -84,14 +83,12 @@ async function main() {
   toRemove.forEach((k) => {
     listWatched.delete(k);
     listMaybeLater.delete(k);
-    listArchive.delete(k);
   });
 
   await db.collection("sharedLists").doc(listId).update({
     items: newItems,
     watched: FieldValue.arrayRemove(...toRemove),
     maybeLater: FieldValue.arrayRemove(...toRemove),
-    archive: FieldValue.arrayRemove(...toRemove),
   });
 
   console.log(`Removed ${toRemove.length} duplicates from "${listData.name}" (shared list).`);

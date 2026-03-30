@@ -114,7 +114,6 @@ async function main() {
     items: newListItems,
     watched: FieldValue.arrayRemove(key),
     maybeLater: FieldValue.arrayRemove(key),
-    archive: FieldValue.arrayRemove(key),
   });
   console.log(`Removed "${movie.title}" from shared list.`);
   console.log("Done.");

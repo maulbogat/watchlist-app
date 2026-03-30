@@ -81,7 +81,6 @@ async function restoreToUser(db, uid, items) {
   const existingKeys = new Set(existing.map((m) => (m.registryId ? m.registryId : listKey(m))));
   const watched = new Set(data.watched || []);
   const maybeLater = new Set(data.maybeLater || []);
-  const archive = new Set(data.archive || []);
 
   let added = 0;
   for (const m of items) {
@@ -100,7 +99,6 @@ async function restoreToUser(db, uid, items) {
       items: existing,
       watched: [...watched],
       maybeLater: [...maybeLater],
-      archive: [...archive],
     },
     { merge: true }
   );

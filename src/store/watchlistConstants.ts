@@ -1,13 +1,12 @@
 /** Shared UI constants for the React watchlist (status labels, SVG snippets, limits). */
 
-export const STATUS_ORDER = ["to-watch", "watched", "archive"] as const;
+export const STATUS_ORDER = ["to-watch", "watched"] as const;
 
 export const GENRE_LIMIT = 10;
 
 export const STATUS_LABELS: Record<string, string> = {
   "to-watch": "To Watch",
   watched: "Watched",
-  archive: "Archive",
 };
 
 export const CHECK_SVG =

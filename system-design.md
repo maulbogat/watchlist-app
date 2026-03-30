@@ -110,7 +110,7 @@ The field table reflects the **intended** schema from the **`add-from-imdb`** en
 
 **Maintenance:** **`scripts/backfill-tmdb-media.mjs`** sets missing **`tmdbMedia`** from **`type`** (`movie` → `movie`, `show` → `tv`) for a curated list of docs; default dry run, **`--write`** to merge. **`scripts/backfill-original-language.mjs`** sets missing **`originalLanguage`** from TMDB **`original_language`** for every **`titleRegistry`** doc with a usable **`tmdbId`** (and **`tmdbMedia`** / **`type`** for movie vs TV); uses **`TMDB_API_KEY`** + Admin; default dry run, **`--write`** to merge; **`--force`** overwrites existing **`originalLanguage`**. **`scripts/cleanup-legacy-fields.mjs`** removes **`addedByUid`**, **`addedByDisplayName`**, **`addedByPhotoUrl`** from a fixed set of registry docs via Admin **`update`** + **`FieldValue.delete()`**; default dry run, **`--write`** to apply. **`scripts/backfill-thumb.mjs`** fills missing **`thumb`** from TMDB **`poster_path`** (w500) for a fixed list; uses **`TMDB_API_KEY`** and Admin from **`.env`** / **`serviceAccountKey.json`**; default dry run, **`--write`** to merge.
 
-**`registryId` (document id) and list keys:** The id is **`registryDocIdFromItem`** in **`src/lib/registry-id.ts`** (client) / **`src/api-lib/registry-id.cjs`** (API): prefer normalized IMDb id (`tt…`), else **`tmdb-tv-{id}`** / **`tmdb-movie-{id}`** when **`tmdbId`** is known, else deterministic **`legacy-{hash}`** from **`title|year`**. For **status arrays** (**`watched`**, **`maybeLater`**, **`archive`**) and legacy rows, the same module’s **`listKey`** returns **`registryId`** when the row has it, otherwise **`title|year`**. The old **`movieKey`** export was removed; **`listKey`** is the single helper.
+**`registryId` (document id) and list keys:** The id is **`registryDocIdFromItem`** in **`src/lib/registry-id.ts`** (client) / **`src/api-lib/registry-id.cjs`** (API): prefer normalized IMDb id (`tt…`), else **`tmdb-tv-{id}`** / **`tmdb-movie-{id}`** when **`tmdbId`** is known, else deterministic **`legacy-{hash}`** from **`title|year`**. For **status arrays** (**`watched`**, **`maybeLater`**) and legacy rows, the same module’s **`listKey`** returns **`registryId`** when the row has it, otherwise **`title|year`**. The old **`movieKey`** export was removed; **`listKey`** is the single helper.
 
 **List rows** in **`sharedLists`** / **`personalLists`** use the canonical **`{ registryId, addedAt }`** shape after migration (shared rows may add **`addedBy*`** — see **List row in Firestore** below). Status arrays use the **`listKey`** string (usually equal to **`registryId`**). Per-user display overrides can attach here or on list rows in a future version.
 
@@ -142,7 +142,7 @@ The field table reflects the **intended** schema from the **`add-from-imdb`** en
 |-------|------|--------|
 | `name` | `string` | **Required** non-empty when creating a subcollection list; stored trimmed. |
 | `items` | `array` | Same **Item object** shape as **`sharedLists`** rows (`{ registryId }` after migration). |
-| `watched`, `maybeLater`, `archive` | `array` of string | Status keys, same pattern as `sharedLists`. |
+| `watched`, `maybeLater` | `array` of string | Status keys (`listKey` strings), same pattern as `sharedLists`. |
 | `createdAt` | `string` (ISO) | Set on create. |
 
 **Relationship:** All personal list **content** lives here (including the default list). The app uses virtual `listId === "personal"` for the list whose real id is `users/{uid}.defaultPersonalListId`.
@@ -157,7 +157,7 @@ The field table reflects the **intended** schema from the **`add-from-imdb`** en
 | `ownerId` | `string` | Firebase `uid` of creator. |
 | `members` | `array` of string | Uids with access; creator included on create. |
 | `items` | `array` | **Item objects** (no `status` stored in Firestore; status derived from key sets). |
-| `watched`, `maybeLater`, `archive` | `array` of string | Same pattern as user doc. |
+| `watched`, `maybeLater` | `array` of string | Status keys; titles in `items` but in neither array are **To Watch** (includes **maybe-later** in the UI tab). |
 | `createdAt` | `string` (ISO) | |
 
 **Relationship:** Many-to-many via `members` (users can be in multiple lists).
@@ -300,7 +300,9 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | `registryId` | `string` | Present on hydrated client objects; not stored inside the registry document body (**`payloadForRegistry`** strips it; doc id is canonical). |
 | `addedAt` | `string` (ISO) | On list rows from **`rowToStore`** / **`ensureAddedAt`**; may appear on merged registry reads when present on list rows. |
 
-**Runtime-only:** `status` (`to-watch` \| `watched` \| `maybe-later` \| `archive`) is **computed in memory** when loading lists, from `watched` / `maybeLater` / `archive` key arrays keyed by **`listKey`** (see **`titleRegistry`** section above).
+**Runtime-only:** `status` (`to-watch` \| `watched` \| `maybe-later`) is **computed in memory** when loading lists, from `watched` / `maybeLater` key arrays keyed by **`listKey`** (see **`titleRegistry`** section above). Legacy documents may still contain an **`archive`** array until **`scripts/strip-archive-field.mjs`** is run; the app ignores it.
+
+**Data cleanup:** Run **`node -r dotenv/config scripts/strip-archive-field.mjs --write`** (after **`--dry-run`**) to remove **`archive`** from all **`sharedLists`** and **`personalLists`** docs. Titles that were only archived remain in **`items`** and appear as **To Watch**.
 
 ---
 
@@ -420,7 +422,7 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 | Name / file | Responsibility | Reads Firestore | Writes Firestore | External APIs |
 |-------------|----------------|-----------------|------------------|---------------|
 | `index.html` / `src/main.tsx` | Vite entry; **`<title>Watchlist`**, **Open Graph** / **Twitter** meta (production **`https://watchlist.maulbogat.com`**, **`/watchlist-og.svg`**), favicon links (**`/watchlist-mark.svg`**, **`/favicon-32x32.png`**, **`/favicon-16x16.png`**, **`/apple-touch-icon.png`**); optional **Sentry** init + **`withErrorBoundary`** when **`VITE_SENTRY_DSN`** is set; mounts React (`App` → routes → **`WatchlistAuthGate`** / **`JoinPage`** / **`JoinAppPage`** / **`AdminPage`**). | — | — | Google Fonts (from HTML); optional **Sentry** browser SDK |
-| `src/pages/AdminPage.tsx` | Admin-only dashboard: **header** link **Switch to prod** / **Switch to local** (other admin tab; prod URL from **`VITE_APP_ORIGIN`** or default **`https://watchlist.maulbogat.com`**), **ACTIVITY (LAST 24H)** card (**`GET /api/admin/external-status?service=axiom`** — Axiom **`watchlist-prod`** aggregates), **SENTRY — LAST 24H** (**`?service=sentry`** — unresolved issue count), **Data Quality** (**`titleRegistry`** field-gap counts; **titles not on any list** uses **Scan now** → **`GET /api/admin/catalog-orphans`** (not on initial load), with results held in TanStack Query + **`sessionStorage`** for the tab session; per-row remove (**`POST /api/admin/delete-registry-orphan`**) updates counts/list locally without re-scanning orphans; optional **`meta/catalogHealthExclusions`** filters missing-`tmdbId` stats; **`POST /api/admin/catalog-health`** per-title thumb fix; **Refresh** refetches **`titleRegistry`** stats only), Firestore read-quota bars (**`meta/usageStats`** via **`getFirestoreUsageStats`**), **Upcoming Check Job** (**`checkUpcomingEnabled`** via **`GET`/`POST /api/admin/job-config`** via **`src/firebase.ts`**), **GitHub Backup** (workflow status **`/api/admin/external-status?service=github`**, optional server **`GITHUB_TOKEN`**; **scheduled JSON export** on/off via **`githubBackupEnabled`** on same **`job-config`** path), **GCS** + **Vercel** deployment status (Deployments card **Open deployments** → **`https://vercel.com/maulbogats-projects/watchlist/deployments`** unless **`VITE_DEPLOYMENTS_URL`** is set), **Service Links** (Vercel env vars, Meta WhatsApp console, Google Cloud billing + project dashboard + **GCS** **`movie-trailer-site-backups`** + **Cloud Scheduler** for **`firestore-daily-export`**, Firebase, etc.). | **`titleRegistry`** (client read + **`getCountFromServer`** / **`getDocs`** with field projection), **`meta/usageStats`**, **`meta/catalogHealthExclusions`** (admin UID), `fetch` to admin APIs | — | `fetch` → **`/api/admin/*`** (**`external-status`**, **`job-config`**, **`catalog-health`**, **`catalog-orphans`**, **`delete-registry-orphan`**); external HTTPS links |
+| `src/pages/AdminPage.tsx` | Admin-only dashboard: **header** link **Switch to prod** / **Switch to local** (other admin tab; prod URL from **`VITE_APP_ORIGIN`** or default **`https://watchlist.maulbogat.com`**), **ACTIVITY (LAST 24H)** card (**`GET /api/admin/external-status?service=axiom`** — Axiom **`watchlist-prod`** aggregates), **SENTRY — LAST 24H** (**`?service=sentry`** — unresolved issue count), **Data Quality** (**`titleRegistry`** field-gap counts; **titles not on any list** uses **Scan now** → **`GET /api/admin/catalog-orphans`** (not on initial load), with results held in TanStack Query + **`sessionStorage`** for the tab session; per-row remove (**`POST /api/admin/delete-registry-orphan`**) updates counts/list locally without re-scanning orphans; optional **`meta/catalogHealthExclusions`** filters missing-`tmdbId` stats; **`POST /api/admin/catalog-health`** per-title thumb fix; **Refresh** refetches **`titleRegistry`** stats only; Data Quality dropdowns with **0** items omit **Show/Hide** (static header); **0 titles not on any list** keeps the list visible while rows are exiting after delete), Firestore read-quota bars (**`meta/usageStats`** via **`getFirestoreUsageStats`**), **Upcoming Check Job** (**`checkUpcomingEnabled`** via **`GET`/`POST /api/admin/job-config`** via **`src/firebase.ts`**), **GitHub Backup** (workflow status **`/api/admin/external-status?service=github`**, optional server **`GITHUB_TOKEN`**; **scheduled JSON export** on/off via **`githubBackupEnabled`** on same **`job-config`** path), **GCS** + **Vercel** deployment status (Deployments card **Open deployments** → **`https://vercel.com/maulbogats-projects/watchlist/deployments`** unless **`VITE_DEPLOYMENTS_URL`** is set), **Service Links** (Vercel env vars, Meta WhatsApp console, Google Cloud billing + project dashboard + **GCS** **`movie-trailer-site-backups`** + **Cloud Scheduler** for **`firestore-daily-export`**, Firebase, etc.). | **`titleRegistry`** (client read + **`getCountFromServer`** / **`getDocs`** with field projection), **`meta/usageStats`**, **`meta/catalogHealthExclusions`** (admin UID), `fetch` to admin APIs | — | `fetch` → **`/api/admin/*`** (**`external-status`**, **`job-config`**, **`catalog-health`**, **`catalog-orphans`**, **`delete-registry-orphan`**); external HTTPS links |
 | `src/components/WhatsAppSettings.tsx` | Dialog: list linked numbers, default list per number, connect flow; **`fetch`** → **`/api/whatsapp-verify`**. | Via `src/firebase.ts` | Via `src/firebase.ts` (`phoneIndex`, `users.phoneNumbers`) | WhatsApp verify API |
 | `src/components/BookmarkletSettings.tsx` | Dialog: bookmarklet instructions + draggable control (opened from profile menu). | — | — | — |
 | `src/components/AllowlistGate.tsx` | After sign-in, **`checkUserAllowed`** on **`allowedUsers`**; blocks watchlist children when denied. | `allowedUsers` | — | Firebase SDK |
@@ -626,7 +628,6 @@ erDiagram
     array items
     array watched
     array maybeLater
-    array archive
     string createdAt
   }
   SHARED_LIST {
@@ -637,7 +638,6 @@ erDiagram
     array items
     array watched
     array maybeLater
-    array archive
     string createdAt
   }
   USER_DOC }o--o{ SHARED_LIST : "uid in members"
@@ -706,7 +706,7 @@ flowchart TD
 
 8. **Composite indexes** — **`firestore.indexes.json`** commits a composite index on **`invites`** (`invitedEmail`, `usedAt`) for invite API queries. **`sharedLists`** still uses **`where("members", "array-contains", uid)`** (`getSharedListsForUser`); Firebase typically auto-provisions single-field support for that pattern.
 
-9. **“Recently Added” as a tab** — **Resolved (UI change).** Tabs are **All / To Watch / Watched / Archive**; **“Date Added (New → Old)”** and **“Date Added (Old → New)”** sort options in **`watchlistFilters`** cover the old “recently added” behavior via **`addedAt`** (with index tie-break). *Residual:* missing **`addedAt`** still uses **`NEGATIVE_INFINITY`** — legacy rows may order like array index among ties.
+9. **“Recently Added” as a tab** — **Resolved (UI change).** Tabs are **All / To Watch / Watched**; **“Date Added (New → Old)”** and **“Date Added (Old → New)”** sort options in **`watchlistFilters`** cover the old “recently added” behavior via **`addedAt`** (with index tie-break). *Residual:* missing **`addedAt`** still uses **`NEGATIVE_INFINITY`** — legacy rows may order like array index among ties.
 
 10. **`src/firebase.ts` public surface** — **Resolved / by design (audit).** Module defines internal **`db`** (`initFirestoreWithLocalCache()`) and loads Analytics via dynamic import **without** exporting either. The **`export { … }`** block lists only **named helpers** (auth exports, list CRUD, upcoming, job config, etc.). Import specifiers in TS often use **`./firebase.js`**; Vite resolves **`firebase.ts`**.
 

@@ -7,7 +7,7 @@
  * **Firestore writes:**
  * - **`titleRegistry/{registryId}`** — `set(merge)` with TMDB/OMDb-enriched fields (via `payloadForRegistry`).
  * - **`sharedLists/{listId}`** — when `listId` is present and user is a member: updates `items`, `watched`,
- *   `maybeLater`, `archive` (registry ref rows + status keys).
+ *   `maybeLater` (registry ref rows + status keys).
  * - **`users/{uid}`** + **`users/{uid}/personalLists/{id}`** — default path: may run legacy migration on `users/{uid}`,
  *   then merges the target personal list subdocument.
  * - **`upcomingAlerts`** — optional upsert via `runSingleTitleSync` when a TMDB id is available.
@@ -410,14 +410,12 @@ async function migrateLegacyPersonalListAdmin(db, uid) {
   const items = Array.isArray(data.items) ? data.items : [];
   const watched = Array.isArray(data.watched) ? data.watched : [];
   const maybeLater = Array.isArray(data.maybeLater) ? data.maybeLater : [];
-  const archive = Array.isArray(data.archive) ? data.archive : [];
   const listName = typeof data.listName === "string" ? data.listName.trim() : "";
 
   const hasPayload =
     items.length > 0 ||
     watched.length > 0 ||
     maybeLater.length > 0 ||
-    archive.length > 0 ||
     listName.length > 0;
 
   if (!hasPayload) return;
@@ -429,7 +427,6 @@ async function migrateLegacyPersonalListAdmin(db, uid) {
     items,
     watched,
     maybeLater,
-    archive,
     createdAt: new Date().toISOString(),
   });
   await userRef.update({
@@ -677,13 +674,12 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
     const items = Array.isArray(listData.items) ? [...listData.items] : [];
     let watched = Array.isArray(listData.watched) ? [...listData.watched] : [];
     let maybeLater = Array.isArray(listData.maybeLater) ? [...listData.maybeLater] : [];
-    let archive = Array.isArray(listData.archive) ? [...listData.archive] : [];
 
     const idx = findItemIndex(items);
     const statusKey = idx >= 0 ? listKey(items[idx]) : registryId;
 
     if (idx >= 0) {
-      if (watched.includes(statusKey) || maybeLater.includes(statusKey) || archive.includes(statusKey)) {
+      if (watched.includes(statusKey) || maybeLater.includes(statusKey)) {
         return { statusCode: 200, body: { ok: true, added: false, message: `"${movie.title}" is already in the list`, title: movie.title, year: movie.year ?? null } };
       }
       const existing = items[idx];
@@ -693,7 +689,6 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
       items[idx] = toStoredRegistryRef(registryId, existing);
       watched = remapStatusKeys(watched, oldKey, registryId);
       maybeLater = remapStatusKeys(maybeLater, oldKey, registryId);
-      archive = remapStatusKeys(archive, oldKey, registryId);
     } else {
       await writeRegistryMerge(movie);
       items.push(
@@ -705,7 +700,7 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
       );
     }
 
-    await listRef.set({ items, watched, maybeLater, archive }, { merge: true });
+    await listRef.set({ items, watched, maybeLater }, { merge: true });
     const regSnap = await regDoc.get();
     const mergedRow = { ...(regSnap.exists ? regSnap.data() : {}), ...movie, registryId };
     await syncUpcomingForAddedTitle(mergedRow);
@@ -742,7 +737,6 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
   const items = Array.isArray(data.items) ? [...data.items] : [];
   let watched = Array.isArray(data.watched) ? [...data.watched] : [];
   let maybeLater = Array.isArray(data.maybeLater) ? [...data.maybeLater] : [];
-  let archive = Array.isArray(data.archive) ? [...data.archive] : [];
 
   const idx = findItemIndex(items);
   const statusKey = idx >= 0 ? listKey(items[idx]) : registryId;
@@ -750,7 +744,7 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
   let shouldSyncUpcoming = false;
 
   if (idx >= 0) {
-    if (watched.includes(statusKey) || maybeLater.includes(statusKey) || archive.includes(statusKey)) {
+    if (watched.includes(statusKey) || maybeLater.includes(statusKey)) {
       return { statusCode: 200, body: { ok: true, added: false, message: `"${movie.title}" is already in your list`, title: movie.title, year: movie.year ?? null } };
     }
     const existing = items[idx];
@@ -776,14 +770,13 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
     items[idx] = toStoredRegistryRef(registryId, existing);
     watched = remapStatusKeys(watched, oldKey, registryId);
     maybeLater = remapStatusKeys(maybeLater, oldKey, registryId);
-    archive = remapStatusKeys(archive, oldKey, registryId);
   } else {
     await writeRegistryMerge(movie);
     items.push(toStoredRegistryRef(registryId));
     if (movie.tmdbId != null && movie.tmdbId !== "") shouldSyncUpcoming = true;
   }
 
-  await plRef.set({ items, watched, maybeLater, archive }, { merge: true });
+  await plRef.set({ items, watched, maybeLater }, { merge: true });
 
   if (shouldSyncUpcoming || idx < 0) {
     const regSnap = await regDoc.get();

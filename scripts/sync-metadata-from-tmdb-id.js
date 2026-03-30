@@ -15,7 +15,7 @@
  * Requires: TMDB_API_KEY in .env
  * Report: backups/sync-metadata-from-tmdb-report.txt
  *
- * Renames movieKey in watched/maybeLater/archive when title/year change.
+ * Renames movieKey in watched/maybeLater when title/year change.
  */
 import "dotenv/config";
 import { readFileSync, writeFileSync, existsSync } from "fs";
@@ -172,7 +172,7 @@ async function fetchDetailsByTmdbId(id, apiKey, hint) {
 
 function replaceKeyEverywhere(backup, oldKey, newKey) {
   if (!oldKey || oldKey === newKey) return;
-  const fields = ["watched", "maybeLater", "archive"];
+  const fields = ["watched", "maybeLater"];
 
   function patchDoc(doc) {
     if (!doc || typeof doc !== "object") return;

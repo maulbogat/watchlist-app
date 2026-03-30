@@ -147,7 +147,6 @@ export function filterTitles(
     if (filters.currentStatus === "all") return true;
     const s = m.status || "to-watch";
     if (filters.currentStatus === "to-watch") return s === "to-watch" || s === "maybe-later";
-    if (filters.currentStatus === "archive") return s === "archive";
     return s === filters.currentStatus;
   });
   if (filters.currentGenre) {

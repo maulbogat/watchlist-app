@@ -194,7 +194,6 @@ export function WatchlistToolbar({
                     { id: "tab-all", status: "all", label: "All" },
                     { id: "tab-to-watch", status: "to-watch", label: STATUS_LABELS["to-watch"] },
                     { id: "tab-watched", status: "watched", label: STATUS_LABELS.watched },
-                    { id: "tab-archive", status: "archive", label: STATUS_LABELS.archive },
                   ].map(({ id, status, label }) => {
                     const active = currentStatus === status;
                     return (
