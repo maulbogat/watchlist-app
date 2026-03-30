@@ -144,8 +144,11 @@ export function filterTitles(
       : listMovies.filter((m) => m.type === filters.currentFilter);
   list = list.filter((m) => matchesAddedBy(m));
   list = list.filter((m) => {
-    if (filters.currentStatus === "all") return true;
     const s = m.status || "to-watch";
+    if (filters.currentStatus === "archive") return s === "archive";
+    // Non-archive tabs never show archived titles.
+    if (s === "archive") return false;
+    if (filters.currentStatus === "all") return true;
     if (filters.currentStatus === "to-watch") return s === "to-watch" || s === "maybe-later";
     return s === filters.currentStatus;
   });

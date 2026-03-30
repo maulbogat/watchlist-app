@@ -123,7 +123,7 @@ export function TitleCard({
 
   const s = m.status || "to-watch";
   const displayStatus = s;
-  const statusTabKey = s === "watched" ? "watched" : "to-watch";
+  const statusTabKey = s === "watched" ? "watched" : s === "archive" ? "archive" : "to-watch";
   const statusIcons: Record<string, ReactElement> = {
     "to-watch": (
       <>
@@ -136,6 +136,13 @@ export function TitleCard({
       <>
         <circle cx="12" cy="12" r="9" fill="none" />
         <path d="M12 7v5l3 2" fill="none" />
+      </>
+    ),
+    archive: (
+      <>
+        <polyline points="21 8 21 21 3 21 3 8" fill="none" />
+        <rect x="1" y="3" width="22" height="5" fill="none" />
+        <line x1="10" y1="12" x2="14" y2="12" />
       </>
     ),
   };

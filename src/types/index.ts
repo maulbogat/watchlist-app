@@ -2,7 +2,7 @@
 
 export type MediaType = "movie" | "show";
 
-export type StatusKey = "to-watch" | "watched" | "maybe-later";
+export type StatusKey = "to-watch" | "watched" | "maybe-later" | "archive";
 
 export type FilterType = "both" | "movie" | "show";
 export type SortType = "title-asc" | "release-desc" | "added-desc" | "added-asc";
@@ -43,6 +43,7 @@ export interface PersonalList {
   items?: WatchlistItem[];
   watched?: string[];
   maybeLater?: string[];
+  archive?: string[];
   createdAt?: string;
 }
 
@@ -54,6 +55,7 @@ export interface SharedList {
   items?: WatchlistItem[];
   watched?: string[];
   maybeLater?: string[];
+  archive?: string[];
   createdAt?: string;
 }
 
@@ -116,6 +118,7 @@ export interface StatusData {
   items: FirestoreListRow[];
   watched: string[];
   maybeLater: string[];
+  archive: string[];
   listName: string;
   defaultPersonalListId: string | null;
   country: string | null;

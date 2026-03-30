@@ -247,6 +247,7 @@ async function firestoreOpWithRetry(fn, label = "firestore") {
  */
 function registryDocToRow(data) {
   if (!data || typeof data !== "object") return null;
+  if (data.listStatus === "archive") return null;
   const t = data.tmdbId;
   if (t == null || t === "") return null;
   const n = Number(t);

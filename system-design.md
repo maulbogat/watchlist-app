@@ -105,6 +105,7 @@ Canonical metadata per title (one doc per stable id). **Writes:** Admin SDK only
 | `services` | `array` of `string` | Watch **provider names** for the user’s **watch region** at add time (TMDB **`watch/providers`**); empty array when unknown or OMDb-only. |
 | `servicesByRegion` | `object` or null | Optional map **`{ "IL": ["Netflix", …], … }`**; populated by maintenance scripts, not by **`add-from-imdb`**. |
 | `originalLanguage` | `string` or null | ISO **639-1**, **lowercase**, from TMDB **`original_language`** when TMDB enrichment runs. |
+| `listStatus` | `'to-watch'` \| `'watched'` \| `'archive'` \| `'maybe-later'` \| null | Highest-priority status across all lists. Written by client mutations. Used by `check-upcoming` to skip archived titles. Priority: `archive` > `watched` > `to-watch` > `maybe-later`. |
 
 The field table reflects the **intended** schema from the **`add-from-imdb`** enrichment path. Individual documents may carry **additional** legacy or script-applied keys not listed here — the table is the **write-path contract**, not a guarantee of document shape.
 

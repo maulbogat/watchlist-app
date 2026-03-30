@@ -42,6 +42,7 @@ import type {
   PersonalList,
   SharedList,
   StatusData,
+  StatusKey,
   UpcomingAlert,
   UserProfile,
   WatchlistItem,
@@ -251,7 +252,8 @@ async function bulkGetTitleRegistryDocData(
 async function hydrateListItemsFromRegistry(
   items: readonly ListRowForHydrate[] | undefined,
   watchedSet: Set<string>,
-  maybeLaterSet: Set<string>
+  maybeLaterSet: Set<string>,
+  archiveSet: Set<string> = new Set()
 ): Promise<WatchlistItem[]> {
   const refs: ListRowForHydrate[] = [];
   const legacy: ListRowForHydrate[] = [];
@@ -289,7 +291,8 @@ async function hydrateListItemsFromRegistry(
     if (rowAddedByPhoto) meta.addedByPhotoUrl = rowAddedByPhoto;
     else delete meta.addedByPhotoUrl;
     let status: WatchlistItem["status"] = "to-watch";
-    if (watchedSet.has(rid)) status = "watched";
+    if (archiveSet.has(rid)) status = "archive";
+    else if (watchedSet.has(rid)) status = "watched";
     else if (maybeLaterSet.has(rid)) status = "maybe-later";
     const mediaType: MediaType = meta.type === "show" ? "show" : "movie";
     const rowAddedBy = addedByUidFromListRow(r);
@@ -331,7 +334,8 @@ async function hydrateListItemsFromRegistry(
   for (const m of legacyMerged) {
     const k = titleYearKey(m);
     let status: WatchlistItem["status"] = "to-watch";
-    if (watchedSet.has(k)) status = "watched";
+    if (archiveSet.has(k)) status = "archive";
+    else if (watchedSet.has(k)) status = "watched";
     else if (maybeLaterSet.has(k)) status = "maybe-later";
     // Legacy embedded rows: shape varies; runtime matches historical Firestore embeds.
     const legacyMeta = m as Record<string, unknown>;
@@ -452,6 +456,7 @@ async function getStatusData(uid: string): Promise<StatusData> {
   let items: FirestoreListRow[] = [];
   let watched: string[] = [];
   let maybeLater: string[] = [];
+  let archive: string[] = [];
   let listName = "";
   if (defaultId) {
     const plSnap = await getDoc(doc(db, "users", uid, "personalLists", defaultId));
@@ -461,6 +466,7 @@ async function getStatusData(uid: string): Promise<StatusData> {
       items = (Array.isArray(ld.items) ? ld.items : []) as FirestoreListRow[];
       watched = (Array.isArray(ld.watched) ? ld.watched : []).map((k) => String(k));
       maybeLater = (Array.isArray(ld.maybeLater) ? ld.maybeLater : []).map((k) => String(k));
+      archive = (Array.isArray(ld.archive) ? ld.archive : []).map((k) => String(k));
       listName = typeof ld.name === "string" ? ld.name.trim() : "";
     }
   }
@@ -476,6 +482,7 @@ async function getStatusData(uid: string): Promise<StatusData> {
     items,
     watched,
     maybeLater,
+    archive,
     listName,
     defaultPersonalListId: defaultId || null,
     country: data.country != null ? String(data.country) : null,
@@ -673,6 +680,7 @@ async function setStatus(uid: string, key: string, status: string): Promise<void
   const removeFromAll = {
     watched: arrayRemove(key),
     maybeLater: arrayRemove(key),
+    archive: arrayRemove(key),
   };
   if (status === "to-watch") {
     await setDoc(ref, removeFromAll, { merge: true });
@@ -684,6 +692,10 @@ async function setStatus(uid: string, key: string, status: string): Promise<void
   }
   if (status === "maybe-later") {
     await setDoc(ref, { ...removeFromAll, maybeLater: arrayUnion(key) }, { merge: true });
+    return;
+  }
+  if (status === "archive") {
+    await setDoc(ref, { ...removeFromAll, archive: arrayUnion(key) }, { merge: true });
     return;
   }
   await setDoc(ref, removeFromAll, { merge: true });
@@ -703,6 +715,7 @@ async function removeTitle(uid: string, key: string): Promise<void> {
       items,
       watched: arrayRemove(key),
       maybeLater: arrayRemove(key),
+      archive: arrayRemove(key),
     },
     { merge: true }
   );
@@ -764,7 +777,8 @@ async function getSharedListMovies(listId: string): Promise<WatchlistItem[]> {
   const items = Array.isArray(data.items) ? data.items : [];
   const watchedSet = new Set((data.watched ?? []).map((k) => String(k)));
   const maybeLaterSet = new Set((data.maybeLater ?? []).map((k) => String(k)));
-  const hydrated = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet);
+  const archiveSet = new Set((data.archive ?? []).map((k) => String(k)));
+  const hydrated = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
   const movies = await mergeAddedByDisplayNamesFromUsers(hydrated);
   void logEvent({
     type: "firestore.read",
@@ -780,6 +794,7 @@ async function setSharedListStatus(listId: string, key: string, status: string):
   const removeFromAll = {
     watched: arrayRemove(key),
     maybeLater: arrayRemove(key),
+    archive: arrayRemove(key),
   };
   if (status === "to-watch") {
     await setDoc(ref, removeFromAll, { merge: true });
@@ -791,6 +806,10 @@ async function setSharedListStatus(listId: string, key: string, status: string):
   }
   if (status === "maybe-later") {
     await setDoc(ref, { ...removeFromAll, maybeLater: arrayUnion(key) }, { merge: true });
+    return;
+  }
+  if (status === "archive") {
+    await setDoc(ref, { ...removeFromAll, archive: arrayUnion(key) }, { merge: true });
     return;
   }
   await setDoc(ref, removeFromAll, { merge: true });
@@ -808,6 +827,7 @@ async function removeFromSharedList(listId: string, key: string): Promise<void> 
       items,
       watched: arrayRemove(key),
       maybeLater: arrayRemove(key),
+      archive: arrayRemove(key),
     },
     { merge: true }
   );
@@ -1019,7 +1039,10 @@ async function getPersonalListMovies(uid: string, listId: string): Promise<Watch
     const maybeLaterSet = new Set(
       (Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k))
     );
-    const movies = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet);
+    const archiveSet = new Set(
+      (Array.isArray(data.archive) ? data.archive : []).map((k) => String(k))
+    );
+    const movies = await hydrateListItemsFromRegistry(items, watchedSet, maybeLaterSet, archiveSet);
     void logEvent({
       type: "firestore.read",
       collection: "personalLists",
@@ -1055,6 +1078,7 @@ async function setPersonalListStatus(
   const removeFromAll = {
     watched: arrayRemove(key),
     maybeLater: arrayRemove(key),
+    archive: arrayRemove(key),
   };
   if (status === "to-watch") {
     await setDoc(ref, removeFromAll, { merge: true });
@@ -1066,6 +1090,10 @@ async function setPersonalListStatus(
   }
   if (status === "maybe-later") {
     await setDoc(ref, { ...removeFromAll, maybeLater: arrayUnion(key) }, { merge: true });
+    return;
+  }
+  if (status === "archive") {
+    await setDoc(ref, { ...removeFromAll, archive: arrayUnion(key) }, { merge: true });
     return;
   }
   await setDoc(ref, removeFromAll, { merge: true });
@@ -1087,6 +1115,7 @@ async function removeFromPersonalList(uid: string, listId: string, key: string):
       items,
       watched: arrayRemove(key),
       maybeLater: arrayRemove(key),
+      archive: arrayRemove(key),
     },
     { merge: true }
   );
@@ -1553,6 +1582,24 @@ async function setGithubBackupEnabledState(enabled: boolean): Promise<JobConfigS
     if (err instanceof Error) throw err;
     throw new Error(String(err || "Failed to update job config."));
   }
+}
+
+/**
+ * Write `listStatus` to `titleRegistry/{registryId}`.
+ * Called by client mutations after any status change or remove.
+ * Pass `null` to delete the field (title no longer in any list).
+ */
+export async function updateRegistryListStatus(
+  registryId: string,
+  status: StatusKey | null
+): Promise<void> {
+  if (!registryId) return;
+  const ref = doc(db, "titleRegistry", registryId);
+  await setDoc(
+    ref,
+    { listStatus: status === null ? deleteField() : status },
+    { merge: true }
+  );
 }
 
 export {

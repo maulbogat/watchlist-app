@@ -17,6 +17,7 @@ import {
   usePersonalLists,
   useSharedLists,
   useWatchlistMovies,
+  useArchiveMovies,
   invalidateUserListQueries,
 } from "../hooks/useWatchlist.js";
 import { useWatchlistSessionRestore } from "../hooks/useWatchlistSessionRestore.js";
@@ -115,11 +116,18 @@ export function WatchlistPage() {
     };
   }, [user?.uid, listsReady, personalQ.isSuccess, setUserCountryCode]);
 
+  const isArchiveTab = currentStatus === "archive";
+
   const moviesQ = useWatchlistMovies(user?.uid, currentListMode, {
-    enabled: listsReady,
+    enabled: listsReady && !isArchiveTab,
   });
 
-  const allMovies = moviesQ.data ?? [];
+  const archiveQ = useArchiveMovies(user?.uid, currentListMode, {
+    enabled: listsReady && isArchiveTab,
+  });
+
+  const activeQ = isArchiveTab ? archiveQ : moviesQ;
+  const allMovies = activeQ.data ?? [];
 
   useEffect(() => {
     if (!currentGenre) return;
@@ -205,7 +213,7 @@ export function WatchlistPage() {
   const viewerDisplayNameForCards = user.displayName?.trim() || user.email?.split("@")[0] || null;
 
   const initial = (user.displayName || user.email || "?").charAt(0).toUpperCase();
-  const watchlistBlocking = !listsReady || moviesQ.isPending;
+  const watchlistBlocking = !listsReady || activeQ.isPending;
 
   const countryLabelRow = useMemo(() => {
     const c = COUNTRIES.find((x) => x.code === userCountryCode);
@@ -417,12 +425,12 @@ export function WatchlistPage() {
         </div>
       </header>
 
-      {listsReady && !moviesQ.isError ? (
-        <UpcomingAlertsBar movies={allMovies} watchlistPending={moviesQ.isPending} />
+      {listsReady && !activeQ.isError ? (
+        <UpcomingAlertsBar movies={allMovies} watchlistPending={activeQ.isPending} />
       ) : null}
 
       <main className="content">
-        {moviesQ.isError ? (
+        {activeQ.isError ? (
           <div className="grid" id="grid">
             <div className="empty-state">Could not load your list.</div>
           </div>
