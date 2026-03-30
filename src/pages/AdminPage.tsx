@@ -1460,9 +1460,7 @@ export function AdminPage() {
                   {!hasCustomDeploymentsUrl ? (
                     <p className="admin-job-result">
                       Optional: set <code className="admin-deploy-code">VITE_DEPLOYMENTS_URL</code>{" "}
-                      for a custom deployments page link; optional{" "}
-                      <code className="admin-deploy-code">VITE_SITE_ID</code> for server env
-                      diagnostics.
+                      for a custom deployments page link.
                     </p>
                   ) : null}
                 </>

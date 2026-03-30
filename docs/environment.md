@@ -33,7 +33,6 @@ Vercel injects matching variables into the **build** process. They are compiled 
 | `VITE_APP_VERSION` | No | Shown in client logs |
 | `VITE_APP_ORIGIN` | No | Admin header prod/local switch and related fallbacks; override if needed (code default **`https://watchlist.maulbogat.com`**) |
 | `VITE_DEPLOYMENTS_URL` | No | Admin “Deployments” card link |
-| `VITE_SITE_ID` | No | Optional; **`admin-env-status`** reports whether a site id is configured (not a secret) |
 | `VITE_SENTRY_DSN` | No | **Sentry** browser SDK — **`src/main.tsx`**; no-op if unset; production-only when set (**`import.meta.env.PROD`**). User context: Firebase **`uid` only** (no email or display name). |
 
 **Optional Vite / CI (production build only):** when **`SENTRY_AUTH_TOKEN`** is set, **`vite.config.ts`** enables **`@sentry/vite-plugin`** and **`build.sourcemap`** so maps upload to Sentry; also set **`SENTRY_ORG`** and **`SENTRY_PROJECT`**. Omit locally if you do not upload source maps.

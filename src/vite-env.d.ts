@@ -12,8 +12,6 @@ interface ImportMetaEnv {
   readonly VITE_APP_ORIGIN?: string;
   /** Admin “Deployments” card (e.g. https://vercel.com/your-team/your-project/deployments). */
   readonly VITE_DEPLOYMENTS_URL?: string;
-  /** Optional id for `admin-env-status` SITE_ID flag (Vercel project id or any marker). */
-  readonly VITE_SITE_ID?: string;
   /** Sentry browser SDK DSN (client). Omit for a no-op. */
   readonly VITE_SENTRY_DSN?: string;
 }
