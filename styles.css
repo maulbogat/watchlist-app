@@ -3835,6 +3835,98 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   flex-shrink: 0;
 }
 
+/* Orphan catalog rows: exit animation + delete-in-progress affordances */
+.admin-dq-li.admin-dq-li--orphan {
+  overflow: hidden;
+  transform-origin: top center;
+  transition:
+    opacity 0.24s ease,
+    filter 0.24s ease,
+    transform 0.28s cubic-bezier(0.33, 1, 0.68, 1),
+    max-height 0.3s cubic-bezier(0.33, 1, 0.68, 1),
+    padding-block 0.26s ease,
+    border-bottom-color 0.2s ease,
+    margin-block 0.26s ease;
+  max-height: 4.75rem;
+}
+
+/* Blur only the label: `filter` on the row breaks transform animations on the spinner (Chrome). */
+.admin-dq-li.admin-dq-li--orphan-deleting {
+  pointer-events: none;
+}
+
+.admin-dq-li.admin-dq-li--orphan-deleting .admin-dq-li-text {
+  opacity: 0.45;
+  filter: blur(1px);
+}
+
+.admin-dq-li.admin-dq-li--orphan-exiting {
+  opacity: 0;
+  filter: blur(2px);
+  transform: scaleY(0.6) translateY(-6px);
+  max-height: 0;
+  padding-block: 0;
+  margin-block: 0;
+  border-bottom-color: transparent;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-dq-li.admin-dq-li--orphan {
+    transition-duration: 0.01ms;
+    transition-delay: 0s;
+  }
+
+  .admin-dq-li.admin-dq-li--orphan-exiting {
+    transform: none;
+  }
+}
+
+.admin-dq-orphan-delete {
+  flex-shrink: 0;
+  margin-inline-end: var(--space-1);
+  background-color: var(--color-bg) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--color-text-muted) !important;
+  box-shadow: none !important;
+}
+
+.admin-dq-orphan-delete:hover:not(:disabled) {
+  background-color: var(--color-surface-3) !important;
+  color: var(--color-red) !important;
+}
+
+.admin-dq-orphan-delete:disabled {
+  opacity: 1;
+}
+
+.admin-dq-orphan-delete--busy {
+  border-color: var(--color-gold) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-gold) 40%, transparent) !important;
+}
+
+@keyframes admin-dq-orphan-spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.admin-dq-orphan-delete__spinner {
+  display: block;
+  color: var(--color-gold);
+  transform-origin: center;
+  /* Avoid fighting the button's transition-all on child SVGs */
+  transition: none !important;
+  animation: admin-dq-orphan-spinner 0.65s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-dq-orphan-delete__spinner {
+    animation-duration: 1.25s;
+  }
+}
+
 .admin-skeleton {
   min-height: 92px;
   background: linear-gradient(90deg, var(--surface) 0%, rgba(255, 255, 255, 0.05) 50%, var(--surface) 100%);

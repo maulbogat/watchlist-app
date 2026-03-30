@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
+import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/shadcn-utils";
 import { useAppStore } from "../store/useAppStore.js";
 import { isAdmin } from "../config/admin.js";
 import { useAuthUser } from "../hooks/useAuthUser.js";
@@ -609,6 +615,34 @@ function formatUsageUpdatedAt(stats: FirestoreUsageStats | null | undefined): st
 
 const DQ_STAT_CARD_COUNT = 5;
 
+/** Orphan row shrink/fade-out duration before Firestore queries refetch (ms). */
+const ORPHAN_ROW_EXIT_MS = 300;
+
+/** Matches `MAX_ORPHANS_IN_RESPONSE` in `api/admin-catalog-orphans.js`. */
+const ADMIN_CATALOG_ORPHANS_CAP = 1500;
+
+/**
+ * Decrement orphan stats immediately after a successful delete so the stat card and
+ * "N titles not on any list" stay in sync with user expectation. The `orphans` list
+ * is left unchanged until refetch so the row can finish its exit animation.
+ */
+function applyOrphanDeletedToCatalogOrphansCache(queryClient: QueryClient): void {
+  queryClient.setQueryData<CatalogOrphansResponse>(["admin", "catalog-orphans"], (prev) => {
+    if (!prev?.ok) return prev;
+    const count = Math.max(0, prev.count - 1);
+    const registryDocCount = Math.max(0, prev.registryDocCount - 1);
+    const truncated = count > ADMIN_CATALOG_ORPHANS_CAP;
+    const omitted = truncated ? Math.max(0, count - ADMIN_CATALOG_ORPHANS_CAP) : 0;
+    return {
+      ...prev,
+      count,
+      registryDocCount,
+      truncated,
+      omitted,
+    };
+  });
+}
+
 async function fetchAdminExternalStatus<T extends { ok?: boolean; error?: string }>(
   path: string
 ): Promise<T> {
@@ -630,6 +664,7 @@ async function fetchAdminExternalStatus<T extends { ok?: boolean; error?: string
 
 export function AdminPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { loading: authLoading } = useAuthUser();
   const currentUser = useAppStore((s) => s.currentUser);
   const userIsAdmin = isAdmin(currentUser?.uid);
@@ -766,6 +801,58 @@ export function AdminPage() {
     orphans: false,
   });
   const [fixingThumbImdbId, setFixingThumbImdbId] = useState<string | null>(null);
+  const [orphanExitingIds, setOrphanExitingIds] = useState<string[]>([]);
+  const orphanExitTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    return () => {
+      for (const t of orphanExitTimersRef.current.values()) clearTimeout(t);
+      orphanExitTimersRef.current.clear();
+    };
+  }, []);
+
+  const deleteRegistryOrphanM = useMutation({
+    mutationFn: async (registryId: string) => {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not signed in");
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/admin-delete-registry-orphan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ registryId }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || `Request failed (${res.status})`);
+      }
+    },
+    onSuccess: (_void, registryId) => {
+      applyOrphanDeletedToCatalogOrphansCache(queryClient);
+      setOrphanExitingIds((prev) => (prev.includes(registryId) ? prev : [...prev, registryId]));
+      const prevTimer = orphanExitTimersRef.current.get(registryId);
+      if (prevTimer) clearTimeout(prevTimer);
+      const t = setTimeout(() => {
+        orphanExitTimersRef.current.delete(registryId);
+        void (async () => {
+          try {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ["admin", "catalog-orphans"] }),
+              queryClient.invalidateQueries({ queryKey: ["admin", "catalog-stats"] }),
+            ]);
+          } finally {
+            setOrphanExitingIds((prev) => prev.filter((id) => id !== registryId));
+          }
+        })();
+      }, ORPHAN_ROW_EXIT_MS);
+      orphanExitTimersRef.current.set(registryId, t);
+    },
+    onError: (err) => {
+      console.error("Delete registry orphan failed:", err);
+    },
+  });
 
   const fixCatalogThumb = useCallback(
     async (imdbId: string) => {
@@ -987,7 +1074,7 @@ export function AdminPage() {
   const includeOrphansCollapsible =
     !catalogOrphansQ.isPending &&
     !catalogOrphansQ.isError &&
-    catalogOrphansQ.data.count > 0;
+    (catalogOrphansQ.data.count > 0 || orphanExitingIds.length > 0);
 
   const dqGridItems = buildDqGridItems(dqVisiblePanels, includeOrphansCollapsible);
 
@@ -1832,13 +1919,46 @@ export function AdminPage() {
                           <code className="admin-dq-code">node scripts/catalog-not-on-any-list.mjs</code>.
                         </p>
                       ) : null}
-                      {catalogOrphansQ.data.orphans.map((row) => (
-                        <div key={row.registryId} className="admin-dq-li">
-                          <span className="admin-dq-li-text">
-                            {row.registryId} · {row.title} ({formatDqYear(row.year)})
-                          </span>
-                        </div>
-                      ))}
+                      {catalogOrphansQ.data.orphans.map((row) => {
+                        const isRowDeleting =
+                          deleteRegistryOrphanM.isPending &&
+                          deleteRegistryOrphanM.variables === row.registryId;
+                        const isRowExiting = orphanExitingIds.includes(row.registryId);
+                        return (
+                          <div
+                            key={row.registryId}
+                            className={cn(
+                              "admin-dq-li",
+                              "admin-dq-li--orphan",
+                              isRowDeleting && "admin-dq-li--orphan-deleting",
+                              isRowExiting && "admin-dq-li--orphan-exiting"
+                            )}
+                          >
+                            <span className="admin-dq-li-text">
+                              {row.registryId} · {row.title} ({formatDqYear(row.year)})
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                "admin-dq-orphan-delete",
+                                isRowDeleting && "admin-dq-orphan-delete--busy"
+                              )}
+                              disabled={isRowDeleting || isRowExiting}
+                              aria-label={`Remove ${row.title} from catalog`}
+                              title="Remove from catalog"
+                              onClick={() => deleteRegistryOrphanM.mutate(row.registryId)}
+                            >
+                              {isRowDeleting ? (
+                                <Loader2 className="size-4 admin-dq-orphan-delete__spinner" aria-hidden />
+                              ) : (
+                                <Trash2 className="size-4" aria-hidden />
+                              )}
+                            </Button>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
