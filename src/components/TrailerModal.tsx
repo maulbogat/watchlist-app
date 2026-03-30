@@ -156,7 +156,6 @@ export function TrailerModal() {
   const tabKey: StatusKey =
     raw === "watched" ? "watched"
     : raw === "archive" ? "archive"
-    : raw === "maybe-later" ? "maybe-later"
     : "to-watch";
 
   function close() {
@@ -176,7 +175,6 @@ export function TrailerModal() {
     const current: StatusKey =
       raw === "watched" ? "watched"
       : raw === "archive" ? "archive"
-      : raw === "maybe-later" ? "maybe-later"
       : "to-watch";
     if (st === current) {
       setStatusOpen(false);
@@ -366,7 +364,7 @@ export function TrailerModal() {
                 className={`modal-action-dropdown-panel${statusOpen ? " open" : ""}`}
                 role="menu"
               >
-                {(["to-watch", "watched", "archive", "maybe-later"] as StatusKey[]).map((st) => {
+                {(["to-watch", "watched", "archive"] as StatusKey[]).map((st) => {
                   const isActive = st === tabKey;
                   return (
                     <button
