@@ -1471,7 +1471,7 @@ async function getFirestoreUsageStats(): Promise<FirestoreUsageStats | null> {
 
 async function getJobConfigState(): Promise<JobConfigState> {
   try {
-    const res = await fetch("/api/admin-job-config", {
+    const res = await fetch("/api/admin/job-config", {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });
@@ -1506,7 +1506,7 @@ async function getJobConfigState(): Promise<JobConfigState> {
 
 async function setCheckUpcomingEnabledState(enabled: boolean): Promise<JobConfigState> {
   try {
-    const res = await fetch("/api/admin-job-config", {
+    const res = await fetch("/api/admin/job-config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ checkUpcomingEnabled: enabled }),
@@ -1542,7 +1542,7 @@ async function setCheckUpcomingEnabledState(enabled: boolean): Promise<JobConfig
 
 async function setGithubBackupEnabledState(enabled: boolean): Promise<JobConfigState> {
   try {
-    const res = await fetch("/api/admin-job-config", {
+    const res = await fetch("/api/admin/job-config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ githubBackupEnabled: enabled }),

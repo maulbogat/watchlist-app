@@ -2,7 +2,7 @@
  * Catalog orphan scan: titleRegistry docs whose id is never referenced as `registryId`
  * on any sharedLists or `users/{uid}/personalLists` list doc (plus legacy `users.items`).
  *
- * Used by `api/admin-catalog-orphans.js`, `api/admin-delete-registry-orphan.js`, and `scripts/catalog-not-on-any-list.mjs`.
+ * Used by `api/admin/[segment].js` (catalog-orphans + delete-registry-orphan) and `scripts/catalog-not-on-any-list.mjs`.
  *
  * @param {import("firebase-admin/firestore").Firestore} db
  * @returns {Promise<{ orphanIds: string[]; allRegistryIds: string[]; referencedIds: string[]; registryDocCount: number; referencedDistinctCount: number }>}

@@ -259,7 +259,7 @@ type VercelDeploymentStatusResponse = {
   vercelHttpStatus?: number;
 };
 
-/** Success payload from `GET /api/external-status?service=gcs` (errors throw from `fetchAdminExternalStatus`). */
+/** Success payload from `GET /api/admin/external-status?service=gcs` (errors throw from `fetchAdminExternalStatus`). */
 type GcsBackupStatusResponse = {
   ok: true;
   lastExportAt: string;
@@ -276,7 +276,7 @@ const AXIOM_ACTIVITY_DASHBOARD_URL = "https://app.axiom.co/maulbogat-riv8/dashbo
 const FIREBASE_FIRESTORE_USAGE_CONSOLE_URL =
   "https://console.firebase.google.com/u/0/project/movie-trailer-site/firestore/usage";
 
-/** Success payload from `GET /api/external-status?service=axiom` (errors throw from `fetchAdminExternalStatus`). */
+/** Success payload from `GET /api/admin/external-status?service=axiom` (errors throw from `fetchAdminExternalStatus`). */
 type AxiomActivityResponse = {
   ok: true;
   firestoreReads: number;
@@ -292,7 +292,7 @@ const ACTIVITY_STAT_CARD_COUNT = 4;
 /** Admin Sentry card — issues list (same org as Service Links). */
 const SENTRY_ISSUES_HUB_URL = "https://maulbogat.sentry.io/issues/";
 
-/** Success payload from `GET /api/external-status?service=sentry` (errors throw from `fetchAdminExternalStatus`). */
+/** Success payload from `GET /api/admin/external-status?service=sentry` (errors throw from `fetchAdminExternalStatus`). */
 type SentryIssuesSummaryResponse = {
   ok: true;
   errorCount: number;
@@ -426,7 +426,7 @@ const SERVICE_LINKS: readonly AdminServiceLinkEntry[] = [
 
 const rawViteDeploymentsUrl = (import.meta.env.VITE_DEPLOYMENTS_URL as string | undefined)?.trim();
 const deploymentsUrl =
-  rawViteDeploymentsUrl || "https://vercel.com/maulbogats-projects/~/deployments";
+  rawViteDeploymentsUrl || "https://vercel.com/maulbogats-projects/watchlist/deployments";
 const hasCustomDeploymentsUrl = Boolean(rawViteDeploymentsUrl);
 
 type MaybeSelectable<T> = T & {
@@ -618,7 +618,7 @@ const DQ_STAT_CARD_COUNT = 5;
 /** Orphan row shrink/fade-out duration before Firestore queries refetch (ms). */
 const ORPHAN_ROW_EXIT_MS = 300;
 
-/** Matches `MAX_ORPHANS_IN_RESPONSE` in `api/admin-catalog-orphans.js`. */
+/** Matches `MAX_ORPHANS_IN_RESPONSE` in `api/admin/[segment].js` (catalog-orphans). */
 const ADMIN_CATALOG_ORPHANS_CAP = 1500;
 
 /**
@@ -790,7 +790,7 @@ export function AdminPage() {
     queryKey: ["admin", "catalog-orphans"],
     staleTime: 60 * 1000,
     enabled: !authLoading && userIsAdmin,
-    queryFn: () => fetchAdminExternalStatus<CatalogOrphansResponse>("/api/admin-catalog-orphans"),
+    queryFn: () => fetchAdminExternalStatus<CatalogOrphansResponse>("/api/admin/catalog-orphans"),
   });
 
   const [dqPanelsOpen, setDqPanelsOpen] = useState<Record<DqPanelOpenKey, boolean>>({
@@ -816,7 +816,7 @@ export function AdminPage() {
       const user = auth.currentUser;
       if (!user) throw new Error("Not signed in");
       const idToken = await user.getIdToken();
-      const res = await fetch("/api/admin-delete-registry-orphan", {
+      const res = await fetch("/api/admin/delete-registry-orphan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -861,7 +861,7 @@ export function AdminPage() {
       setFixingThumbImdbId(imdbId);
       try {
         const idToken = await user.getIdToken();
-        const res = await fetch("/api/catalog-health", {
+        const res = await fetch("/api/admin/catalog-health", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -905,7 +905,7 @@ export function AdminPage() {
     staleTime: 60 * 1000,
     enabled: !authLoading && userIsAdmin,
     queryFn: () =>
-      fetchAdminExternalStatus<GithubBackupStatusResponse>("/api/external-status?service=github"),
+      fetchAdminExternalStatus<GithubBackupStatusResponse>("/api/admin/external-status?service=github"),
   });
 
   const vercelDeploymentQ = useQuery<VercelDeploymentStatusResponse>({
@@ -915,7 +915,7 @@ export function AdminPage() {
     enabled: !authLoading && userIsAdmin,
     queryFn: () =>
       fetchAdminExternalStatus<VercelDeploymentStatusResponse>(
-        "/api/external-status?service=vercel"
+        "/api/admin/external-status?service=vercel"
       ),
   });
 
@@ -924,7 +924,7 @@ export function AdminPage() {
     staleTime: 60 * 1000,
     enabled: !authLoading && userIsAdmin,
     queryFn: () =>
-      fetchAdminExternalStatus<GcsBackupStatusResponse>("/api/external-status?service=gcs"),
+      fetchAdminExternalStatus<GcsBackupStatusResponse>("/api/admin/external-status?service=gcs"),
   });
 
   const axiomActivityQ = useQuery<AxiomActivityResponse>({
@@ -933,7 +933,7 @@ export function AdminPage() {
     refetchOnMount: "always",
     enabled: !authLoading && userIsAdmin,
     queryFn: () =>
-      fetchAdminExternalStatus<AxiomActivityResponse>("/api/external-status?service=axiom"),
+      fetchAdminExternalStatus<AxiomActivityResponse>("/api/admin/external-status?service=axiom"),
   });
 
   const sentryIssuesQ = useQuery<SentryIssuesSummaryResponse>({
@@ -942,7 +942,7 @@ export function AdminPage() {
     refetchOnMount: "always",
     enabled: !authLoading && userIsAdmin,
     queryFn: () =>
-      fetchAdminExternalStatus<SentryIssuesSummaryResponse>("/api/external-status?service=sentry"),
+      fetchAdminExternalStatus<SentryIssuesSummaryResponse>("/api/admin/external-status?service=sentry"),
   });
 
   const [runNowResult, setRunNowResult] = useState<string | null>(null);

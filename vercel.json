@@ -4,6 +4,7 @@
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
   "crons": [{ "path": "/api/check-upcoming", "schedule": "0 3 * * *" }],
   "functions": {
+    "api/admin/[segment].js": { "maxDuration": 60 },
     "api/check-upcoming.js": { "maxDuration": 60 },
     "api/trigger-upcoming-sync.js": { "maxDuration": 60 },
     "api/add-from-imdb.js": { "maxDuration": 60 },

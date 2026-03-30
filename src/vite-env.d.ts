@@ -10,7 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_MEASUREMENT_ID: string;
   /** Production origin for Admin “Switch to prod” links (default in code: https://watchlist.maulbogat.com). */
   readonly VITE_APP_ORIGIN?: string;
-  /** Admin “Deployments” card (e.g. https://vercel.com/your-team/your-project/deployments). */
+  /** Admin “Deployments” card (overrides default https://vercel.com/maulbogats-projects/watchlist/deployments). */
   readonly VITE_DEPLOYMENTS_URL?: string;
   /** Sentry browser SDK DSN (client). Omit for a no-op. */
   readonly VITE_SENTRY_DSN?: string;
