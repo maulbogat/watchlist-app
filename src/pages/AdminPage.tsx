@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/shadcn-utils";
 import { useAppStore } from "../store/useAppStore.js";
 import { isAdmin } from "../config/admin.js";
-import { useAuthUser } from "../hooks/useAuthUser.js";
 import {
   auth,
   getFirestoreUsageStats,
@@ -688,7 +687,6 @@ async function fetchAdminExternalStatus<T extends { ok?: boolean; error?: string
 export function AdminPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { loading: authLoading } = useAuthUser();
   const currentUser = useAppStore((s) => s.currentUser);
   const userIsAdmin = isAdmin(currentUser?.uid);
 
@@ -701,7 +699,7 @@ export function AdminPage() {
   const catalogStatsQ = useQuery<CatalogStats>({
     queryKey: ["admin", "catalog-stats"],
     staleTime: 60 * 1000,
-    enabled: !authLoading && userIsAdmin,
+    enabled: userIsAdmin,
     queryFn: async () => {
       const emptyLists = (): Pick<
         CatalogStats,
@@ -914,7 +912,7 @@ export function AdminPage() {
     queryKey: ["admin", "firestore-usage-stats"],
     staleTime: 0,
     refetchOnMount: "always",
-    enabled: !authLoading && userIsAdmin,
+    enabled: userIsAdmin,
     queryFn: getFirestoreUsageStats,
   });
 
@@ -923,14 +921,14 @@ export function AdminPage() {
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    enabled: !authLoading && userIsAdmin,
+    enabled: userIsAdmin,
     queryFn: () => getJobConfigState(),
   });
 
   const githubBackupQ = useQuery<GithubBackupStatusResponse>({
     queryKey: ["admin", "external-status", "github"],
     staleTime: 60 * 1000,
-    enabled: !authLoading && userIsAdmin,
+    enabled: userIsAdmin,
     queryFn: () =>
       fetchAdminExternalStatus<GithubBackupStatusResponse>(
         "/api/admin/external-status?service=github"
@@ -941,7 +939,7 @@ export function AdminPage() {
     queryKey: ["admin", "external-status", "vercel"],
     staleTime: 0,
     refetchOnMount: "always",
-    enabled: !authLoading && userIsAdmin,
+    enabled: userIsAdmin,
     queryFn: () =>
       fetchAdminExternalStatus<VercelDeploymentStatusResponse>(
         "/api/admin/external-status?service=vercel"
@@ -951,7 +949,7 @@ export function AdminPage() {
   const gcsBackupQ = useQuery<GcsBackupStatusResponse>({
     queryKey: ["admin", "external-status", "gcs"],
     staleTime: 60 * 1000,
-    enabled: !authLoading && userIsAdmin,
+    enabled: userIsAdmin,
     queryFn: () =>
       fetchAdminExternalStatus<GcsBackupStatusResponse>("/api/admin/external-status?service=gcs"),
   });
@@ -960,7 +958,7 @@ export function AdminPage() {
     queryKey: ["admin", "external-status", "axiom"],
     staleTime: 0,
     refetchOnMount: "always",
-    enabled: !authLoading && userIsAdmin,
+    enabled: userIsAdmin,
     queryFn: () =>
       fetchAdminExternalStatus<AxiomActivityResponse>("/api/admin/external-status?service=axiom"),
   });
@@ -969,7 +967,7 @@ export function AdminPage() {
     queryKey: ["admin", "external-status", "sentry"],
     staleTime: 0,
     refetchOnMount: "always",
-    enabled: !authLoading && userIsAdmin,
+    enabled: userIsAdmin,
     queryFn: () =>
       fetchAdminExternalStatus<SentryIssuesSummaryResponse>(
         "/api/admin/external-status?service=sentry"
@@ -1105,10 +1103,6 @@ export function AdminPage() {
   const dqGridItems = buildDqGridItems(dqVisiblePanels, userIsAdmin);
   const catalogOrphansData = catalogOrphansQ.data;
   const hasCatalogOrphansScanResult = catalogOrphansData?.ok === true;
-
-  if (authLoading) {
-    return <div className="react-migration-shell">Loading…</div>;
-  }
 
   if (!userIsAdmin) {
     return <Navigate to="/" replace />;
@@ -1880,29 +1874,51 @@ export function AdminPage() {
                   : catalogOrphansData.orphans.length > 0;
                 return (
                   <div key="orphans" className="admin-dq-detail">
-                    {orphanExpandable ? (
-                      <button
-                        type="button"
-                        className="admin-dq-detail-toggle"
-                        aria-expanded={dqPanelsOpen.orphans}
-                        onClick={() =>
-                          setDqPanelsOpen((prev) => ({ ...prev, orphans: !prev.orphans }))
-                        }
-                      >
-                        <span className="admin-dq-detail-toggle-label">
-                          {catalogOrphansData.count} titles not on any list
-                        </span>
-                        <span className="admin-dq-chevron">
-                          {dqPanelsOpen.orphans ? "▴ Hide" : "▾ Show"}
-                        </span>
-                      </button>
-                    ) : (
-                      <div className="admin-dq-detail-toggle--static" role="status">
-                        <span className="admin-dq-detail-toggle-label">
-                          {catalogOrphansData.count} titles not on any list
-                        </span>
+                    <div
+                      className="admin-dq-orphan-scan-row"
+                      role="status"
+                      aria-busy={orphanScanBusy}
+                      aria-live="polite"
+                    >
+                      <span className="admin-dq-detail-toggle-label">
+                        {catalogOrphansData.count} titles not on any list
+                      </span>
+                      <div className="admin-dq-orphan-scan-row-actions">
+                        {orphanScanBusy ? (
+                          <Loader2
+                            className="admin-dq-orphan-scan-spinner"
+                            aria-label="Scan in progress"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-secondary admin-dq-orphan-scan-btn"
+                            onClick={() => void runCatalogOrphansScan()}
+                          >
+                            Scan now
+                          </button>
+                        )}
+                        {orphanExpandable ? (
+                          <button
+                            type="button"
+                            className="admin-dq-orphan-show-toggle"
+                            aria-expanded={dqPanelsOpen.orphans}
+                            onClick={() =>
+                              setDqPanelsOpen((prev) => ({ ...prev, orphans: !prev.orphans }))
+                            }
+                          >
+                            <span className="admin-dq-chevron">
+                              {dqPanelsOpen.orphans ? "▴ Hide" : "▾ Show"}
+                            </span>
+                          </button>
+                        ) : null}
                       </div>
-                    )}
+                    </div>
+                    {orphanScanError ? (
+                      <p className="admin-dq-orphan-scan-error" role="alert">
+                        {orphanScanError}
+                      </p>
+                    ) : null}
                     {orphanBodyOpen ? (
                       <div className="admin-dq-detail-body admin-orphan-detail-body">
                         {catalogOrphansData.truncated ? (

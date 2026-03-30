@@ -21,17 +21,10 @@ import {
 import { useAppStore } from "./store/useAppStore.js";
 import { usePersonalLists, useSharedLists } from "./hooks/useWatchlist.js";
 import { Toaster } from "@/components/ui/toaster";
+import { AuthLoadingSplash } from "./components/AuthLoadingSplash.js";
 
 function isAuthError(err: unknown): err is { code?: string; message?: string } {
   return typeof err === "object" && err !== null;
-}
-
-function AuthLoadingSplash() {
-  return (
-    <div className="splash-screen">
-      <img src="/watchlist-mark.svg" alt="Watchlist" className="splash-logo" />
-    </div>
-  );
 }
 
 function WatchlistAuthGate() {

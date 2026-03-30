@@ -3404,6 +3404,47 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   color: var(--text);
 }
 
+.admin-dq-orphan-scan-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  /* Match .admin-dq-detail-toggle gap between label and chevron */
+  gap: var(--space-3);
+}
+
+/*
+ * Same affordance as .admin-dq-detail-toggle’s chevron (not .btn-ghost — that used
+ * --color-text-muted on the control and bolder inherited weight).
+ */
+.admin-dq-orphan-show-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.admin-dq-orphan-show-toggle:hover {
+  background: rgb(from var(--color-gold) r g b / 0.06);
+}
+
+.admin-dq-orphan-show-toggle .admin-dq-chevron {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+
 /* Explicit size: Lucide SVG default intrinsic ~24px was stretching the flex row past peer toggles. */
 .admin-dq-orphan-scan-spinner {
   flex: 0 0 auto;

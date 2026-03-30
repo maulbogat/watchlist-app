@@ -1,6 +1,18 @@
 import { useEffect, useState, type ReactNode } from "react";
+import type { User } from "firebase/auth";
 import { auth, checkUserAllowed, fbSignOut } from "../firebase.js";
 import { useAppStore } from "../store/useAppStore.js";
+import { AuthLoadingSplash } from "./AuthLoadingSplash.js";
+
+function allowlistCacheKey(u: User): string {
+  return `${u.uid}:${u.email ?? ""}`;
+}
+
+/**
+ * Survives React Strict Mode remounts so we do not flash the gate UI again after children
+ * have already rendered (local useState would reset `checking` to true on remount).
+ */
+let allowlistVerifiedCacheKey: string | null = null;
 
 /**
  * After Firebase Auth has a user, verifies `allowedUsers/{email}` before rendering children.
@@ -9,12 +21,24 @@ import { useAppStore } from "../store/useAppStore.js";
 export function AllowlistGate({ children }: { children: ReactNode }) {
   const user = useAppStore((s) => s.currentUser);
   const setAccessDenied = useAppStore((s) => s.setAccessDenied);
-  const [allowed, setAllowed] = useState(false);
-  const [checking, setChecking] = useState(true);
+  const initialKey = user ? allowlistCacheKey(user) : null;
+  const cacheHit = initialKey != null && initialKey === allowlistVerifiedCacheKey;
+  const [allowed, setAllowed] = useState(cacheHit);
+  const [checking, setChecking] = useState(!cacheHit);
 
   useEffect(() => {
     if (!user) {
+      allowlistVerifiedCacheKey = null;
       setAllowed(false);
+      setChecking(false);
+      return;
+    }
+
+    const key = allowlistCacheKey(user);
+    const userEmail = user.email;
+    if (key === allowlistVerifiedCacheKey) {
+      setAccessDenied(null);
+      setAllowed(true);
       setChecking(false);
       return;
     }
@@ -24,7 +48,7 @@ export function AllowlistGate({ children }: { children: ReactNode }) {
     setAllowed(false);
 
     (async () => {
-      if (!user.email) {
+      if (!userEmail) {
         setAccessDenied("no_email");
         await fbSignOut(auth);
         if (!cancelled) {
@@ -32,14 +56,16 @@ export function AllowlistGate({ children }: { children: ReactNode }) {
         }
         return;
       }
-      const ok = await checkUserAllowed(user.email);
+      const ok = await checkUserAllowed(userEmail);
       if (cancelled) return;
       if (!ok) {
+        allowlistVerifiedCacheKey = null;
         setAccessDenied("not_invited");
         await fbSignOut(auth);
         setChecking(false);
         return;
       }
+      allowlistVerifiedCacheKey = key;
       setAccessDenied(null);
       setAllowed(true);
       setChecking(false);
@@ -48,11 +74,11 @@ export function AllowlistGate({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.uid, user?.email, setAccessDenied]);
+  }, [user, setAccessDenied]);
 
   if (!user) return null;
   if (checking) {
-    return <div className="react-migration-shell">Loading…</div>;
+    return <AuthLoadingSplash />;
   }
   if (!allowed) return null;
   return <>{children}</>;
