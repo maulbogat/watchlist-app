@@ -3902,10 +3902,6 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   min-width: 0;
 }
 
-.admin-dq-fix-btn {
-  flex-shrink: 0;
-}
-
 /* Orphan catalog rows: exit animation + delete-in-progress affordances */
 .admin-dq-li.admin-dq-li--orphan {
   overflow: hidden;

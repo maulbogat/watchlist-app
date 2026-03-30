@@ -151,7 +151,6 @@ type DqPanelDef = {
   fieldLabel: string;
   count: number | "Error";
   rows: DQTitleRow[] | DQThumbRow[];
-  fixable?: boolean;
 };
 
 type DqGridItem = { kind: "panel"; def: DqPanelDef } | { kind: "orphans" };
@@ -178,7 +177,6 @@ function buildDqPanelDefs(d: CatalogStats): DqPanelDef[] {
       fieldLabel: "thumb",
       count: d.missingThumb,
       rows: d.missingThumbTitles,
-      fixable: true,
     },
     {
       key: "tmdbMedia",
@@ -847,7 +845,6 @@ export function AdminPage() {
     youtubeId: false,
     orphans: false,
   });
-  const [fixingThumbImdbId, setFixingThumbImdbId] = useState<string | null>(null);
   const [orphanExitingIds, setOrphanExitingIds] = useState<string[]>([]);
   /** Each row keeps its spinner until its own delete request settles (supports parallel deletes). */
   const [orphanDeleteInFlightIds, setOrphanDeleteInFlightIds] = useState<Set<string>>(
@@ -912,35 +909,6 @@ export function AdminPage() {
       console.error("Delete registry orphan failed:", err);
     },
   });
-
-  const fixCatalogThumb = useCallback(
-    async (imdbId: string) => {
-      const user = auth.currentUser;
-      if (!user) return;
-      setFixingThumbImdbId(imdbId);
-      try {
-        const idToken = await user.getIdToken();
-        const res = await fetch("/api/admin/catalog-health", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ imdbId }),
-        });
-        const data = (await res.json()) as { ok?: boolean; error?: string; thumb?: string };
-        if (!res.ok || data.ok === false) {
-          throw new Error(data.error || `Request failed (${res.status})`);
-        }
-        await catalogStatsQ.refetch();
-      } catch (e) {
-        console.error("Catalog thumb fix failed:", e);
-      } finally {
-        setFixingThumbImdbId(null);
-      }
-    },
-    [catalogStatsQ.refetch]
-  );
 
   const firestoreUsageQ = useQuery<FirestoreUsageStats | null>({
     queryKey: ["admin", "firestore-usage-stats"],
@@ -1897,34 +1865,6 @@ export function AdminPage() {
                             <span className="admin-dq-li-text">
                               {row.imdbId} · {row.title} ({formatDqYear(row.year)})
                             </span>
-                            {item.def.fixable && "tmdbId" in row ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="admin-dq-fix-btn"
-                                disabled={
-                                  fixingThumbImdbId === row.imdbId ||
-                                  row.tmdbId == null ||
-                                  catalogStatsQ.isFetching
-                                }
-                                title={
-                                  row.tmdbId == null
-                                    ? "Needs tmdbId on document before TMDB poster fetch"
-                                    : undefined
-                                }
-                                onClick={() => void fixCatalogThumb(row.imdbId)}
-                              >
-                                {fixingThumbImdbId === row.imdbId ? (
-                                  <>
-                                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                                    Fix…
-                                  </>
-                                ) : (
-                                  "Fix"
-                                )}
-                              </Button>
-                            ) : null}
                           </div>
                         ))}
                       </div>
