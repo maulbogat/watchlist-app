@@ -214,7 +214,7 @@ export function TitleCard({
             role="menu"
             aria-label="Move to"
           >
-            {STATUS_ORDER.map((st) => (
+            {(["to-watch", "watched", "archive", "maybe-later"] as StatusKey[]).map((st) => (
               <button
                 key={st}
                 type="button"
@@ -224,7 +224,11 @@ export function TitleCard({
                 onClick={(e) => {
                   e.stopPropagation();
                   const raw = m.status || "to-watch";
-                  const current = raw === "watched" ? "watched" : "to-watch";
+                  const current: StatusKey =
+                    raw === "watched" ? "watched"
+                    : raw === "archive" ? "archive"
+                    : raw === "maybe-later" ? "maybe-later"
+                    : "to-watch";
                   if (st !== current) onStatusChange(m, st);
                   onSetStatusOpenKey(null);
                 }}
