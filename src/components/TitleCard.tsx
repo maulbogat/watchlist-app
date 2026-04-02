@@ -222,7 +222,7 @@ export function TitleCard({
             role="menu"
             aria-label="Move to"
           >
-            {(["to-watch", "watched", "archive"] as StatusKey[]).map((st) => (
+            {STATUS_ORDER.map((st) => (
               <button
                 key={st}
                 type="button"
@@ -246,7 +246,7 @@ export function TitleCard({
           </div>
         </div>
         {thumbHTML}
-        {onToggleFavorite && (m.status === "watched" || m.status === "archive") ? (
+        {onToggleFavorite && m.status === "watched" ? (
           <button
             type="button"
             className={`btn-favorite${isFavorite ? " btn-favorite--active" : ""}`}

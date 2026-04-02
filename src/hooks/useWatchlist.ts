@@ -96,28 +96,6 @@ export function useSharedLists(
   });
 }
 
-/**
- * Lazy-loaded archive tab query. Only fetches when `enabled` is true (i.e. archive tab active).
- * Uses a shared list-mode query key so cache is reused if the user revisits the tab.
- */
-export function useArchiveMovies(
-  uid: string | undefined,
-  listMode: ListMode | undefined,
-  options: ListQueryOpts = {}
-): ReturnType<typeof useQuery<WatchlistItem[], Error>> {
-  const { enabled: enabledOpt, ...rest } = options;
-  const modeKey = listModeQueryKey(listMode);
-  const enabled = Boolean(uid) && modeKey[0] !== "none" && enabledOpt !== false;
-
-  return useQuery({
-    queryKey: ["watchlistMovies", uid, ...modeKey],
-    queryFn: () => fetchWatchlistMovies(uid, listMode),
-    enabled,
-    staleTime: 5 * 60 * 1000,
-    ...rest,
-  });
-}
-
 export function invalidateUserListQueries(
   queryClient: QueryClient,
   uid: string | undefined

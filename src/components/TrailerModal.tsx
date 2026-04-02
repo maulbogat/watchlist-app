@@ -19,6 +19,7 @@ import { getCurrentListLabel } from "../data/lists.js";
 import { displayListName, errorMessage } from "../lib/utils.js";
 import { logEvent } from "../lib/axiom-logger.js";
 import { getPersonalListMovies, listKey } from "../firebase.js";
+import { resolveStatusForCrossListAdd } from "../lib/resolve-add-item-status.js";
 import { toast } from "sonner";
 
 const MODAL_LANG_NAMES: Record<string, string> = {
@@ -222,13 +223,19 @@ export function TrailerModal() {
       if (currentlyInList) {
         await removeTitleFromListMutation.mutateAsync({ uid: currentUser.uid, listId, key, type });
       } else {
+        const status = resolveStatusForCrossListAdd(
+          m,
+          currentUser.uid,
+          currentListMode,
+          queryClient
+        );
         await addTitleMutation.mutateAsync({
           uid: currentUser.uid,
           listMode:
             type === "personal"
               ? { type: "personal", listId }
               : { type: "shared", listId, name: "" },
-          item: m,
+          item: { ...m, status },
         });
       }
     } catch (err: unknown) {
@@ -347,7 +354,7 @@ export function TrailerModal() {
           <div className="modal-footer-meta">
             {metaParts}
             {servicePart}
-            {uid && (tabKey === "watched" || tabKey === "archive") ? (
+            {uid && tabKey === "watched" ? (
               <button
                 type="button"
                 className={`btn-favorite modal-favorite-btn${favorites.has(listKey(m)) ? " btn-favorite--active" : ""}`}
@@ -383,7 +390,7 @@ export function TrailerModal() {
                 className={`modal-action-dropdown-panel${statusOpen ? " open" : ""}`}
                 role="menu"
               >
-                {(["to-watch", "watched", "archive"] as StatusKey[]).map((st) => {
+                {STATUS_ORDER.map((st) => {
                   const isActive = st === tabKey;
                   return (
                     <button

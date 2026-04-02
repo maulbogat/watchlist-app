@@ -867,10 +867,16 @@ async function addToSharedList(
   const maybeLater = new Set(
     (Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k))
   );
+  const archive = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
   const s = movie.status || "to-watch";
   if (s === "watched") watched.add(key);
   else if (s === "maybe-later") maybeLater.add(key);
-  await setDoc(ref, { items, watched: [...watched], maybeLater: [...maybeLater] }, { merge: true });
+  else if (s === "archive") archive.add(key);
+  await setDoc(
+    ref,
+    { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] },
+    { merge: true }
+  );
   // Keep `users/{uid}` in sync for other features; list rows carry denormalized attribution.
   if (cur && cur.uid === addedByUid) {
     const label = cur.displayName?.trim() || (cur.email ? cur.email.split("@")[0] : "") || "";
@@ -898,11 +904,13 @@ async function addToPersonalList(uid: string, listId: string, movie: WatchlistIt
     const maybeLater = new Set(
       (Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k))
     );
+    const archive = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
     if (s === "watched") watched.add(key);
     else if (s === "maybe-later") maybeLater.add(key);
+    else if (s === "archive") archive.add(key);
     await setDoc(
       ref,
-      { items, watched: [...watched], maybeLater: [...maybeLater] },
+      { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] },
       { merge: true }
     );
   } else {
@@ -921,11 +929,13 @@ async function addToPersonalList(uid: string, listId: string, movie: WatchlistIt
     const maybeLater = new Set(
       (Array.isArray(data.maybeLater) ? data.maybeLater : []).map((k) => String(k))
     );
+    const archive = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
     if (s === "watched") watched.add(key);
     else if (s === "maybe-later") maybeLater.add(key);
+    else if (s === "archive") archive.add(key);
     await setDoc(
       ref,
-      { items, watched: [...watched], maybeLater: [...maybeLater] },
+      { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] },
       { merge: true }
     );
   }
@@ -1638,8 +1648,9 @@ export function subscribeFavorites(
 
 /**
  * Write `listStatus` to `titleRegistry/{registryId}`.
- * Called by client mutations after any status change or remove.
- * Pass `null` to delete the field (title no longer in any list).
+ * Optional denormalized hint for scripts / maintenance (e.g. import jobs). **Not** updated by normal
+ * app mutations — status is list-scoped on `personalLists` / `sharedLists` only.
+ * Pass `null` to delete the field.
  */
 export async function updateRegistryListStatus(
   registryId: string,

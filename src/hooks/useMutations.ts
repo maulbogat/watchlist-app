@@ -2,14 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { invalidateUserListQueries, listModeQueryKey } from "./useWatchlist.js";
 import { addTitleToList, removeTitleFromList, setTitleStatus } from "../data/titles.js";
-import {
-  auth,
-  listKey,
-  removeFromPersonalList,
-  removeFromSharedList,
-  updateRegistryListStatus,
-  toggleFavorite,
-} from "../firebase.js";
+import { auth, listKey, removeFromPersonalList, removeFromSharedList, toggleFavorite } from "../firebase.js";
 import type {
   ListMode,
   PersonalList,
@@ -187,11 +180,10 @@ export function useSetTitleStatus() {
     onError: (_err, _vars, snapshot) => {
       restoreSnapshot(queryClient, snapshot);
     },
-    onSuccess: (_, { uid, listMode, key, status }) => {
+    onSuccess: (_, { uid, listMode }) => {
       if (isSharedMode(listMode)) {
         scheduleSharedBackgroundSync(queryClient, uid);
       }
-      void updateRegistryListStatus(key, status).catch(() => {});
     },
   });
 }
@@ -222,11 +214,10 @@ export function useRemoveTitle() {
       restoreSnapshot(queryClient, snapshot);
       invalidateListsContainingForMovie(queryClient, vars.uid, vars.key);
     },
-    onSuccess: (_, { uid, listMode, key }) => {
+    onSuccess: (_, { uid, listMode }) => {
       if (isSharedMode(listMode)) {
         scheduleSharedBackgroundSync(queryClient, uid);
       }
-      void updateRegistryListStatus(key, null).catch(() => {});
     },
   });
 }
@@ -319,11 +310,10 @@ export function useRemoveTitleFromList() {
       restoreSnapshot(queryClient, snapshot);
       invalidateListsContainingForMovie(queryClient, vars.uid, vars.key);
     },
-    onSuccess: (_, { uid, type, key }) => {
+    onSuccess: (_, { uid, type }) => {
       if (type === "shared") {
         scheduleSharedBackgroundSync(queryClient, uid);
       }
-      void updateRegistryListStatus(key, null).catch(() => {});
     },
   });
 }

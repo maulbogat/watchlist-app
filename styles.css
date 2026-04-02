@@ -8,7 +8,8 @@
  * Spacing:    --space-1 (4px), --space-2 (8px), --space-3 (12px), --space-4 (16px),
  *             --space-6 (24px), --space-8 (32px), --space-12 (48px)
  * Watchlist:  --watchlist-genre-popover-border (genre filter popover edge)
- * Admin matrix: --admin-matrix-head-row1-height (sticky second header row offset)
+ * Admin matrix: --admin-matrix-head-row1-height (sticky second header row offset);
+ *   --admin-matrix-scroll-max-height (scroll container height — required because overflow-x:auto on an ancestor breaks viewport-relative sticky)
  * Buttons:    .btn-primary, .btn-secondary, .btn-ghost, .btn-destructive
  * Sentry:     .sentry-error-boundary (global React error UI; uses surface/text/spacing tokens)
  *
@@ -88,8 +89,10 @@
   --radius-watchlist-card: 8px;
   --radius-watchlist-control: 6px;
   --watchlist-genre-popover-border: rgba(255, 255, 255, 0.08);
-  /* Admin list matrix: first thead row height — must match sticky `top` on second row */
-  --admin-matrix-head-row1-height: 4.75rem;
+  /* Admin list matrix: first thead row height — must match sticky `top` on second row (fixed row1 height avoids overlap into tbody) */
+  --admin-matrix-head-row1-height: 4.5rem;
+  /* Admin matrix: inner scrollport so thead `position:sticky` works (parent overflow cannot be only overflow-x:auto) */
+  --admin-matrix-scroll-max-height: calc(100dvh - 15rem);
 }
 
 :root, .dark {
@@ -3495,7 +3498,15 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 }
 
 .admin-matrix-scroll {
-  overflow-x: auto;
+  /*
+   * `overflow-x: auto` alone makes this a scroll container; browsers then treat overflow-y as
+   * non-visible, so sticky `th` stick to this box — but the box is as tall as the table, so there
+   * is no vertical scroll *inside* it and headers never pin. Bounded height + `overflow: auto`
+   * creates a real vertical scrollport; thead sticky tops are relative to this element.
+   */
+  overflow: auto;
+  max-height: max(14rem, calc(100vh - 15rem));
+  max-height: max(14rem, var(--admin-matrix-scroll-max-height));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -3514,8 +3525,18 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
 .admin-matrix-table {
   width: max-content;
   min-width: 100%;
-  border-collapse: collapse;
+  /*
+   * `border-collapse: collapse` + sticky `thead` often paints the first tbody row under the header
+   * (half-clipped title/radios). `separate` + zero spacing keeps grid lines without that overlap bug.
+   */
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: var(--text-xs);
+}
+
+/* Fills subpixel seams between sticky header rows (scroll container bg otherwise shows through) */
+.admin-matrix-table thead {
+  background-color: var(--color-surface-3);
 }
 
 .admin-matrix-th {
@@ -3528,33 +3549,41 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   color: var(--text);
 }
 
-/* Sticky thead: scoped to thead so tbody rows are unaffected */
-.admin-matrix-table thead .admin-matrix-thead-row1 th {
+/* Sticky thead: list-name row — fixed height must match row2 `top` (rowspan Title cell is not height-locked) */
+.admin-matrix-table thead .admin-matrix-thead-row1 th.admin-matrix-th--list {
   position: sticky;
   top: 0;
   z-index: 2;
-  min-height: var(--admin-matrix-head-row1-height);
+  height: var(--admin-matrix-head-row1-height);
   box-sizing: border-box;
+  overflow: hidden;
+  vertical-align: bottom;
+  background-clip: padding-box;
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-1);
+  /* Divider sits on bottom edge of this row (`.admin-matrix-th` border-bottom) — no row2 border-top = no seam/gap */
+}
+
+.admin-matrix-table thead .admin-matrix-thead-row1 th.admin-matrix-th--title {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  text-align: left;
+  min-width: 12rem;
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
+  vertical-align: middle;
+  background-clip: padding-box;
 }
 
 .admin-matrix-table thead .admin-matrix-thead-row2 th {
   position: sticky;
   top: var(--admin-matrix-head-row1-height);
   z-index: 2;
-}
-
-/* Title column: sticks left on horizontal scroll; stacks above list headers */
-.admin-matrix-table thead .admin-matrix-th--title {
-  left: 0;
-  z-index: 4;
-  text-align: left;
-  min-width: 12rem;
-  padding-left: var(--space-3);
-  padding-right: var(--space-3);
-}
-
-.admin-matrix-table thead .admin-matrix-thead-row2 .admin-matrix-th--title {
-  z-index: 5;
+  background-clip: padding-box;
+  padding-top: var(--space-1);
+  border-top: none;
 }
 
 .admin-matrix-th--list {
@@ -3582,10 +3611,6 @@ body:has(#upcoming-alerts-mount:not([hidden])) header {
   font-weight: 400;
   color: var(--color-text-muted);
   margin-top: var(--space-1);
-}
-
-.admin-matrix-subhead {
-  border-top: none;
 }
 
 .admin-matrix-th--choice {

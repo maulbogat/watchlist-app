@@ -13,12 +13,12 @@ import { getUserProfile, setUserCountry } from "../data/user.js";
 import { COUNTRIES } from "../countries.js";
 import { errorMessage } from "../lib/utils.js";
 import { logEvent } from "../lib/axiom-logger.js";
+import { persistFilterPreferences } from "../lib/storage.js";
 import { useAppStore } from "../store/useAppStore.js";
 import {
   usePersonalLists,
   useSharedLists,
   useWatchlistMovies,
-  useArchiveMovies,
   useFavorites,
   invalidateUserListQueries,
 } from "../hooks/useWatchlist.js";
@@ -120,18 +120,25 @@ export function WatchlistPage() {
     };
   }, [user?.uid, listsReady, personalQ.isSuccess, setUserCountryCode]);
 
-  const isArchiveTab = currentStatus === "archive";
+  useEffect(() => {
+    if (!user?.uid || currentStatus !== "archive") return;
+    const s = useAppStore.getState();
+    useAppStore.setState({ currentStatus: "to-watch" });
+    persistFilterPreferences(user, {
+      currentFilter: s.currentFilter,
+      currentGenre: s.currentGenre,
+      currentStatus: "to-watch",
+      currentSort: s.currentSort,
+      currentSearch: s.currentSearch,
+      currentAddedByUid: s.currentAddedByUid,
+    });
+  }, [user, currentStatus]);
 
   const moviesQ = useWatchlistMovies(user?.uid, currentListMode, {
-    enabled: listsReady && !isArchiveTab,
+    enabled: listsReady,
   });
 
-  const archiveQ = useArchiveMovies(user?.uid, currentListMode, {
-    enabled: listsReady && isArchiveTab,
-  });
-
-  const activeQ = isArchiveTab ? archiveQ : moviesQ;
-  const allMovies = activeQ.data ?? [];
+  const allMovies = moviesQ.data ?? [];
   const favorites = useFavorites(user?.uid);
 
   useEffect(() => {
@@ -220,7 +227,7 @@ export function WatchlistPage() {
   const viewerDisplayNameForCards = user.displayName?.trim() || user.email?.split("@")[0] || null;
 
   const initial = (user.displayName || user.email || "?").charAt(0).toUpperCase();
-  const watchlistBlocking = !listsReady || activeQ.isPending;
+  const watchlistBlocking = !listsReady || moviesQ.isPending;
 
   const countryLabelRow = useMemo(() => {
     const c = COUNTRIES.find((x) => x.code === userCountryCode);
@@ -432,20 +439,18 @@ export function WatchlistPage() {
         </div>
       </header>
 
-      {listsReady && !activeQ.isError ? (
+      {listsReady && !moviesQ.isError ? (
         <>
-          <UpcomingAlertsBar movies={allMovies} watchlistPending={activeQ.isPending} />
-          {!isArchiveTab ? (
-            <RecommendationsSection
-              movies={allMovies}
-              watchlistPending={activeQ.isPending}
-            />
-          ) : null}
+          <UpcomingAlertsBar movies={allMovies} watchlistPending={moviesQ.isPending} />
+          <RecommendationsSection
+            movies={allMovies}
+            watchlistPending={moviesQ.isPending}
+          />
         </>
       ) : null}
 
       <main className="content">
-        {activeQ.isError ? (
+        {moviesQ.isError ? (
           <div className="grid" id="grid">
             <div className="empty-state">Could not load your list.</div>
           </div>

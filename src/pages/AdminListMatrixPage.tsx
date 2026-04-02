@@ -173,7 +173,8 @@ export function AdminListMatrixPage() {
         <p className="admin-matrix-help">
           Each row is a catalog title. Each list is a column group with four choices: To watch
           (includes maybe-later), Watched, Archive, or Not on list. Changes apply only when you
-          click Submit.
+          click Submit. Scroll inside the table panel — header rows stay pinned while you move
+          through titles.
         </p>
         <div className="admin-matrix-toolbar">
           <label className="admin-matrix-filter">
@@ -267,7 +268,7 @@ export function AdminListMatrixPage() {
             <table className="admin-matrix-table">
               <thead>
                 <tr className="admin-matrix-thead-row1">
-                  <th scope="col" className="admin-matrix-th admin-matrix-th--title">
+                  <th rowSpan={2} scope="col" className="admin-matrix-th admin-matrix-th--title">
                     Title
                   </th>
                   {columns.map((c) => (
@@ -285,11 +286,6 @@ export function AdminListMatrixPage() {
                   ))}
                 </tr>
                 <tr className="admin-matrix-thead-row2">
-                  <th
-                    scope="col"
-                    className="admin-matrix-th admin-matrix-subhead admin-matrix-th--title"
-                    aria-label="Title"
-                  />
                   {columns.flatMap((c) =>
                     CHOICE_ORDER.map((choice) => (
                       <th

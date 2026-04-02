@@ -44,11 +44,11 @@ export function useWatchlistSessionRestore(
             nextStatus = "to-watch";
             nextSort = "added-desc";
           }
+          if (nextStatus === "archive") nextStatus = "to-watch";
           const validStatus =
             nextStatus === "all" ||
             nextStatus === "to-watch" ||
-            nextStatus === "watched" ||
-            nextStatus === "archive"
+            nextStatus === "watched"
               ? nextStatus
               : s.currentStatus;
           const validSort =

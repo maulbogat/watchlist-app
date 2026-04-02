@@ -18,7 +18,6 @@ import {
   getPersonalLists,
   getSharedListsForUser,
   listKey,
-  updateRegistryListStatus,
 } from "../firebase.js";
 import {
   matrixChoiceToStatusKey,
@@ -260,7 +259,6 @@ async function applyOneCellChange(
 
   if (to === "absent") {
     await removeTitleFromList(uid, listMode, registryId);
-    await updateRegistryListStatus(registryId, null).catch(() => {});
     return;
   }
 
@@ -270,12 +268,10 @@ async function applyOneCellChange(
     if (!item) throw new Error(`Cannot add ${registryId} without catalog metadata`);
     const addItem = enrichItemForSharedAdd(uid, col, { ...item, registryId, status: statusKey });
     await addTitleToList(uid, listMode, addItem);
-    await updateRegistryListStatus(registryId, statusKey).catch(() => {});
     return;
   }
 
   await setTitleStatus(uid, listMode, registryId, statusKey);
-  await updateRegistryListStatus(registryId, statusKey).catch(() => {});
 }
 
 export type MatrixSubmitDiff = {
