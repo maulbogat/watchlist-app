@@ -1,6 +1,6 @@
 # System Design Document
 
-This document describes the **Watchlist** app — **only what exists in this repository** (static site, Vercel **`api/*`** serverless routes, Firestore rules, Firebase client module, and operational scripts). It does not specify future or assumed behavior. **Firebase** and **GCS** resource names may still use the legacy id **`movie-trailer-site`** (unchangeable). **GitHub** repository **`maulbogat/watchlist`** (formerly **`maulbogat/watchlist-app`**; GitHub redirects the old remote). **Vercel** dashboard links in **Admin** use project slug **`watchlist`** unless you change them in **`AdminPage.tsx`**.
+This document describes the **Watchlist** app — **only what exists in this repository** (static site, Vercel **`api/*`** serverless routes, Firestore rules, Firebase client module, and operational scripts). It does not specify future or assumed behavior. **Firebase** and **GCS** resource names may still use the legacy id **`movie-trailer-site`** (unchangeable). **GitHub** source repository **`maulbogat/watchlist-app`** (the REST API uses this slug; **`GITHUB_REPO`** defaults to it for **`?service=github`**). Web **`github.com/maulbogat/watchlist`** may redirect in the browser but is not a valid **`repos/{owner}/{repo}`** path for the Actions API. **Vercel** dashboard links in **Admin** use project slug **`watchlist`** unless you change them in **`AdminPage.tsx`**.
 
 ---
 
@@ -18,7 +18,7 @@ This document describes the **Watchlist** app — **only what exists in this rep
 | **Geist (npm)** | **Geist Variable** for shadcn / component UI (`@theme` in **`styles.css`**). | **`@import "@fontsource-variable/geist"`** in **`styles.css`** (bundled by Vite). | None. | None. |
 | **maulbogat.com** | Verified **From** domain for invite email. | DNS at **Cloudflare Registrar**; domain + DNS records verified in **Resend** for outbound mail. | — | — |
 | **Google Cloud Storage** | Daily native **Firestore export** for **disaster recovery**. Bucket **`movie-trailer-site-backups`** (**europe-west1**). **Retention:** **30-day** lifecycle rule auto-deletes old exports. | **Cloud Scheduler** job **`firestore-daily-export`** at **4am UTC** daily (Firestore Admin export API; not this repo’s Vercel app or GitHub Actions JSON workflow). **Restore:** `gcloud firestore import gs://movie-trailer-site-backups/{folder}`. | **OAuth** token via **`firestore-scheduler`** service account. | None (configured in Google Cloud Console only). |
-| **Vercel** | Replaces **Netlify** for this project: static **`dist/`**, **9** serverless API routes (root **`api/*.js`** and **`api/admin/[segment].js`**), **Cron** **`/api/check-upcoming`** (**`vercel.json`** `0 3 * * *` = **03:00 UTC**); **Hobby** default is **12** serverless function slots — confirm capacity if you stay on that tier. | **Browser:** same-origin **`fetch`** to **`/api/*`**. **Server:** handlers wrapped by **`src/api-lib/vercel-adapter.js`** (Netlify-shaped handler compatibility, Node **`req`/`res`**). | Routes verify Firebase ID token where required. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional **`FIRESTORE_HOURLY_READ_LIMIT`**, **`FIRESTORE_DAILY_READ_LIMIT`**, optional **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_APP_SECRET`** (required for webhook POST), **`WHATSAPP_TOKEN`**, **`WHATSAPP_PHONE_NUMBER_ID`**, optional **`RESEND_API_KEY`**, **`RESEND_FROM_EMAIL`**, optional **`APP_PUBLIC_URL`** / **`VERCEL_URL`**, optional **`VERCEL_API_TOKEN`**, **`VERCEL_PROJECT_ID`** (Admin deployment status), optional **`GITHUB_TOKEN`**, optional **`GITHUB_REPO`** (default **`maulbogat/watchlist`**) (Admin GitHub Actions card), optional **`VITE_APP_ORIGIN`**, optional **`SENTRY_DSN`**, optional **`VITE_SENTRY_DSN`**; no `VITE_AXIOM_*`. |
+| **Vercel** | Replaces **Netlify** for this project: static **`dist/`**, **9** serverless API routes (root **`api/*.js`** and **`api/admin/[segment].js`**), **Cron** **`/api/check-upcoming`** (**`vercel.json`** `0 3 * * *` = **03:00 UTC**); **Hobby** default is **12** serverless function slots — confirm capacity if you stay on that tier. | **Browser:** same-origin **`fetch`** to **`/api/*`**. **Server:** handlers wrapped by **`src/api-lib/vercel-adapter.js`** (Netlify-shaped handler compatibility, Node **`req`/`res`**). | Routes verify Firebase ID token where required. | `FIREBASE_SERVICE_ACCOUNT`, `OMDB_API_KEY`, `TMDB_API_KEY`, optional `UPCOMING_SYNC_TRIGGER_SECRET`, optional **`FIRESTORE_HOURLY_READ_LIMIT`**, **`FIRESTORE_DAILY_READ_LIMIT`**, optional **`WHATSAPP_VERIFY_TOKEN`**, **`WHATSAPP_APP_SECRET`** (required for webhook POST), **`WHATSAPP_TOKEN`**, **`WHATSAPP_PHONE_NUMBER_ID`**, optional **`RESEND_API_KEY`**, **`RESEND_FROM_EMAIL`**, optional **`APP_PUBLIC_URL`** / **`VERCEL_URL`**, optional **`VERCEL_API_TOKEN`**, **`VERCEL_PROJECT_ID`** (Admin deployment status), optional **`GITHUB_TOKEN`**, optional **`GITHUB_REPO`** (default **`maulbogat/watchlist-app`**) (Admin GitHub Actions card), optional **`VITE_APP_ORIGIN`**, optional **`SENTRY_DSN`**, optional **`VITE_SENTRY_DSN`**; no `VITE_AXIOM_*`. |
 | **Resend** | Transactional email for **app invitations** only (`POST /api/invites` `action: send`). | **Server:** HTTPS `POST https://api.resend.com/emails` from **`src/api-lib/resend-send.js`**. **Not** called from the browser. | API key in `Authorization: Bearer`. | **`RESEND_API_KEY`**; **`RESEND_FROM_EMAIL`** (e.g. **`noreply@maulbogat.com`** when domain verified; code falls back to **`onboarding@resend.dev`** if unset). |
 | **Axiom** | Log search / observability via **direct HTTP ingest** (not a Netlify log drain). | **Client:** **`src/lib/axiom-logger.ts`** → **`POST /api/log-client-event`** (Firebase ID token). **Server:** **`src/api-lib/logger.js`** → Axiom HTTP API when **`AXIOM_TOKEN`** / **`AXIOM_DATASET`** are set; otherwise **`console.log`** JSON. | Client: Firebase ID token. Server: Axiom token. | **`AXIOM_TOKEN`**, **`AXIOM_DATASET`** (server-only; often omitted locally). |
 | **Sentry** | Error tracking and (when enabled) performance traces + **session replay on errors only** for the SPA; server-side capture on **`add-from-imdb`** and **`whatsapp-webhook`** only; **Admin** unresolved-issue count via **`GET /api/admin/external-status?service=sentry`**. | **Client:** **`@sentry/react`** in **`src/main.tsx`** (init only when **`VITE_SENTRY_DSN`** is set; **`enabled`** in **production** builds only), **`Sentry.withErrorBoundary`** around **`App`**, **`useAuthUser`** sets **`Sentry.setUser({ id: uid })`** on sign-in and **`setUser(null)`** on sign-out (**never** email or display name). **Server:** **`@sentry/node`** via **`src/api-lib/sentry-node.js`** when **`SENTRY_DSN`** is set; **`captureException`** in those two API routes’ failure paths. **Admin API:** Sentry REST with **`SENTRY_READ_TOKEN`**. **Build:** optional **`@sentry/vite-plugin`** when **`SENTRY_AUTH_TOKEN`** is set (source maps + **`SENTRY_ORG`** / **`SENTRY_PROJECT`** for the plugin). | DSN-based ingest; read token for issues API; org auth token for source map upload only. | **`VITE_SENTRY_DSN`** (client; optional). **`SENTRY_DSN`** (server; optional). Optional **Admin issues card:** **`SENTRY_READ_TOKEN`**, **`SENTRY_PROJECT`** (API project slug, org **`maulbogat`**). Optional CI/build: **`SENTRY_AUTH_TOKEN`**, **`SENTRY_ORG`**, **`SENTRY_PROJECT`** (Vite plugin). |
@@ -44,7 +44,15 @@ This document describes the **Watchlist** app — **only what exists in this rep
 - **Watchlist toolbar:** **`WatchlistToolbar.tsx`** uses a two-row layout (primary: status tabs, type, sort, search; secondary: genre **Radix Popover** via **`src/components/ui/popover.tsx`**, **Added by** segmented control on shared lists). Genre list styling: **`watchlist-genre-popover-*`** in **`styles.css`**; sort still uses **Radix Select**.
 
 **Migration note (Netlify → Vercel)**  
-Serverless code moved from **`netlify/functions/`** to root **`api/*.js`**. **`src/api-lib/vercel-adapter.js`** preserves Netlify-shaped handler wiring on Vercel’s **`(req, res)`** model. Scheduled jobs use **`vercel.json`** Cron only (legacy **`netlify.toml`** was removed from the repo). Full local dev uses two processes: **`npm run dev:react`** (Vite) and **`vercel dev --listen 3000`** (API + **`process.env`**).
+Serverless code moved from **`netlify/functions/`** to root **`api/*.js`**. **`src/api-lib/vercel-adapter.js`** preserves Netlify-shaped handler wiring on Vercel’s **`(req, res)`** model. Scheduled jobs use **`vercel.json`** Cron only (legacy **`netlify.toml`** was removed from the repo).
+
+**Local development (full stack)**  
+Run **two terminals** at the repo root (after **`npm install`**), order arbitrary:
+
+1. **`vercel dev --listen 3000`** — serves **`api/*.js`** and loads server **`process.env`** (see **`docs/environment.md`**).
+2. **`npm run dev:react`** — Vite on **5173**; **`vite.config.ts`** proxies **`/api/*`** to **http://localhost:3000**.
+
+Vite alone is enough for UI-only work; anything that **`fetch`**es **`/api/*`** (bookmarklet popup, invites, client logging, etc.) needs **`vercel dev`** on **3000** as well.
 
 **Vercel (`api/*`)**  
 - **Static hosting** for HTML, CSS, JS, SVG assets from **`dist/`**.  
@@ -278,6 +286,41 @@ Document id examples: `tv_136311_3_9`, `mv_12345_sequel_67890`. Fields include:
 **Client:** `src/firebase.ts` → `fetchUpcomingAlertsForItems` (chunks `catalogTmdbId` / `sequelTmdbId` `in` queries), `dismissUpcomingAlert` merges into `users/{uid}.upcomingDismissals`. **`UpcomingAlertsBar.tsx`** (UI label **Up next**): horizontal **cards** for the **currently loaded list** — poster thumbnail, title, episode/release **detail**, **`airDate`** in gold, **dismiss**, and **Add to calendar** (all-day **`.ics`**) when `airDate` is `YYYY-MM-DD`. Shows the **first four** matches; **Show more** expands inline to a grid, **Show less** collapses. A **skeleton** strip renders while data loads; the section is **hidden** when there are no alerts. **`src/lib/storage.ts`** caches fetched alerts per user + list fingerprint (**2**-hour TTL) to skip redundant Firestore reads. Sync never writes undated/TBA rows; the client drops any alert without a parseable date (legacy junk).
 
 **Admin queries:** Composite `(catalogTmdbId, media)` may be required for `deleteStaleAlertsForRow`; Firebase console may prompt to create an index on first scheduled run.
+
+---
+
+### `recommendations` / `{listId}`
+
+Top-level collection. **Writes:** Admin SDK only (`scripts/generate-recommendations.mjs`). **Reads:** Any signed-in user (`firestore.rules`). Document id equals the list id (`sharedLists` doc id or `personalLists` doc id).
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `listId` | `string` | Same as the document id. |
+| `generatedAt` | `string` (ISO) | Timestamp when the script wrote this doc. |
+| `source` | `"recs"` \| `"similar"` | Which TMDB index was used (`--source` flag). |
+| `algorithmVersion` | `string` | E.g. `"v4-graph"`. |
+| `items` | `array` | Ordered list of recommendation objects (top-k, highest `refCount` first). |
+
+Each `items` entry:
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `tmdbId` | `number` | TMDB id of the recommended title. |
+| `imdbId` | `string` or null | From `titleRegistry` if the title is already in the catalog; otherwise null. |
+| `title` | `string` | Display title. |
+| `year` | `number` or null | Release year. |
+| `type` | `"movie"` \| `"show"` | App convention (mirrors `titleRegistry.type`). |
+| `mediaType` | `"movie"` \| `"tv"` | TMDB convention (used for API calls). |
+| `genres` | `array` of `string` | Genre names (e.g. `["Comedy", "Drama"]`). |
+| `thumb` | `string` or null | Full TMDB poster URL (`https://image.tmdb.org/t/p/w500/…`) or `titleRegistry.thumb`. |
+| `youtubeId` | `string` or null | YouTube video key for trailer embed; null if no trailer found. |
+| `refCount` | `number` | Number of watched/archived list titles that point to this rec via the forward index. |
+| `references` | `array` | Simplified source titles: `[{ title, isFavorite }]`. Max 3 shown in `explanation`; full list stored for client use. |
+| `explanation` | `string` | Pre-formatted explanation string (e.g. `"Because you watched: Ted Lasso, Emily in Paris and 2 more"`). |
+| `registryId` | `string` or null | `titleRegistry` doc id if the rec is already in the catalog; enables the "add to list" flow. |
+| `services` | `array` of `string` | Streaming service chips from `titleRegistry`; empty array if not in catalog. |
+
+**Script:** `scripts/generate-recommendations.mjs` — loads `data/tmdb-recs-forward.json` (or `data/tmdb-similar-forward.json`), iterates all personal + shared lists for all `allowedUsers`, aggregates the graph-based recs, enriches with poster/trailer from `titleRegistry` or TMDB API, and writes one doc per list. Supports `--list <id>`, `--dry-run`, `--source similar`, `--top <k>`.
 
 ---
 

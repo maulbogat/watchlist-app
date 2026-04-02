@@ -1,22 +1,25 @@
 /**
- * Watchlist — Content-Based Recommendation Engine v2
+ * Watchlist — Content-Based Recommendation Engine v3
  *
- * Run: node scripts/recommendations.mjs <firebase-uid>
+ * Run: node scripts/recommendations.mjs <listId> [--uid <uid>] [--type movie|show|all]
  * Requires:
  *   - FIREBASE_SERVICE_ACCOUNT in .env
+ *   - TMDB_API_KEY in .env
  *   - data/imdb/title.basics.tsv
  *   - data/imdb/title.ratings.tsv
- *   - data/imdb-watched.csv (optional — IMDb export for extra history signal)
+ *   - data/tmdb-cache.json (auto-created — gitignored)
  *
- * Changes from v1:
- *   - MIN_VOTES raised 5k → 50k (filters out niche/regional titles)
- *   - Genre dimensions weighted 3× (fixes score compression)
- *   - IMDb watched CSV import for richer history signal
+ * v3 philosophy: v1's simplicity + v2's infrastructure.
+ *   - Simple cosine similarity on genre+enrichment vectors (no IDF, no MMR, no hybrid blend)
+ *   - Per-list positive signal, cross-list exclusion
+ *   - Full TMDB enrichment for all candidates
+ *   - Feature-aware explanations
+ *   - High MIN_VOTES (50k) to surface mainstream quality titles
  */
 
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { createReadStream, existsSync, readFileSync } from "fs";
+import { createReadStream, existsSync, readFileSync, writeFileSync } from "fs";
 import { createInterface } from "readline";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -27,25 +30,41 @@ dotenv.config({ path: resolve(__dirname, "../.env") });
 
 const IMDB_BASICS       = resolve(__dirname, "../data/imdb/title.basics.tsv");
 const IMDB_RATINGS      = resolve(__dirname, "../data/imdb/title.ratings.tsv");
-const IMDB_WATCHED_CSV  = resolve(__dirname, "../data/imdb-watched.csv");
+const TMDB_CACHE_PATH   = resolve(__dirname, "../data/tmdb-cache.json");
 
-const MIN_VOTES  = 50000;  // raised from 5k — filters regional/niche titles
+// ─── Thresholds ──────────────────────────────────────────────────────────────
+const MIN_VOTES         = 50000;
+const MIN_VOTES_FOREIGN = 3000;
+const MIN_RATING = 6.0;
 const MIN_YEAR   = 1970;
 const VALID_TYPES = new Set(["movie", "tvSeries", "tvMiniSeries", "tvMovie"]);
 const TOP_N      = 20;
 
-// ─── Feature weights ──────────────────────────────────────────────────────────
-// Genre dimensions are weighted 3× to prevent year/rating from dominating.
-// Without this, everything clusters near 93-94% because year and lang:en
-// are nearly identical across all candidates.
+// ─── Feature weights ────────────────────────────────────────────────────────
 const GENRE_WEIGHT    = 3.0;
-const LANGUAGE_WEIGHT = 1.0;
-const TYPE_WEIGHT     = 1.0;
-const YEAR_WEIGHT     = 1.0;
-const RATING_WEIGHT   = 1.5;  // slightly upweight — prefer higher rated titles
+const KEYWORD_WEIGHT  = 2.0;
+const DIRECTOR_WEIGHT = 3.0;
+const ACTOR_WEIGHT    = 1.5;
 
-// ─── Firebase ─────────────────────────────────────────────────────────────────
+// ─── Feature vocabulary ─────────────────────────────────────────────────────
+const GENRES = [
+  "action","adventure","animation","biography","comedy","crime",
+  "documentary","drama","family","fantasy","history","horror",
+  "music","musical","mystery","romance","sci-fi","sport",
+  "thriller","war","western",
+];
+const G = GENRES.length; // 21
 
+// CLI flags
+const typeArgIdx = process.argv.indexOf("--type");
+const TYPE_FILTER = typeArgIdx >= 0 ? process.argv[typeArgIdx + 1] : "all";
+
+// Enriched vocabulary — populated after TMDB enrichment
+let KEYWORDS  = [];
+let DIRECTORS = [];
+let ACTORS    = [];
+
+// ─── Firebase ───────────────────────────────────────────────────────────────
 function initFirebase() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT not set in .env");
@@ -54,8 +73,7 @@ function initFirebase() {
   return getFirestore(app);
 }
 
-// ─── TSV reader ───────────────────────────────────────────────────────────────
-
+// ─── TSV reader ─────────────────────────────────────────────────────────────
 function readTsv(filePath, onRow) {
   return new Promise((resolve, reject) => {
     const rl = createInterface({
@@ -72,51 +90,59 @@ function readTsv(filePath, onRow) {
   });
 }
 
-// ─── Feature vocabulary ───────────────────────────────────────────────────────
+// ─── TMDB cache ─────────────────────────────────────────────────────────────
+async function fetchTmdb(path, cache) {
+  if (path in cache) return cache[path];
+  await new Promise(r => setTimeout(r, 260));
+  try {
+    const sep = path.includes("?") ? "&" : "?";
+    const url = `https://api.themoviedb.org/3${path}${sep}api_key=${process.env.TMDB_API_KEY}`;
+    const res = await fetch(url);
+    const data = res.ok ? await res.json() : null;
+    cache[path] = data;
+    return data;
+  } catch {
+    cache[path] = null;
+    return null;
+  }
+}
 
-const GENRES = [
-  "action","adventure","animation","biography","comedy","crime",
-  "documentary","drama","family","fantasy","history","horror",
-  "music","musical","mystery","romance","sci-fi","sport",
-  "thriller","war","western",
-];
-const LANGUAGES = ["en","he","fr","es","de","ko","ja","it","ar"];
+// ─── Vector building ────────────────────────────────────────────────────────
+function buildVector(genreList, keywords, directors, actors) {
+  const KW = KEYWORDS.length;
+  const DR = DIRECTORS.length;
+  const AC = ACTORS.length;
+  const v = new Array(G + KW + DR + AC).fill(0);
 
-// Vector layout:
-// [0..G-1]         genres × GENRE_WEIGHT
-// [G..G+L-1]       languages × LANGUAGE_WEIGHT
-// [G+L]            type (movie=1) × TYPE_WEIGHT
-// [G+L+1]          year normalized × YEAR_WEIGHT
-// [G+L+2]          rating normalized × RATING_WEIGHT
-const G = GENRES.length;    // 21
-const L = LANGUAGES.length; // 9
-const DIM = G + L + 3;      // 33
-
-function buildVector(genreList, language, isMovie, year, rating) {
-  const v = new Array(DIM).fill(0);
-
-  // Genres (weighted)
   for (const g of genreList) {
     const idx = GENRES.indexOf(g.toLowerCase().trim());
     if (idx >= 0) v[idx] = GENRE_WEIGHT;
   }
-
-  // Language (weighted)
-  const langIdx = LANGUAGES.indexOf((language || "en").toLowerCase());
-  v[G + (langIdx >= 0 ? langIdx : 0)] = LANGUAGE_WEIGHT;
-
-  // Type
-  v[G + L]     = (isMovie ? 1 : 0) * TYPE_WEIGHT;
-  // Year: [1970,2030] → [0,1]
-  v[G + L + 1] = Math.max(0, Math.min(1, ((year || 2000) - 1970) / 60)) * YEAR_WEIGHT;
-  // Rating: [1,10] → [0,1]
-  v[G + L + 2] = Math.max(0, Math.min(1, ((rating || 5) - 1) / 9)) * RATING_WEIGHT;
-
+  for (const kw of (keywords || [])) {
+    const idx = KEYWORDS.indexOf(kw);
+    if (idx >= 0) v[G + idx] = KEYWORD_WEIGHT;
+  }
+  for (const dir of (directors || [])) {
+    const idx = DIRECTORS.indexOf(dir);
+    if (idx >= 0) v[G + KW + idx] = DIRECTOR_WEIGHT;
+  }
+  for (const actor of (actors || [])) {
+    const idx = ACTORS.indexOf(actor);
+    if (idx >= 0) v[G + KW + DR + idx] = ACTOR_WEIGHT;
+  }
   return v;
 }
 
-// ─── Math ─────────────────────────────────────────────────────────────────────
+function featureName(i) {
+  if (i < G) return `genre:${GENRES[i]}`;
+  const k = i - G;
+  if (k < KEYWORDS.length) return `kw:${KEYWORDS[k]}`;
+  const d = k - KEYWORDS.length;
+  if (d < DIRECTORS.length) return `dir:${DIRECTORS[d]}`;
+  return `actor:${ACTORS[d - DIRECTORS.length]}`;
+}
 
+// ─── Math ───────────────────────────────────────────────────────────────────
 const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
 const mag = (v) => Math.sqrt(dot(v, v));
 const cosine = (a, b) => { const ma = mag(a), mb = mag(b); return (ma && mb) ? dot(a, b) / (ma * mb) : 0; };
@@ -130,89 +156,179 @@ function weightedAvg(vectors, weights) {
   return avg.map(v => v / total);
 }
 
-function featureName(i) {
-  if (i < G) return `genre:${GENRES[i]}`;
-  const j = i - G;
-  if (j < L) return `lang:${LANGUAGES[j]}`;
-  return ["type:movie", "year", "rating"][j - L];
-}
+// ─── Explanation ────────────────────────────────────────────────────────────
+function explain(candidateVector, watchedTitles, enrichData, candidateImdbId) {
+  const candEnrich = enrichData.get(candidateImdbId) || {};
 
-function explain(candidateVec, watchedTitles) {
   return watchedTitles
-    .map(t => ({ title: t.title, isFavorite: t.isFavorite ?? false, score: cosine(candidateVec, t.vector) }))
+    .map(t => {
+      const watchEnrich = enrichData.get(t.imdbId) || {};
+      const sharedKw = (candEnrich.keywords || []).filter(k => (watchEnrich.keywords || []).includes(k));
+      const sharedDir = (candEnrich.directors || []).filter(d => (watchEnrich.directors || []).includes(d));
+      const sharedAct = (candEnrich.cast || []).filter(a => (watchEnrich.cast || []).includes(a));
+      return {
+        title: t.title,
+        isFavorite: t.isFavorite,
+        score: cosine(candidateVector, t.vector),
+        sharedKw, sharedDir, sharedAct,
+      };
+    })
     .filter(t => t.score > 0.5)
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
 }
 
-// ─── IMDb watched CSV parser ──────────────────────────────────────────────────
-// IMDb export format: Const,Your Rating,Date Rated,Title,URL,Title Type,IMDb Rating,Runtime (mins),Year,Genres,Num Votes,Release Date,Directors
-// We only need: Const (imdbId), Title Type, Title, Year, Genres
+function formatExplanation(matches) {
+  if (!matches.length) return "Matches your taste profile";
 
-function loadImdbWatchedCsv(filePath) {
-  if (!existsSync(filePath)) return [];
-  const lines = readFileSync(filePath, "utf8").split("\n");
-  if (lines.length < 2) return [];
+  const prefix = matches.every(t => t.isFavorite) ? "Because you loved:" : "Because you liked:";
+  const titleStr = matches.map(e => e.title).join(", ");
 
-  const header = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
-  const idxConst     = header.indexOf("Const");
-  const idxTitle     = header.indexOf("Title");
-  const idxYear      = header.indexOf("Year");
-  const idxGenres    = header.indexOf("Genres");
-  const idxTitleType = header.indexOf("Title Type");
-  const idxRating    = header.indexOf("IMDb Rating");
+  const allDir = [...new Set(matches.flatMap(t => t.sharedDir))];
+  const allAct = [...new Set(matches.flatMap(t => t.sharedAct))];
+  const allKw = [...new Set(matches.flatMap(t => t.sharedKw))];
 
-  if (idxConst < 0) return [];
+  const parts = [];
+  if (allDir.length > 0) parts.push(`director ${allDir.slice(0, 2).join(", ")}`);
+  if (allAct.length > 0) parts.push(allAct.slice(0, 2).join(", "));
+  if (allKw.length > 0) parts.push(allKw.slice(0, 3).join(", "));
 
-  const results = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    // Simple CSV parse (handles quoted fields)
-    const fields = line.match(/(".*?"|[^,]+|(?<=,)(?=,)|(?<=,)$|^(?=,))/g) || line.split(",");
-    const clean = (s) => (s || "").replace(/^"|"$/g, "").trim();
-
-    const imdbId    = clean(fields[idxConst]);
-    const titleType = clean(fields[idxTitleType]);
-    const title     = clean(fields[idxTitle]);
-    const year      = parseInt(clean(fields[idxYear]));
-    const genres    = clean(fields[idxGenres]).split(",").map(g => g.trim());
-    const rating    = parseFloat(clean(fields[idxRating])) || 7;
-
-    if (!imdbId || !imdbId.startsWith("tt")) continue;
-
-    const validTypes = new Set(["Movie", "TV Series", "TV Mini Series", "TV Movie", "TV Episode"]);
-    if (!validTypes.has(titleType)) continue;
-
-    results.push({
-      imdbId,
-      title,
-      year: isNaN(year) ? 2000 : year,
-      type: titleType === "Movie" || titleType === "TV Movie" ? "movie" : "show",
-      genres,
-      rating,
-      source: "imdb-csv",
-    });
-  }
-  return results;
+  if (parts.length > 0) return `${prefix} ${titleStr} (shared: ${parts.join("; ")})`;
+  return `${prefix} ${titleStr}`;
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Franchise dedup ────────────────────────────────────────────────────────
+function dedupeByCollection(titles) {
+  const groups = {};
+  const noCollection = [];
+  for (const t of titles) {
+    if (t.collectionId) {
+      if (!groups[t.collectionId]) groups[t.collectionId] = [];
+      groups[t.collectionId].push(t);
+    } else {
+      noCollection.push(t);
+    }
+  }
+  const deduped = [...noCollection];
+  for (const group of Object.values(groups)) {
+    const maxWeight = Math.max(...group.map(t => t._weight || 2));
+    const avgVec = weightedAvg(group.map(t => t.vector), group.map(() => 1));
+    deduped.push({
+      title: group.map(t => t.title).join(" / "),
+      status: group[0].status,
+      isFavorite: group.some(t => t.isFavorite),
+      vector: avgVec,
+      _weight: maxWeight,
+      collectionId: group[0].collectionId,
+    });
+  }
+  return deduped;
+}
 
+// ─── List resolver ──────────────────────────────────────────────────────────
+async function resolveList(db, listId, uid) {
+  const sharedDoc = await db.collection("sharedLists").doc(listId).get();
+  if (sharedDoc.exists) {
+    const data = sharedDoc.data();
+    return { data, type: "shared", name: data.name || listId, members: data.members || [] };
+  }
+  if (uid) {
+    const personalDoc = await db.collection("users").doc(uid).collection("personalLists").doc(listId).get();
+    if (personalDoc.exists) {
+      const data = personalDoc.data();
+      return { data, type: "personal", name: data.name || listId, uid };
+    }
+    console.error(`List not found: ${listId} (tried sharedLists and users/${uid}/personalLists)`);
+  } else {
+    console.error(`List not found in sharedLists: ${listId}. For personal lists, use --uid <uid>`);
+  }
+  process.exit(1);
+}
+
+// ─── Cross-list exclusion ───────────────────────────────────────────────────
+function extractMemberUids(members) {
+  return members.map(m => typeof m === "string" ? m : (m.uid || m.id || null)).filter(Boolean);
+}
+
+async function collectSeenImdbIds(db, registry, uids) {
+  const seen = new Set();
+  const listsSummary = [];
+  const uidSet = new Set(uids);
+
+  for (const uid of uids) {
+    const personalSnap = await db.collection("users").doc(uid).collection("personalLists").get();
+    for (const doc of personalSnap.docs) {
+      const data = doc.data();
+      const watched = new Set(data.watched || []);
+      const archive = new Set(data.archive || []);
+      let count = 0;
+      for (const item of data.items || []) {
+        const rid = item.registryId; if (!rid) continue;
+        if (watched.has(rid) || archive.has(rid)) {
+          const reg = registry[rid] || {};
+          if (reg.imdbId) { seen.add(reg.imdbId); count++; }
+        }
+      }
+      if (count > 0) listsSummary.push({ uid: uid.slice(0, 8), list: data.name || doc.id, type: "personal", seen: count });
+    }
+  }
+
+  const sharedSnap = await db.collection("sharedLists").get();
+  for (const doc of sharedSnap.docs) {
+    const data = doc.data();
+    const memberUids = extractMemberUids(data.members || []);
+    if (!memberUids.some(m => uidSet.has(m))) continue;
+    const watched = new Set(data.watched || []);
+    const archive = new Set(data.archive || []);
+    let count = 0;
+    for (const item of data.items || []) {
+      const rid = item.registryId; if (!rid) continue;
+      if (watched.has(rid) || archive.has(rid)) {
+        const reg = registry[rid] || {};
+        if (reg.imdbId) { seen.add(reg.imdbId); count++; }
+      }
+    }
+    if (count > 0) listsSummary.push({ list: data.name || doc.id, type: "shared", seen: count });
+  }
+
+  return { seen, listsSummary };
+}
+
+async function buildExclusionSet(db, registry, list, uid) {
+  const uids = list.type === "personal" ? [uid] : extractMemberUids(list.members);
+  const label = list.type === "personal" ? `user ${uid.slice(0, 8)}` : `${uids.length} members`;
+  console.log(`  Building exclusion set for ${label}...`);
+  const { seen, listsSummary } = await collectSeenImdbIds(db, registry, uids);
+  console.log(`  Exclusion: ${seen.size} titles seen across ${listsSummary.length} lists`);
+  for (const s of listsSummary) {
+    const owner = s.uid ? ` (${s.uid}…)` : "";
+    console.log(`    ${s.type.padEnd(9)} "${s.list}"${owner}: ${s.seen} seen`);
+  }
+  return seen;
+}
+
+// ─── Main ───────────────────────────────────────────────────────────────────
 async function main() {
-  const uid = process.argv[2];
-  if (!uid) { console.error("Usage: node scripts/recommendations.mjs <uid>"); process.exit(1); }
+  const listId = process.argv[2];
+  if (!listId) {
+    console.error("Usage: node scripts/recommendations.mjs <listId> [--uid <uid>] [--type movie|show|all]");
+    process.exit(1);
+  }
+  const uidArgIdx = process.argv.indexOf("--uid");
+  const uid = uidArgIdx >= 0 ? process.argv[uidArgIdx + 1] : null;
 
-  console.log("\n🎬  Watchlist Recommendation Engine v2\n");
+  const tmdbCache = existsSync(TMDB_CACHE_PATH)
+    ? JSON.parse(readFileSync(TMDB_CACHE_PATH, "utf8"))
+    : {};
 
   // 1. IMDb ratings
   process.stdout.write("Loading IMDb ratings... ");
   const ratings = new Map();
   await readTsv(IMDB_RATINGS, ([tconst, avgRating, numVotes]) => {
-    if (parseInt(numVotes) >= MIN_VOTES)
+    if (parseInt(numVotes) >= MIN_VOTES_FOREIGN)
       ratings.set(tconst, { rating: parseFloat(avgRating), votes: parseInt(numVotes) });
   });
-  console.log(`${ratings.size.toLocaleString()} titles with ≥${MIN_VOTES.toLocaleString()} votes`);
+  console.log(`${ratings.size.toLocaleString()} titles with ≥${MIN_VOTES_FOREIGN.toLocaleString()} votes (staging)`);
 
   // 2. IMDb basics → candidates
   process.stdout.write("Building candidate pool... ");
@@ -221,18 +337,15 @@ async function main() {
     if (!VALID_TYPES.has(titleType)) return;
     const r = ratings.get(tconst);
     if (!r) return;
+    if (r.rating < MIN_RATING) return;
     const year = parseInt(startYear);
     if (isNaN(year) || year < MIN_YEAR) return;
     if (!genres || genres === "\\N") return;
+    const candType = (titleType === "movie" || titleType === "tvMovie") ? "movie" : "show";
+    if (TYPE_FILTER !== "all" && candType !== TYPE_FILTER) return;
     candidates.set(tconst, {
-      imdbId: tconst,
-      title: primaryTitle,
-      year,
-      type: (titleType === "movie" || titleType === "tvMovie") ? "movie" : "show",
-      genres: genres.split(","),
-      rating: r.rating,
-      votes: r.votes,
-      language: "en",
+      imdbId: tconst, title: primaryTitle, year, type: candType,
+      genres: genres.split(","), rating: r.rating, votes: r.votes, language: "en",
     });
   });
   console.log(`${candidates.size.toLocaleString()} quality candidates`);
@@ -242,91 +355,80 @@ async function main() {
   const db = initFirebase();
   const regSnap = await db.collection("titleRegistry").get();
   const registry = {};
+  const imdbToTmdb = new Map();
   for (const doc of regSnap.docs) {
     const data = doc.data();
     registry[doc.id] = data;
     if (data.imdbId && candidates.has(data.imdbId) && data.originalLanguage)
       candidates.get(data.imdbId).language = data.originalLanguage;
+    if (data.imdbId && data.tmdbId) imdbToTmdb.set(data.imdbId, data.tmdbId);
   }
 
-  // User lists
-  const userRef = db.collection("users").doc(uid);
-  const userSnap = await userRef.get();
-  if (!userSnap.exists) { console.error(`\nUser not found: ${uid}`); process.exit(1); }
+  const upcomingSnap = await db.collection("upcomingChecks").get();
+  const tmdbToCollection = new Map();
+  for (const doc of upcomingSnap.docs) {
+    const data = doc.data();
+    const tmdbId = doc.id.split("_")[0];
+    const collId = data.collectionId ?? data.belongs_to_collection ?? null;
+    if (collId !== null) tmdbToCollection.set(tmdbId, collId);
+  }
 
-  const statusPriority = { archive: 3, watched: 2, "to-watch": 1, "maybe-later": 0 };
-  const deduped = {};
+  // 4. Resolve target list
+  const list = await resolveList(db, listId, uid);
+  const listData = list.data;
+  const listTypeLabel = list.type === "shared"
+    ? `shared, ${list.members.length} members`
+    : "personal";
 
-  const plSnap = await userRef.collection("personalLists").get();
-  for (const plDoc of plSnap.docs) {
-    const pl = plDoc.data();
-    const watched    = new Set(pl.watched    || []);
-    const archive    = new Set(pl.archive    || []);
-    const maybeLater = new Set(pl.maybeLater || []);
-    for (const item of pl.items || []) {
-      const rid = item.registryId; if (!rid) continue;
-      let status = "to-watch";
-      if (watched.has(rid)) status = "watched";
-      else if (archive.has(rid)) status = "archive";
-      else if (maybeLater.has(rid)) status = "maybe-later";
-      const reg = registry[rid] || {};
-      const ex = deduped[rid];
-      if (!ex || statusPriority[status] > statusPriority[ex.status])
-        deduped[rid] = { registryId: rid, imdbId: reg.imdbId, title: reg.title, status };
+  console.log("\n🎬  Watchlist Recommendation Engine v3");
+  console.log(`List: ${list.name} (${listTypeLabel})\n`);
+
+  // Load favorites from all relevant users
+  let favorites = new Set();
+  const favUids = list.type === "personal" ? [list.uid] : extractMemberUids(list.members);
+  for (const fuid of favUids) {
+    if (!fuid) continue;
+    const userSnap = await db.collection("users").doc(fuid).get();
+    if (userSnap.exists) {
+      const favMap = (userSnap.data().favorites && typeof userSnap.data().favorites === "object")
+        ? userSnap.data().favorites : {};
+      for (const rid of Object.keys(favMap)) favorites.add(rid);
     }
   }
 
-  const sharedSnap = await db.collection("sharedLists").where("members","array-contains",uid).get();
-  for (const sharedDoc of sharedSnap.docs) {
-    const sl = sharedDoc.data();
-    const watched = new Set(sl.watched || []);
-    const archive = new Set(sl.archive || []);
-    for (const item of sl.items || []) {
-      const rid = item.registryId; if (!rid) continue;
-      let status = "to-watch";
-      if (watched.has(rid)) status = "watched";
-      else if (archive.has(rid)) status = "archive";
-      const reg = registry[rid] || {};
-      const ex = deduped[rid];
-      if (!ex || statusPriority[status] > statusPriority[ex.status])
-        deduped[rid] = { registryId: rid, imdbId: reg.imdbId, title: reg.title, status };
-    }
+  // Build list items with status
+  const watched    = new Set(listData.watched    || []);
+  const archive    = new Set(listData.archive    || []);
+  const maybeLater = new Set(listData.maybeLater || []);
+
+  const listItems = [];
+  for (const item of listData.items || []) {
+    const rid = item.registryId; if (!rid) continue;
+    let status = "to-watch";
+    if (watched.has(rid)) status = "watched";
+    else if (archive.has(rid)) status = "archive";
+    else if (maybeLater.has(rid)) status = "maybe-later";
+    const reg = registry[rid] || {};
+    listItems.push({ registryId: rid, imdbId: reg.imdbId, title: reg.title, status });
   }
 
-  // Favorites
-  const userDocData = userSnap.data();
-  const favMap = (userDocData.favorites && typeof userDocData.favorites === "object") ? userDocData.favorites : {};
-  const favorites = new Set(Object.keys(favMap));
-
-  const userItems = Object.values(deduped);
-
-  // All IMDb IDs the user already has (to exclude from candidates)
-  const userImdbIds = new Set([
-    ...userItems.map(i => i.imdbId).filter(Boolean),
-    ...Object.values(registry).map(r => r.imdbId).filter(Boolean),
-  ]);
+  // Cross-list exclusion
+  const excludeImdbIds = new Set(listItems.map(i => i.imdbId).filter(Boolean));
+  const crossListSeen = await buildExclusionSet(db, registry, list, uid);
+  for (const id of crossListSeen) excludeImdbIds.add(id);
+  console.log(`  Total exclusion: ${excludeImdbIds.size} unique IMDb IDs\n`);
 
   console.log(
-    `${userItems.length} Firestore titles — ` +
-    `${userItems.filter(i=>i.status==="watched").length} watched, ` +
-    `${userItems.filter(i=>i.status==="archive").length} archived, ` +
-    `${userItems.filter(i=>i.status==="to-watch").length} to watch`
+    `${listItems.length} titles on list — ` +
+    `${listItems.filter(i=>i.status==="watched").length} watched, ` +
+    `${listItems.filter(i=>i.status==="archive").length} archived, ` +
+    `${listItems.filter(i=>i.status==="to-watch").length} to watch\n`
   );
 
-  // 4. IMDb watched CSV (optional extra history signal)
-  const imdbWatched = loadImdbWatchedCsv(IMDB_WATCHED_CSV);
-  if (imdbWatched.length > 0) {
-    console.log(`  + ${imdbWatched.length} titles from IMDb watched CSV`);
-    // Add their imdbIds to exclusion set
-    for (const t of imdbWatched) userImdbIds.add(t.imdbId);
-  }
-  console.log();
-
-  // 5. Build positive signal
-  // Firestore watched + archived + IMDb CSV watched
+  // 5. Positive signal from this list
+  const positiveItems = listItems.filter(i => i.status === "watched" || i.status === "archive");
   const positiveTitles = [];
-
-  for (const item of userItems.filter(i => i.status === "watched" || i.status === "archive")) {
+  for (const item of positiveItems) {
     let meta = item.imdbId && candidates.has(item.imdbId) ? candidates.get(item.imdbId) : null;
     if (!meta) {
       const reg = registry[item.registryId] || {};
@@ -334,19 +436,17 @@ async function main() {
       meta = { title: reg.title, year: reg.year, type: reg.type,
                genres: reg.genre.split(/[/,|]/), rating: 7, language: reg.originalLanguage || "en" };
     }
+    const tmdbId = imdbToTmdb.get(item.imdbId);
+    const collectionId = tmdbToCollection.get(String(tmdbId)) ?? null;
     positiveTitles.push({
       title: meta.title || item.title,
       status: item.status,
       isFavorite: favorites.has(item.registryId),
-      vector: buildVector(meta.genres, meta.language, meta.type === "movie", meta.year, meta.rating),
-    });
-  }
-
-  for (const item of imdbWatched) {
-    positiveTitles.push({
-      title: item.title,
-      status: "watched",
-      vector: buildVector(item.genres, "en", item.type === "movie", item.year, item.rating),
+      imdbId: item.imdbId,
+      collectionId,
+      _genres: meta.genres,
+      _type: meta.type,
+      _language: meta.language,
     });
   }
 
@@ -354,16 +454,112 @@ async function main() {
     console.log("No watched/archived titles. Watch something first!");
     process.exit(0);
   }
+  console.log(`Positive signal: ${positiveTitles.length} titles total`);
 
-  console.log(`Positive signal: ${positiveTitles.length} titles total\n`);
+  // Language-aware vote filter
+  const positiveLanguages = new Set(positiveTitles.map(t => t._language).filter(Boolean));
+  positiveLanguages.add("en");
+  for (const [imdbId, cand] of [...candidates]) {
+    if (!positiveLanguages.has(cand.language)) { candidates.delete(imdbId); continue; }
+    if (cand.votes < (cand.language !== "en" ? MIN_VOTES_FOREIGN : MIN_VOTES)) candidates.delete(imdbId);
+  }
+  console.log(`  ${candidates.size.toLocaleString()} candidates after vote filter`);
 
-  // 6. Taste profile (weighted average)
+  // Franchise dedup count
+  const franchiseGroups = new Set(positiveTitles.filter(t => t.collectionId).map(t => t.collectionId)).size;
+  console.log(`  Collapsed ${franchiseGroups} franchise groups\n`);
+
+  // 6. TMDB enrichment — ALL candidates + positive titles
+  const toEnrichSet = new Set();
+  const toEnrich = [];
+  for (const pt of positiveTitles) {
+    const tmdbId = imdbToTmdb.get(pt.imdbId);
+    if (tmdbId && !toEnrichSet.has(pt.imdbId)) {
+      toEnrichSet.add(pt.imdbId);
+      toEnrich.push({ imdbId: pt.imdbId, tmdbId, isMovie: pt._type === "movie" });
+    }
+  }
+  for (const [imdbId, cand] of candidates) {
+    if (excludeImdbIds.has(imdbId) || toEnrichSet.has(imdbId)) continue;
+    if (TYPE_FILTER !== "all" && cand.type !== TYPE_FILTER) continue;
+    toEnrichSet.add(imdbId);
+    toEnrich.push({ imdbId, tmdbId: imdbToTmdb.get(imdbId) || null, isMovie: cand.type === "movie" });
+  }
+
+  console.log(`Enriching ${toEnrich.length} titles from TMDB...`);
+  const enrichData = new Map();
+  let fetchedCount = 0, cacheCount = 0, findCount = 0, findMissCount = 0;
+  for (let i = 0; i < toEnrich.length; i++) {
+    let { imdbId, tmdbId, isMovie } = toEnrich[i];
+
+    if (!tmdbId) {
+      const findPath = `/find/${imdbId}?external_source=imdb_id`;
+      const findData = await fetchTmdb(findPath, tmdbCache);
+      const results = isMovie ? (findData?.movie_results || []) : (findData?.tv_results || []);
+      if (results.length > 0) {
+        tmdbId = results[0].id;
+        imdbToTmdb.set(imdbId, tmdbId);
+        findCount++;
+      } else {
+        findMissCount++;
+        continue;
+      }
+    }
+
+    const kwPath   = isMovie ? `/movie/${tmdbId}/keywords` : `/tv/${tmdbId}/keywords`;
+    const credPath = isMovie ? `/movie/${tmdbId}/credits`  : `/tv/${tmdbId}/aggregate_credits`;
+    const bothCached = kwPath in tmdbCache && credPath in tmdbCache;
+
+    const kwData   = await fetchTmdb(kwPath, tmdbCache);
+    const credData = await fetchTmdb(credPath, tmdbCache);
+
+    if (bothCached) cacheCount++; else fetchedCount++;
+    if ((i + 1) % 200 === 0) {
+      console.log(`  ... ${i + 1}/${toEnrich.length} (${fetchedCount} fetched, ${cacheCount} cached, ${findCount} found, ${findMissCount} miss)`);
+      writeFileSync(TMDB_CACHE_PATH, JSON.stringify(tmdbCache));
+    }
+
+    const keywords = (kwData?.keywords || kwData?.results || []).map(k => k.name.toLowerCase());
+    const directors = (credData?.crew || [])
+      .filter(c => isMovie ? c.job === "Director" : (c.jobs || []).some(j => j.job === "Director"))
+      .map(c => c.name);
+    const cast = (credData?.cast || [])
+      .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+      .slice(0, 5)
+      .map(c => c.name);
+
+    enrichData.set(imdbId, { keywords, directors, cast });
+  }
+  console.log(`  Enrichment complete: ${fetchedCount} fetched, ${cacheCount} cached, ${findCount} found, ${findMissCount} miss`);
+
+  // 7. Build vocabulary from enriched data
+  const kwFreq = {}, dirFreq = {}, actFreq = {};
+  for (const { keywords, directors, cast } of enrichData.values()) {
+    for (const kw  of keywords)  kwFreq[kw]   = (kwFreq[kw]   || 0) + 1;
+    for (const dir of directors) dirFreq[dir] = (dirFreq[dir] || 0) + 1;
+    for (const act of cast)      actFreq[act] = (actFreq[act] || 0) + 1;
+  }
+  KEYWORDS  = Object.entries(kwFreq).sort((a, b) => b[1] - a[1]).slice(0, 100).map(([k]) => k);
+  DIRECTORS = Object.entries(dirFreq).sort((a, b) => b[1] - a[1]).slice(0, 150).map(([k]) => k);
+  ACTORS    = Object.entries(actFreq).sort((a, b) => b[1] - a[1]).slice(0, 300).map(([k]) => k);
+  const totalDim = G + KEYWORDS.length + DIRECTORS.length + ACTORS.length;
+  console.log(`  Vocabulary: ${KEYWORDS.length} kw, ${DIRECTORS.length} dir, ${ACTORS.length} actors → ${totalDim} dims\n`);
+
+  // 8. Build vectors for positive titles
+  for (const pt of positiveTitles) {
+    const enrich = enrichData.get(pt.imdbId) || {};
+    pt.vector = buildVector(pt._genres, enrich.keywords, enrich.directors, enrich.cast);
+  }
+
+  // 9. Taste profile
+  const dedupedTitles = dedupeByCollection(positiveTitles);
   const tasteProfile = weightedAvg(
-    positiveTitles.map(t => t.vector),
-    positiveTitles.map(t => {
-      if (t.status === "archive" && t.isFavorite) return 3;
+    dedupedTitles.map(t => t.vector),
+    dedupedTitles.map(t => {
+      if (t._weight) return t._weight;
+      if ((t.status === "archive" || t.status === "watched") && t.isFavorite) return 4;
       if (t.status === "archive") return 2;
-      if (t.status === "watched" && t.isFavorite) return 2;
+      if (t.status === "watched") return 1.5;
       return 1;
     })
   );
@@ -372,35 +568,37 @@ async function main() {
   tasteProfile
     .map((val, i) => ({ label: featureName(i), val }))
     .sort((a, b) => b.val - a.val)
-    .slice(0, 12)
+    .slice(0, 15)
     .filter(({ val }) => val >= 0.05)
     .forEach(({ label, val }) => {
-      const bar = "█".repeat(Math.round(val / (GENRE_WEIGHT) * 20));
-      console.log(`  ${label.padEnd(22)} ${bar} ${(val).toFixed(2)}`);
+      const bar = "█".repeat(Math.round(val / GENRE_WEIGHT * 20));
+      console.log(`  ${label.padEnd(26)} ${bar} ${val.toFixed(2)}`);
     });
   console.log();
 
-  // 7. Score candidates
+  // 10. Score all candidates
   process.stdout.write("Scoring candidates... ");
   const scored = [];
   for (const [imdbId, cand] of candidates) {
-    if (userImdbIds.has(imdbId)) continue;
-    const vector = buildVector(cand.genres, cand.language, cand.type === "movie", cand.year, cand.rating);
+    if (excludeImdbIds.has(imdbId)) continue;
+    if (TYPE_FILTER !== "all" && cand.type !== TYPE_FILTER) continue;
+    const enrich = enrichData.get(imdbId) || {};
+    const vector = buildVector(cand.genres, enrich.keywords, enrich.directors, enrich.cast);
     scored.push({ cand, vector, score: cosine(tasteProfile, vector) });
   }
   scored.sort((a, b) => b.score - a.score);
   console.log(`${scored.length.toLocaleString()} candidates scored\n`);
 
-  // 8. Top-N
+  // 11. Top-N output
+  const modeLabel = TYPE_FILTER === "movie" ? "MOVIE " : TYPE_FILTER === "show" ? "SHOW " : "";
   console.log("═".repeat(65));
-  console.log(`  TOP ${TOP_N} RECOMMENDATIONS`);
+  console.log(`  TOP ${TOP_N} ${modeLabel}RECOMMENDATIONS`);
   console.log("═".repeat(65) + "\n");
 
   for (let i = 0; i < Math.min(TOP_N, scored.length); i++) {
     const { cand, vector, score } = scored[i];
-    const expl = explain(vector, positiveTitles);
-    const explPrefix = expl.length && expl.every(e => e.isFavorite) ? "Because you loved:" : "Because you liked:";
-    const explStr = expl.length ? `${explPrefix} ${expl.map(e=>e.title).join(", ")}` : "Matches your taste profile";
+    const expl = explain(vector, positiveTitles, enrichData, cand.imdbId);
+    const explStr = formatExplanation(expl);
     const typeLabel = cand.type === "movie" ? "MOVIE" : "SERIES";
     console.log(`${(i+1).toString().padStart(2)}. ${cand.title} (${cand.year}) [${typeLabel}]`);
     console.log(`    Match: ${(score*100).toFixed(1)}%  |  IMDb: ${cand.rating}/10  |  ${cand.votes.toLocaleString()} votes`);
@@ -410,7 +608,16 @@ async function main() {
     console.log();
   }
 
-  // 9. Distribution
+  // 12. Language distribution
+  const langDist = {};
+  for (const r of scored.slice(0, TOP_N))
+    langDist[r.cand.language || "?"] = (langDist[r.cand.language || "?"] || 0) + 1;
+  console.log("Language distribution:");
+  for (const [lang, count] of Object.entries(langDist).sort((a, b) => b[1] - a[1]))
+    console.log(`  ${lang.padEnd(4)} ${count}`);
+  console.log();
+
+  // 13. Score distribution
   console.log("═".repeat(65));
   console.log("  SCORE DISTRIBUTION");
   console.log("═".repeat(65) + "\n");
@@ -425,6 +632,7 @@ async function main() {
     console.log(`  ${label}: ${count.toLocaleString().padStart(6)} titles`);
   });
 
+  writeFileSync(TMDB_CACHE_PATH, JSON.stringify(tmdbCache));
   process.exit(0);
 }
 

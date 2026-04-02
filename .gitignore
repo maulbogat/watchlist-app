@@ -50,3 +50,8 @@ Thumbs.db
 .vercel
 deno.lock
 data/imdb/
+data/tmdb-cache.json
+data/tmdb-recs-forward.json
+data/tmdb-recs-inverted.json
+data/tmdb-similar-forward.json
+data/tmdb-similar-inverted.json

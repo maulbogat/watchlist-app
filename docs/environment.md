@@ -55,7 +55,7 @@ Read at **runtime** by **`api/*.js`** on Vercel (and by **`vercel dev`** / local
 | `SENTRY_PROJECT` | Optional — same route — Sentry **project slug** under org **`maulbogat`** (issues list path). Unset → **`{ ok: false, error }`** (not **503**) |
 | `UPCOMING_SYNC_TRIGGER_SECRET` | Optional — bearer auth for **`/api/trigger-upcoming-sync`** |
 | `GITHUB_TOKEN` | Optional — **`/api/admin/external-status?service=github`** (private repo or higher GitHub API rate limits) |
-| `GITHUB_REPO` | Optional — override `owner/repo` for backup workflow discovery; **`/api/admin/external-status?service=github`** defaults to **`maulbogat/watchlist`** when unset |
+| `GITHUB_REPO` | Optional — override `owner/repo` for backup workflow discovery; **`/api/admin/external-status?service=github`** defaults to **`maulbogat/watchlist-app`** when unset |
 | `VERCEL_API_TOKEN` | **`/api/admin/external-status?service=vercel`** — Vercel API bearer token (Admin deployments card) |
 | `VERCEL_PROJECT_ID` | Same route — Vercel **Project ID** (Settings → General). Both `VERCEL_*` required or the route returns **503** |
 | `WHATSAPP_VERIFY_TOKEN` | **`/api/whatsapp-webhook`** — Meta webhook verification (GET) |
@@ -70,15 +70,17 @@ Some routes also read **`VITE_APP_ORIGIN`** from **`process.env`** when present 
 
 ## 4. Local development (parity with production)
 
+**Full stack:** two terminals at the repo root — **`vercel dev --listen 3000`** (API + env on port **3000**) and **`npm run dev:react`** (Vite on **5173**, proxies **`/api/*`** to **localhost:3000**). See **`README.md`** → Run locally.
+
 | What | File |
 |------|------|
 | **`VITE_*`** | **`.env.local`** (Vite; gitignored) |
-| **Server / script keys** | **`.env`** at repo root ( **`vercel dev`**, Node scripts; gitignored) |
+| **Server / script keys** | **`.env`** at repo root (**`vercel dev`**, Node scripts; gitignored) |
 
 Keep **names identical** to Vercel so behavior matches.
 
-- **`npm run dev:react`** — loads **`.env.local`**; proxies **`/api/*`** to **`vercel dev`** (see **`vite.config.ts`**, typically **http://localhost:3000**).
-- **`vercel dev`** (repo root) — serves **`api/*.js`** with project environment rules; use it alongside Vite when you need bookmarklet, WhatsApp verify, cron handlers, or Axiom logging locally.
+- **`vercel dev --listen 3000`** (repo root) — serves **`api/*.js`** with project environment rules (**port 3000** matches **`vite.config.ts`** proxy target). Required locally for bookmarklet, **`/api/invites`**, **`log-client-event`**, WhatsApp routes, cron handlers hit manually, etc.
+- **`npm run dev:react`** — loads **`.env.local`**; proxies **`/api/*`** to **http://localhost:3000** (see **`vite.config.ts`**).
 
 ## 5. Feature → variables
 

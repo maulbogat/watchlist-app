@@ -40,19 +40,27 @@ The watchlist is **React** (`src/`) served by **Vite**. Root **`index.html`** is
 
 ```bash
 npm install
-npm run dev:react
 ```
 
-Open the URL Vite prints (e.g. `http://localhost:5173`). The dev server uses `--host` so LAN devices can reach it if needed.
+**Full local stack (two terminals, repo root):** Vite proxies **`/api/*`** to **`http://localhost:3000`** (**`vite.config.ts`**). Run both processes; order does not matter.
 
+| Terminal | Command | Port |
+|----------|---------|------|
+| **1** | `vercel dev --listen 3000` | **3000** — serverless **`api/*`** + env (**`.env`** / Vercel-linked vars) |
+| **2** | `npm run dev:react` | **5173** — Vite HMR for the SPA |
+
+Open **`http://localhost:5173`** (or the URL Vite prints). The dev server uses `--host` so LAN devices can reach it if needed.
+
+- **UI only:** You can run **`npm run dev:react`** alone if you are not calling **`/api/*`** (no bookmarklet popup, invites, or server-backed features).
 - **Firebase Auth:** Add your dev host (e.g. `localhost` and the port you use) under Firebase Console → Authentication → Settings → **Authorized domains**.
-- **API routes locally:** `vite.config.ts` proxies **`/api/*`** to **`http://localhost:3000`**. In one terminal run **`vercel dev --listen 3000`** at the repo root (API + env); in another run **`npm run dev:react`** (Vite, port **5173**). Use the same `.env` / `.env.local` vars as production so **`log-client-event`**, **bookmarklet**, joins, and jobs work end-to-end.
+- Mirror **`.env`** / **`.env.local`** with production names so **`log-client-event`**, **bookmarklet**, joins, and jobs work end-to-end when both terminals are running.
 
 **Other commands**
 
 | Command | Purpose |
 |--------|---------|
-| `npm run dev:react` | Dev server (HMR) |
+| `vercel dev --listen 3000` | Local **`api/*`** + server env (use with Vite for full stack) |
+| `npm run dev:react` | Vite dev server (HMR), port **5173** |
 | `npm run build:react` | Production bundle → `dist/` |
 | `npm run preview:react` | Serve `dist/` locally |
 | `npm run test:run` | Run Vitest test suite once |
@@ -309,6 +317,40 @@ To **delete the legacy `removed` field** from `sharedLists`, `users`, and person
 node scripts/strip-removed-field.js --dry-run
 node scripts/strip-removed-field.js --write
 ```
+
+## Recommendation engine
+
+Graph-based recommendations (v4): for each list, TMDB `/recommendations` (or `/similar`) links between watched/archived titles and candidate titles are aggregated into a ranked list and written to `recommendations/{listId}` in Firestore.
+
+**Step 1 — build the forward index** (fetch TMDB recs for every title in `titleRegistry`; incremental):
+
+```bash
+node scripts/build-recs-cache.mjs                   # full build
+node scripts/build-recs-cache.mjs --refresh-days 7  # skip titles updated within 7 days
+node scripts/build-recs-cache.mjs --dry-run          # preview only
+```
+
+Writes `data/tmdb-recs-forward.json` and `data/tmdb-recs-inverted.json`. For `/similar` instead of `/recommendations`, use `build-similar-cache.mjs` (same flags).
+
+**Step 2 — generate recommendations for all lists** (reads index, writes to Firestore):
+
+```bash
+node scripts/generate-recommendations.mjs                        # all lists
+node scripts/generate-recommendations.mjs --list <listId>        # one list
+node scripts/generate-recommendations.mjs --dry-run              # compute but skip Firestore write
+node scripts/generate-recommendations.mjs --source similar       # use /similar index
+node scripts/generate-recommendations.mjs --top 5                # top-5 instead of default 10
+```
+
+Enriches each rec with poster + trailer from `titleRegistry` (free) or TMDB API (260 ms throttle, cached in `data/tmdb-cache.json`). Writes `recommendations/{listId}` docs.
+
+**Debug a single list** (prints both raw and diversity rankings to console; no Firestore write):
+
+```bash
+node scripts/graph-recommend.mjs <listId> [--uid <uid>] [--type movie|show|all] [--top <k>] [--source recs|similar]
+```
+
+---
 
 ## Maintenance scripts (titleRegistry)
 

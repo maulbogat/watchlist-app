@@ -83,7 +83,7 @@ function getSegment(event) {
 }
 
 async function handleGithub() {
-  const repo = (process.env.GITHUB_REPO || "maulbogat/watchlist").trim();
+  const repo = (process.env.GITHUB_REPO || "maulbogat/watchlist-app").trim();
   const ghToken = (process.env.GITHUB_TOKEN || "").trim();
   const apiUrl = `https://api.github.com/repos/${repo}/actions/workflows/${encodeURIComponent(
     WORKFLOW_FILE

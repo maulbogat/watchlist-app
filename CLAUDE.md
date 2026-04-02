@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Stack:** React 19 + TypeScript + Vite 6 · Vercel Serverless Functions · Firebase Firestore + Auth · Zustand + TanStack Query · Tailwind CSS 4 + shadcn/ui · Vitest · ESLint 9 + Prettier · Sonner (toasts) · Axiom (observability) · Sentry (error tracking)
 
 **Production:** https://watchlist.maulbogat.com  
-**GitHub:** https://github.com/maulbogat/watchlist  
+**GitHub:** https://github.com/maulbogat/watchlist-app  
 **Vercel project:** watchlist  
 **Firebase project ID:** movie-trailer-site (cannot be renamed — legacy identifier)  
 **GCS bucket:** movie-trailer-site-backups (cannot be renamed — legacy identifier)
