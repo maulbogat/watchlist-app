@@ -41,6 +41,7 @@ import type {
   FirestoreListRow,
   MediaType,
   PersonalList,
+  RecommendationDoc,
   SharedList,
   StatusData,
   StatusKey,
@@ -1653,6 +1654,43 @@ export async function updateRegistryListStatus(
   );
 }
 
+/** Read the pre-computed recommendations doc for a list. Returns null if it doesn't exist. */
+async function getRecommendations(listId: string): Promise<RecommendationDoc | null> {
+  if (!listId) return null;
+  const snap = await getDoc(doc(db, "recommendations", listId));
+  if (!snap.exists()) return null;
+  return snap.data() as RecommendationDoc;
+}
+
+/**
+ * Read `users/{uid}.dismissedRecommendations` and return dismissed tmdbIds as a Set.
+ * Firestore local cache will usually serve this without a network round-trip.
+ */
+async function getDismissedRecommendations(uid: string): Promise<Set<number>> {
+  const snap = await getDoc(doc(db, "users", uid));
+  if (!snap.exists()) return new Set<number>();
+  const raw = snap.data()?.dismissedRecommendations;
+  if (!raw || typeof raw !== "object") return new Set<number>();
+  return new Set(
+    Object.keys(raw)
+      .map(Number)
+      .filter((n) => !Number.isNaN(n))
+  );
+}
+
+/** Persist a dismissed recommendation on `users/{uid}.dismissedRecommendations.{tmdbId}`. */
+async function dismissRecommendation(uid: string, tmdbId: number): Promise<void> {
+  if (!uid || tmdbId == null) return;
+  const ref = doc(db, "users", uid);
+  await setDoc(ref, { dismissedRecommendations: { [String(tmdbId)]: true } }, { merge: true });
+}
+
+/** Resolve the actual Firestore document ID of the user's default personal list. */
+export async function getDefaultPersonalListId(uid: string): Promise<string | null> {
+  const id = await resolveDefaultPersonalListId(uid);
+  return id || null;
+}
+
 export {
   auth,
   signInWithPopup,
@@ -1704,6 +1742,9 @@ export {
   normalizeUserEmailKey,
   checkUserAllowed,
   getIdTokenForApi,
+  getRecommendations,
+  getDismissedRecommendations,
+  dismissRecommendation,
 };
 
 export type { WhatsAppListType };

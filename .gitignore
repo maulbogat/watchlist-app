@@ -25,6 +25,8 @@ backups/items-not-in-all-three-report.txt
 backups/sync-missing-to-catalog-report.txt
 backups/audit-candidates-manual-review.txt
 backups/my-list-and-our-list-titles.txt
+backups/pre-consolidate-my-list-*.json
+backups/pre-clear-favorites-*.json
 
 # Dependencies
 node_modules/

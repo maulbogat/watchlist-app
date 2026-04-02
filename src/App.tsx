@@ -9,9 +9,11 @@ import { AccessDeniedScreen } from "./components/AccessDeniedScreen.js";
 import { JoinPage } from "./pages/JoinPage.js";
 import { JoinAppPage } from "./pages/JoinAppPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
+import { AdminListMatrixPage } from "./pages/AdminListMatrixPage.js";
 import { logEvent } from "./lib/axiom-logger.js";
 import {
   Navigate,
+  Outlet,
   Route,
   Routes,
   useLocation,
@@ -154,7 +156,7 @@ function AdminRouteShell() {
   }
   return (
     <AllowlistGate>
-      <AdminPage />
+      <Outlet />
     </AllowlistGate>
   );
 }
@@ -183,7 +185,10 @@ export default function App() {
           <Routes>
             <Route path="/join-app/:inviteId" element={<JoinAppPage />} />
             <Route path="/join/:listId" element={<JoinPage />} />
-            <Route path="/admin" element={<AdminRouteShell />} />
+            <Route path="/admin" element={<AdminRouteShell />}>
+              <Route index element={<AdminPage />} />
+              <Route path="list-matrix" element={<AdminListMatrixPage />} />
+            </Route>
             <Route path="/" element={<WatchlistAuthGate />} />
             <Route path="/list/:listId" element={<WatchlistAuthGate />} />
             <Route path="*" element={<Navigate to="/" replace />} />

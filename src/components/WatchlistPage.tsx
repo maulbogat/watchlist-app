@@ -36,6 +36,7 @@ import { ManageListsModal } from "./ManageListsModal.js";
 import { CountryModal } from "./CountryModal.js";
 import { ListNameModal } from "./modals/ListNameModal.js";
 import { UpcomingAlertsBar } from "./UpcomingAlertsBar.js";
+import { RecommendationsSection } from "./RecommendationsSection.js";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -432,7 +433,15 @@ export function WatchlistPage() {
       </header>
 
       {listsReady && !activeQ.isError ? (
-        <UpcomingAlertsBar movies={allMovies} watchlistPending={activeQ.isPending} />
+        <>
+          <UpcomingAlertsBar movies={allMovies} watchlistPending={activeQ.isPending} />
+          {!isArchiveTab ? (
+            <RecommendationsSection
+              movies={allMovies}
+              watchlistPending={activeQ.isPending}
+            />
+          ) : null}
+        </>
       ) : null}
 
       <main className="content">

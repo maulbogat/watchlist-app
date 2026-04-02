@@ -91,6 +91,36 @@ export interface UpcomingAlert {
   expiresAt?: string;
 }
 
+export interface RecommendationReference {
+  title: string;
+  isFavorite: boolean;
+}
+
+export interface RecommendationItem {
+  tmdbId: number;
+  imdbId: string | null;
+  title: string;
+  year: number | null;
+  type: "movie" | "show";
+  mediaType: "movie" | "tv";
+  genres: string[];
+  thumb: string | null;
+  youtubeId: string | null;
+  refCount: number;
+  references: RecommendationReference[];
+  explanation: string;
+  registryId: string | null;
+  services: string[];
+}
+
+export interface RecommendationDoc {
+  listId: string;
+  generatedAt: string;
+  source: string;
+  algorithmVersion: string;
+  items: RecommendationItem[];
+}
+
 /** Active list selection (Zustand). `type` is narrowed at runtime in most paths. */
 export type ListMode =
   | "personal"
