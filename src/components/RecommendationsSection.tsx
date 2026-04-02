@@ -21,10 +21,12 @@ function recToWatchlistItem(item: RecommendationItem): WatchlistItem {
     youtubeId: item.youtubeId,
     imdbId: item.imdbId,
     tmdbId: item.tmdbId,
+    tmdbMedia: item.mediaType,
     ...(item.registryId != null ? { registryId: item.registryId } : {}),
     services: item.services,
     servicesByRegion: null,
     genre: item.genres.join(", "),
+    source: "recommendation",
   };
 }
 

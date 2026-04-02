@@ -15,6 +15,7 @@ import {
   useSetTitleStatus,
   useToggleFavorite,
 } from "../hooks/useMutations.js";
+import { useAddRecommendation } from "../hooks/useRecommendations.js";
 import { getCurrentListLabel } from "../data/lists.js";
 import { displayListName, errorMessage } from "../lib/utils.js";
 import { logEvent } from "../lib/axiom-logger.js";
@@ -51,6 +52,7 @@ export function TrailerModal() {
   const addTitleMutation = useAddTitleToList();
   const removeTitleFromListMutation = useRemoveTitleFromList();
   const toggleFavoriteMutation = useToggleFavorite();
+  const addRecommendationMutation = useAddRecommendation(currentUser?.uid);
   const favorites = useFavorites(currentUser?.uid);
 
   const personalQ = usePersonalLists(currentUser?.uid, { enabled: Boolean(currentUser?.uid) });
@@ -245,6 +247,24 @@ export function TrailerModal() {
   }
 
   const currentListButtonLabel = getCurrentListLabel(currentListMode, personalLists, sharedLists);
+
+  const isRec = m.source === "recommendation";
+  const currentListId = typeof currentListMode === "object" ? currentListMode.listId : "personal";
+  const alreadyOnCurrentList = isRec && containingLists.has(currentListId);
+
+  async function onAddRecommendation() {
+    if (!uid || !isRec) return;
+    try {
+      const result = await addRecommendationMutation.mutateAsync({
+        item: m,
+        listMode: currentListMode,
+      });
+      toast.success(`Added "${result.title}" to list`);
+      close();
+    } catch (err: unknown) {
+      toast.error(errorMessage(err) || "Failed to add to list.");
+    }
+  }
 
   const metaCore = [m.year || "", m.genre || ""].filter(Boolean).join(" ");
   const langLabel = modalOriginalLanguageLabel(m.originalLanguage);
@@ -493,6 +513,25 @@ export function TrailerModal() {
               </div>
             </div>
 
+            {isRec && uid ? (
+              alreadyOnCurrentList ? (
+                <span className="modal-action-btn modal-youtube-link" style={{ opacity: 0.45, cursor: "default" }}>
+                  Already on list
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-primary modal-rec-add-btn"
+                  disabled={addRecommendationMutation.isPending}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void onAddRecommendation();
+                  }}
+                >
+                  {addRecommendationMutation.isPending ? "Adding…" : "Add to list"}
+                </button>
+              )
+            ) : null}
             {hasTrailer && m.youtubeId ? (
               <a
                 href={`https://www.youtube.com/watch?v=${encodeURIComponent(m.youtubeId)}`}

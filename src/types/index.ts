@@ -33,6 +33,8 @@ export interface WatchlistItem {
   /** TMDB `original_language` (ISO 639-1), lowercase when from API. */
   originalLanguage?: string | null;
   status?: StatusKey;
+  /** Set when the item was opened from the recommendations strip. */
+  source?: "recommendation";
 }
 
 export interface PersonalList {
