@@ -4,6 +4,10 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/shadcn-utils";
+import {
+  runCheckUpcomingUntilComplete,
+  UPCOMING_ADMIN_BATCH_PAUSE_MS,
+} from "../lib/upcoming-admin-sync.js";
 import { useAppStore } from "../store/useAppStore.js";
 import { isAdmin } from "../config/admin.js";
 import {
@@ -199,15 +203,6 @@ type JobConfigState = {
   lastRunStatus: string | null;
   lastRunMessage: string | null;
   lastRunResult: Record<string, unknown> | null;
-};
-
-type RunNowResponse = {
-  ok?: boolean;
-  skipped?: boolean;
-  reason?: string;
-  alertsUpserted?: number;
-  writesSkipped?: number;
-  error?: string;
 };
 
 type GithubBackupLastRun = {
@@ -975,20 +970,22 @@ export function AdminPage() {
   });
 
   const [runNowResult, setRunNowResult] = useState<string | null>(null);
+  const [runUpcomingProgress, setRunUpcomingProgress] = useState<string | null>(null);
   const runNowTimerRef = useRef<number | null>(null);
+  const runUpcomingAbortRef = useRef<AbortController | null>(null);
   useEffect(() => {
     return () => {
       if (runNowTimerRef.current) window.clearTimeout(runNowTimerRef.current);
     };
   }, []);
 
-  function showRunNowResult(message: string) {
+  function showRunNowResult(message: string, dismissMs: number = 10_000) {
     setRunNowResult(message);
     if (runNowTimerRef.current) window.clearTimeout(runNowTimerRef.current);
     runNowTimerRef.current = window.setTimeout(() => {
       setRunNowResult(null);
       runNowTimerRef.current = null;
-    }, 10_000);
+    }, dismissMs);
   }
 
   const toggleJobMutation = useMutation({
@@ -1012,48 +1009,59 @@ export function AdminPage() {
   });
 
   const runNowMutation = useMutation({
+    onMutate: () => {
+      runUpcomingAbortRef.current?.abort();
+      runUpcomingAbortRef.current = new AbortController();
+      setRunUpcomingProgress(null);
+    },
     mutationFn: async () => {
-      const res = await fetch("/api/check-upcoming", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trigger: "manual" }),
+      const signal = runUpcomingAbortRef.current?.signal;
+      if (!signal) throw new Error("Could not start run");
+      return runCheckUpcomingUntilComplete({
+        signal,
+        onProgress: ({ batch, last }) => {
+          const phase =
+            last.skipped === true
+              ? "skipped"
+              : last.completed === true
+                ? "complete"
+                : last.completed === false
+                  ? "partial"
+                  : "…";
+          setRunUpcomingProgress(`Batch ${batch} (${phase})…`);
+        },
       });
-      const raw = await res.text();
-      let data: RunNowResponse = {};
-      let textFallback = "";
-      try {
-        data = raw ? (JSON.parse(raw) as RunNowResponse) : {};
-      } catch {
-        textFallback = raw;
-      }
-      if (!res.ok || data.ok === false) {
-        throw new Error(textFallback || data.error || `Request failed (${res.status})`);
-      }
-      if (textFallback) {
-        return { ok: true, reason: textFallback };
-      }
-      return data;
     },
     onSuccess: (data) => {
+      setRunUpcomingProgress(null);
+      runUpcomingAbortRef.current = null;
+      if (!data.ok) {
+        showRunNowResult(
+          data.error === "Cancelled" ? "Cancelled" : data.error || "Run failed",
+          data.error === "Cancelled" ? 8000 : 12_000
+        );
+        void jobConfigQ.refetch();
+        return;
+      }
       if (data.skipped) {
         showRunNowResult(data.reason || "Skipped");
-      } else {
-        if (typeof data.reason === "string" && data.reason.trim()) {
-          showRunNowResult(data.reason);
-          void jobConfigQ.refetch();
-          return;
-        }
-        const written = typeof data.alertsUpserted === "number" ? data.alertsUpserted : null;
-        const skipped = typeof data.writesSkipped === "number" ? data.writesSkipped : null;
-        if (written != null || skipped != null) {
-          showRunNowResult(`Done — wrote ${written ?? 0}, skipped ${skipped ?? 0}`);
-        } else {
-          showRunNowResult("Done");
-        }
+        void jobConfigQ.refetch();
+        return;
       }
+      const { batches, totals } = data;
+      const suffix =
+        batches > 1
+          ? ` — ${batches} server batches (paused between batches for TMDB rate limits)`
+          : "";
+      showRunNowResult(
+        `Full sync finished${suffix} — wrote ${totals.alertsUpserted}, skipped ${totals.writesSkipped} unchanged writes (${totals.rowsChecked} registry rows visited)`,
+        25_000
+      );
       void jobConfigQ.refetch();
     },
     onError: (err: Error) => {
+      setRunUpcomingProgress(null);
+      runUpcomingAbortRef.current = null;
       showRunNowResult(err.message || "Failed to run check-upcoming");
       void jobConfigQ.refetch();
     },
@@ -1173,6 +1181,11 @@ export function AdminPage() {
                       )}
                     </span>
                   </div>
+                  <p className="admin-job-hint">
+                    Run Now walks the whole catalog: it calls the check-upcoming API repeatedly
+                    until the sync reports complete, waiting {UPCOMING_ADMIN_BATCH_PAUSE_MS / 1000}s
+                    between batches so TMDB is not hammered across serverless invocations.
+                  </p>
                   <div className="admin-job-row admin-job-row--actions">
                     <div className="admin-job-actions">
                       <Button
@@ -1184,6 +1197,16 @@ export function AdminPage() {
                       >
                         {runNowMutation.isPending ? "Running…" : "Run Now"}
                       </Button>
+                      {runNowMutation.isPending ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={toggleJobMutation.isPending}
+                          onClick={() => runUpcomingAbortRef.current?.abort()}
+                        >
+                          Cancel
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         className="admin-job-toggle-btn"
@@ -1201,6 +1224,11 @@ export function AdminPage() {
                       </Button>
                     </div>
                   </div>
+                  {runUpcomingProgress ? (
+                    <p className="admin-job-result admin-job-result--muted">
+                      {runUpcomingProgress}
+                    </p>
+                  ) : null}
                   {runNowResult ? <p className="admin-job-result">{runNowResult}</p> : null}
                 </>
               )}

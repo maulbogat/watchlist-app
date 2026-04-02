@@ -185,15 +185,15 @@ Keep **`AXIOM_*` on the server** only; do not reintroduce **`VITE_AXIOM_*`**. If
 
    The **GitHub Actions** JSON backup (`scripts/backup-firestore.js`) honors **`githubBackupEnabled`**: when **`false`**, the script exits successfully without rewriting **`backups/firestore-backup.json`**. The Actions workflow still runs on its schedule unless you change it in GitHub.
 
-   **If `curl …/api/check-upcoming` errors or times out:** the sync uses a **time budget + Firestore cursor** (`syncState/upcomingAlerts`, Admin-only — deploy updated **`firestore.rules`**). Use **Admin → Run now** (POST **`/api/check-upcoming`**) or cron until logs show **`completed":true`**. **`vercel.json`** sets **`maxDuration`** **60s** for the heaviest API routes.
+   **If `curl …/api/check-upcoming` errors or times out:** the sync uses a **time budget + Firestore cursor** (`syncState/upcomingAlerts`, Admin-only — deploy updated **`firestore.rules`**). **Admin → Run now** loops POST **`/api/check-upcoming`** until the response has **`"completed":true`**, waiting **2.5s** between calls so TMDB is not hammered across separate serverless invocations (each single POST still only runs ~21s of work). Cron continues the cursor on its own schedule. **`vercel.json`** sets **`maxDuration`** **60s** for the heaviest API routes.
 
-   **Manual HTTP / `curl`:** You can POST **`/api/check-upcoming`** with `{"trigger":"manual"}` from the Admin UI, or use the dedicated trigger:
+   **Manual HTTP / `curl`:** One POST runs **one** chunk. Repeat until **`"completed":true`**, or use **Admin → Run now** to do that loop in the browser (with **Cancel**). Example dedicated trigger:
 
    ```bash
    curl -X POST "https://YOUR-SITE.vercel.app/api/trigger-upcoming-sync"
    ```
 
-   Repeat until the JSON shows `"completed":true` (same chunked sync as the scheduler). Optional: set **`UPCOMING_SYNC_TRIGGER_SECRET`** in Vercel and send `Authorization: Bearer <that-value>` so random people can’t trigger TMDB/Firestore work.
+   Optional: set **`UPCOMING_SYNC_TRIGGER_SECRET`** in Vercel and send `Authorization: Bearer <that-value>` so random people can’t trigger TMDB/Firestore work.
 
    **Firestore `RESOURCE_EXHAUSTED` / “Quota exceeded”** in function logs usually means the **Spark (free) plan daily read/write budget** was hit, or two runs overlapped and doubled traffic. The sync now **pages through `titleRegistry`** (instead of downloading the whole collection every run) and **retries** quota errors with backoff. If errors persist: upgrade to **Blaze (pay-as-you-go)** in Firebase, reduce how often you manually trigger sync, or run **`node scripts/sync-upcoming-alerts.mjs`** locally when the registry is large.
 
