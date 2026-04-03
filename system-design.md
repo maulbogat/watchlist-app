@@ -299,7 +299,8 @@ Top-level collection. **Writes:** Admin SDK only (`scripts/generate-recommendati
 | `listId` | `string` | Same as the document id. |
 | `generatedAt` | `string` (ISO) | Timestamp when the script wrote this doc. |
 | `source` | `"recs"` \| `"similar"` | Which TMDB index was used (`--source` flag). |
-| `algorithmVersion` | `string` | E.g. `"v4-graph"`. |
+| `algorithmVersion` | `string` | E.g. `"v4-graph-q1"`. |
+| `qualityFilter` | `object` or null | When quality filtering is active: `{ minRating, minVotesEn, minVotesForeign }`. null when `data/imdb/title.ratings.tsv` was absent at run time. |
 | `items` | `array` | Ordered list of recommendation objects (top-k, highest `refCount` first). |
 
 Each `items` entry:
@@ -321,7 +322,7 @@ Each `items` entry:
 | `registryId` | `string` or null | `titleRegistry` doc id if the rec is already in the catalog; enables the "add to list" flow. |
 | `services` | `array` of `string` | Streaming service chips from `titleRegistry`; empty array if not in catalog. |
 
-**Script:** `scripts/generate-recommendations.mjs` — loads `data/tmdb-recs-forward.json` (or `data/tmdb-similar-forward.json`), iterates all personal + shared lists for all `allowedUsers`, aggregates the graph-based recs, enriches with poster/trailer from `titleRegistry` or TMDB API, and writes one doc per list. Supports `--list <id>`, `--dry-run`, `--source similar`, `--top <k>`.
+**Script:** `scripts/generate-recommendations.mjs` — loads `data/tmdb-recs-forward.json` (or `data/tmdb-similar-forward.json`), iterates all personal + shared lists for all `allowedUsers`, aggregates the graph-based recs, enriches with poster/trailer from `titleRegistry` or TMDB API, and writes one doc per list. Supports `--list <id>`, `--dry-run`, `--source similar`, `--top <k>`. When `data/imdb/title.ratings.tsv` is present, applies IMDb quality filtering (rating ≥ 6.0, EN votes ≥ 15,000, foreign votes ≥ 3,000) against a 3× candidate pool before selecting the final top-k. If the file is absent, filtering is skipped and the pipeline runs as before (backward compatible).
 
 **Client-side display:** `src/components/RecommendationsSection.tsx` renders a horizontal strip below "Up next" on the watchlist page. Uses `useRecommendations` (TanStack Query, 1-hour stale time) and `useDismissedRecommendations` hooks (both in `src/hooks/useRecommendations.ts`). Items already on the current list or previously dismissed are filtered client-side before display. Dismissals are written to `users/{uid}.dismissedRecommendations.{tmdbId}` via `dismissRecommendation()` in `src/firebase.ts` (pipeline will use this map in a future iteration).
 

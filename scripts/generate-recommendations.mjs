@@ -34,8 +34,13 @@ const INDEX_PATHS = {
   recs:    resolve(__dirname, "../data/tmdb-recs-forward.json"),
   similar: resolve(__dirname, "../data/tmdb-similar-forward.json"),
 };
+const IMDB_RATINGS_PATH = resolve(__dirname, "../data/imdb/title.ratings.tsv");
 
-const ALGORITHM_VERSION = "v4-graph";
+const ALGORITHM_VERSION = "v4-graph-q1"; // q1 = quality filter v1
+
+const MIN_RATING      = 6.0;
+const MIN_VOTES_EN    = 15000;
+const MIN_VOTES_FOREIGN = 3000;
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -95,6 +100,41 @@ function pickYoutubeTrailerKey(results) {
     r.find(v => v.site === "YouTube" && v.key && (v.type === "Clip" || v.type === "Featurette")) ||
     r.find(v => v.site === "YouTube" && v.key);
   return pick ? pick.key : null;
+}
+
+// ─── IMDb ratings loader ──────────────────────────────────────────────────────
+function loadImdbRatings(path) {
+  const ratings = new Map();
+  const content = readFileSync(path, "utf8");
+  const lines = content.split("\n");
+  for (let i = 1; i < lines.length; i++) {
+    const parts = lines[i].split("\t");
+    if (parts.length >= 3) {
+      ratings.set(parts[0], {
+        rating: parseFloat(parts[1]),
+        votes:  parseInt(parts[2], 10),
+      });
+    }
+  }
+  return ratings;
+}
+
+// ─── Quality filter ───────────────────────────────────────────────────────────
+function passesQualityFilter(enrichedRec, imdbRatings) {
+  if (!imdbRatings) return true; // no ratings file = no filtering
+
+  const imdbId = enrichedRec.imdbId;
+  if (!imdbId) return true; // can't filter without imdbId — let it through
+
+  const rating = imdbRatings.get(imdbId);
+  if (!rating) return true; // not in IMDb dataset — let it through
+
+  if (rating.rating < MIN_RATING) return false;
+
+  const isEnglish = !enrichedRec.originalLanguage || enrichedRec.originalLanguage === "en";
+  const minVotes = isEnglish ? MIN_VOTES_EN : MIN_VOTES_FOREIGN;
+
+  return rating.votes >= minVotes;
 }
 
 // ─── Explanation builder ──────────────────────────────────────────────────────
@@ -163,38 +203,40 @@ async function enrichRec(rec, tmdbToRegistry, tmdbCache) {
   if (regEntry) {
     const data = regEntry.data;
     return {
-      fromRegistry: true,
-      title:       data.title       || rec.title,
-      year:        data.year        || null,
-      type:        data.type        || (rec.mediaType === "tv" ? "show" : "movie"),
-      mediaType:   rec.mediaType,
-      genres:      data.genre ? data.genre.split(/[/,|]/).map(g => g.trim()).filter(Boolean) : [],
-      thumb:       data.thumb       || null,
-      youtubeId:   data.youtubeId   || null,
-      imdbId:      data.imdbId      || null,
-      registryId:  regEntry.id,
-      services:    Array.isArray(data.services) ? data.services : [],
+      fromRegistry:     true,
+      title:            data.title       || rec.title,
+      year:             data.year        || null,
+      type:             data.type        || (rec.mediaType === "tv" ? "show" : "movie"),
+      mediaType:        rec.mediaType,
+      genres:           data.genre ? data.genre.split(/[/,|]/).map(g => g.trim()).filter(Boolean) : [],
+      thumb:            data.thumb       || null,
+      youtubeId:        data.youtubeId   || null,
+      imdbId:           data.imdbId      || null,
+      originalLanguage: data.originalLanguage || null,
+      registryId:       regEntry.id,
+      services:         Array.isArray(data.services) ? data.services : [],
     };
   }
 
   // Fallback: TMDB API
   const mediaType = rec.mediaType || "movie";
-  const path = `/${mediaType}/${rec.tmdbId}?append_to_response=videos`;
+  const path = `/${mediaType}/${rec.tmdbId}?append_to_response=videos,external_ids`;
   const data = await fetchTmdb(path, tmdbCache);
 
   if (!data) {
     return {
-      fromRegistry: false,
-      title:      rec.title,
-      year:       null,
-      type:       mediaType === "tv" ? "show" : "movie",
+      fromRegistry:     false,
+      title:            rec.title,
+      year:             null,
+      type:             mediaType === "tv" ? "show" : "movie",
       mediaType,
-      genres:     [],
-      thumb:      null,
-      youtubeId:  null,
-      imdbId:     null,
-      registryId: null,
-      services:   [],
+      genres:           [],
+      thumb:            null,
+      youtubeId:        null,
+      imdbId:           null,
+      originalLanguage: null,
+      registryId:       null,
+      services:         [],
     };
   }
 
@@ -203,19 +245,22 @@ async function enrichRec(rec, tmdbToRegistry, tmdbCache) {
   const thumb   = data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null;
   const genres  = (data.genres || []).map(g => g.name);
   const youtubeId = pickYoutubeTrailerKey(data.videos?.results);
+  const imdbId  = data.external_ids?.imdb_id || data.imdb_id || null;
+  const originalLanguage = data.original_language || null;
 
   return {
-    fromRegistry: false,
-    title:      data.title || data.name || rec.title,
+    fromRegistry:     false,
+    title:            data.title || data.name || rec.title,
     year,
-    type:       mediaType === "tv" ? "show" : "movie",
+    type:             mediaType === "tv" ? "show" : "movie",
     mediaType,
     genres,
     thumb,
     youtubeId,
-    imdbId:     null,
-    registryId: null,
-    services:   [],
+    imdbId,
+    originalLanguage,
+    registryId:       null,
+    services:         [],
   };
 }
 
@@ -286,6 +331,15 @@ async function main() {
   const tmdbCache = existsSync(TMDB_CACHE_PATH)
     ? JSON.parse(readFileSync(TMDB_CACHE_PATH, "utf8"))
     : {};
+
+  // 2b. Load IMDb ratings for quality filtering
+  let imdbRatings = null;
+  if (existsSync(IMDB_RATINGS_PATH)) {
+    imdbRatings = loadImdbRatings(IMDB_RATINGS_PATH);
+    console.log(`IMDb ratings: ${imdbRatings.size.toLocaleString()} entries loaded`);
+  } else {
+    console.warn(`Warning: IMDb ratings not found at ${IMDB_RATINGS_PATH} — quality filtering disabled`);
+  }
 
   // 3. Init Firebase + load titleRegistry
   const db = initFirebase();
@@ -398,19 +452,39 @@ async function main() {
       continue;
     }
 
-    // Select top-k
-    const topRecs = selectTopK(aggregated, topK);
+    // Take a larger pool for filtering (3x topK, but at least 30)
+    const poolSize = Math.max(topK * 3, 30);
+    const pool = selectTopK(aggregated, poolSize);
 
-    // Enrich each recommendation
+    // Enrich the entire pool
     const tmdbCallsBefore = Object.keys(tmdbCache).length;
+    const enrichedPool = [];
+    for (const rec of pool) {
+      const enrich = await enrichRec(rec, tmdbToRegistry, tmdbCache);
+      enrichedPool.push({ rec, enrich });
+    }
+
+    // Apply quality filter
+    const filtered = imdbRatings
+      ? enrichedPool.filter(({ enrich }) => passesQualityFilter(enrich, imdbRatings))
+      : enrichedPool;
+
+    const dropped = enrichedPool.length - filtered.length;
+    if (dropped > 0) {
+      console.log(`    Quality filter: ${dropped} of ${enrichedPool.length} dropped, ${filtered.length} passed`);
+    }
+
+    // Take top-k from filtered pool (already sorted by ref count from selectTopK)
+    const topFiltered = filtered.slice(0, topK);
+
+    // Build enriched items from the filtered top-k
     const enrichedItems = [];
     let listFromRegistry = 0;
     let listFromTmdb = 0;
     let listWithTrailer = 0;
     let listWithoutTrailer = 0;
 
-    for (const rec of topRecs) {
-      const enrich = await enrichRec(rec, tmdbToRegistry, tmdbCache);
+    for (const { rec, enrich } of topFiltered) {
       const refCount = rec.references.length;
       // Keep only title+isFavorite for the Firestore doc (debug data stays local)
       const references = rec.references.map(r => ({ title: r.title, isFavorite: r.isFavorite }));
@@ -458,6 +532,9 @@ async function main() {
       generatedAt:      new Date().toISOString(),
       source,
       algorithmVersion: ALGORITHM_VERSION,
+      qualityFilter:    imdbRatings
+        ? { minRating: MIN_RATING, minVotesEn: MIN_VOTES_EN, minVotesForeign: MIN_VOTES_FOREIGN }
+        : null,
       items:            enrichedItems,
     };
 
@@ -484,6 +561,10 @@ async function main() {
   console.log(`  ${totalFromRegistry} enriched from titleRegistry, ${totalFromTmdb} from TMDB`);
   console.log(`  ${totalWithTrailer} with trailers, ${totalWithoutTrailer} without`);
   console.log(`  TMDB API calls: ${tmdbApiCalls} (enrichment) in ${elapsed}s`);
+  console.log(`  Quality filter: ${imdbRatings ? "ON" : "OFF (no IMDb data)"}`);
+  if (imdbRatings) {
+    console.log(`    Thresholds: rating≥${MIN_RATING}, EN votes≥${MIN_VOTES_EN.toLocaleString()}, foreign votes≥${MIN_VOTES_FOREIGN.toLocaleString()}`);
+  }
   if (isDryRun) {
     console.log(`  Firestore writes: 0 (dry run)`);
   } else {
