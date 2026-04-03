@@ -312,7 +312,7 @@ export function TrailerModal() {
               allowFullScreen
               allow="autoplay; encrypted-media; picture-in-picture"
               referrerPolicy="strict-origin-when-cross-origin"
-              src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(m.youtubeId)}?rel=0&modestbranding=1&playsinline=1`}
+              src={`https://www.youtube.com/embed/${encodeURIComponent(m.youtubeId)}?rel=0&modestbranding=1&playsinline=1`}
             />
           ) : (
             <div
