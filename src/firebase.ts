@@ -39,6 +39,7 @@ import { listKey } from "./lib/registry-id.js";
 import { logEvent } from "./lib/axiom-logger.js";
 import type {
   FirestoreListRow,
+  ListMode,
   MediaType,
   PersonalList,
   RecommendationDoc,
@@ -293,9 +294,7 @@ async function hydrateListItemsFromRegistry(
     if (rowAddedByPhoto) meta.addedByPhotoUrl = rowAddedByPhoto;
     else delete meta.addedByPhotoUrl;
     let status: WatchlistItem["status"] = "to-watch";
-    if (archiveSet.has(rid)) status = "archive";
-    else if (watchedSet.has(rid)) status = "watched";
-    else if (maybeLaterSet.has(rid)) status = "maybe-later";
+    if (watchedSet.has(rid)) status = "watched";
     const mediaType: MediaType = meta.type === "show" ? "show" : "movie";
     const rowAddedBy = addedByUidFromListRow(r);
     out.push({
@@ -336,9 +335,7 @@ async function hydrateListItemsFromRegistry(
   for (const m of legacyMerged) {
     const k = titleYearKey(m);
     let status: WatchlistItem["status"] = "to-watch";
-    if (archiveSet.has(k)) status = "archive";
-    else if (watchedSet.has(k)) status = "watched";
-    else if (maybeLaterSet.has(k)) status = "maybe-later";
+    if (watchedSet.has(k)) status = "watched";
     // Legacy embedded rows: shape varies; runtime matches historical Firestore embeds.
     const legacyMeta = m as Record<string, unknown>;
     out.push({
@@ -870,8 +867,6 @@ async function addToSharedList(
   const archive = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
   const s = movie.status || "to-watch";
   if (s === "watched") watched.add(key);
-  else if (s === "maybe-later") maybeLater.add(key);
-  else if (s === "archive") archive.add(key);
   await setDoc(
     ref,
     { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] },
@@ -906,8 +901,6 @@ async function addToPersonalList(uid: string, listId: string, movie: WatchlistIt
     );
     const archive = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
     if (s === "watched") watched.add(key);
-    else if (s === "maybe-later") maybeLater.add(key);
-    else if (s === "archive") archive.add(key);
     await setDoc(
       ref,
       { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] },
@@ -931,8 +924,6 @@ async function addToPersonalList(uid: string, listId: string, movie: WatchlistIt
     );
     const archive = new Set((Array.isArray(data.archive) ? data.archive : []).map((k) => String(k)));
     if (s === "watched") watched.add(key);
-    else if (s === "maybe-later") maybeLater.add(key);
-    else if (s === "archive") archive.add(key);
     await setDoc(
       ref,
       { items, watched: [...watched], maybeLater: [...maybeLater], archive: [...archive] },
@@ -1597,15 +1588,41 @@ async function setGithubBackupEnabledState(enabled: boolean): Promise<JobConfigS
 }
 
 /**
- * Toggle a title's favorite state for a user.
+ * Resolves the Firestore document reference where favorites are stored for the given list.
+ * Personal lists store favorites on the list doc; shared lists on the sharedLists doc.
+ */
+async function resolveFavoritesDocRef(
+  uid: string,
+  listMode: ListMode
+): Promise<DocumentReference | null> {
+  if (typeof listMode === "object" && listMode.type === "shared") {
+    return doc(db, "sharedLists", listMode.listId);
+  }
+  // Personal list — resolve actual list ID
+  let listId: string;
+  if (typeof listMode === "object" && listMode.type === "personal" && listMode.listId !== "personal") {
+    listId = listMode.listId;
+  } else {
+    listId = await resolveDefaultPersonalListId(uid);
+  }
+  if (!listId) return null;
+  return doc(db, "users", uid, "personalLists", listId);
+}
+
+/**
+ * Toggle a title's favorite state for a list.
+ * For personal lists, favorites are stored on the personal list doc.
+ * For shared lists, favorites are stored on the shared list doc (visible to all members).
  * isFavorite=true sets `favorites.{registryId}: true`; false deletes the key.
  */
 export async function toggleFavorite(
   uid: string,
+  listMode: ListMode,
   registryId: string,
   isFavorite: boolean
 ): Promise<void> {
-  const ref = doc(db, "users", uid);
+  const ref = await resolveFavoritesDocRef(uid, listMode);
+  if (!ref) return;
   if (isFavorite) {
     await updateDoc(ref, { [`favorites.${registryId}`]: true });
   } else {
@@ -1613,9 +1630,10 @@ export async function toggleFavorite(
   }
 }
 
-/** Read favorites for a user — returns Set<string> of registryIds. */
-export async function getFavorites(uid: string): Promise<Set<string>> {
-  const ref = doc(db, "users", uid);
+/** Read favorites for a list — returns Set<string> of registryIds. */
+export async function getFavorites(uid: string, listMode: ListMode): Promise<Set<string>> {
+  const ref = await resolveFavoritesDocRef(uid, listMode);
+  if (!ref) return new Set();
   const snap = await getDoc(ref);
   if (!snap.exists()) return new Set();
   const favMap = snap.data()?.favorites;
@@ -1624,26 +1642,37 @@ export async function getFavorites(uid: string): Promise<Set<string>> {
 }
 
 /**
- * Subscribe to real-time favorites updates for a user.
+ * Subscribe to real-time favorites updates for a list.
  * Returns an unsubscribe function.
  */
 export function subscribeFavorites(
   uid: string,
+  listMode: ListMode,
   callback: (favorites: Set<string>) => void
 ): () => void {
-  const ref = doc(db, "users", uid);
-  return onSnapshot(ref, (snap) => {
-    if (!snap.exists()) {
-      callback(new Set());
-      return;
-    }
-    const favMap = snap.data()?.favorites;
-    if (!favMap || typeof favMap !== "object" || Array.isArray(favMap)) {
-      callback(new Set());
-      return;
-    }
-    callback(new Set(Object.keys(favMap)));
+  let cancelled = false;
+  let unsub: (() => void) | undefined;
+
+  void resolveFavoritesDocRef(uid, listMode).then((ref) => {
+    if (cancelled || !ref) return;
+    unsub = onSnapshot(ref, (snap) => {
+      if (!snap.exists()) {
+        callback(new Set());
+        return;
+      }
+      const favMap = snap.data()?.favorites;
+      if (!favMap || typeof favMap !== "object" || Array.isArray(favMap)) {
+        callback(new Set());
+        return;
+      }
+      callback(new Set(Object.keys(favMap)));
+    });
   });
+
+  return () => {
+    cancelled = true;
+    unsub?.();
+  };
 }
 
 /**

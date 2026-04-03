@@ -13,7 +13,6 @@ import { getUserProfile, setUserCountry } from "../data/user.js";
 import { COUNTRIES } from "../countries.js";
 import { errorMessage } from "../lib/utils.js";
 import { logEvent } from "../lib/axiom-logger.js";
-import { persistFilterPreferences } from "../lib/storage.js";
 import { useAppStore } from "../store/useAppStore.js";
 import {
   usePersonalLists,
@@ -23,11 +22,7 @@ import {
   invalidateUserListQueries,
 } from "../hooks/useWatchlist.js";
 import { useWatchlistSessionRestore } from "../hooks/useWatchlistSessionRestore.js";
-import {
-  filterTitles,
-  isAddedByPresentInMovies,
-  isGenrePresentInMovies,
-} from "../lib/watchlistFilters.js";
+import { filterTitles, isAddedByPresentInMovies } from "../lib/watchlistFilters.js";
 import { ListSelector } from "./ListSelector.js";
 import { WatchlistToolbar } from "./WatchlistToolbar.js";
 import { TitleGrid, TitleGridSkeleton } from "./TitleGrid.js";
@@ -50,7 +45,6 @@ export function WatchlistPage() {
   const sharedQ = useSharedLists(user?.uid, { enabled: Boolean(user?.uid) });
   const currentListMode = useAppStore((s) => s.currentListMode);
   const currentFilter = useAppStore((s) => s.currentFilter);
-  const currentGenre = useAppStore((s) => s.currentGenre);
   const currentAddedByUid = useAppStore((s) => s.currentAddedByUid);
   const currentStatus = useAppStore((s) => s.currentStatus);
   const currentSort = useAppStore((s) => s.currentSort);
@@ -120,33 +114,12 @@ export function WatchlistPage() {
     };
   }, [user?.uid, listsReady, personalQ.isSuccess, setUserCountryCode]);
 
-  useEffect(() => {
-    if (!user?.uid || currentStatus !== "archive") return;
-    const s = useAppStore.getState();
-    useAppStore.setState({ currentStatus: "to-watch" });
-    persistFilterPreferences(user, {
-      currentFilter: s.currentFilter,
-      currentGenre: s.currentGenre,
-      currentStatus: "to-watch",
-      currentSort: s.currentSort,
-      currentSearch: s.currentSearch,
-      currentAddedByUid: s.currentAddedByUid,
-    });
-  }, [user, currentStatus]);
-
   const moviesQ = useWatchlistMovies(user?.uid, currentListMode, {
     enabled: listsReady,
   });
 
   const allMovies = moviesQ.data ?? [];
-  const favorites = useFavorites(user?.uid);
-
-  useEffect(() => {
-    if (!currentGenre) return;
-    if (!isGenrePresentInMovies(allMovies, currentGenre)) {
-      useAppStore.getState().setCurrentGenre("");
-    }
-  }, [allMovies, currentGenre]);
+  const favorites = useFavorites(user?.uid, currentListMode);
 
   useEffect(() => {
     if (!currentAddedByUid) return;
@@ -170,7 +143,6 @@ export function WatchlistPage() {
   const visibleMovies = useMemo(() => {
     const base = filterTitles(allMovies, {
       currentFilter,
-      currentGenre,
       currentStatus,
       currentSort,
       currentSearch,
@@ -181,7 +153,6 @@ export function WatchlistPage() {
   }, [
     allMovies,
     currentFilter,
-    currentGenre,
     currentStatus,
     currentSort,
     currentSearch,

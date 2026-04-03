@@ -62,7 +62,7 @@ export function TitleGrid({
   const setTitleStatusMutation = useSetTitleStatus();
   const removeTitleMutation = useRemoveTitle();
   const toggleFavoriteMutation = useToggleFavorite();
-  const favorites = useFavorites(currentUser?.uid);
+  const favorites = useFavorites(currentUser?.uid, currentListMode);
 
   const [statusOpenKey, setStatusOpenKey] = useState<string | null>(null);
 
@@ -217,6 +217,7 @@ export function TitleGrid({
                     const nowFavorite = !favorites.has(registryId);
                     void toggleFavoriteMutation.mutateAsync({
                       uid: currentUser.uid,
+                      listMode: currentListMode,
                       registryId,
                       isFavorite: nowFavorite,
                     });

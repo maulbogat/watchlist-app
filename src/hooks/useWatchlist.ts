@@ -125,25 +125,30 @@ export function useInvalidateUserListQueries(): (uid: string | undefined) => voi
 }
 
 /**
- * Subscribes to the current user's favorites in real time.
- * Returns a Set<string> of favorited registryIds.
- * Uses TanStack Query for caching + onSnapshot for live updates.
+ * Subscribes to favorites for the current list in real time.
+ * Returns a Set<string> of favorited registryIds scoped to that list.
+ * Personal list favorites are private; shared list favorites are shared across all members.
  */
-export function useFavorites(uid: string | undefined): Set<string> {
+export function useFavorites(uid: string | undefined, listMode: ListMode | undefined): Set<string> {
   const queryClient = useQueryClient();
+  const modeKey = listModeQueryKey(listMode);
+  const modeKeyStr = modeKey.join("\0");
 
   useEffect(() => {
-    if (!uid) return;
-    const unsub = subscribeFavorites(uid, (favorites) => {
-      queryClient.setQueryData(["favorites", uid], favorites);
+    if (!uid || !listMode) return;
+    const unsub = subscribeFavorites(uid, listMode, (favorites) => {
+      queryClient.setQueryData(["favorites", uid, ...modeKey], favorites);
     });
     return unsub;
-  }, [uid, queryClient]);
+    // modeKeyStr is a stable string representation of listMode for the dep array;
+    // modeKey is captured at the time the effect runs and is consistent with modeKeyStr.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, modeKeyStr, queryClient]);
 
   const { data } = useQuery({
-    queryKey: ["favorites", uid],
-    queryFn: () => getFavorites(uid!),
-    enabled: Boolean(uid),
+    queryKey: ["favorites", uid, ...modeKey],
+    queryFn: () => getFavorites(uid!, listMode!),
+    enabled: Boolean(uid) && Boolean(listMode),
     staleTime: 60 * 1000,
   });
 

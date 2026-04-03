@@ -320,6 +320,7 @@ export function useRemoveTitleFromList() {
 
 interface ToggleFavoriteVars {
   uid: string;
+  listMode: ListMode;
   registryId: string;
   isFavorite: boolean;
 }
@@ -327,22 +328,24 @@ interface ToggleFavoriteVars {
 export function useToggleFavorite() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ uid, registryId, isFavorite }: ToggleFavoriteVars) =>
-      toggleFavorite(uid, registryId, isFavorite),
-    onMutate: async ({ uid, registryId, isFavorite }) => {
-      await queryClient.cancelQueries({ queryKey: ["favorites", uid] });
-      const previous = queryClient.getQueryData<Set<string>>(["favorites", uid]);
-      queryClient.setQueryData<Set<string>>(["favorites", uid], (prev) => {
+    mutationFn: ({ uid, listMode, registryId, isFavorite }: ToggleFavoriteVars) =>
+      toggleFavorite(uid, listMode, registryId, isFavorite),
+    onMutate: async ({ uid, listMode, registryId, isFavorite }) => {
+      const modeKey = listModeQueryKey(listMode);
+      const cacheKey = ["favorites", uid, ...modeKey];
+      await queryClient.cancelQueries({ queryKey: cacheKey });
+      const previous = queryClient.getQueryData<Set<string>>(cacheKey);
+      queryClient.setQueryData<Set<string>>(cacheKey, (prev) => {
         const next = new Set(prev ?? []);
         if (isFavorite) next.add(registryId);
         else next.delete(registryId);
         return next;
       });
-      return { previous, uid };
+      return { previous, uid, modeKey };
     },
     onError: (_err, _vars, context) => {
       if (context) {
-        queryClient.setQueryData(["favorites", context.uid], context.previous);
+        queryClient.setQueryData(["favorites", context.uid, ...context.modeKey], context.previous);
       }
     },
   });

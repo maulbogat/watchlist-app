@@ -53,7 +53,7 @@ export function TrailerModal() {
   const removeTitleFromListMutation = useRemoveTitleFromList();
   const toggleFavoriteMutation = useToggleFavorite();
   const addRecommendationMutation = useAddRecommendation(currentUser?.uid);
-  const favorites = useFavorites(currentUser?.uid);
+  const favorites = useFavorites(currentUser?.uid, currentListMode);
 
   const personalQ = usePersonalLists(currentUser?.uid, { enabled: Boolean(currentUser?.uid) });
   const sharedQ = useSharedLists(currentUser?.uid, { enabled: Boolean(currentUser?.uid) });
@@ -382,7 +382,7 @@ export function TrailerModal() {
                   e.stopPropagation();
                   const registryId = listKey(m);
                   const nowFavorite = !favorites.has(registryId);
-                  void toggleFavoriteMutation.mutateAsync({ uid, registryId, isFavorite: nowFavorite });
+                  void toggleFavoriteMutation.mutateAsync({ uid, listMode: currentListMode, registryId, isFavorite: nowFavorite });
                 }}
               >
                 {favorites.has(listKey(m)) ? "♥" : "♡"}
