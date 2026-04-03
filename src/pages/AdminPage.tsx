@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -1121,11 +1121,6 @@ export function AdminPage() {
       <header className="admin-header">
         <h1>Admin</h1>
         <p className="admin-subtitle">{currentUser?.email || "Unknown email"}</p>
-        <p className="admin-nav-secondary">
-          <Link to="/admin/list-matrix" className="admin-matrix-link">
-            List membership matrix
-          </Link>
-        </p>
         <a href={switchHref} className="admin-env-switch" target="_blank" rel="noopener noreferrer">
           {switchLabel} ↗
         </a>
