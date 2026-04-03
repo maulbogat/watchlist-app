@@ -171,10 +171,6 @@ export function TrailerModal() {
     setCurrentModalMovie(null);
   }
 
-  const rawOrigin = window.location.origin;
-  const originParam =
-    rawOrigin && rawOrigin !== "null" ? `&origin=${encodeURIComponent(rawOrigin)}` : "";
-
   const imdbUrl = m.imdbId ? `https://www.imdb.com/title/${m.imdbId}/` : null;
 
   async function onPickStatus(st: StatusKey) {
@@ -316,7 +312,7 @@ export function TrailerModal() {
               allowFullScreen
               allow="autoplay; encrypted-media; picture-in-picture"
               referrerPolicy="strict-origin-when-cross-origin"
-              src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(m.youtubeId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1${originParam}`}
+              src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(m.youtubeId)}?rel=0&modestbranding=1&playsinline=1`}
             />
           ) : (
             <div
