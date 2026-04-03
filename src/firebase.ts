@@ -683,6 +683,7 @@ async function setStatus(uid: string, key: string, status: string): Promise<void
   };
   if (status === "to-watch") {
     await setDoc(ref, removeFromAll, { merge: true });
+    await updateDoc(ref, { [`favorites.${key}`]: deleteField() });
     return;
   }
   if (status === "watched") {
@@ -797,6 +798,7 @@ async function setSharedListStatus(listId: string, key: string, status: string):
   };
   if (status === "to-watch") {
     await setDoc(ref, removeFromAll, { merge: true });
+    await updateDoc(ref, { [`favorites.${key}`]: deleteField() });
     return;
   }
   if (status === "watched") {
@@ -1085,6 +1087,7 @@ async function setPersonalListStatus(
   };
   if (status === "to-watch") {
     await setDoc(ref, removeFromAll, { merge: true });
+    await updateDoc(ref, { [`favorites.${key}`]: deleteField() });
     return;
   }
   if (status === "watched") {

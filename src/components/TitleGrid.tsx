@@ -209,8 +209,8 @@ export function TitleGrid({
               setCurrentModalMovie(movie);
             }}
             onRequestRemove={scheduleRemove}
-            isFavorite={favorites.has(listKey(m))}
-            {...(currentUser?.uid
+            isFavorite={(m.status || "to-watch") === "watched" && favorites.has(listKey(m))}
+            {...(currentUser?.uid && (m.status || "to-watch") === "watched"
               ? {
                   onToggleFavorite: () => {
                     const registryId = listKey(m);
