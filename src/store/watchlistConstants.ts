@@ -7,7 +7,6 @@ export const GENRE_LIMIT = 10;
 export const STATUS_LABELS: Record<string, string> = {
   "to-watch": "To Watch",
   watched: "Watched",
-  archive: "Archive",
 };
 
 export const CHECK_SVG =

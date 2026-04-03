@@ -36,12 +36,12 @@ describe("resolveStatusForCrossListAdd", () => {
     const qc = new QueryClient();
     qc.setQueryData(["watchlistMovies", "u1", "personal", "list-a"], []);
     const out = resolveStatusForCrossListAdd(
-      { ...base, status: "archive" },
+      { ...base, status: "watched" },
       "u1",
       { type: "personal", listId: "list-a" },
       qc
     );
-    expect(out).toBe("archive");
+    expect(out).toBe("watched");
   });
 
   it("defaults missing status to to-watch", () => {

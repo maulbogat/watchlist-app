@@ -2,10 +2,10 @@
 
 export type MediaType = "movie" | "show";
 
-export type StatusKey = "to-watch" | "watched" | "maybe-later" | "archive";
+export type StatusKey = "to-watch" | "watched";
 
 export type FilterType = "both" | "movie" | "show";
-export type SortType = "title-asc" | "release-desc" | "added-desc" | "added-asc";
+export type SortType = "title-asc" | "release-desc" | "added-desc";
 
 export type ServicesByRegion = Record<string, string[]>;
 

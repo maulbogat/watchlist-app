@@ -4,7 +4,7 @@ import { listModeQueryKey } from "../hooks/useWatchlist.js";
 import type { ListMode, StatusKey, WatchlistItem } from "../types/index.js";
 
 function coerceStatus(s: string | undefined): StatusKey {
-  if (s === "watched" || s === "maybe-later" || s === "archive" || s === "to-watch") return s;
+  if (s === "watched" || s === "to-watch") return s;
   return "to-watch";
 }
 

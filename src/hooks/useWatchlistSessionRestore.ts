@@ -44,18 +44,13 @@ export function useWatchlistSessionRestore(
             nextStatus = "to-watch";
             nextSort = "added-desc";
           }
-          if (nextStatus === "archive") nextStatus = "to-watch";
-          const validStatus =
-            nextStatus === "all" ||
-            nextStatus === "to-watch" ||
-            nextStatus === "watched"
-              ? nextStatus
-              : s.currentStatus;
+          // Map legacy statuses to valid ones
+          if (nextStatus !== "all" && nextStatus !== "to-watch" && nextStatus !== "watched") {
+            nextStatus = "to-watch";
+          }
+          const validStatus = nextStatus as "all" | "to-watch" | "watched";
           const validSort =
-            nextSort === "title-asc" ||
-            nextSort === "release-desc" ||
-            nextSort === "added-desc" ||
-            nextSort === "added-asc"
+            nextSort === "title-asc" || nextSort === "release-desc" || nextSort === "added-desc"
               ? nextSort
               : s.currentSort;
           return {
@@ -66,8 +61,6 @@ export function useWatchlistSessionRestore(
                 ? prefs.currentFilter
                 : s.currentFilter,
             currentStatus: validStatus,
-            currentGenre:
-              typeof prefs.currentGenre === "string" ? prefs.currentGenre : s.currentGenre,
             currentSort: validSort,
             currentSearch:
               typeof prefs.currentSearch === "string" ? prefs.currentSearch : s.currentSearch,

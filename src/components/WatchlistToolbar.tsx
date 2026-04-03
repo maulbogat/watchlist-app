@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAppStore, STATUS_LABELS } from "../store/useAppStore.js";
 import { persistFilterPreferences } from "../lib/storage.js";
-import { getUniqueAddersFromMovies, getUniqueGenresFromMovies } from "../lib/watchlistFilters.js";
+import { getUniqueAddersFromMovies } from "../lib/watchlistFilters.js";
 import { logEvent } from "../lib/axiom-logger.js";
 import type { FilterType, SortType, WatchlistItem } from "../types/index.js";
 import {
@@ -11,8 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/shadcn-utils";
 
 const watchlistSelectContentClass =
   "watchlist-filter-select-content custom-dropdown-content lists-modal-select-popover--no-check z-[1300] min-w-[var(--radix-select-trigger-width)] border border-[var(--border)] bg-[var(--surface2)] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.08]";
@@ -32,8 +30,6 @@ export function WatchlistToolbar({
   const currentUser = useAppStore((s) => s.currentUser);
   const currentFilter = useAppStore((s) => s.currentFilter);
   const setCurrentFilter = useAppStore((s) => s.setCurrentFilter);
-  const currentGenre = useAppStore((s) => s.currentGenre);
-  const setCurrentGenre = useAppStore((s) => s.setCurrentGenre);
   const currentStatus = useAppStore((s) => s.currentStatus);
   const setCurrentStatus = useAppStore((s) => s.setCurrentStatus);
   const currentSort = useAppStore((s) => s.currentSort);
@@ -49,14 +45,7 @@ export function WatchlistToolbar({
   const isSharedList =
     currentListMode && typeof currentListMode === "object" && currentListMode.type === "shared";
 
-  const genres = getUniqueGenresFromMovies(allMovies);
-  const genresSorted = useMemo(
-    () => [...genres].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })),
-    [genres]
-  );
   const adders = isSharedList ? getUniqueAddersFromMovies(allMovies, currentUser?.uid ?? null) : [];
-
-  const [genrePopoverOpen, setGenrePopoverOpen] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -101,7 +90,7 @@ export function WatchlistToolbar({
     ro.observe(el);
     setToolbarFlowHeight(readToolbarBlockHeight());
     return () => ro.disconnect();
-  }, [adders.length, genres.length, readToolbarBlockHeight, toolbarSticky]);
+  }, [adders.length, readToolbarBlockHeight, toolbarSticky]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -140,7 +129,7 @@ export function WatchlistToolbar({
   function persistFilters() {
     persistFilterPreferences(currentUser, {
       currentFilter: useAppStore.getState().currentFilter,
-      currentGenre: useAppStore.getState().currentGenre,
+      currentGenre: "",
       currentStatus: useAppStore.getState().currentStatus,
       currentSort: useAppStore.getState().currentSort,
       currentSearch: useAppStore.getState().currentSearch,
@@ -148,22 +137,9 @@ export function WatchlistToolbar({
     });
   }
 
-  function applyGenre(next: string) {
-    setCurrentGenre(next);
-    persistFilters();
-    setGenrePopoverOpen(false);
-    void logEvent({
-      type: "user.action",
-      action: "filter.change",
-      filterType: "genre",
-      value: next || "all",
-      uid: currentUser?.uid ?? null,
-    }).catch(() => {});
-  }
-
   const spacerH = Math.max(toolbarFlowHeight, 1);
 
-  const showSecondaryRow = genres.length > 0 || adders.length > 1;
+  const showSecondaryRow = adders.length > 1;
 
   return (
     <>
@@ -307,9 +283,6 @@ export function WatchlistToolbar({
                     <SelectItem value="added-desc" className="custom-dropdown-item">
                       Date Added (New → Old)
                     </SelectItem>
-                    <SelectItem value="added-asc" className="custom-dropdown-item">
-                      Date Added (Old → New)
-                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -364,75 +337,6 @@ export function WatchlistToolbar({
 
             {showSecondaryRow ? (
               <div className="watchlist-toolbar-secondary-row">
-                {genres.length ? (
-                  <div id="genre-filter-wrap" className="watchlist-toolbar-genre-wrap">
-                    <Popover open={genrePopoverOpen} onOpenChange={setGenrePopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          id="genre-filter-trigger"
-                          className={cn(
-                            "custom-dropdown-trigger watchlist-toolbar-select-trigger watchlist-genre-popover-trigger focus-visible:ring-0 shadow-none",
-                            currentGenre ? "watchlist-genre-popover-trigger--active" : ""
-                          )}
-                          aria-haspopup="listbox"
-                          aria-expanded={genrePopoverOpen}
-                          aria-controls="genre-filter-listbox"
-                        >
-                          <span className="watchlist-genre-popover-trigger-label">
-                            {currentGenre || "All Genres"}
-                          </span>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        id="genre-filter-popover"
-                        align="start"
-                        side="bottom"
-                        sideOffset={8}
-                        avoidCollisions={true}
-                        className="watchlist-genre-popover-content"
-                      >
-                        <div
-                          id="genre-filter-listbox"
-                          role="listbox"
-                          aria-label="Genre"
-                          className="watchlist-genre-popover-list"
-                        >
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={!currentGenre}
-                            className={cn(
-                              "watchlist-genre-option",
-                              !currentGenre ? "watchlist-genre-option--active" : ""
-                            )}
-                            onClick={() => applyGenre("")}
-                          >
-                            All Genres
-                          </button>
-                          {genresSorted.map((g) => {
-                            const active = currentGenre === g;
-                            return (
-                              <button
-                                key={g}
-                                type="button"
-                                role="option"
-                                aria-selected={active}
-                                className={cn(
-                                  "watchlist-genre-option",
-                                  active ? "watchlist-genre-option--active" : ""
-                                )}
-                                onClick={() => applyGenre(g)}
-                              >
-                                {g}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                ) : null}
                 {adders.length > 1 ? (
                   <div
                     id="added-by-filter-wrap"

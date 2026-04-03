@@ -129,7 +129,7 @@ export function TitleCard({
 
   const s = m.status || "to-watch";
   const displayStatus = s;
-  const statusTabKey = s === "watched" ? "watched" : s === "archive" ? "archive" : "to-watch";
+  const statusTabKey = s === "watched" ? "watched" : "to-watch";
   const statusIcons: Record<string, ReactElement> = {
     "to-watch": (
       <>
@@ -138,22 +138,8 @@ export function TitleCard({
       </>
     ),
     watched: <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />,
-    "maybe-later": (
-      <>
-        <circle cx="12" cy="12" r="9" fill="none" />
-        <path d="M12 7v5l3 2" fill="none" />
-      </>
-    ),
-    archive: (
-      <>
-        <polyline points="21 8 21 21 3 21 3 8" fill="none" />
-        <rect x="1" y="3" width="22" height="5" fill="none" />
-        <line x1="10" y1="12" x2="14" y2="12" />
-      </>
-    ),
   };
-  const iconKey: keyof typeof statusIcons =
-    displayStatus in statusIcons ? (displayStatus as keyof typeof statusIcons) : "to-watch";
+  const iconKey: keyof typeof statusIcons = displayStatus === "watched" ? "watched" : "to-watch";
 
   const useFill = displayStatus === "watched";
 
@@ -232,10 +218,7 @@ export function TitleCard({
                 onClick={(e) => {
                   e.stopPropagation();
                   const raw = m.status || "to-watch";
-                  const current: StatusKey =
-                    raw === "watched" ? "watched"
-                    : raw === "archive" ? "archive"
-                    : "to-watch";
+                  const current: StatusKey = raw === "watched" ? "watched" : "to-watch";
                   if (st !== current) onStatusChange(m, st);
                   onSetStatusOpenKey(null);
                 }}

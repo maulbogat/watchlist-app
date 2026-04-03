@@ -8,10 +8,10 @@ export type MatrixUiChoice = "absent" | "queue" | "watched" | "archive";
 /** Firestore `StatusKey` for writes when the user picks a non-absent column (queue → to-watch). */
 export function matrixChoiceToStatusKey(
   choice: Exclude<MatrixUiChoice, "absent">
-): "to-watch" | "watched" | "archive" {
-  if (choice === "queue") return "to-watch";
+): "to-watch" | "watched" {
   if (choice === "watched") return "watched";
-  return "archive";
+  // "queue" and legacy "archive" both map to "to-watch" (archive is deprecated)
+  return "to-watch";
 }
 
 /**

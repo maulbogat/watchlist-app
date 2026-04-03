@@ -1,18 +1,5 @@
-import { GENRE_LIMIT } from "../store/watchlistConstants.js";
 import type { WatchlistItem } from "../types/index.js";
 import { listKey } from "./registry-id.js";
-
-export function isGenrePresentInMovies(
-  movies: WatchlistItem[] | undefined,
-  genre: string
-): boolean {
-  if (!genre) return true;
-  const g = genre.toLowerCase();
-  return (movies || []).some((m) => {
-    const gs = String(m?.genre || "");
-    return gs.split(/\s*\/\s*/).some((s) => s.trim().toLowerCase() === g);
-  });
-}
 
 export interface AddedByFilterOption {
   uid: string;
@@ -46,25 +33,8 @@ export function isAddedByPresentInMovies(
   return (movies || []).some((m) => m.addedByUid === addedByUid);
 }
 
-export function getUniqueGenresFromMovies(movies: WatchlistItem[] | undefined): string[] {
-  const count = new Map<string, number>();
-  (movies || []).forEach((m) => {
-    const g = String(m?.genre || "").trim();
-    if (!g) return;
-    g.split(/\s*\/\s*/).forEach((s) => {
-      const t = s.trim();
-      if (t) count.set(t, (count.get(t) || 0) + 1);
-    });
-  });
-  return [...count.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], undefined, { sensitivity: "base" }))
-    .slice(0, GENRE_LIMIT)
-    .map(([name]) => name);
-}
-
 export interface FilterState {
   currentFilter: string;
-  currentGenre: string;
   currentStatus: string;
   currentSort: string;
   currentSearch: string;
@@ -130,9 +100,6 @@ export function filterTitles(
     if (filters.currentSort === "added-desc") {
       return sortByAddedAt(list, false);
     }
-    if (filters.currentSort === "added-asc") {
-      return sortByAddedAt(list, true);
-    }
     return [...list].sort((a, b) =>
       String(a.title).localeCompare(String(b.title), undefined, { sensitivity: "base" })
     );
@@ -145,20 +112,9 @@ export function filterTitles(
   list = list.filter((m) => matchesAddedBy(m));
   list = list.filter((m) => {
     const s = m.status || "to-watch";
-    // Archived titles stay in Firestore but are not shown in the main grid.
-    if (s === "archive") return false;
     if (filters.currentStatus === "all") return true;
-    if (filters.currentStatus === "to-watch") return s === "to-watch" || s === "maybe-later";
     return s === filters.currentStatus;
   });
-  if (filters.currentGenre) {
-    list = list.filter((m) => {
-      const g = String(m.genre || "");
-      return g
-        .split(/\s*\/\s*/)
-        .some((s) => s.trim().toLowerCase() === filters.currentGenre.toLowerCase());
-    });
-  }
   if (search) {
     list = list.filter((m) => matchesSearch(m));
   }
