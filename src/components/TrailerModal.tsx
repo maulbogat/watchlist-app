@@ -90,23 +90,26 @@ export function TrailerModal() {
       if (!movie || !uid) return new Set<string>();
       const key = listKey(movie);
       const containing = new Set<string>();
-      for (const l of personalLists) {
-        const listId = l.id;
-        const cacheKey =
-          listId === "personal"
-            ? ["watchlistMovies", uid, "personal"]
-            : ["watchlistMovies", uid, "personal", listId];
-        let listMovies = queryClient.getQueryData<WatchlistItem[]>(cacheKey);
-        if (!listMovies) {
-          try {
-            listMovies = await getPersonalListMovies(uid, listId);
-          } catch {
-            listMovies = [];
+      const personalResults = await Promise.all(
+        personalLists.map(async (l) => {
+          const listId = l.id;
+          const cacheKey =
+            listId === "personal"
+              ? ["watchlistMovies", uid, "personal"]
+              : ["watchlistMovies", uid, "personal", listId];
+          let listMovies = queryClient.getQueryData<WatchlistItem[]>(cacheKey);
+          if (!listMovies) {
+            try {
+              listMovies = await getPersonalListMovies(uid, listId);
+            } catch {
+              listMovies = [];
+            }
           }
-        }
-        if (listMovies.some((x) => listKey(x) === key)) {
-          containing.add(listId);
-        }
+          return { listId, inList: listMovies.some((x) => listKey(x) === key) };
+        })
+      );
+      for (const { listId, inList } of personalResults) {
+        if (inList) containing.add(listId);
       }
       for (const l of sharedLists) {
         const sharedCacheKey = ["watchlistMovies", uid, "shared", l.id];
@@ -121,6 +124,7 @@ export function TrailerModal() {
       return containing;
     },
     enabled: Boolean(movie && uid),
+    staleTime: 60_000,
   });
 
   useEffect(() => {
@@ -159,10 +163,7 @@ export function TrailerModal() {
 
   const m = movie;
   const raw = m.status || "to-watch";
-  const tabKey: StatusKey =
-    raw === "watched" ? "watched"
-    : raw === "archive" ? "archive"
-    : "to-watch";
+  const tabKey: StatusKey = raw === "watched" ? "watched" : "to-watch";
 
   function close() {
     setStatusOpen(false);
@@ -178,10 +179,7 @@ export function TrailerModal() {
 
   async function onPickStatus(st: StatusKey) {
     if (!currentUser?.uid) return;
-    const current: StatusKey =
-      raw === "watched" ? "watched"
-      : raw === "archive" ? "archive"
-      : "to-watch";
+    const current: StatusKey = raw === "watched" ? "watched" : "to-watch";
     if (st === current) {
       setStatusOpen(false);
       return;
