@@ -36,11 +36,7 @@ const INDEX_PATHS = {
 };
 const IMDB_RATINGS_PATH = resolve(__dirname, "../data/imdb/title.ratings.tsv");
 
-const ALGORITHM_VERSION = "v4-graph-q1"; // q1 = quality filter v1
-
-const MIN_RATING      = 6.0;
-const MIN_VOTES_EN    = 15000;
-const MIN_VOTES_FOREIGN = 3000;
+// Config constants are loaded from Firestore at runtime (see main())
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -120,7 +116,7 @@ function loadImdbRatings(path) {
 }
 
 // ─── Quality filter ───────────────────────────────────────────────────────────
-function passesQualityFilter(enrichedRec, imdbRatings) {
+function passesQualityFilter(enrichedRec, imdbRatings, minRating, minVotesEn, minVotesForeign) {
   if (!imdbRatings) return true; // no ratings file = no filtering
 
   const imdbId = enrichedRec.imdbId;
@@ -129,12 +125,34 @@ function passesQualityFilter(enrichedRec, imdbRatings) {
   const rating = imdbRatings.get(imdbId);
   if (!rating) return true; // not in IMDb dataset — let it through
 
-  if (rating.rating < MIN_RATING) return false;
+  if (rating.rating < minRating) return false;
 
   const isEnglish = !enrichedRec.originalLanguage || enrichedRec.originalLanguage === "en";
-  const minVotes = isEnglish ? MIN_VOTES_EN : MIN_VOTES_FOREIGN;
+  const minVotes = isEnglish ? minVotesEn : minVotesForeign;
 
   return rating.votes >= minVotes;
+}
+
+// ─── IMDb rating boost ────────────────────────────────────────────────────────
+function applyImdbBoost(enrichedPool, imdbRatings, baseline) {
+  for (const item of enrichedPool) {
+    const { rec, enrich } = item;
+    item.boostedScore = rec.count; // default: raw count
+
+    if (!imdbRatings || !enrich.imdbId) continue;
+    const rating = imdbRatings.get(enrich.imdbId);
+    if (!rating || isNaN(rating.rating)) continue;
+
+    item.boostedScore = rec.count * (rating.rating / baseline);
+  }
+
+  // Re-sort by boosted score descending, recency tiebreaker
+  enrichedPool.sort((a, b) => {
+    if (Math.abs(b.boostedScore - a.boostedScore) > 0.001) return b.boostedScore - a.boostedScore;
+    const da = a.rec.releaseDate ? new Date(a.rec.releaseDate).getTime() : 0;
+    const db_ = b.rec.releaseDate ? new Date(b.rec.releaseDate).getTime() : 0;
+    return db_ - da;
+  });
 }
 
 // ─── Explanation builder ──────────────────────────────────────────────────────
@@ -354,6 +372,21 @@ async function main() {
   }
   console.log(`Loaded ${regSnap.docs.length} titleRegistry docs`);
 
+  // 3b. Load recommendation config from Firestore (admin UI writes here)
+  const configDoc = await db.collection("config").doc("recommendations").get();
+  const config = configDoc.exists ? configDoc.data() : null;
+  const configSource = configDoc.exists ? "Firestore" : "defaults";
+
+  const MIN_RATING        = config?.minRating        ?? 6.0;
+  const MIN_VOTES_EN      = config?.minVotesEn       ?? 15000;
+  const MIN_VOTES_FOREIGN = config?.minVotesForeign  ?? 3000;
+  const POOL_SIZE_CONFIG  = config?.poolSize          ?? 100;
+  const IMDB_BOOST        = config?.imdbBoostEnabled  ?? true;
+  const IMDB_BASELINE     = config?.imdbBoostBaseline ?? 7.0;
+  const ALGORITHM_VERSION = config?.algorithmVersion  ?? "v4-graph-q2";
+
+  console.log(`Config: ${configSource} (version=${ALGORITHM_VERSION}, boost=${IMDB_BOOST ? `on, baseline=${IMDB_BASELINE}` : "off"})`);
+
   // 4. Load allowedUsers → UIDs
   const allowedSnap = await db.collection("allowedUsers").get();
   const allUids = [];
@@ -452,9 +485,8 @@ async function main() {
       continue;
     }
 
-    // Take a larger pool for filtering (3x topK, but at least 30)
-    const poolSize = Math.max(topK * 3, 30);
-    const pool = selectTopK(aggregated, poolSize);
+    // Take pool from config
+    const pool = selectTopK(aggregated, POOL_SIZE_CONFIG);
 
     // Enrich the entire pool
     const tmdbCallsBefore = Object.keys(tmdbCache).length;
@@ -464,9 +496,14 @@ async function main() {
       enrichedPool.push({ rec, enrich });
     }
 
+    // Apply IMDb rating boost (re-sorts pool by boosted score)
+    if (IMDB_BOOST && imdbRatings) {
+      applyImdbBoost(enrichedPool, imdbRatings, IMDB_BASELINE);
+    }
+
     // Apply quality filter
     const filtered = imdbRatings
-      ? enrichedPool.filter(({ enrich }) => passesQualityFilter(enrich, imdbRatings))
+      ? enrichedPool.filter(({ enrich }) => passesQualityFilter(enrich, imdbRatings, MIN_RATING, MIN_VOTES_EN, MIN_VOTES_FOREIGN))
       : enrichedPool;
 
     const dropped = enrichedPool.length - filtered.length;
@@ -535,6 +572,8 @@ async function main() {
       qualityFilter:    imdbRatings
         ? { minRating: MIN_RATING, minVotesEn: MIN_VOTES_EN, minVotesForeign: MIN_VOTES_FOREIGN }
         : null,
+      imdbBoost:        IMDB_BOOST ? { enabled: true, baseline: IMDB_BASELINE } : null,
+      configSource,
       items:            enrichedItems,
     };
 
@@ -565,6 +604,7 @@ async function main() {
   if (imdbRatings) {
     console.log(`    Thresholds: rating≥${MIN_RATING}, EN votes≥${MIN_VOTES_EN.toLocaleString()}, foreign votes≥${MIN_VOTES_FOREIGN.toLocaleString()}`);
   }
+  console.log(`  IMDb boost: ${IMDB_BOOST ? `ON (baseline=${IMDB_BASELINE})` : "OFF"}`);
   if (isDryRun) {
     console.log(`  Firestore writes: 0 (dry run)`);
   } else {

@@ -694,6 +694,8 @@ type RecConfigField = {
   min?: number;
   max?: number;
   step?: number;
+  /** Hide this field when the named boolean key is false. */
+  showWhenKey?: keyof RecommendationConfigEditable;
 };
 
 type RecConfigGroup = {
@@ -791,6 +793,29 @@ const REC_CONFIG_GROUPS: RecConfigGroup[] = [
         min: 0,
         max: 5,
         step: 0.1,
+      },
+    ],
+  },
+  {
+    title: "IMDb Rating Boost",
+    fields: [
+      {
+        key: "imdbBoostEnabled",
+        label: "Boost enabled",
+        tooltip:
+          "When on, each candidate's ref count is multiplied by (IMDb rating / baseline). Titles with higher IMDb ratings rank above lower-rated titles with the same ref count.",
+        type: "boolean",
+      },
+      {
+        key: "imdbBoostBaseline",
+        label: "Baseline rating",
+        tooltip:
+          "The IMDb rating treated as a neutral multiplier (×1.0). Titles above the baseline rank higher; titles below rank lower. Recommended: 7.0.",
+        type: "number",
+        min: 1.0,
+        max: 10.0,
+        step: 0.1,
+        showWhenKey: "imdbBoostEnabled",
       },
     ],
   },
@@ -896,7 +921,7 @@ function RecommendationSettingsSection() {
               <div key={group.title} className="admin-rec-group">
                 <p className="admin-rec-group-title">{group.title}</p>
                 {group.fields.map((field) => (
-                  <div key={field.key} className="admin-job-row" title={field.tooltip}>
+                  (field.showWhenKey === undefined || Boolean(form[field.showWhenKey])) && <div key={field.key} className="admin-job-row" title={field.tooltip}>
                     <span className="admin-rec-field-label">{field.label}</span>
                     {field.type === "boolean" ? (
                       <button

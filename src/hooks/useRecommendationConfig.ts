@@ -40,7 +40,7 @@ export function useUpdateRecommendationConfig() {
     mutationFn: async (config: RecommendationConfigEditable) => {
       const uid = auth.currentUser?.uid;
       if (!uid) throw new Error("Not signed in");
-      await setRecommendationConfig(config, uid, "v4-graph-q1");
+      await setRecommendationConfig(config, uid, "v4-graph-q2");
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });

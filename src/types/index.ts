@@ -159,6 +159,10 @@ export interface RecommendationConfig {
   wUnliked: number;
   wUnwatched: number;
 
+  // IMDb rating boost
+  imdbBoostEnabled: boolean;
+  imdbBoostBaseline: number;
+
   // Diversity
   diversityEnabled: boolean;
 
@@ -183,6 +187,8 @@ export const RECOMMENDATION_CONFIG_DEFAULTS: Omit<
   wWatched: 1.0,
   wUnliked: 0.3,
   wUnwatched: 0.7,
+  imdbBoostEnabled: true,
+  imdbBoostBaseline: 7.0,
   diversityEnabled: true,
   positionWeightEnabled: false,
 };
