@@ -1,4 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import {
+  useRecommendationConfig,
+  useUpdateRecommendationConfig,
+  type RecommendationConfigEditable,
+} from "../hooks/useRecommendationConfig.js";
+import { RECOMMENDATION_CONFIG_DEFAULTS } from "../types/index.js";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
@@ -677,6 +684,273 @@ async function fetchAdminExternalStatus<T extends { ok?: boolean; error?: string
     throw new Error(data.error);
   }
   return data;
+}
+
+type RecConfigField = {
+  key: keyof RecommendationConfigEditable;
+  label: string;
+  tooltip: string;
+  type: "number" | "boolean";
+  min?: number;
+  max?: number;
+  step?: number;
+};
+
+type RecConfigGroup = {
+  title: string;
+  fields: RecConfigField[];
+};
+
+const REC_CONFIG_GROUPS: RecConfigGroup[] = [
+  {
+    title: "Quality Filter",
+    fields: [
+      {
+        key: "minRating",
+        label: "Min rating",
+        tooltip: "Minimum TMDB rating (0–10) a title must have to be considered as a recommendation.",
+        type: "number",
+        min: 0,
+        max: 10,
+        step: 0.1,
+      },
+      {
+        key: "minVotesEn",
+        label: "Min votes (English)",
+        tooltip:
+          "Minimum number of TMDB votes required for English-language titles. Higher bar because more data is available.",
+        type: "number",
+        min: 0,
+        step: 100,
+      },
+      {
+        key: "minVotesForeign",
+        label: "Min votes (Foreign)",
+        tooltip:
+          "Minimum number of TMDB votes required for non-English titles. Lower bar to account for less global coverage.",
+        type: "number",
+        min: 0,
+        step: 100,
+      },
+    ],
+  },
+  {
+    title: "Pool Size",
+    fields: [
+      {
+        key: "poolSize",
+        label: "Pool size",
+        tooltip:
+          "How many candidate titles are scored and ranked before the final recommendation list is cut. A larger pool increases diversity at the cost of more computation.",
+        type: "number",
+        min: 10,
+        max: 1000,
+        step: 10,
+      },
+    ],
+  },
+  {
+    title: "Status Weights",
+    fields: [
+      {
+        key: "wFavorite",
+        label: "Favorite weight",
+        tooltip:
+          "Score multiplier applied when a candidate is similar to a favorited title (watched and liked). Higher = stronger signal.",
+        type: "number",
+        min: 0,
+        max: 5,
+        step: 0.1,
+      },
+      {
+        key: "wWatched",
+        label: "Watched weight",
+        tooltip:
+          "Score multiplier for similarity to neutrally-watched titles (no explicit like/dislike).",
+        type: "number",
+        min: 0,
+        max: 5,
+        step: 0.1,
+      },
+      {
+        key: "wUnliked",
+        label: "Unliked weight",
+        tooltip:
+          "Score multiplier for similarity to disliked titles. Keep low so similar content is down-ranked. (Future — dislike data not yet in the data model.)",
+        type: "number",
+        min: 0,
+        max: 5,
+        step: 0.1,
+      },
+      {
+        key: "wUnwatched",
+        label: "Unwatched weight",
+        tooltip:
+          "Score multiplier for similarity to to-watch / maybe-later items. Currently excluded from scoring; set > 0 to include.",
+        type: "number",
+        min: 0,
+        max: 5,
+        step: 0.1,
+      },
+    ],
+  },
+  {
+    title: "Diversity",
+    fields: [
+      {
+        key: "diversityEnabled",
+        label: "Diversity enabled",
+        tooltip:
+          "When on, over-represented genres and directors are penalised so the final list spans a broader range of content.",
+        type: "boolean",
+      },
+    ],
+  },
+  {
+    title: "Position Weighting (future)",
+    fields: [
+      {
+        key: "positionWeightEnabled",
+        label: "Position weight enabled",
+        tooltip:
+          "When on, titles added earlier in a list contribute less signal than recently-added titles. Not yet implemented — toggling this has no effect until the pipeline supports it.",
+        type: "boolean",
+      },
+    ],
+  },
+];
+
+function formatRecConfigUpdatedAt(
+  updatedAt: { toDate: () => Date } | null | undefined
+): string {
+  if (!updatedAt) return "Never";
+  try {
+    const d = updatedAt.toDate();
+    return d.toLocaleString(undefined, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "Unknown";
+  }
+}
+
+function RecommendationSettingsSection() {
+  const configQ = useRecommendationConfig();
+  const updateM = useUpdateRecommendationConfig();
+
+  const [form, setForm] = useState<RecommendationConfigEditable>(RECOMMENDATION_CONFIG_DEFAULTS);
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    if (configQ.data) {
+      const { updatedAt: _updatedAt, updatedBy: _updatedBy, algorithmVersion: _av, ...editable } =
+        configQ.data;
+      setForm(editable);
+      setIsDirty(false);
+    }
+  }, [configQ.data]);
+
+  function handleNumberChange(key: keyof RecommendationConfigEditable, raw: string) {
+    const value = parseFloat(raw);
+    if (!Number.isNaN(value)) {
+      setForm((prev) => ({ ...prev, [key]: value }));
+      setIsDirty(true);
+    }
+  }
+
+  function handleBooleanChange(key: keyof RecommendationConfigEditable, checked: boolean) {
+    setForm((prev) => ({ ...prev, [key]: checked }));
+    setIsDirty(true);
+  }
+
+  function handleSave() {
+    updateM.mutate(form, {
+      onSuccess: () => {
+        toast.success("Recommendation settings saved");
+        setIsDirty(false);
+      },
+      onError: (err) => {
+        toast.error(err instanceof Error ? err.message : "Failed to save settings");
+      },
+    });
+  }
+
+  const updatedAt = configQ.data?.updatedAt ?? null;
+  const updatedBy = configQ.data?.updatedBy ?? "";
+
+  return (
+    <section className="admin-section admin-section--rec-config">
+      <h2>Recommendation Algorithm Settings</h2>
+      <div className="admin-card admin-job-card">
+        {configQ.isPending ? (
+          <p className="admin-job-result">Loading…</p>
+        ) : configQ.isError ? (
+          <p className="admin-job-result">Failed to load config</p>
+        ) : (
+          <>
+            {REC_CONFIG_GROUPS.map((group) => (
+              <div key={group.title} className="admin-rec-group">
+                <p className="admin-rec-group-title">{group.title}</p>
+                {group.fields.map((field) => (
+                  <div key={field.key} className="admin-job-row" title={field.tooltip}>
+                    <span className="admin-rec-field-label">{field.label}</span>
+                    {field.type === "boolean" ? (
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={Boolean(form[field.key])}
+                        className={cn(
+                          "admin-rec-toggle-switch",
+                          Boolean(form[field.key]) && "admin-rec-toggle-switch--on"
+                        )}
+                        onClick={() => handleBooleanChange(field.key, !Boolean(form[field.key]))}
+                      >
+                        <span className="admin-rec-toggle-thumb" />
+                        <span className="admin-rec-toggle-label">
+                          {form[field.key] ? "On" : "Off"}
+                        </span>
+                      </button>
+                    ) : (
+                      <input
+                        className="admin-rec-number-input"
+                        type="number"
+                        value={Number(form[field.key])}
+                        min={field.min}
+                        max={field.max}
+                        step={field.step ?? 1}
+                        onChange={(e) => handleNumberChange(field.key, e.target.value)}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            <p className="admin-job-hint">Changes take effect on next pipeline run.</p>
+
+            <div className="admin-rec-footer">
+              <span className="admin-stat-label">
+                Last updated: {formatRecConfigUpdatedAt(updatedAt)}
+                {updatedBy ? ` · ${updatedBy}` : ""}
+              </span>
+              <button
+                type="button"
+                className={cn("btn-primary", (updateM.isPending || !isDirty) && "admin-rec-save-btn--disabled")}
+                disabled={updateM.isPending || !isDirty}
+                onClick={handleSave}
+              >
+                {updateM.isPending ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
 }
 
 export function AdminPage() {
@@ -2044,6 +2318,8 @@ export function AdminPage() {
           </div>
         ) : null}
       </section>
+
+      <RecommendationSettingsSection />
 
       <section className="admin-section">
         <h2>Service Links</h2>

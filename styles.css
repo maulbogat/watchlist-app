@@ -4390,6 +4390,136 @@ a.admin-job-run-btn {
   line-height: 1.45;
 }
 
+/* Recommendation config section — constrained to 50% width */
+.admin-section--rec-config .admin-card {
+  max-width: 50%;
+}
+
+.admin-rec-group {
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-rec-group:last-of-type {
+  padding-bottom: 0;
+  margin-bottom: var(--space-3);
+  border-bottom: none;
+}
+
+.admin-rec-group-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.admin-rec-field-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Number input — no spinners, narrower */
+.admin-rec-number-input {
+  width: 5.25rem;
+  padding: 0.2rem 0.45rem;
+  background: var(--color-surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: right;
+  /* Remove browser spinners */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.admin-rec-number-input::-webkit-inner-spin-button,
+.admin-rec-number-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.admin-rec-number-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  color: var(--foreground);
+}
+
+/* Toggle switch */
+.admin-rec-toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.admin-rec-toggle-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.admin-rec-toggle-thumb {
+  position: relative;
+  display: inline-block;
+  width: 2.1rem;
+  height: 1.15rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  border: 1px solid var(--border);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.admin-rec-toggle-thumb::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0.18rem;
+  transform: translateY(-50%);
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-text-muted);
+  transition: left 0.2s ease, background 0.2s ease;
+}
+
+.admin-rec-toggle-switch--on .admin-rec-toggle-thumb {
+  background: var(--color-gold);
+  border-color: var(--color-gold);
+}
+
+.admin-rec-toggle-switch--on .admin-rec-toggle-thumb::after {
+  left: calc(100% - 0.93rem);
+  background: var(--color-surface-1);
+}
+
+.admin-rec-toggle-switch--on .admin-rec-toggle-label {
+  color: var(--color-gold);
+}
+
+/* Footer row */
+.admin-rec-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.admin-rec-save-btn--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .admin-button-spinner {
   display: inline-block;
   width: 0.9rem;

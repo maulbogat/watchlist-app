@@ -26,6 +26,7 @@ import {
   deleteField,
   writeBatch,
   onSnapshot,
+  serverTimestamp,
 } from "firebase/firestore";
 import type {
   DocumentData,
@@ -42,6 +43,7 @@ import type {
   ListMode,
   MediaType,
   PersonalList,
+  RecommendationConfig,
   RecommendationDoc,
   SharedList,
   StatusData,
@@ -1728,6 +1730,27 @@ async function dismissRecommendation(uid: string, tmdbId: number): Promise<void>
   await setDoc(ref, { dismissedRecommendations: { [String(tmdbId)]: true } }, { merge: true });
 }
 
+/** Read the recommendation algorithm config from `config/recommendations`. Returns null if not set. */
+async function getRecommendationConfig(): Promise<RecommendationConfig | null> {
+  const snap = await getDoc(doc(db, "config", "recommendations"));
+  if (!snap.exists()) return null;
+  return snap.data() as RecommendationConfig;
+}
+
+/** Write recommendation algorithm config to `config/recommendations`. */
+async function setRecommendationConfig(
+  config: Omit<RecommendationConfig, "updatedAt" | "updatedBy" | "algorithmVersion">,
+  uid: string,
+  algorithmVersion: string
+): Promise<void> {
+  const ref = doc(db, "config", "recommendations");
+  await setDoc(
+    ref,
+    { ...config, updatedAt: serverTimestamp(), updatedBy: uid, algorithmVersion },
+    { merge: true }
+  );
+}
+
 /** Resolve the actual Firestore document ID of the user's default personal list. */
 export async function getDefaultPersonalListId(uid: string): Promise<string | null> {
   const id = await resolveDefaultPersonalListId(uid);
@@ -1787,6 +1810,8 @@ export {
   getIdTokenForApi,
   getRecommendations,
   getDismissedRecommendations,
+  getRecommendationConfig,
+  setRecommendationConfig,
   dismissRecommendation,
 };
 

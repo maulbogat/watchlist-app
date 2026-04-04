@@ -143,6 +143,50 @@ export interface Country {
   searchKey: string;
 }
 
+/** Configuration for the recommendation algorithm, stored at `config/recommendations`. */
+export interface RecommendationConfig {
+  // Quality filter
+  minRating: number;
+  minVotesEn: number;
+  minVotesForeign: number;
+
+  // Pool size
+  poolSize: number;
+
+  // Status weights
+  wFavorite: number;
+  wWatched: number;
+  wUnliked: number;
+  wUnwatched: number;
+
+  // Diversity
+  diversityEnabled: boolean;
+
+  // Position weighting (future)
+  positionWeightEnabled: boolean;
+
+  // Metadata
+  updatedAt: { toDate: () => Date } | null;
+  updatedBy: string;
+  algorithmVersion: string;
+}
+
+export const RECOMMENDATION_CONFIG_DEFAULTS: Omit<
+  RecommendationConfig,
+  "updatedAt" | "updatedBy" | "algorithmVersion"
+> = {
+  minRating: 6.0,
+  minVotesEn: 15000,
+  minVotesForeign: 3000,
+  poolSize: 100,
+  wFavorite: 1.5,
+  wWatched: 1.0,
+  wUnliked: 0.3,
+  wUnwatched: 0.7,
+  diversityEnabled: true,
+  positionWeightEnabled: false,
+};
+
 /** Raw Firestore list row before hydration. */
 export type FirestoreListRow = Record<string, unknown> & { registryId?: string };
 
