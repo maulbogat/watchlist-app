@@ -1,17 +1,21 @@
 /**
- * Watchlist — Recommendation Engine v4: Quality-Filtered (O4)
+ * Watchlist — Recommendation Engine v4: Quality-Filtered (O4) + Diversity (O9)
  *
  * Same as graph-recommend.mjs but with IMDb quality thresholds applied to
  * the top-N candidate pool. Produces side-by-side comparison showing which
  * titles were dropped (low quality) and which were promoted (high quality
  * but previously buried by reference count).
  *
+ * NEW (O9): --diversity flag applies graph-pruning diversity AFTER quality
+ * filtering, showing a three-way comparison: unfiltered → filtered → filtered+diversity.
+ *
  * Run:
  *   node scripts/graph-recommend-filtered.mjs <listId> --type show
  *   node scripts/graph-recommend-filtered.mjs <listId> --min-rating 6.0 --min-votes-en 50000
- *   node scripts/graph-recommend-filtered.mjs <listId> --no-filter   # show quality data only
+ *   node scripts/graph-recommend-filtered.mjs <listId> --no-filter          # show quality data only
  *   node scripts/graph-recommend-filtered.mjs <listId> --source similar --top 20 --pool 60
- *   node scripts/graph-recommend-filtered.mjs <listId> --allow-unknown  # treat no-IMDb-data as PASS
+ *   node scripts/graph-recommend-filtered.mjs <listId> --allow-unknown      # treat no-IMDb-data as PASS
+ *   node scripts/graph-recommend-filtered.mjs <listId> --type show --diversity  # quality + diversity
  *
  * Requires:
  *   - data/tmdb-recs-forward.json (from build-recs-cache.mjs)
@@ -32,16 +36,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: resolve(__dirname, "../.env") });
 
 const INDEX_PATHS = {
-  recs:    { forward: resolve(__dirname, "../data/tmdb-recs-forward.json"),    inverted: resolve(__dirname, "../data/tmdb-recs-inverted.json") },
+  recs: { forward: resolve(__dirname, "../data/tmdb-recs-forward.json"), inverted: resolve(__dirname, "../data/tmdb-recs-inverted.json") },
   similar: { forward: resolve(__dirname, "../data/tmdb-similar-forward.json"), inverted: resolve(__dirname, "../data/tmdb-similar-inverted.json") },
 };
-const IMDB_RATINGS_PATH = resolve(__dirname, "../data/imdb/title.ratings.tsv");
-const TMDB_CACHE_PATH   = resolve(__dirname, "../data/tmdb-cache.json");
-const SEP = "═".repeat(67);
 
+const IMDB_RATINGS_PATH = resolve(__dirname, "../data/imdb/title.ratings.tsv");
+const TMDB_CACHE_PATH = resolve(__dirname, "../data/tmdb-cache.json");
+
+const SEP = "═".repeat(67);
 let tmdbCacheDirtyCount = 0;
 
 // ─── Firebase ─────────────────────────────────────────────────────────────────
+
 function initFirebase() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT not set in .env");
@@ -51,6 +57,7 @@ function initFirebase() {
 }
 
 // ─── List resolver ────────────────────────────────────────────────────────────
+
 async function resolveList(db, listId, uid) {
   const sharedDoc = await db.collection("sharedLists").doc(listId).get();
   if (sharedDoc.exists) {
@@ -71,11 +78,13 @@ async function resolveList(db, listId, uid) {
 }
 
 // ─── Member UID extraction ────────────────────────────────────────────────────
+
 function extractMemberUids(members) {
   return members.map(m => typeof m === "string" ? m : (m.uid || m.id || null)).filter(Boolean);
 }
 
 // ─── IMDb ratings loader ──────────────────────────────────────────────────────
+
 function loadImdbRatings(filePath) {
   const ratings = new Map();
   const content = readFileSync(filePath, "utf8");
@@ -85,7 +94,7 @@ function loadImdbRatings(filePath) {
     if (parts.length >= 3) {
       ratings.set(parts[0], {
         rating: parseFloat(parts[1]),
-        votes:  parseInt(parts[2], 10),
+        votes: parseInt(parts[2], 10),
       });
     }
   }
@@ -93,6 +102,7 @@ function loadImdbRatings(filePath) {
 }
 
 // ─── TMDB fetch with cache ────────────────────────────────────────────────────
+
 async function fetchTmdb(path, cache) {
   if (path in cache) return cache[path];
   await new Promise(r => setTimeout(r, 260));
@@ -115,6 +125,7 @@ async function fetchTmdb(path, cache) {
 }
 
 // ─── Quality check ────────────────────────────────────────────────────────────
+
 /**
  * Returns { pass: boolean, reason: string | null }
  * reason is set only when failing.
@@ -122,37 +133,31 @@ async function fetchTmdb(path, cache) {
 function qualityCheck(imdbEntry, language, opts) {
   const { minRating, minVotesEn, minVotesForeign, noFilter, allowUnknown } = opts;
   if (noFilter) return { pass: true, reason: null };
-
   if (!imdbEntry) {
     return allowUnknown
       ? { pass: true, reason: null }
       : { pass: false, reason: "no IMDb data" };
   }
-
   const { rating, votes } = imdbEntry;
-
   if (isNaN(rating) || isNaN(votes)) {
     return allowUnknown
       ? { pass: true, reason: null }
       : { pass: false, reason: "invalid IMDb data" };
   }
-
   if (rating < minRating) {
     return { pass: false, reason: `rating ${rating.toFixed(1)} < ${minRating.toFixed(1)}` };
   }
-
   const isEnglish = !language || language === "en";
   const minVotes = isEnglish ? minVotesEn : minVotesForeign;
-
   if (votes < minVotes) {
     const label = isEnglish ? "en" : language;
     return { pass: false, reason: `votes ${votes.toLocaleString()} < ${minVotes.toLocaleString()} (${label})` };
   }
-
   return { pass: true, reason: null };
 }
 
 // ─── Resolve imdbId + language for a candidate ───────────────────────────────
+
 /**
  * Priority:
  *   1. titleRegistry (by tmdbId lookup)
@@ -164,7 +169,7 @@ async function resolveImdbAndLang(tmdbId, mediaType, tmdbToRegistry, tmdbCache) 
   if (regEntry) {
     const d = regEntry.data;
     const imdbId = d.imdbId || null;
-    const lang   = d.originalLanguage || null;
+    const lang = d.originalLanguage || null;
     if (imdbId) return { imdbId, lang };
     // Has registry entry but no imdbId — still try TMDB for it
   }
@@ -174,13 +179,86 @@ async function resolveImdbAndLang(tmdbId, mediaType, tmdbToRegistry, tmdbCache) 
   const path = `/${mt}/${tmdbId}?append_to_response=external_ids`;
   const data = await fetchTmdb(path, tmdbCache);
   if (!data) return { imdbId: null, lang: null };
-
   const imdbId = data.external_ids?.imdb_id || null;
-  const lang   = data.original_language || null;
+  const lang = data.original_language || null;
   return { imdbId, lang };
 }
 
+// ─── Diversity ranking (graph pruning) ───────────────────────────────────────
+
+/**
+ * Ported from graph-recommend.mjs.
+ *
+ * Works on a list of candidate objects (must have .tmdbId, .title, .mediaType,
+ * .releaseDate, .references[], .count). Each round:
+ *   1. Find rec with highest count (alphabetical tiebreaker)
+ *   2. "Use up" all its source imdbIds — remove those refs from all remaining recs
+ *   3. Recompute counts; remove zero-count recs from pool
+ * Returns top-k selections with metadata about diversity impact.
+ */
+function runDiversityRanking(candidates, topK) {
+  // Deep copy — pool entries track original count separately
+  const pool = new Map();
+  for (const entry of candidates) {
+    pool.set(String(entry.tmdbId), {
+      tmdbId: String(entry.tmdbId),
+      title: entry.title,
+      mediaType: entry.mediaType,
+      releaseDate: entry.releaseDate,
+      // Carry over quality metadata for output
+      imdbId: entry.imdbId || null,
+      imdbEntry: entry.imdbEntry || null,
+      lang: entry.lang || null,
+      qualityResult: entry.qualityResult || null,
+      references: entry.references.map(r => ({ ...r })),
+      count: entry.references.length,
+      originalCount: entry.references.length,
+    });
+  }
+
+  const selections = [];
+
+  while (selections.length < topK && pool.size > 0) {
+    // Find max count in pool
+    let maxCount = 0;
+    for (const e of pool.values()) {
+      if (e.count > maxCount) maxCount = e.count;
+    }
+
+    // Collect all candidates tied at max, sort alphabetically for determinism
+    const tied = [...pool.values()]
+      .filter(e => e.count === maxCount)
+      .sort((a, b) => a.title.localeCompare(b.title));
+
+    const selected = tied[0];
+    const wasTiebreak = tied.length > 1;
+
+    // Source imdbIds used by this selection — "spend" these votes
+    const usedSourceIds = new Set(selected.references.map(r => r.imdbId));
+
+    let affectedRecs = 0;
+    const toDelete = [];
+
+    for (const [tmdbId, entry] of pool) {
+      if (tmdbId === selected.tmdbId) continue;
+      const before = entry.references.length;
+      entry.references = entry.references.filter(r => !usedSourceIds.has(r.imdbId));
+      entry.count = entry.references.length;
+      if (entry.count !== before) affectedRecs++;
+      if (entry.count === 0) toDelete.push(tmdbId);
+    }
+
+    for (const id of toDelete) pool.delete(id);
+    pool.delete(selected.tmdbId);
+
+    selections.push({ ...selected, wasTiebreak, tiebreakCount: tied.length, affectedRecs });
+  }
+
+  return selections;
+}
+
 // ─── Output helpers ───────────────────────────────────────────────────────────
+
 function fmtMedia(mediaType) {
   if (mediaType === "tv") return "tv";
   if (mediaType === "movie") return "movie";
@@ -198,15 +276,17 @@ function truncate(str, maxLen) {
 }
 
 // ─── Section: Setup summary ───────────────────────────────────────────────────
+
 function printSetup(opts, listName, listTypeLabel, positiveItems, forwardEntries, imdbCount) {
   const filterStatus = opts.noFilter
     ? "OFF (--no-filter)"
     : `ON (min_rating=${opts.minRating.toFixed(1)}, min_votes_en=${opts.minVotesEn.toLocaleString()}, min_votes_foreign=${opts.minVotesForeign.toLocaleString()})`;
 
-  console.log(`\n🎬  Watchlist Recommendation Engine v4 (Graph-based + Quality Filter)`);
+  console.log(`\n🎬 Watchlist Recommendation Engine v4 (Graph-based + Quality Filter${opts.diversity ? " + Diversity" : ""})`);
   console.log(`List: ${listName} (${listTypeLabel})`);
   console.log(`Source: ${opts.source} (${opts.source === "similar" ? "TMDB /similar" : "TMDB /recommendations"})`);
   console.log(`Quality filter: ${filterStatus}`);
+  console.log(`Diversity: ${opts.diversity ? "ON (graph pruning)" : "OFF (use --diversity to enable)"}`);
   if (opts.typeFilter !== "all") console.log(`Type filter: ${opts.typeFilter}`);
   console.log(`Positive signal: ${positiveItems.length} titles (${positiveItems.filter(i => i.status === "watched").length} watched, ${positiveItems.filter(i => i.status === "archive").length} archived)`);
   console.log(`Forward index: ${forwardEntries} entries loaded`);
@@ -214,14 +294,15 @@ function printSetup(opts, listName, listTypeLabel, positiveItems, forwardEntries
 }
 
 // ─── Section: Candidate quality audit ─────────────────────────────────────────
+
 function printAudit(pool, opts) {
   console.log(`\n${SEP}`);
-  console.log(`  CANDIDATE QUALITY AUDIT (top ${pool.length} by reference count)`);
+  console.log(` CANDIDATE QUALITY AUDIT (top ${pool.length} by reference count)`);
   console.log(`${SEP}\n`);
 
   const titleW = 30;
   const header =
-    ` ${"#".padStart(2)}  ${"Title".padEnd(titleW)}  ${"Refs".padStart(4)}  ${"IMDb".padStart(5)}  ${"Votes".padStart(8)}  ${"Lang".padStart(4)}  Verdict`;
+    ` ${"#".padStart(2)} ${"Title".padEnd(titleW)} ${"Refs".padStart(4)} ${"IMDb".padStart(5)} ${"Votes".padStart(8)} ${"Lang".padStart(4)} Verdict`;
   console.log(header);
   console.log(" " + "─".repeat(header.length - 1));
 
@@ -231,25 +312,25 @@ function printAudit(pool, opts) {
     const c = pool[i];
     const rankStr = String(i + 1).padStart(3);
     const titleStr = truncate(c.title, titleW).padEnd(titleW);
-    const refsStr  = String(c.count).padStart(4);
+    const refsStr = String(c.count).padStart(4);
 
     if (!c.imdbId || !c.imdbEntry) {
       noDataCount++;
       const verdict = opts.allowUnknown ? "? PASS (unknown, --allow-unknown)" : "✗ FAIL (no IMDb data)";
-      console.log(` ${rankStr}  ${titleStr}  ${refsStr}  ${"—".padStart(5)}  ${"—".padStart(8)}  ${"?".padStart(4)}  ${verdict}`);
+      console.log(` ${rankStr} ${titleStr} ${refsStr} ${"—".padStart(5)} ${"—".padStart(8)} ${"?".padStart(4)} ${verdict}`);
       continue;
     }
 
     const { rating, votes } = c.imdbEntry;
     const ratingStr = isNaN(rating) ? "—" : rating.toFixed(1).padStart(5);
-    const votesStr  = isNaN(votes)  ? "—" : fmtNum(votes).padStart(8);
-    const langStr   = (c.lang || "?").padStart(4);
+    const votesStr = isNaN(votes) ? "—" : fmtNum(votes).padStart(8);
+    const langStr = (c.lang || "?").padStart(4);
 
     const passStr = c.qualityResult.pass ? "✓ PASS" : "✗ FAIL";
     const reasonStr = c.qualityResult.reason ? ` (${c.qualityResult.reason})` : "";
     const langNote = !c.qualityResult.pass ? "" : c.lang && c.lang !== "en" ? ` (foreign: ${fmtNum(votes)} ≥ ${opts.minVotesForeign.toLocaleString()})` : "";
 
-    console.log(` ${rankStr}  ${titleStr}  ${refsStr}  ${ratingStr}  ${votesStr}  ${langStr}  ${passStr}${reasonStr}${langNote}`);
+    console.log(` ${rankStr} ${titleStr} ${refsStr} ${ratingStr} ${votesStr} ${langStr} ${passStr}${reasonStr}${langNote}`);
   }
 
   if (noDataCount > 0) {
@@ -258,15 +339,15 @@ function printAudit(pool, opts) {
   console.log();
 }
 
-// ─── Section: Side-by-side comparison ────────────────────────────────────────
-function printComparison(unfilteredTop, filteredTop, pool, topK, opts) {
+// ─── Section: Side-by-side comparison (2-column, no diversity) ───────────────
+
+function printComparison2Col(unfilteredTop, filteredTop, pool, topK) {
   console.log(`${SEP}`);
-  console.log(`  COMPARISON: UNFILTERED vs QUALITY-FILTERED (top ${topK})`);
+  console.log(` COMPARISON: UNFILTERED vs QUALITY-FILTERED (top ${topK})`);
   console.log(`${SEP}\n`);
 
-  // Build rank maps: tmdbId → rank (1-based)
   const unfilteredRankMap = new Map(unfilteredTop.map((c, i) => [c.tmdbId, i + 1]));
-  const filteredRankMap   = new Map(filteredTop.map((c, i) => [c.tmdbId, i + 1]));
+  const filteredRankMap = new Map(filteredTop.map((c, i) => [c.tmdbId, i + 1]));
 
   const colW = 32;
   console.log(`  ${"#".padEnd(4)} ${"Unfiltered".padEnd(colW)} ${"Filtered".padEnd(colW)} Change`);
@@ -276,20 +357,16 @@ function printComparison(unfilteredTop, filteredTop, pool, topK, opts) {
   for (let row = 0; row < rows; row++) {
     const u = unfilteredTop[row];
     const f = filteredTop[row];
-
-    const rankStr  = String(row + 1).padStart(3);
-    const uLabel   = u ? truncate(`${u.title} (${u.count} ref${u.count !== 1 ? "s" : ""})`, colW - 1).padEnd(colW) : "".padEnd(colW);
+    const rankStr = String(row + 1).padStart(3);
+    const uLabel = u ? truncate(`${u.title} (${u.count} ref${u.count !== 1 ? "s" : ""})`, colW - 1).padEnd(colW) : "".padEnd(colW);
 
     let fLabel = "";
     let changeStr = "";
-
     if (f) {
       fLabel = truncate(`${f.title} (${f.count} ref${f.count !== 1 ? "s" : ""})`, colW - 1).padEnd(colW);
       const unfiltRank = unfilteredRankMap.get(f.tmdbId);
-      const filtRank   = row + 1;
-
+      const filtRank = row + 1;
       if (unfiltRank === undefined) {
-        // Find where it was in the pool
         const poolIdx = pool.findIndex(c => c.tmdbId === f.tmdbId);
         changeStr = poolIdx >= 0 ? `↑ from pool #${poolIdx + 1}` : "NEW";
       } else if (unfiltRank === filtRank) {
@@ -300,13 +377,11 @@ function printComparison(unfilteredTop, filteredTop, pool, topK, opts) {
         changeStr = `↑ from #${unfiltRank}`;
       }
     }
-
     console.log(`  ${rankStr} ${uLabel} ${fLabel} ${changeStr}`);
   }
-
   console.log();
 
-  // Dropped titles (in unfiltered top-k but not in filtered top-k)
+  // Dropped / promoted analysis
   const droppedTitles = unfilteredTop.filter(c => !filteredRankMap.has(c.tmdbId));
   if (droppedTitles.length > 0) {
     console.log(`  Dropped by filter (were in unfiltered top-${topK}):`);
@@ -316,7 +391,6 @@ function printComparison(unfilteredTop, filteredTop, pool, topK, opts) {
     console.log();
   }
 
-  // Promoted titles (in filtered top-k but NOT in unfiltered top-k)
   const promotedTitles = filteredTop.filter(c => !unfilteredRankMap.has(c.tmdbId));
   if (promotedTitles.length > 0) {
     console.log(`  Promoted by filter (now in filtered top-${topK}, were NOT in unfiltered top-${topK}):`);
@@ -334,43 +408,191 @@ function printComparison(unfilteredTop, filteredTop, pool, topK, opts) {
   }
 }
 
-// ─── Section: Filter impact summary ──────────────────────────────────────────
-function printFilterSummary(pool, unfilteredTop, filteredTop, topK, opts) {
+// ─── Section: 3-column comparison (unfiltered, filtered, filtered+diversity) ─
+
+function printComparison3Col(unfilteredTop, filteredTop, diversityTop, pool, topK) {
   console.log(`${SEP}`);
-  console.log(`  FILTER IMPACT SUMMARY`);
+  console.log(` COMPARISON: UNFILTERED → FILTERED → FILTERED + DIVERSITY (top ${topK})`);
   console.log(`${SEP}\n`);
 
-  const passed    = pool.filter(c => c.qualityResult.pass).length;
-  const failed    = pool.length - passed;
+  const unfilteredRankMap = new Map(unfilteredTop.map((c, i) => [c.tmdbId, i + 1]));
+  const filteredRankMap = new Map(filteredTop.map((c, i) => [c.tmdbId, i + 1]));
+  const diversityRankMap = new Map(diversityTop.map((c, i) => [c.tmdbId, i + 1]));
 
-  const failLowRating   = pool.filter(c => !c.qualityResult.pass && c.qualityResult.reason?.startsWith("rating")).length;
-  const failLowVotesEn  = pool.filter(c => !c.qualityResult.pass && c.qualityResult.reason?.includes("(en)")).length;
+  const colW = 26;
+  console.log(`  ${"#".padEnd(4)} ${"Unfiltered".padEnd(colW)} ${"Filtered".padEnd(colW)} ${"Filtered+Diversity".padEnd(colW)} Change`);
+  console.log("  " + "─".repeat(4 + colW * 3 + 3 + 20));
+
+  const rows = Math.max(unfilteredTop.length, filteredTop.length, diversityTop.length);
+  for (let row = 0; row < rows; row++) {
+    const u = unfilteredTop[row];
+    const f = filteredTop[row];
+    const d = diversityTop[row];
+    const rankStr = String(row + 1).padStart(3);
+
+    function colLabel(entry) {
+      if (!entry) return "".padEnd(colW);
+      const countStr = entry.originalCount !== undefined && entry.originalCount !== entry.count
+        ? `${entry.originalCount}→${entry.count}`
+        : `${entry.count}`;
+      return truncate(`${entry.title} (${countStr})`, colW - 1).padEnd(colW);
+    }
+
+    const uLabel = u ? truncate(`${u.title} (${u.count})`, colW - 1).padEnd(colW) : "".padEnd(colW);
+    const fLabel = f ? truncate(`${f.title} (${f.count})`, colW - 1).padEnd(colW) : "".padEnd(colW);
+    const dLabel = colLabel(d);
+
+    // Change column: compare diversity position to filtered position
+    let changeStr = "";
+    if (d) {
+      const filtRank = filteredRankMap.get(d.tmdbId);
+      const divRank = row + 1;
+      if (filtRank === undefined) {
+        changeStr = "↑ diversity boost";
+      } else if (filtRank === divRank) {
+        changeStr = "—";
+      } else if (filtRank < divRank) {
+        changeStr = `↓ from filtered #${filtRank}`;
+      } else {
+        changeStr = `↑ from filtered #${filtRank}`;
+      }
+    }
+    console.log(`  ${rankStr} ${uLabel} ${fLabel} ${dLabel} ${changeStr}`);
+  }
+  console.log();
+
+  // ── Dropped by quality filter ──
+  const droppedByQuality = unfilteredTop.filter(c => !filteredRankMap.has(c.tmdbId));
+  if (droppedByQuality.length > 0) {
+    console.log(`  Dropped by quality filter (were in unfiltered top-${topK}):`);
+    for (const c of droppedByQuality) {
+      console.log(`    ${c.title} — ${c.qualityResult.reason || "filtered"}`);
+    }
+    console.log();
+  }
+
+  // ── Reordered by diversity ──
+  const reorderedByDiversity = diversityTop.filter(d => {
+    const filtRank = filteredRankMap.get(d.tmdbId);
+    const divRank = diversityRankMap.get(d.tmdbId);
+    return filtRank !== undefined && filtRank !== divRank;
+  });
+  if (reorderedByDiversity.length > 0) {
+    console.log(`  Reordered by diversity (position changed from filtered ranking):`);
+    for (const d of reorderedByDiversity) {
+      const filtRank = filteredRankMap.get(d.tmdbId);
+      const divRank = diversityRankMap.get(d.tmdbId);
+      const dir = divRank < filtRank ? "↑" : "↓";
+      const countInfo = d.originalCount !== d.count
+        ? ` (refs: ${d.originalCount}→${d.count} after pruning)`
+        : "";
+      console.log(`    ${d.title}: filtered #${filtRank} → diversity #${divRank} ${dir}${countInfo}`);
+    }
+    console.log();
+  }
+
+  // ── Titles unique to diversity top-k (promoted from deeper in filtered pool) ──
+  const diversityOnly = diversityTop.filter(d => !filteredRankMap.has(d.tmdbId));
+  if (diversityOnly.length > 0) {
+    console.log(`  Promoted by diversity (in diversity top-${topK}, NOT in filtered top-${topK}):`);
+    for (const d of diversityOnly) {
+      const ratingStr = d.imdbEntry ? `IMDb ${d.imdbEntry.rating.toFixed(1)} / ${fmtNum(d.imdbEntry.votes)} votes` : "no IMDb data";
+      console.log(`    ${d.title} (${d.originalCount} refs), ${ratingStr}`);
+    }
+    console.log();
+  }
+
+  // ── Titles in filtered top-k but dropped by diversity ──
+  const filteredOnly = filteredTop.filter(f => !diversityRankMap.has(f.tmdbId));
+  if (filteredOnly.length > 0) {
+    console.log(`  In filtered top-${topK} but NOT in diversity top-${topK}:`);
+    for (const f of filteredOnly) {
+      console.log(`    ${f.title} (${f.count} refs)`);
+    }
+    console.log();
+  }
+
+  if (droppedByQuality.length === 0 && reorderedByDiversity.length === 0 && diversityOnly.length === 0 && filteredOnly.length === 0) {
+    console.log(`  No changes across all three rankings.\n`);
+  }
+}
+
+// ─── Section: Diversity detail ────────────────────────────────────────────────
+
+function printDiversityDetail(diversityTop, topK) {
+  console.log(`${SEP}`);
+  console.log(` DIVERSITY RANKING DETAIL (graph pruning on quality-filtered pool)`);
+  console.log(`${SEP}\n`);
+
+  for (let i = 0; i < diversityTop.length; i++) {
+    const sel = diversityTop[i];
+    const countChanged = sel.count !== sel.originalCount;
+    const countStr = countChanged
+      ? `${sel.originalCount} references → ${sel.count} after diversity`
+      : `${sel.count} reference${sel.count !== 1 ? "s" : ""}`;
+
+    const ratingStr = sel.imdbEntry ? ` | IMDb ${sel.imdbEntry.rating.toFixed(1)}` : "";
+
+    console.log(`  ${String(i + 1).padStart(2)}. ${sel.title} (${fmtMedia(sel.mediaType)}) — ${countStr}${ratingStr}`);
+    console.log(`      Release: ${sel.releaseDate || "unknown"} | TMDB ID: ${sel.tmdbId}`);
+
+    if (sel.wasTiebreak) {
+      console.log(`      [tiebreaker: alphabetical among ${sel.tiebreakCount} contenders tied at count=${sel.originalCount}]`);
+    }
+
+    const refLabel = i > 0 ? "References (surviving after prior diversity rounds):" : "References:";
+    console.log(`      ${refLabel}`);
+    for (const ref of sel.references) {
+      const fav = ref.isFavorite ? ", ★ favorite" : "";
+      console.log(`        • ${ref.title} (${ref.status}${fav}, position #${ref.position + 1})`);
+    }
+
+    const srcCount = sel.references.length;
+    console.log(`      [Diversity: removed ${srcCount} source node${srcCount !== 1 ? "s" : ""} → ${sel.affectedRecs} other recs affected]`);
+    console.log();
+  }
+}
+
+// ─── Section: Filter impact summary ──────────────────────────────────────────
+
+function printFilterSummary(pool, unfilteredTop, filteredTop, diversityTop, topK, opts) {
+  console.log(`${SEP}`);
+  console.log(` FILTER IMPACT SUMMARY`);
+  console.log(`${SEP}\n`);
+
+  const passed = pool.filter(c => c.qualityResult.pass).length;
+  const failed = pool.length - passed;
+  const failLowRating = pool.filter(c => !c.qualityResult.pass && c.qualityResult.reason?.startsWith("rating")).length;
+  const failLowVotesEn = pool.filter(c => !c.qualityResult.pass && c.qualityResult.reason?.includes("(en)")).length;
   const failLowVotesForeign = pool.filter(c => !c.qualityResult.pass && c.qualityResult.reason && c.qualityResult.reason.includes("votes") && !c.qualityResult.reason.includes("(en)")).length;
-  const failNoData      = pool.filter(c => !c.qualityResult.pass && c.qualityResult.reason === "no IMDb data").length;
-  const failOther       = failed - failLowRating - failLowVotesEn - failLowVotesForeign - failNoData;
-
+  const failNoData = pool.filter(c => !c.qualityResult.pass && c.qualityResult.reason === "no IMDb data").length;
+  const failOther = failed - failLowRating - failLowVotesEn - failLowVotesForeign - failNoData;
   const pct = pool.length > 0 ? Math.round((passed / pool.length) * 100) : 0;
 
   console.log(`  Pool evaluated: ${pool.length} candidates`);
   console.log(`  Passed filter:  ${passed} (${pct}%)`);
-  console.log(`  Failed — low rating:         ${failLowRating}`);
-  console.log(`  Failed — low votes (EN):     ${failLowVotesEn}`);
-  console.log(`  Failed — low votes (foreign):${failLowVotesForeign}`);
-  console.log(`  Failed — no IMDb data:       ${failNoData}`);
+  console.log(`  Failed — low rating:          ${failLowRating}`);
+  console.log(`  Failed — low votes (EN):      ${failLowVotesEn}`);
+  console.log(`  Failed — low votes (foreign): ${failLowVotesForeign}`);
+  console.log(`  Failed — no IMDb data:        ${failNoData}`);
   if (failOther > 0) {
-    console.log(`  Failed — other:              ${failOther}`);
+    console.log(`  Failed — other:               ${failOther}`);
   }
 
-  const changedInTop = unfilteredTop.filter(c => {
-    const filteredRank = filteredTop.findIndex(f => f.tmdbId === c.tmdbId);
-    const unfiltRank   = unfilteredTop.findIndex(u => u.tmdbId === c.tmdbId);
-    return filteredRank !== unfiltRank;
-  }).length;
+  const droppedByQuality = unfilteredTop.filter(c => !filteredTop.find(f => f.tmdbId === c.tmdbId)).length;
+  console.log(`\n  Top-${topK} changes from quality filter: ${droppedByQuality} of ${topK} replaced`);
 
-  const droppedCount = unfilteredTop.filter(c => !filteredTop.find(f => f.tmdbId === c.tmdbId)).length;
-  console.log(`\n  Top-${topK} changes: ${droppedCount} of ${topK} replaced`);
+  if (diversityTop) {
+    const filteredRankMap = new Map(filteredTop.map((c, i) => [c.tmdbId, i + 1]));
+    const diversityRankMap = new Map(diversityTop.map((c, i) => [c.tmdbId, i + 1]));
+    const reordered = diversityTop.filter(d => {
+      const fRank = filteredRankMap.get(d.tmdbId);
+      return fRank === undefined || fRank !== diversityRankMap.get(d.tmdbId);
+    }).length;
+    console.log(`  Top-${topK} changes from diversity:       ${reordered} of ${topK} moved or swapped`);
+  }
 
-  // Average IMDb rating for top-k (only titles with IMDb data)
+  // Average IMDb rating for each ranking
   function avgRating(list) {
     const withData = list.filter(c => c.imdbEntry && !isNaN(c.imdbEntry.rating));
     if (withData.length === 0) return null;
@@ -378,47 +600,51 @@ function printFilterSummary(pool, unfilteredTop, filteredTop, topK, opts) {
   }
 
   const avgUnfiltered = avgRating(unfilteredTop);
-  const avgFiltered   = avgRating(filteredTop);
-
+  const avgFiltered = avgRating(filteredTop);
   if (avgUnfiltered !== null) {
-    console.log(`  Avg IMDb rating (unfiltered top-${topK}): ${avgUnfiltered.toFixed(1)}`);
+    console.log(`\n  Avg IMDb rating (unfiltered top-${topK}):            ${avgUnfiltered.toFixed(1)}`);
   }
   if (avgFiltered !== null) {
-    console.log(`  Avg IMDb rating (filtered top-${topK}):   ${avgFiltered.toFixed(1)}`);
+    console.log(`  Avg IMDb rating (filtered top-${topK}):              ${avgFiltered.toFixed(1)}`);
   }
-
+  if (diversityTop) {
+    const avgDiv = avgRating(diversityTop);
+    if (avgDiv !== null) {
+      console.log(`  Avg IMDb rating (filtered+diversity top-${topK}):    ${avgDiv.toFixed(1)}`);
+    }
+  }
   console.log();
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
+
 async function main() {
   // ─── Parse CLI ────────────────────────────────────────────────────────────
   const listId = process.argv[2];
   if (!listId || listId.startsWith("--")) {
     console.error("Usage: node scripts/graph-recommend-filtered.mjs <listId> [--uid <uid>] [--type movie|show|all] [--top <k>] [--source recs|similar]");
-    console.error("       [--min-rating 6.0] [--min-votes-en 50000] [--min-votes-foreign 3000] [--pool <n>] [--no-filter] [--allow-unknown]");
+    console.error("       [--min-rating 6.0] [--min-votes-en 50000] [--min-votes-foreign 3000] [--pool <n>] [--no-filter] [--allow-unknown] [--diversity]");
     process.exit(1);
   }
 
   const argv = process.argv.slice(3);
-
   function getArg(flag, defaultVal) {
     const idx = argv.indexOf(flag);
     return idx >= 0 ? argv[idx + 1] : defaultVal;
   }
 
-  const uid          = getArg("--uid", null);
-  const typeFilter   = getArg("--type", "all");
-  const topK         = parseInt(getArg("--top", "10"), 10);
-  const source       = getArg("--source", "recs");
-  const minRating    = parseFloat(getArg("--min-rating", "6.0"));
-  const minVotesEn   = parseInt(getArg("--min-votes-en", "50000"), 10);
+  const uid = getArg("--uid", null);
+  const typeFilter = getArg("--type", "all");
+  const topK = parseInt(getArg("--top", "10"), 10);
+  const source = getArg("--source", "recs");
+  const minRating = parseFloat(getArg("--min-rating", "6.0"));
+  const minVotesEn = parseInt(getArg("--min-votes-en", "50000"), 10);
   const minVotesForeign = parseInt(getArg("--min-votes-foreign", "3000"), 10);
-  const noFilter     = argv.includes("--no-filter");
+  const noFilter = argv.includes("--no-filter");
   const allowUnknown = argv.includes("--allow-unknown");
-
-  const defaultPool  = topK * 3;
-  const poolSize     = parseInt(getArg("--pool", String(defaultPool)), 10);
+  const diversity = argv.includes("--diversity");
+  const defaultPool = topK * 3;
+  const poolSize = parseInt(getArg("--pool", String(defaultPool)), 10);
 
   if (!["movie", "show", "all"].includes(typeFilter)) {
     console.error(`Invalid --type: "${typeFilter}". Must be movie, show, or all`); process.exit(1);
@@ -433,9 +659,9 @@ async function main() {
     console.error(`Invalid --pool: must be >= --top (${topK})`); process.exit(1);
   }
 
-  const opts = { typeFilter, topK, source, minRating, minVotesEn, minVotesForeign, noFilter, allowUnknown, poolSize };
+  const opts = { typeFilter, topK, source, minRating, minVotesEn, minVotesForeign, noFilter, allowUnknown, diversity, poolSize };
 
-  const FORWARD_INDEX_PATH  = INDEX_PATHS[source].forward;
+  const FORWARD_INDEX_PATH = INDEX_PATHS[source].forward;
   const INVERTED_INDEX_PATH = INDEX_PATHS[source].inverted;
   const buildScript = source === "similar" ? "build-similar-cache.mjs" : "build-recs-cache.mjs";
 
@@ -447,6 +673,7 @@ async function main() {
       process.exit(1);
     }
   }
+
   const forwardIndex = JSON.parse(readFileSync(FORWARD_INDEX_PATH, "utf8"));
   const forwardEntries = Object.keys(forwardIndex).length;
 
@@ -480,8 +707,8 @@ async function main() {
   console.log(`${regSnap.docs.length} registry docs`);
 
   // ─── Resolve list ────────────────────────────────────────────────────────
-  const list      = await resolveList(db, listId, uid);
-  const listData  = list.data;
+  const list = await resolveList(db, listId, uid);
+  const listData = list.data;
   const memberUids = list.type === "shared"
     ? extractMemberUids(list.members)
     : (list.uid ? [list.uid] : []);
@@ -499,8 +726,8 @@ async function main() {
   }
 
   // ─── Build list items ────────────────────────────────────────────────────
-  const watched    = new Set(listData.watched    || []);
-  const archive    = new Set(listData.archive    || []);
+  const watched = new Set(listData.watched || []);
+  const archive = new Set(listData.archive || []);
   const maybeLater = new Set(listData.maybeLater || []);
 
   const listItems = [];
@@ -508,15 +735,15 @@ async function main() {
     const rid = item.registryId;
     if (!rid) continue;
     let status = "to-watch";
-    if (watched.has(rid))         status = "watched";
-    else if (archive.has(rid))    status = "archive";
+    if (watched.has(rid)) status = "watched";
+    else if (archive.has(rid)) status = "archive";
     else if (maybeLater.has(rid)) status = "maybe-later";
     const reg = registry[rid] || {};
     listItems.push({
       registryId: rid,
-      imdbId:     reg.imdbId || null,
-      tmdbId:     reg.tmdbId ? String(reg.tmdbId) : null,
-      title:      reg.title  || rid,
+      imdbId: reg.imdbId || null,
+      tmdbId: reg.tmdbId ? String(reg.tmdbId) : null,
+      title: reg.title || rid,
       status,
       isFavorite: favorites.has(rid),
     });
@@ -528,7 +755,6 @@ async function main() {
   const listTypeLabel = list.type === "shared"
     ? `shared, ${memberUids.length} member${memberUids.length !== 1 ? "s" : ""}`
     : "personal";
-
   printSetup(opts, list.name, listTypeLabel, positiveItems, forwardEntries, imdbRatings.size);
 
   if (positiveItems.length === 0) {
@@ -555,20 +781,20 @@ async function main() {
       const key = String(rec.tmdbId);
       if (!aggregated[key]) {
         aggregated[key] = {
-          tmdbId:      key,
-          title:       rec.title,
-          mediaType:   rec.mediaType,
+          tmdbId: key,
+          title: rec.title,
+          mediaType: rec.mediaType,
           releaseDate: rec.releaseDate,
-          references:  [],
-          count:       0,
+          references: [],
+          count: 0,
         };
       }
       aggregated[key].references.push({
-        imdbId:     item.imdbId,
-        title:      item.title,
-        status:     item.status,
+        imdbId: item.imdbId,
+        title: item.title,
+        status: item.status,
         isFavorite: item.isFavorite,
-        position:   rec.position,
+        position: rec.position,
       });
       aggregated[key].count++;
     }
@@ -587,13 +813,12 @@ async function main() {
   }
 
   const afterExclusionCount = Object.keys(aggregated).length;
-
   const dist = { 1: 0, 2: 0, 3: 0, "4+": 0 };
   for (const e of Object.values(aggregated)) {
-    if      (e.count === 1) dist[1]++;
+    if (e.count === 1) dist[1]++;
     else if (e.count === 2) dist[2]++;
     else if (e.count === 3) dist[3]++;
-    else                    dist["4+"]++;
+    else dist["4+"]++;
   }
 
   console.log(`\nRecommendation graph for this list:`);
@@ -623,8 +848,8 @@ async function main() {
       tmdbToRegistry,
       tmdbCache
     );
-    candidate.imdbId    = imdbId;
-    candidate.lang      = lang;
+    candidate.imdbId = imdbId;
+    candidate.lang = lang;
     candidate.imdbEntry = imdbId ? (imdbRatings.get(imdbId) || null) : null;
     candidate.qualityResult = qualityCheck(candidate.imdbEntry, lang, opts);
   }
@@ -647,11 +872,29 @@ async function main() {
     if (candidate.qualityResult.pass) filteredTop.push(candidate);
   }
 
+  // ─── Build diversity top-k (quality-filtered pool → graph pruning) ────────
+  let diversityTop = null;
+  if (diversity) {
+    // Feed ALL quality-passing candidates from the pool into diversity ranking,
+    // not just the top-k — diversity should be able to promote from deeper in
+    // the filtered pool when it "spends" source nodes from top candidates.
+    const qualityPassingPool = poolCandidates.filter(c => c.qualityResult.pass);
+    console.log(`\nRunning diversity ranking on ${qualityPassingPool.length} quality-passing candidates...`);
+    diversityTop = runDiversityRanking(qualityPassingPool, topK);
+  }
+
   // ─── Print all sections ───────────────────────────────────────────────────
   printAudit(poolCandidates, opts);
-  printComparison(unfilteredTop, filteredTop, poolCandidates, topK, opts);
+
+  if (diversity) {
+    printComparison3Col(unfilteredTop, filteredTop, diversityTop, poolCandidates, topK);
+    printDiversityDetail(diversityTop, topK);
+  } else {
+    printComparison2Col(unfilteredTop, filteredTop, poolCandidates, topK);
+  }
+
   if (!noFilter) {
-    printFilterSummary(poolCandidates, unfilteredTop, filteredTop, topK, opts);
+    printFilterSummary(poolCandidates, unfilteredTop, filteredTop, diversityTop, topK, opts);
   }
 
   process.exit(0);
