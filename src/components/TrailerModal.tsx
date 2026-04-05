@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { StatusKey, WatchlistItem } from "../types/index.js";
-import { useAppStore, STATUS_ORDER, STATUS_LABELS, CHECK_SVG } from "../store/useAppStore.js";
+import type { ListMode, StatusKey, WatchlistItem } from "../types/index.js";
+import { useAppStore } from "../store/useAppStore.js";
 import {
   hasPlayableTrailerYoutubeId,
   renderServiceChips,
   servicesForMovie,
 } from "../lib/movieDisplay.js";
-import { usePersonalLists, useSharedLists, useFavorites } from "../hooks/useWatchlist.js";
+import {
+  usePersonalLists,
+  useSharedLists,
+  useFavorites,
+  useWatchlistMovies,
+} from "../hooks/useWatchlist.js";
 import {
   useAddTitleToList,
   useRemoveTitleFromList,
@@ -16,11 +21,9 @@ import {
   useToggleFavorite,
 } from "../hooks/useMutations.js";
 import { useAddRecommendation } from "../hooks/useRecommendations.js";
-import { getCurrentListLabel } from "../data/lists.js";
 import { displayListName, errorMessage } from "../lib/utils.js";
 import { logEvent } from "../lib/axiom-logger.js";
 import { getPersonalListMovies, listKey } from "../firebase.js";
-import { resolveStatusForCrossListAdd } from "../lib/resolve-add-item-status.js";
 import { toast } from "sonner";
 
 const MODAL_LANG_NAMES: Record<string, string> = {
@@ -41,19 +44,168 @@ function modalOriginalLanguageLabel(code: string | null | undefined): string | n
   return MODAL_LANG_NAMES[two] ?? two.toUpperCase();
 }
 
+interface ListRowInfo {
+  id: string;
+  name: string;
+  type: "personal" | "shared";
+}
+
+function listInfoToMode(info: ListRowInfo): ListMode {
+  if (info.type === "shared") return { type: "shared", listId: info.id, name: info.name };
+  if (info.id === "personal") return "personal";
+  return { type: "personal", listId: info.id };
+}
+
+interface PerListRowProps {
+  listInfo: ListRowInfo;
+  movie: WatchlistItem;
+  uid: string;
+}
+
+function PerListRow({ listInfo, movie, uid }: PerListRowProps) {
+  const listMode = listInfoToMode(listInfo);
+  const favorites = useFavorites(uid, listMode);
+  const setTitleStatusMutation = useSetTitleStatus();
+  const removeTitleFromListMutation = useRemoveTitleFromList();
+  const toggleFavoriteMutation = useToggleFavorite();
+
+  // Subscribe to the list's cache — reactive, serves from cache if already loaded
+  const { data: listMovies = [] } = useWatchlistMovies(uid, listMode);
+
+  const movieKey = listKey(movie);
+  const cachedItem = listMovies.find((x) => listKey(x) === movieKey);
+  const status: StatusKey = cachedItem?.status ?? movie.status ?? "to-watch";
+  const isLiked = favorites.has(movieKey);
+
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const confirmTimer = useRef<number | null>(null);
+
+  function startConfirmRemove(e: ReactMouseEvent) {
+    e.stopPropagation();
+    if (confirmTimer.current) window.clearTimeout(confirmTimer.current);
+    setConfirmRemove(true);
+    confirmTimer.current = window.setTimeout(() => setConfirmRemove(false), 3000);
+  }
+
+  function cancelConfirmRemove(e: ReactMouseEvent) {
+    e.stopPropagation();
+    if (confirmTimer.current) window.clearTimeout(confirmTimer.current);
+    setConfirmRemove(false);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimer.current) window.clearTimeout(confirmTimer.current);
+    };
+  }, []);
+
+  async function onStatusChange(st: StatusKey) {
+    try {
+      await setTitleStatusMutation.mutateAsync({ uid, listMode, key: movieKey, status: st });
+      void logEvent({
+        type: "user.action",
+        action: "status.change",
+        tmdbId: movie.tmdbId ?? null,
+        status: st,
+        uid,
+      }).catch(() => {});
+    } catch (err: unknown) {
+      toast.error(errorMessage(err) || "Failed to update status.");
+    }
+  }
+
+  async function onLikeToggle(e: ReactMouseEvent) {
+    e.stopPropagation();
+    try {
+      await toggleFavoriteMutation.mutateAsync({
+        uid,
+        listMode,
+        registryId: movieKey,
+        isFavorite: !isLiked,
+      });
+    } catch (err: unknown) {
+      toast.error(errorMessage(err) || "Failed to update.");
+    }
+  }
+
+  async function onConfirmRemove(e: ReactMouseEvent) {
+    e.stopPropagation();
+    if (confirmTimer.current) window.clearTimeout(confirmTimer.current);
+    try {
+      await removeTitleFromListMutation.mutateAsync({
+        uid,
+        listId: listInfo.id,
+        key: movieKey,
+        type: listInfo.type,
+      });
+    } catch (err: unknown) {
+      toast.error(errorMessage(err) || "Failed to remove.");
+      setConfirmRemove(false);
+    }
+  }
+
+  return (
+    <div className="modal-list-row">
+      <span className="modal-list-row-name">{listInfo.name}</span>
+      {confirmRemove ? (
+        <span className="modal-list-row-confirm">
+          <span className="modal-list-row-confirm-label">Remove?</span>
+          <button
+            type="button"
+            className="modal-list-row-confirm-yes"
+            onClick={(e) => { void onConfirmRemove(e); }}
+          >
+            Yes
+          </button>
+          <button
+            type="button"
+            className="modal-list-row-confirm-no"
+            onClick={cancelConfirmRemove}
+          >
+            No
+          </button>
+        </span>
+      ) : (
+        <>
+          <select
+            className="modal-list-row-status"
+            value={status}
+            aria-label={`Status for ${listInfo.name}`}
+            onChange={(e) => { void onStatusChange(e.target.value as StatusKey); }}
+          >
+            <option value="to-watch">To watch</option>
+            <option value="watched">Watched</option>
+          </select>
+          <button
+            type="button"
+            className={`modal-list-row-like${isLiked ? " modal-list-row-like--active" : ""}`}
+            aria-label={isLiked ? `Unlike on ${listInfo.name}` : `Like on ${listInfo.name}`}
+            onClick={(e) => { void onLikeToggle(e); }}
+          >
+            {isLiked ? "♥" : "♡"}
+          </button>
+          <button
+            type="button"
+            className="modal-list-row-remove"
+            aria-label={`Remove from ${listInfo.name}`}
+            onClick={startConfirmRemove}
+          >
+            ✕
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function TrailerModal() {
   const queryClient = useQueryClient();
   const currentUser = useAppStore((s) => s.currentUser);
   const movie = useAppStore((s) => s.currentModalMovie);
   const setCurrentModalMovie = useAppStore((s) => s.setCurrentModalMovie);
   const userCountryCode = useAppStore((s) => s.userCountryCode);
-  const currentListMode = useAppStore((s) => s.currentListMode);
-  const setTitleStatusMutation = useSetTitleStatus();
   const addTitleMutation = useAddTitleToList();
-  const removeTitleFromListMutation = useRemoveTitleFromList();
-  const toggleFavoriteMutation = useToggleFavorite();
   const addRecommendationMutation = useAddRecommendation(currentUser?.uid);
-  const favorites = useFavorites(currentUser?.uid, currentListMode);
 
   const personalQ = usePersonalLists(currentUser?.uid, { enabled: Boolean(currentUser?.uid) });
   const sharedQ = useSharedLists(currentUser?.uid, { enabled: Boolean(currentUser?.uid) });
@@ -64,7 +216,6 @@ export function TrailerModal() {
   /** Close dropdowns when switching titles, not when the same row gets a new object (e.g. status). */
   const movieStableKey = movie ? listKey(movie) : null;
 
-  const [statusOpen, setStatusOpen] = useState(false);
   const [addListOpen, setAddListOpen] = useState(false);
   const uid = currentUser?.uid;
   const listsFetched = personalQ.isFetched && sharedQ.isFetched;
@@ -128,7 +279,6 @@ export function TrailerModal() {
   });
 
   useEffect(() => {
-    setStatusOpen(false);
     setAddListOpen(false);
   }, [movieStableKey]);
 
@@ -136,7 +286,6 @@ export function TrailerModal() {
     if (!movie) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        setStatusOpen(false);
         setAddListOpen(false);
         setCurrentModalMovie(null);
       }
@@ -146,118 +295,85 @@ export function TrailerModal() {
   }, [movie, setCurrentModalMovie]);
 
   useEffect(() => {
-    if (!statusOpen && !addListOpen) return;
+    if (!addListOpen) return;
     function onDocClick(ev: MouseEvent) {
       const footer = document.getElementById("modal-footer");
       const t = ev.target;
       if (footer && t instanceof Node && !footer.contains(t)) {
-        setStatusOpen(false);
         setAddListOpen(false);
       }
     }
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
-  }, [statusOpen, addListOpen]);
+  }, [addListOpen]);
 
   if (!movie) return null;
 
   const m = movie;
-  const raw = m.status || "to-watch";
-  const tabKey: StatusKey = raw === "watched" ? "watched" : "to-watch";
 
   function close() {
-    setStatusOpen(false);
     setAddListOpen(false);
     setCurrentModalMovie(null);
   }
 
   const imdbUrl = m.imdbId ? `https://www.imdb.com/title/${m.imdbId}/` : null;
-
-  async function onPickStatus(st: StatusKey) {
-    if (!currentUser?.uid) return;
-    const current: StatusKey = raw === "watched" ? "watched" : "to-watch";
-    if (st === current) {
-      setStatusOpen(false);
-      return;
-    }
-    try {
-      await setTitleStatusMutation.mutateAsync({
-        uid: currentUser.uid,
-        listMode: currentListMode,
-        key: listKey(m),
-        status: st,
-      });
-      setCurrentModalMovie({ ...m, status: st });
-      void logEvent({
-        type: "user.action",
-        action: "status.change",
-        tmdbId: m.tmdbId ?? null,
-        status: st,
-        uid: currentUser.uid,
-      }).catch(() => {});
-    } catch (err: unknown) {
-      console.error(err);
-      toast.error(errorMessage(err) || "Failed to update.");
-    }
-    setStatusOpen(false);
-  }
-
-  function onAddListTriggerClick(e: ReactMouseEvent<HTMLButtonElement>) {
-    e.stopPropagation();
-    setStatusOpen(false);
-    setAddListOpen((o) => !o);
-  }
-
-  async function onToggleListMembership(
-    type: "personal" | "shared",
-    listId: string,
-    currentlyInList: boolean
-  ) {
-    if (!currentUser?.uid) return;
-    try {
-      const key = listKey(m);
-      if (currentlyInList) {
-        await removeTitleFromListMutation.mutateAsync({ uid: currentUser.uid, listId, key, type });
-      } else {
-        const status = resolveStatusForCrossListAdd(
-          m,
-          currentUser.uid,
-          currentListMode,
-          queryClient
-        );
-        await addTitleMutation.mutateAsync({
-          uid: currentUser.uid,
-          listMode:
-            type === "personal"
-              ? { type: "personal", listId }
-              : { type: "shared", listId, name: "" },
-          item: { ...m, status },
-        });
-      }
-    } catch (err: unknown) {
-      console.error(err);
-      toast.error(errorMessage(err) || "Failed to update list.");
-    }
-  }
-
-  const currentListButtonLabel = getCurrentListLabel(currentListMode, personalLists, sharedLists);
-
   const isRec = m.source === "recommendation";
-  const currentListId = typeof currentListMode === "object" ? currentListMode.listId : "personal";
-  const alreadyOnCurrentList = isRec && containingLists.has(currentListId);
 
-  async function onAddRecommendation() {
-    if (!uid || !isRec) return;
+  // Build per-list row data: lists this title IS on and lists it is NOT on
+  const allListInfos: ListRowInfo[] = [
+    ...personalLists.map((l) => ({
+      id: l.id,
+      name: displayListName(l.name),
+      type: "personal" as const,
+    })),
+    ...sharedLists.map((l) => ({
+      id: l.id,
+      name: displayListName(l.name),
+      type: "shared" as const,
+    })),
+  ];
+  const onLists = allListInfos.filter((l) => containingLists.has(l.id));
+  const notOnLists = allListInfos.filter((l) => !containingLists.has(l.id));
+
+  async function onAddToList(listInfo: ListRowInfo) {
+    if (!uid) return;
+    const targetMode = listInfoToMode(listInfo);
     try {
-      const result = await addRecommendationMutation.mutateAsync({
-        item: m,
-        listMode: currentListMode,
+      await addTitleMutation.mutateAsync({
+        uid,
+        listMode: targetMode,
+        item: { ...m, status: "to-watch" },
       });
-      toast.success(`Added "${result.title}" to list`);
-      close();
     } catch (err: unknown) {
       toast.error(errorMessage(err) || "Failed to add to list.");
     }
+    setAddListOpen(false);
+  }
+
+  async function onAddRecommendationToList(listInfo: ListRowInfo) {
+    if (!uid) return;
+    const targetMode = listInfoToMode(listInfo);
+    try {
+      const result = await addRecommendationMutation.mutateAsync({ item: m, listMode: targetMode });
+      toast.success(`Added "${result.title}" to list`);
+      // Invalidate so the new row appears in containingLists
+      if (movieStableKey) {
+        void queryClient.invalidateQueries({
+          predicate: (q) => {
+            const k = q.queryKey;
+            return (
+              Array.isArray(k) &&
+              k[0] === "listsContaining" &&
+              k[1] === movieStableKey &&
+              k[2] === uid
+            );
+          },
+        });
+      }
+    } catch (err: unknown) {
+      toast.error(errorMessage(err) || "Failed to add to list.");
+    }
+    setAddListOpen(false);
   }
 
   const metaCore = [m.year || "", m.genre || ""].filter(Boolean).join(" ");
@@ -368,164 +484,70 @@ export function TrailerModal() {
           <div className="modal-footer-meta">
             {metaParts}
             {servicePart}
-            {uid && tabKey === "watched" ? (
-              <button
-                type="button"
-                className={`btn-favorite modal-favorite-btn${favorites.has(listKey(m)) ? " btn-favorite--active" : ""}`}
-                aria-label={favorites.has(listKey(m)) ? "Remove from favorites" : "Add to favorites"}
-                title={favorites.has(listKey(m)) ? "Remove from favorites" : "Add to favorites"}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const registryId = listKey(m);
-                  const nowFavorite = !favorites.has(registryId);
-                  void toggleFavoriteMutation.mutateAsync({ uid, listMode: currentListMode, registryId, isFavorite: nowFavorite });
-                }}
-              >
-                {favorites.has(listKey(m)) ? "♥" : "♡"}
-              </button>
-            ) : null}
           </div>
           <div className="modal-footer-actions">
-            <div className="modal-action-dropdown" data-dropdown="status">
-              <button
-                type="button"
-                className="modal-action-btn modal-status-trigger"
-                aria-haspopup="true"
-                aria-expanded={statusOpen}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setAddListOpen(false);
-                  setStatusOpen((o) => !o);
-                }}
-              >
-                <span className="modal-action-label">{STATUS_LABELS[tabKey]}</span>
-              </button>
-              <div
-                className={`modal-action-dropdown-panel${statusOpen ? " open" : ""}`}
-                role="menu"
-              >
-                {STATUS_ORDER.map((st) => {
-                  const isActive = st === tabKey;
-                  return (
-                    <button
-                      key={st}
-                      type="button"
-                      className="modal-action-dropdown-item"
-                      role="menuitem"
-                      data-status={st}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPickStatus(st);
-                      }}
-                      dangerouslySetInnerHTML={{
-                        __html: `${STATUS_LABELS[st]}${isActive ? " " + CHECK_SVG : ""}`,
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="modal-action-dropdown" data-dropdown="add-to-list">
-              <button
-                type="button"
-                className="modal-action-btn modal-add-to-list-trigger"
-                aria-haspopup="true"
-                aria-expanded={addListOpen}
-                onClick={onAddListTriggerClick}
-              >
-                <span className="modal-action-label modal-list-label">
-                  {currentListButtonLabel}
-                </span>
-              </button>
-              <div
-                className={`modal-action-dropdown-panel modal-add-to-list-panel${addListOpen ? " open" : ""}`}
-                role="menu"
-              >
-                {addListOpen && containingLoading && listsFetched ? (
+            {/* Per-list rows section */}
+            {uid ? (
+              <div className="modal-lists-section">
+                {containingLoading && !listsFetched ? (
                   <span className="modal-add-to-list-loading">Loading…</span>
                 ) : null}
-                {addListOpen && !containingLoading && !currentUser?.uid ? (
-                  <span className="modal-add-to-list-empty">Sign in to manage lists</span>
-                ) : null}
-                {addListOpen && !containingLoading && currentUser?.uid
-                  ? personalLists.map((l) => {
-                      const listId = l.id;
-                      const inList = containingLists.has(listId);
-                      const label = displayListName(l.name);
-                      return (
+                {!containingLoading || listsFetched ? (
+                  <>
+                    {onLists.map((listInfo) => (
+                      <PerListRow
+                        key={`${listInfo.type}-${listInfo.id}`}
+                        listInfo={listInfo}
+                        movie={m}
+                        uid={uid}
+                      />
+                    ))}
+                    {notOnLists.length > 0 ? (
+                      <div className="modal-action-dropdown" data-dropdown="add-to-list">
                         <button
-                          key={`p-${listId}`}
                           type="button"
-                          className="modal-action-dropdown-item"
-                          role="menuitem"
+                          className="modal-add-to-list-btn"
+                          aria-haspopup="true"
+                          aria-expanded={addListOpen}
                           onClick={(e) => {
                             e.stopPropagation();
-                            void onToggleListMembership("personal", listId, inList);
+                            setAddListOpen((o) => !o);
                           }}
                         >
-                          {label}
-                          {inList ? (
-                            <span dangerouslySetInnerHTML={{ __html: ` ${CHECK_SVG}` }} />
-                          ) : null}
+                          + Add to list
                         </button>
-                      );
-                    })
-                  : null}
-                {addListOpen && !containingLoading && currentUser?.uid
-                  ? sharedLists.map((l) => {
-                      const listId = l.id;
-                      const inList = containingLists.has(listId);
-                      const label = displayListName(l.name);
-                      return (
-                        <button
-                          key={`s-${listId}`}
-                          type="button"
-                          className="modal-action-dropdown-item"
-                          role="menuitem"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void onToggleListMembership("shared", listId, inList);
-                          }}
+                        <div
+                          className={`modal-action-dropdown-panel modal-add-to-list-panel${addListOpen ? " open" : ""}`}
+                          role="menu"
                         >
-                          {label}
-                          {inList ? (
-                            <span dangerouslySetInnerHTML={{ __html: ` ${CHECK_SVG}` }} />
-                          ) : null}
-                        </button>
-                      );
-                    })
-                  : null}
-                {addListOpen &&
-                !containingLoading &&
-                currentUser?.uid &&
-                listsFetched &&
-                personalLists.length === 0 &&
-                sharedLists.length === 0 ? (
-                  <span className="modal-add-to-list-empty">No lists</span>
+                          {notOnLists.map((listInfo) => (
+                            <button
+                              key={`${listInfo.type}-${listInfo.id}`}
+                              type="button"
+                              className="modal-action-dropdown-item"
+                              role="menuitem"
+                              disabled={
+                                addTitleMutation.isPending ||
+                                addRecommendationMutation.isPending
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void (isRec
+                                  ? onAddRecommendationToList(listInfo)
+                                  : onAddToList(listInfo));
+                              }}
+                            >
+                              {listInfo.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
-            </div>
-
-            {isRec && uid ? (
-              alreadyOnCurrentList ? (
-                <span className="modal-action-btn modal-youtube-link" style={{ opacity: 0.45, cursor: "default" }}>
-                  Already on list
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="btn-primary modal-rec-add-btn"
-                  disabled={addRecommendationMutation.isPending}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void onAddRecommendation();
-                  }}
-                >
-                  {addRecommendationMutation.isPending ? "Adding…" : "Add to list"}
-                </button>
-              )
             ) : null}
+
             {hasTrailer && m.youtubeId ? (
               <a
                 href={`https://www.youtube.com/watch?v=${encodeURIComponent(m.youtubeId)}`}
