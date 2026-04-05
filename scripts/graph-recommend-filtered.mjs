@@ -1,13 +1,17 @@
 /**
- * Watchlist — Recommendation Engine v4: Quality-Filtered (O4) + Diversity (O9)
+ * Watchlist — Recommendation Engine v4: Quality-Filtered (O4) + Diversity (O9) + Status Weights (O2)
  *
  * Same as graph-recommend.mjs but with IMDb quality thresholds applied to
  * the top-N candidate pool. Produces side-by-side comparison showing which
  * titles were dropped (low quality) and which were promoted (high quality
  * but previously buried by reference count).
  *
- * NEW (O9): --diversity flag applies graph-pruning diversity AFTER quality
+ * O9: --diversity flag applies graph-pruning diversity AFTER quality
  * filtering, showing a three-way comparison: unfiltered → filtered → filtered+diversity.
+ *
+ * O2: --w-favorite, --w-watched, --w-unliked, --w-unwatched flags control
+ * how much each source title contributes to recommendation scores based on
+ * the user's relationship to that title.
  *
  * Run:
  *   node scripts/graph-recommend-filtered.mjs <listId> --type show
@@ -16,6 +20,7 @@
  *   node scripts/graph-recommend-filtered.mjs <listId> --source similar --top 20 --pool 60
  *   node scripts/graph-recommend-filtered.mjs <listId> --allow-unknown      # treat no-IMDb-data as PASS
  *   node scripts/graph-recommend-filtered.mjs <listId> --type show --diversity  # quality + diversity
+ *   node scripts/graph-recommend-filtered.mjs <listId> --type show --diversity --w-favorite 2.0 --w-watched 1.0  # with status weights
  *
  * Requires:
  *   - data/tmdb-recs-forward.json (from build-recs-cache.mjs)
@@ -187,19 +192,20 @@ async function resolveImdbAndLang(tmdbId, mediaType, tmdbToRegistry, tmdbCache) 
 // ─── Diversity ranking (graph pruning) ───────────────────────────────────────
 
 /**
- * Ported from graph-recommend.mjs.
+ * Ported from graph-recommend.mjs, extended with weighted scoring.
  *
  * Works on a list of candidate objects (must have .tmdbId, .title, .mediaType,
- * .releaseDate, .references[], .count). Each round:
- *   1. Find rec with highest count (alphabetical tiebreaker)
+ * .releaseDate, .references[], .score). Each round:
+ *   1. Find rec with highest weighted score (alphabetical tiebreaker)
  *   2. "Use up" all its source imdbIds — remove those refs from all remaining recs
- *   3. Recompute counts; remove zero-count recs from pool
+ *   3. Recompute scores; remove zero-score recs from pool
  * Returns top-k selections with metadata about diversity impact.
  */
 function runDiversityRanking(candidates, topK) {
-  // Deep copy — pool entries track original count separately
+  // Deep copy — pool entries track original score separately
   const pool = new Map();
   for (const entry of candidates) {
+    const score = entry.references.reduce((sum, r) => sum + (r.weight || 1), 0);
     pool.set(String(entry.tmdbId), {
       tmdbId: String(entry.tmdbId),
       title: entry.title,
@@ -213,21 +219,23 @@ function runDiversityRanking(candidates, topK) {
       references: entry.references.map(r => ({ ...r })),
       count: entry.references.length,
       originalCount: entry.references.length,
+      score,
+      originalScore: score,
     });
   }
 
   const selections = [];
 
   while (selections.length < topK && pool.size > 0) {
-    // Find max count in pool
-    let maxCount = 0;
+    // Find max score in pool
+    let maxScore = 0;
     for (const e of pool.values()) {
-      if (e.count > maxCount) maxCount = e.count;
+      if (e.score > maxScore) maxScore = e.score;
     }
 
-    // Collect all candidates tied at max, sort alphabetically for determinism
+    // Collect all candidates tied at max score, sort alphabetically for determinism
     const tied = [...pool.values()]
-      .filter(e => e.count === maxCount)
+      .filter(e => Math.abs(e.score - maxScore) < 0.001)
       .sort((a, b) => a.title.localeCompare(b.title));
 
     const selected = tied[0];
@@ -244,6 +252,7 @@ function runDiversityRanking(candidates, topK) {
       const before = entry.references.length;
       entry.references = entry.references.filter(r => !usedSourceIds.has(r.imdbId));
       entry.count = entry.references.length;
+      entry.score = entry.references.reduce((sum, r) => sum + (r.weight || 1), 0);
       if (entry.count !== before) affectedRecs++;
       if (entry.count === 0) toDelete.push(tmdbId);
     }
@@ -255,6 +264,20 @@ function runDiversityRanking(candidates, topK) {
   }
 
   return selections;
+}
+
+// ─── Status weight computation ───────────────────────────────────────────────
+
+/**
+ * Returns the weight for a reference based on the source title's status and
+ * favorite flag. Higher weight = stronger taste signal.
+ */
+function computeRefWeight(status, isFavorite, opts) {
+  if (status === "watched" || status === "archive") {
+    return isFavorite ? opts.wFavorite : opts.wWatched;
+  }
+  // to-watch, maybe-later
+  return opts.wUnwatched;
 }
 
 // ─── Output helpers ───────────────────────────────────────────────────────────
@@ -287,6 +310,7 @@ function printSetup(opts, listName, listTypeLabel, positiveItems, forwardEntries
   console.log(`Source: ${opts.source} (${opts.source === "similar" ? "TMDB /similar" : "TMDB /recommendations"})`);
   console.log(`Quality filter: ${filterStatus}`);
   console.log(`Diversity: ${opts.diversity ? "ON (graph pruning)" : "OFF (use --diversity to enable)"}`);
+  console.log(`IMDb boost: ${opts.imdbBoost ? `ON (baseline=${opts.imdbBaseline})` : "OFF (use --imdb-boost to enable)"}`);
   if (opts.typeFilter !== "all") console.log(`Type filter: ${opts.typeFilter}`);
   console.log(`Positive signal: ${positiveItems.length} titles (${positiveItems.filter(i => i.status === "watched").length} watched, ${positiveItems.filter(i => i.status === "archive").length} archived)`);
   console.log(`Forward index: ${forwardEntries} entries loaded`);
@@ -296,13 +320,15 @@ function printSetup(opts, listName, listTypeLabel, positiveItems, forwardEntries
 // ─── Section: Candidate quality audit ─────────────────────────────────────────
 
 function printAudit(pool, opts) {
+  const isWeighted = opts.wFavorite !== 1.0 || opts.wWatched !== 1.0 || opts.wUnwatched > 0;
   console.log(`\n${SEP}`);
-  console.log(` CANDIDATE QUALITY AUDIT (top ${pool.length} by reference count)`);
+  console.log(` CANDIDATE QUALITY AUDIT (top ${pool.length} by ${isWeighted ? "weighted score" : "reference count"})`);
   console.log(`${SEP}\n`);
 
   const titleW = 30;
+  const scoreCol = isWeighted ? ` ${"Score".padStart(6)}` : "";
   const header =
-    ` ${"#".padStart(2)} ${"Title".padEnd(titleW)} ${"Refs".padStart(4)} ${"IMDb".padStart(5)} ${"Votes".padStart(8)} ${"Lang".padStart(4)} Verdict`;
+    ` ${"#".padStart(2)} ${"Title".padEnd(titleW)} ${"Refs".padStart(4)}${scoreCol} ${"IMDb".padStart(5)} ${"Votes".padStart(8)} ${"Lang".padStart(4)} Verdict`;
   console.log(header);
   console.log(" " + "─".repeat(header.length - 1));
 
@@ -313,11 +339,12 @@ function printAudit(pool, opts) {
     const rankStr = String(i + 1).padStart(3);
     const titleStr = truncate(c.title, titleW).padEnd(titleW);
     const refsStr = String(c.count).padStart(4);
+    const scoreStr = isWeighted ? ` ${c.score.toFixed(1).padStart(6)}` : "";
 
     if (!c.imdbId || !c.imdbEntry) {
       noDataCount++;
       const verdict = opts.allowUnknown ? "? PASS (unknown, --allow-unknown)" : "✗ FAIL (no IMDb data)";
-      console.log(` ${rankStr} ${titleStr} ${refsStr} ${"—".padStart(5)} ${"—".padStart(8)} ${"?".padStart(4)} ${verdict}`);
+      console.log(` ${rankStr} ${titleStr} ${refsStr}${scoreStr} ${"—".padStart(5)} ${"—".padStart(8)} ${"?".padStart(4)} ${verdict}`);
       continue;
     }
 
@@ -330,7 +357,7 @@ function printAudit(pool, opts) {
     const reasonStr = c.qualityResult.reason ? ` (${c.qualityResult.reason})` : "";
     const langNote = !c.qualityResult.pass ? "" : c.lang && c.lang !== "en" ? ` (foreign: ${fmtNum(votes)} ≥ ${opts.minVotesForeign.toLocaleString()})` : "";
 
-    console.log(` ${rankStr} ${titleStr} ${refsStr} ${ratingStr} ${votesStr} ${langStr} ${passStr}${reasonStr}${langNote}`);
+    console.log(` ${rankStr} ${titleStr} ${refsStr}${scoreStr} ${ratingStr} ${votesStr} ${langStr} ${passStr}${reasonStr}${langNote}`);
   }
 
   if (noDataCount > 0) {
@@ -339,9 +366,34 @@ function printAudit(pool, opts) {
   console.log();
 }
 
+// ─── Label formatting for comparison columns ─────────────────────────────────
+
+function entryLabel(entry, showScore) {
+  if (!entry) return "";
+  if (showScore && entry.score !== undefined && entry.score !== entry.count) {
+    return `${entry.title} (${entry.score.toFixed(1)})`;
+  }
+  return `${entry.title} (${entry.count})`;
+}
+
+function diversityLabel(entry, showScore) {
+  if (!entry) return "";
+  const origScore = entry.originalScore !== undefined ? entry.originalScore : entry.originalCount;
+  const curScore = showScore ? entry.score : entry.count;
+  const origDisplay = showScore ? origScore : entry.originalCount;
+  if (origDisplay !== curScore) {
+    const origStr = showScore ? origScore.toFixed(1) : String(entry.originalCount);
+    const curStr = showScore ? curScore.toFixed(1) : String(curScore);
+    return `${entry.title} (${origStr}→${curStr})`;
+  }
+  const valStr = showScore ? curScore.toFixed(1) : String(curScore);
+  return `${entry.title} (${valStr})`;
+}
+
 // ─── Section: Side-by-side comparison (2-column, no diversity) ───────────────
 
-function printComparison2Col(unfilteredTop, filteredTop, pool, topK) {
+function printComparison2Col(unfilteredTop, filteredTop, pool, topK, opts) {
+  const isWeighted = opts.wFavorite !== 1.0 || opts.wWatched !== 1.0 || opts.wUnwatched > 0;
   console.log(`${SEP}`);
   console.log(` COMPARISON: UNFILTERED vs QUALITY-FILTERED (top ${topK})`);
   console.log(`${SEP}\n`);
@@ -358,12 +410,12 @@ function printComparison2Col(unfilteredTop, filteredTop, pool, topK) {
     const u = unfilteredTop[row];
     const f = filteredTop[row];
     const rankStr = String(row + 1).padStart(3);
-    const uLabel = u ? truncate(`${u.title} (${u.count} ref${u.count !== 1 ? "s" : ""})`, colW - 1).padEnd(colW) : "".padEnd(colW);
+    const uLabel = truncate(entryLabel(u, isWeighted), colW - 1).padEnd(colW);
 
     let fLabel = "";
     let changeStr = "";
     if (f) {
-      fLabel = truncate(`${f.title} (${f.count} ref${f.count !== 1 ? "s" : ""})`, colW - 1).padEnd(colW);
+      fLabel = truncate(entryLabel(f, isWeighted), colW - 1).padEnd(colW);
       const unfiltRank = unfilteredRankMap.get(f.tmdbId);
       const filtRank = row + 1;
       if (unfiltRank === undefined) {
@@ -410,7 +462,8 @@ function printComparison2Col(unfilteredTop, filteredTop, pool, topK) {
 
 // ─── Section: 3-column comparison (unfiltered, filtered, filtered+diversity) ─
 
-function printComparison3Col(unfilteredTop, filteredTop, diversityTop, pool, topK) {
+function printComparison3Col(unfilteredTop, filteredTop, diversityTop, pool, topK, opts) {
+  const isWeighted = opts.wFavorite !== 1.0 || opts.wWatched !== 1.0 || opts.wUnwatched > 0;
   console.log(`${SEP}`);
   console.log(` COMPARISON: UNFILTERED → FILTERED → FILTERED + DIVERSITY (top ${topK})`);
   console.log(`${SEP}\n`);
@@ -430,17 +483,9 @@ function printComparison3Col(unfilteredTop, filteredTop, diversityTop, pool, top
     const d = diversityTop[row];
     const rankStr = String(row + 1).padStart(3);
 
-    function colLabel(entry) {
-      if (!entry) return "".padEnd(colW);
-      const countStr = entry.originalCount !== undefined && entry.originalCount !== entry.count
-        ? `${entry.originalCount}→${entry.count}`
-        : `${entry.count}`;
-      return truncate(`${entry.title} (${countStr})`, colW - 1).padEnd(colW);
-    }
-
-    const uLabel = u ? truncate(`${u.title} (${u.count})`, colW - 1).padEnd(colW) : "".padEnd(colW);
-    const fLabel = f ? truncate(`${f.title} (${f.count})`, colW - 1).padEnd(colW) : "".padEnd(colW);
-    const dLabel = colLabel(d);
+    const uLabel = truncate(entryLabel(u, isWeighted), colW - 1).padEnd(colW);
+    const fLabel = truncate(entryLabel(f, isWeighted), colW - 1).padEnd(colW);
+    const dLabel = truncate(diversityLabel(d, isWeighted), colW - 1).padEnd(colW);
 
     // Change column: compare diversity position to filtered position
     let changeStr = "";
@@ -519,7 +564,8 @@ function printComparison3Col(unfilteredTop, filteredTop, diversityTop, pool, top
 
 // ─── Section: Diversity detail ────────────────────────────────────────────────
 
-function printDiversityDetail(diversityTop, topK) {
+function printDiversityDetail(diversityTop, topK, opts) {
+  const isWeighted = opts.wFavorite !== 1.0 || opts.wWatched !== 1.0 || opts.wUnwatched > 0;
   console.log(`${SEP}`);
   console.log(` DIVERSITY RANKING DETAIL (graph pruning on quality-filtered pool)`);
   console.log(`${SEP}\n`);
@@ -527,9 +573,17 @@ function printDiversityDetail(diversityTop, topK) {
   for (let i = 0; i < diversityTop.length; i++) {
     const sel = diversityTop[i];
     const countChanged = sel.count !== sel.originalCount;
-    const countStr = countChanged
+    let countStr = countChanged
       ? `${sel.originalCount} references → ${sel.count} after diversity`
       : `${sel.count} reference${sel.count !== 1 ? "s" : ""}`;
+
+    if (isWeighted) {
+      const scoreChanged = Math.abs(sel.score - sel.originalScore) > 0.001;
+      const scoreInfo = scoreChanged
+        ? `, score ${sel.originalScore.toFixed(1)}→${sel.score.toFixed(1)}`
+        : `, score ${sel.score.toFixed(1)}`;
+      countStr += scoreInfo;
+    }
 
     const ratingStr = sel.imdbEntry ? ` | IMDb ${sel.imdbEntry.rating.toFixed(1)}` : "";
 
@@ -537,14 +591,16 @@ function printDiversityDetail(diversityTop, topK) {
     console.log(`      Release: ${sel.releaseDate || "unknown"} | TMDB ID: ${sel.tmdbId}`);
 
     if (sel.wasTiebreak) {
-      console.log(`      [tiebreaker: alphabetical among ${sel.tiebreakCount} contenders tied at count=${sel.originalCount}]`);
+      const tieVal = isWeighted ? `score=${sel.originalScore.toFixed(1)}` : `count=${sel.originalCount}`;
+      console.log(`      [tiebreaker: alphabetical among ${sel.tiebreakCount} contenders tied at ${tieVal}]`);
     }
 
     const refLabel = i > 0 ? "References (surviving after prior diversity rounds):" : "References:";
     console.log(`      ${refLabel}`);
     for (const ref of sel.references) {
       const fav = ref.isFavorite ? ", ★ favorite" : "";
-      console.log(`        • ${ref.title} (${ref.status}${fav}, position #${ref.position + 1})`);
+      const weightStr = isWeighted ? `, w=${ref.weight.toFixed(1)}` : "";
+      console.log(`        • ${ref.title} (${ref.status}${fav}, position #${ref.position + 1}${weightStr})`);
     }
 
     const srcCount = sel.references.length;
@@ -624,6 +680,7 @@ async function main() {
   if (!listId || listId.startsWith("--")) {
     console.error("Usage: node scripts/graph-recommend-filtered.mjs <listId> [--uid <uid>] [--type movie|show|all] [--top <k>] [--source recs|similar]");
     console.error("       [--min-rating 6.0] [--min-votes-en 50000] [--min-votes-foreign 3000] [--pool <n>] [--no-filter] [--allow-unknown] [--diversity]");
+    console.error("       [--w-favorite 1.5] [--w-watched 1.0] [--w-unliked 0.3] [--w-unwatched 0.0] [--imdb-boost] [--imdb-baseline 7.0]");
     process.exit(1);
   }
 
@@ -643,6 +700,12 @@ async function main() {
   const noFilter = argv.includes("--no-filter");
   const allowUnknown = argv.includes("--allow-unknown");
   const diversity = argv.includes("--diversity");
+  const imdbBoost = argv.includes("--imdb-boost");
+  const imdbBaseline = parseFloat(getArg("--imdb-baseline", "7.0"));
+  const wFavorite = parseFloat(getArg("--w-favorite", "1.5"));
+  const wWatched = parseFloat(getArg("--w-watched", "1.0"));
+  const wUnliked = parseFloat(getArg("--w-unliked", "0.3"));
+  const wUnwatched = parseFloat(getArg("--w-unwatched", "0.0")); // 0 = excluded (current behavior)
   const defaultPool = topK * 3;
   const poolSize = parseInt(getArg("--pool", String(defaultPool)), 10);
 
@@ -659,7 +722,7 @@ async function main() {
     console.error(`Invalid --pool: must be >= --top (${topK})`); process.exit(1);
   }
 
-  const opts = { typeFilter, topK, source, minRating, minVotesEn, minVotesForeign, noFilter, allowUnknown, diversity, poolSize };
+  const opts = { typeFilter, topK, source, minRating, minVotesEn, minVotesForeign, noFilter, allowUnknown, diversity, imdbBoost, imdbBaseline, wFavorite, wWatched, wUnliked, wUnwatched, poolSize };
 
   const FORWARD_INDEX_PATH = INDEX_PATHS[source].forward;
   const INVERTED_INDEX_PATH = INDEX_PATHS[source].inverted;
@@ -749,17 +812,36 @@ async function main() {
     });
   }
 
-  // ─── Positive signal ──────────────────────────────────────────────────────
+  // ─── Signal items ───────────────────────────────────────────────────────────
+  // Watched/archived always contribute. Unwatched (to-watch/maybe-later) only
+  // contribute when their weight is > 0.
+  const signalItems = listItems.filter(i => {
+    if (i.status === "watched" || i.status === "archive") return true;
+    if (opts.wUnwatched > 0 && (i.status === "to-watch" || i.status === "maybe-later")) return true;
+    return false;
+  });
+  // For display purposes, still count the watched/archived subset
   const positiveItems = listItems.filter(i => i.status === "watched" || i.status === "archive");
+  const unwatchedSignalItems = signalItems.filter(i => i.status === "to-watch" || i.status === "maybe-later");
 
   const listTypeLabel = list.type === "shared"
     ? `shared, ${memberUids.length} member${memberUids.length !== 1 ? "s" : ""}`
     : "personal";
   printSetup(opts, list.name, listTypeLabel, positiveItems, forwardEntries, imdbRatings.size);
 
-  if (positiveItems.length === 0) {
-    console.log("No watched/archived titles on this list. Watch something first!");
+  if (signalItems.length === 0) {
+    console.log("No signal titles on this list. Watch something first!");
     process.exit(0);
+  }
+
+  if (unwatchedSignalItems.length > 0) {
+    console.log(`  + ${unwatchedSignalItems.length} unwatched titles contributing signal (weight=${opts.wUnwatched})`);
+  }
+
+  // Show active weights
+  const isWeighted = opts.wFavorite !== 1.0 || opts.wWatched !== 1.0 || opts.wUnwatched > 0;
+  if (isWeighted) {
+    console.log(`\nStatus weights: favorite=${opts.wFavorite}, watched=${opts.wWatched}, unliked=${opts.wUnliked}, unwatched=${opts.wUnwatched}`);
   }
 
   // ─── Aggregate recommendations ────────────────────────────────────────────
@@ -767,11 +849,13 @@ async function main() {
   let notInIndex = 0;
   let mappedCount = 0;
 
-  for (const item of positiveItems) {
+  for (const item of signalItems) {
     if (!item.imdbId) { notInIndex++; continue; }
     const entry = forwardIndex[item.imdbId];
     if (!entry) { notInIndex++; continue; }
     mappedCount++;
+
+    const refWeight = computeRefWeight(item.status, item.isFavorite, opts);
 
     let recs = entry.recs || [];
     if (typeFilter === "movie") recs = recs.filter(r => r.mediaType === "movie");
@@ -786,7 +870,8 @@ async function main() {
           mediaType: rec.mediaType,
           releaseDate: rec.releaseDate,
           references: [],
-          count: 0,
+          count: 0,       // raw reference count (unweighted)
+          score: 0,        // weighted score
         };
       }
       aggregated[key].references.push({
@@ -795,8 +880,10 @@ async function main() {
         status: item.status,
         isFavorite: item.isFavorite,
         position: rec.position,
+        weight: refWeight,
       });
       aggregated[key].count++;
+      aggregated[key].score += refWeight;
     }
   }
 
@@ -831,8 +918,8 @@ async function main() {
     process.exit(0);
   }
 
-  // ─── Build candidate pool (top-N by raw count) ────────────────────────────
-  const sortedAll = Object.values(aggregated).sort((a, b) => b.count - a.count);
+  // ─── Build candidate pool (top-N by weighted score) ────────────────────────
+  const sortedAll = Object.values(aggregated).sort((a, b) => b.score - a.score || b.count - a.count);
   const poolCandidates = sortedAll.slice(0, poolSize);
 
   console.log(`\nResolving IMDb data for top-${poolCandidates.length} candidates...`);
@@ -862,6 +949,25 @@ async function main() {
   // Save cache
   writeFileSync(TMDB_CACHE_PATH, JSON.stringify(tmdbCache));
 
+  // ─── Apply IMDb rating boost (re-sort pool by boosted score) ──────────────
+  if (imdbBoost && imdbRatings) {
+    for (const candidate of poolCandidates) {
+      candidate.boostedScore = candidate.score; // default: weighted score
+      if (candidate.imdbEntry && !isNaN(candidate.imdbEntry.rating)) {
+        candidate.boostedScore = candidate.score * (candidate.imdbEntry.rating / imdbBaseline);
+      }
+    }
+    // Re-sort by boosted score
+    poolCandidates.sort((a, b) => {
+      if (Math.abs(b.boostedScore - a.boostedScore) > 0.001) return b.boostedScore - a.boostedScore;
+      // Tiebreaker: recency
+      const da = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+      const db_ = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+      return db_ - da;
+    });
+    console.log(`\nIMDb boost applied (baseline=${imdbBaseline})`);
+  }
+
   // ─── Build unfiltered top-k (raw count, no quality) ───────────────────────
   const unfilteredTop = poolCandidates.slice(0, topK);
 
@@ -887,10 +993,10 @@ async function main() {
   printAudit(poolCandidates, opts);
 
   if (diversity) {
-    printComparison3Col(unfilteredTop, filteredTop, diversityTop, poolCandidates, topK);
-    printDiversityDetail(diversityTop, topK);
+    printComparison3Col(unfilteredTop, filteredTop, diversityTop, poolCandidates, topK, opts);
+    printDiversityDetail(diversityTop, topK, opts);
   } else {
-    printComparison2Col(unfilteredTop, filteredTop, poolCandidates, topK);
+    printComparison2Col(unfilteredTop, filteredTop, poolCandidates, topK, opts);
   }
 
   if (!noFilter) {

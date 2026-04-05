@@ -23,8 +23,10 @@ import {
   getJobConfigState,
   setCheckUpcomingEnabledState,
   setGithubBackupEnabledState,
+  updateListAlgorithmOverrides,
   type FirestoreUsageStats,
 } from "../firebase.js";
+import type { ListAlgorithmOverrides } from "../types/index.js";
 import {
   getFirestore,
   collection,
@@ -32,6 +34,8 @@ import {
   getDoc,
   getCountFromServer,
   getDocs,
+  query,
+  where,
 } from "firebase/firestore";
 
 type DQTitleRow = {
@@ -863,6 +867,134 @@ function formatRecConfigUpdatedAt(
   }
 }
 
+type AdminListInfo = {
+  id: string;
+  name: string;
+  type: "personal" | "shared";
+  ownerUid?: string;
+  diversityOverride?: boolean;
+};
+
+function PerListDiversitySection({ globalDiversityEnabled }: { globalDiversityEnabled: boolean }) {
+  const queryClient = useQueryClient();
+  const db = getFirestore();
+
+  const listsQ = useQuery<AdminListInfo[]>({
+    queryKey: ["admin", "all-lists"],
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) throw new Error("Not signed in");
+      const lists: AdminListInfo[] = [];
+
+      // Current user's personal lists (rules allow only own uid)
+      const plSnap = await getDocs(collection(db, "users", uid, "personalLists"));
+      for (const d of plSnap.docs) {
+        const data = d.data() as Record<string, unknown>;
+        const overrides = data.algorithmOverrides as Record<string, unknown> | undefined;
+        const info: AdminListInfo = {
+          id: d.id,
+          name: typeof data.name === "string" ? data.name : d.id,
+          type: "personal",
+          ownerUid: uid,
+        };
+        if (typeof overrides?.diversityEnabled === "boolean") {
+          info.diversityOverride = overrides.diversityEnabled;
+        }
+        lists.push(info);
+      }
+
+      // Shared lists the current user is a member of (rules require array-contains query)
+      const sharedSnap = await getDocs(
+        query(collection(db, "sharedLists"), where("members", "array-contains", uid))
+      );
+      for (const d of sharedSnap.docs) {
+        const data = d.data() as Record<string, unknown>;
+        const overrides = data.algorithmOverrides as Record<string, unknown> | undefined;
+        const info: AdminListInfo = {
+          id: d.id,
+          name: typeof data.name === "string" ? data.name : d.id,
+          type: "shared",
+        };
+        if (typeof overrides?.diversityEnabled === "boolean") {
+          info.diversityOverride = overrides.diversityEnabled;
+        }
+        lists.push(info);
+      }
+
+      return lists;
+    },
+  });
+
+  const updateOverrideM = useMutation({
+    mutationFn: async ({
+      list,
+      overrides,
+    }: {
+      list: AdminListInfo;
+      overrides: ListAlgorithmOverrides;
+    }) => {
+      await updateListAlgorithmOverrides(list.type, list.id, overrides, list.ownerUid);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "all-lists"] });
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Failed to save override");
+    },
+  });
+
+  function cycleOverride(list: AdminListInfo) {
+    const next =
+      list.diversityOverride === undefined
+        ? true
+        : list.diversityOverride === true
+          ? false
+          : undefined;
+    const overrides: ListAlgorithmOverrides = {};
+    if (next !== undefined) overrides.diversityEnabled = next;
+    updateOverrideM.mutate({ list, overrides });
+  }
+
+  function overrideLabel(value: boolean | undefined): string {
+    if (value === undefined) return `Default (${globalDiversityEnabled ? "on" : "off"})`;
+    return value ? "Force on" : "Force off";
+  }
+
+  if (listsQ.isPending) return <p className="admin-job-hint">Loading lists…</p>;
+  if (listsQ.isError) return <p className="admin-job-hint">Failed to load lists</p>;
+
+  return (
+    <div className="admin-rec-group">
+      <p className="admin-rec-group-title">Per-List Diversity Overrides</p>
+      {listsQ.data?.map((list) => (
+        <div
+          key={list.id}
+          className="admin-job-row"
+          title={`${list.type === "shared" ? "Shared" : "Personal"} list · ${list.id}`}
+        >
+          <span className="admin-rec-field-label">
+            {list.name}
+            <span className="admin-stat-label"> ({list.type})</span>
+          </span>
+          <button
+            type="button"
+            className={cn(
+              "admin-rec-toggle-switch",
+              list.diversityOverride === true && "admin-rec-toggle-switch--on"
+            )}
+            onClick={() => cycleOverride(list)}
+            disabled={updateOverrideM.isPending}
+          >
+            <span className="admin-rec-toggle-thumb" />
+            <span className="admin-rec-toggle-label">{overrideLabel(list.diversityOverride)}</span>
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RecommendationSettingsSection() {
   const configQ = useRecommendationConfig();
   const updateM = useUpdateRecommendationConfig();
@@ -954,6 +1086,8 @@ function RecommendationSettingsSection() {
                 ))}
               </div>
             ))}
+
+            <PerListDiversitySection globalDiversityEnabled={Boolean(form.diversityEnabled)} />
 
             <p className="admin-job-hint">Changes take effect on next pipeline run.</p>
 

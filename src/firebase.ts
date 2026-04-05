@@ -40,6 +40,7 @@ import { listKey } from "./lib/registry-id.js";
 import { logEvent } from "./lib/axiom-logger.js";
 import type {
   FirestoreListRow,
+  ListAlgorithmOverrides,
   ListMode,
   MediaType,
   PersonalList,
@@ -1751,6 +1752,23 @@ async function setRecommendationConfig(
   );
 }
 
+/** Update the `algorithmOverrides` map on a personal or shared list document. */
+async function updateListAlgorithmOverrides(
+  listType: "personal" | "shared",
+  listId: string,
+  overrides: ListAlgorithmOverrides,
+  ownerUid?: string
+): Promise<void> {
+  const ref =
+    listType === "shared"
+      ? doc(db, "sharedLists", listId)
+      : doc(db, "users", ownerUid!, "personalLists", listId);
+  await updateDoc(ref, {
+    "algorithmOverrides.diversityEnabled":
+      overrides.diversityEnabled !== undefined ? overrides.diversityEnabled : deleteField(),
+  });
+}
+
 /** Resolve the actual Firestore document ID of the user's default personal list. */
 export async function getDefaultPersonalListId(uid: string): Promise<string | null> {
   const id = await resolveDefaultPersonalListId(uid);
@@ -1812,6 +1830,7 @@ export {
   getDismissedRecommendations,
   getRecommendationConfig,
   setRecommendationConfig,
+  updateListAlgorithmOverrides,
   dismissRecommendation,
 };
 

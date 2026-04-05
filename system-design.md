@@ -155,6 +155,7 @@ The field table reflects the **intended** schema from the **`add-from-imdb`** en
 | `items` | `array` | Same **Item object** shape as **`sharedLists`** rows (`{ registryId }` after migration). |
 | `watched`, `maybeLater` | `array` of string | Status keys (`listKey` strings), same pattern as `sharedLists`. |
 | `createdAt` | `string` (ISO) | Set on create. |
+| `algorithmOverrides` | `object` (optional) | Per-list algorithm overrides. Currently supports `diversityEnabled` (boolean). `undefined`/absent = use global `config/recommendations.diversityEnabled`. Written by admin UI via `updateListAlgorithmOverrides()`. |
 
 **Relationship:** All personal list **content** lives here (including the default list). The app uses virtual `listId === "personal"` for the list whose real id is `users/{uid}.defaultPersonalListId`.
 
@@ -170,6 +171,7 @@ The field table reflects the **intended** schema from the **`add-from-imdb`** en
 | `items` | `array` | **Item objects** (no `status` stored in Firestore; status derived from key sets). |
 | `watched`, `maybeLater` | `array` of string | Status keys; titles in `items` but in neither array are **To Watch** (includes **maybe-later** in the UI tab). |
 | `createdAt` | `string` (ISO) | |
+| `algorithmOverrides` | `object` (optional) | Per-list algorithm overrides. Currently supports `diversityEnabled` (boolean). `undefined`/absent = use global `config/recommendations.diversityEnabled`. Written by admin UI via `updateListAlgorithmOverrides()`. |
 
 **Relationship:** Many-to-many via `members` (users can be in multiple lists).
 

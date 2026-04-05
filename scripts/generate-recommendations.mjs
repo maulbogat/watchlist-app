@@ -194,6 +194,7 @@ function aggregateRecs(positiveItems, forwardIndex) {
         title:      item.title,
         isFavorite: item.isFavorite,
         position:   rec.position,
+        imdbId:     item.imdbId,
       });
       aggregated[key].count++;
     }
@@ -327,6 +328,56 @@ async function loadFavorites(db, uids) {
 // ─── Extract member UIDs ──────────────────────────────────────────────────────
 function extractMemberUids(members) {
   return (members || []).map(m => typeof m === "string" ? m : (m.uid || m.id || null)).filter(Boolean);
+}
+
+// ─── Diversity ranking ────────────────────────────────────────────────────────
+/**
+ * MMR-style diversity pass. Each round:
+ *   1. Select the candidate with the highest weighted score
+ *   2. "Spend" all its source imdbIds — remove those references from remaining candidates
+ *   3. Recompute scores; remove zero-score candidates from pool
+ * Returns top-k selections in diversity order.
+ */
+function runDiversityRanking(candidates, topK) {
+  const pool = new Map();
+  for (const entry of candidates) {
+    const score = entry.references.reduce((sum, r) => sum + (r.weight || 1), 0);
+    pool.set(String(entry.tmdbId), {
+      tmdbId: String(entry.tmdbId),
+      references: entry.references.map(r => ({ ...r })),
+      score,
+    });
+  }
+
+  const selections = [];
+
+  while (selections.length < topK && pool.size > 0) {
+    let maxScore = 0;
+    for (const e of pool.values()) {
+      if (e.score > maxScore) maxScore = e.score;
+    }
+
+    const tied = [...pool.values()]
+      .filter(e => Math.abs(e.score - maxScore) < 0.001)
+      .sort((a, b) => a.tmdbId.localeCompare(b.tmdbId));
+
+    const selected = tied[0];
+    const usedSourceIds = new Set(selected.references.map(r => r.imdbId).filter(Boolean));
+    const toDelete = [];
+
+    for (const [tmdbId, entry] of pool) {
+      if (tmdbId === selected.tmdbId) continue;
+      entry.references = entry.references.filter(r => !usedSourceIds.has(r.imdbId));
+      entry.score = entry.references.reduce((sum, r) => sum + (r.weight || 1), 0);
+      if (entry.references.length === 0) toDelete.push(tmdbId);
+    }
+
+    for (const id of toDelete) pool.delete(id);
+    pool.delete(selected.tmdbId);
+    selections.push(selected.tmdbId);
+  }
+
+  return selections; // array of tmdbId strings, in diversity order
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -511,8 +562,23 @@ async function main() {
       console.log(`    Quality filter: ${dropped} of ${enrichedPool.length} dropped, ${filtered.length} passed`);
     }
 
-    // Take top-k from filtered pool (already sorted by ref count from selectTopK)
-    const topFiltered = filtered.slice(0, topK);
+    // Determine diversity setting for this list (per-list override > global config > false)
+    const listOverrides = list.data.algorithmOverrides || {};
+    const diversityForThisList = listOverrides.diversityEnabled ?? config?.diversityEnabled ?? false;
+
+    // Take top-k: diversity pass or plain slice
+    let topFiltered;
+    if (diversityForThisList && filtered.length > 0) {
+      const filteredByTmdbId = new Map(filtered.map(item => [item.rec.tmdbId, item]));
+      const diversityCandidates = filtered.map(({ rec }) => ({
+        tmdbId: rec.tmdbId,
+        references: rec.references,
+      }));
+      const diversityOrder = runDiversityRanking(diversityCandidates, topK);
+      topFiltered = diversityOrder.map(tmdbId => filteredByTmdbId.get(tmdbId)).filter(Boolean);
+    } else {
+      topFiltered = filtered.slice(0, topK);
+    }
 
     // Build enriched items from the filtered top-k
     const enrichedItems = [];
@@ -560,7 +626,9 @@ async function main() {
     totalWithoutTrailer += listWithoutTrailer;
     totalRecsWritten   += enrichedItems.length;
 
-    console.log(`  ${list.name} (${memberLabel}): ${listItems.length} items, ${positiveItems.length} positive → ${enrichedItems.length} recs generated`);
+    const diversityTag = diversityForThisList ? "on" : "off";
+    const diversitySource = listOverrides.diversityEnabled !== undefined ? "override" : "global";
+    console.log(`  ${list.name} (${memberLabel}): ${listItems.length} items, ${positiveItems.length} positive → ${enrichedItems.length} recs generated (diversity: ${diversityTag}, ${diversitySource})`);
     console.log(`    Enriched: ${listFromRegistry} from registry, ${listFromTmdb} from TMDB (${listWithTrailer} with trailer, ${listWithoutTrailer} without)`);
 
     // Build Firestore document

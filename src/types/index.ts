@@ -37,6 +37,12 @@ export interface WatchlistItem {
   source?: "recommendation";
 }
 
+/** Per-list algorithm overrides (optional — falls back to global config). */
+export interface ListAlgorithmOverrides {
+  /** undefined = use global config default; true/false = force on/off for this list */
+  diversityEnabled?: boolean;
+}
+
 export interface PersonalList {
   id: string;
   name: string;
@@ -47,6 +53,7 @@ export interface PersonalList {
   maybeLater?: string[];
   archive?: string[];
   createdAt?: string;
+  algorithmOverrides?: ListAlgorithmOverrides;
 }
 
 export interface SharedList {
@@ -59,6 +66,7 @@ export interface SharedList {
   maybeLater?: string[];
   archive?: string[];
   createdAt?: string;
+  algorithmOverrides?: ListAlgorithmOverrides;
 }
 
 export interface UserProfile {
