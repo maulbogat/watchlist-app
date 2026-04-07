@@ -313,8 +313,22 @@ exports.handler = async (event) => {
       const year = r && r.body && r.body.year != null && r.body.year !== "" ? String(r.body.year) : "—";
 
       if (ok && r.statusCode >= 200 && r.statusCode < 300) {
+        const tmdbPending = r && r.body && r.body.tmdbPending === true;
         if (added) {
-          await sendWhatsAppText(senderDigits, `✓ Added: ${title} (${year})`);
+          if (tmdbPending) {
+            await sendWhatsAppText(
+              senderDigits,
+              `⚠️ Added: ${title} (limited info — not yet in TMDB. Details will update when available.)`
+            );
+            logEvent({
+              type: "tmdb-miss",
+              imdbId,
+              listId: listId || personalListId || "unknown",
+              senderMasked: maskPhone(senderDigits),
+            });
+          } else {
+            await sendWhatsAppText(senderDigits, `✓ Added: ${title} (${year})`);
+          }
         } else {
           await sendWhatsAppText(senderDigits, `✓ Already on your list: ${title} (${year})`);
         }
@@ -322,7 +336,7 @@ exports.handler = async (event) => {
           type: "whatsapp.imdb.done",
           imdbId,
           senderMasked: maskPhone(senderDigits),
-          outcome: added ? "added" : "duplicate",
+          outcome: added ? (tmdbPending ? "added_pending" : "added") : "duplicate",
           statusCode: r.statusCode,
         });
       } else {

@@ -543,7 +543,19 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
         durationMs: 0,
         status: 500,
       });
-      return { statusCode: 502, body: { ok: false, error: e.message || "Title not found in TMDB or OMDb" } };
+      // Neither TMDB nor OMDb has data yet — create a pending placeholder so the
+      // title is added to the list and can be enriched later.
+      movie = {
+        title: nImdb,
+        year: null,
+        type: "movie",
+        genre: "",
+        thumb: null,
+        youtubeId: null,
+        imdbId: nImdb,
+        services: [],
+        tmdbPending: true,
+      };
     }
 
     const title = omdb.Title || "Unknown";
@@ -711,7 +723,7 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
       title: movie.title,
       listType: "shared",
     });
-    return { statusCode: 200, body: { ok: true, added: true, message: `Added "${movie.title}" to shared list`, title: movie.title, year: movie.year ?? null } };
+    return { statusCode: 200, body: { ok: true, added: true, message: `Added "${movie.title}" to shared list`, title: movie.title, year: movie.year ?? null, ...(movie.tmdbPending ? { tmdbPending: true } : {}) } };
   }
 
   await migrateLegacyPersonalListAdmin(db, uid);
@@ -791,7 +803,7 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
     listType: "personal",
   });
 
-  return { statusCode: 200, body: { ok: true, added: true, message: `Added "${movie.title}" to To Watch`, title: movie.title, year: movie.year ?? null } };
+  return { statusCode: 200, body: { ok: true, added: true, message: `Added "${movie.title}" to To Watch`, title: movie.title, year: movie.year ?? null, ...(movie.tmdbPending ? { tmdbPending: true } : {}) } };
 }
 
 

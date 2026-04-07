@@ -32,6 +32,8 @@ export interface WatchlistItem {
   tmdbMedia?: string | null;
   /** TMDB `original_language` (ISO 639-1), lowercase when from API. */
   originalLanguage?: string | null;
+  /** True when the title was added before TMDB had any data for the IMDb ID. */
+  tmdbPending?: boolean;
   status?: StatusKey;
   /** Set when the item was opened from the recommendations strip. */
   source?: "recommendation";

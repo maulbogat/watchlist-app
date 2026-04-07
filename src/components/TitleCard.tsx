@@ -50,8 +50,22 @@ export function TitleCard({
 }: TitleCardProps) {
   const key = listKey(m);
   const menuOpen = statusOpenKey === key;
+  const isPending = m.tmdbPending === true || /^tt\d{7,}$/.test(m.title);
   const thumbSrc = sanitizePosterUrl(m.thumb);
-  const thumbHTML = thumbSrc ? (
+  const thumbHTML = isPending ? (
+    <div className="thumb-placeholder">
+      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+        <rect x="2" y="4" width="20" height="16" rx="2" />
+        <rect x="2" y="4" width="4" height="3" />
+        <rect x="2" y="10.5" width="4" height="3" />
+        <rect x="18" y="4" width="4" height="3" />
+        <rect x="18" y="10.5" width="4" height="3" />
+        <line x1="6" y1="4" x2="6" y2="20" />
+        <line x1="18" y1="4" x2="18" y2="20" />
+        <path d="M10 9l4 3-4 3V9z" fill="currentColor" stroke="none" />
+      </svg>
+    </div>
+  ) : thumbSrc ? (
     <>
       <img
         src={thumbSrc}
@@ -73,7 +87,7 @@ export function TitleCard({
 
   const yearStr = m.year ? m.year : "—";
   const badgeClass = m.type === "show" ? "badge-show" : "badge-movie";
-  const badgeLabel = m.type === "show" ? "TV" : "Film";
+  const badgeLabel = isPending ? "?" : m.type === "show" ? "TV" : "Film";
   const langRaw = m.originalLanguage?.trim();
   const langCode =
     langRaw && langRaw.toLowerCase() !== "en" ? langRaw.slice(0, 2).toUpperCase() : null;
@@ -253,13 +267,24 @@ export function TitleCard({
       </div>
       <div className="card-info">
         <div className="card-title" dir={/[\u0590-\u05FF]/.test(m.title) ? "rtl" : undefined}>
-          {m.title}
+          {isPending && m.imdbId ? (
+            <a
+              href={`https://www.imdb.com/title/${m.imdbId}/`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted" }}
+            >
+              {m.title}
+            </a>
+          ) : m.title}
         </div>
         <div className="card-meta">
           <span className="card-meta-main">
             <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
-            {langCode ? <span className="badge badge-lang">{langCode}</span> : null}
-            {yearStr} &nbsp;·&nbsp; {m.genre}
+            {isPending ? <span className="badge" style={{ background: "var(--color-text-muted)", opacity: 0.7 }}>Pending</span> : null}
+            {!isPending && langCode ? <span className="badge badge-lang">{langCode}</span> : null}
+            {isPending ? null : <>{yearStr} &nbsp;·&nbsp; {m.genre}</>}
           </span>
           {avatarBadge ? (
             <div
