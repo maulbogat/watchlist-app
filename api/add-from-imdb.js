@@ -558,31 +558,33 @@ async function performAddFromImdbByUid(uid, imdbId, listId, cookiePersonalListId
       };
     }
 
-    const title = omdb.Title || "Unknown";
-    let year = null;
-    const yearStr = String(omdb.Year || "").trim();
-    if (yearStr && yearStr !== "N/A") {
-      const digits = yearStr.replace(/\D/g, "").slice(0, 4);
-      if (digits.length >= 4) year = parseInt(digits, 10);
-    }
-    if (year == null && omdb.Released && omdb.Released !== "N/A") {
-      const releasedMatch = String(omdb.Released).match(/\b(19|20)\d{2}\b/);
-      if (releasedMatch) year = parseInt(releasedMatch[0], 10);
-    }
-    const nType = (omdb.Type || "").toLowerCase() === "series" ? "show" : "movie";
-    const genre = omdb.Genre || "";
-    const thumb = omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
+    if (omdb) {
+      const title = omdb.Title || "Unknown";
+      let year = null;
+      const yearStr = String(omdb.Year || "").trim();
+      if (yearStr && yearStr !== "N/A") {
+        const digits = yearStr.replace(/\D/g, "").slice(0, 4);
+        if (digits.length >= 4) year = parseInt(digits, 10);
+      }
+      if (year == null && omdb.Released && omdb.Released !== "N/A") {
+        const releasedMatch = String(omdb.Released).match(/\b(19|20)\d{2}\b/);
+        if (releasedMatch) year = parseInt(releasedMatch[0], 10);
+      }
+      const nType = (omdb.Type || "").toLowerCase() === "series" ? "show" : "movie";
+      const genre = omdb.Genre || "";
+      const thumb = omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
 
-    movie = {
-      title,
-      year: isNaN(year) ? null : year,
-      type: nType,
-      genre: genre || "",
-      thumb,
-      youtubeId: null,
-      imdbId: nImdb,
-      services: [],
-    };
+      movie = {
+        title,
+        year: isNaN(year) ? null : year,
+        type: nType,
+        genre: genre || "",
+        thumb,
+        youtubeId: null,
+        imdbId: nImdb,
+        services: [],
+      };
+    }
   }
 
   const registryId = registryDocIdFromItem(movie);
