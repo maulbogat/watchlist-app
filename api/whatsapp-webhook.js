@@ -318,7 +318,7 @@ exports.handler = async (event) => {
           if (tmdbPending) {
             await sendWhatsAppText(
               senderDigits,
-              `⚠️ Added: ${title} (limited info — not yet in TMDB. Details will update when available.)`
+              "👍 Added to your list! I couldn't find full details for this title yet, so it'll appear with limited info for now."
             );
             logEvent({
               type: "tmdb-miss",
@@ -327,10 +327,10 @@ exports.handler = async (event) => {
               senderMasked: maskPhone(senderDigits),
             });
           } else {
-            await sendWhatsAppText(senderDigits, `✓ Added: ${title} (${year})`);
+            await sendWhatsAppText(senderDigits, `🙌 Added: ${title} (${year})`);
           }
         } else {
-          await sendWhatsAppText(senderDigits, `✓ Already on your list: ${title} (${year})`);
+          await sendWhatsAppText(senderDigits, `🙌 Already on your list: ${title} (${year})`);
         }
         logEvent({
           type: "whatsapp.imdb.done",
@@ -340,7 +340,7 @@ exports.handler = async (event) => {
           statusCode: r.statusCode,
         });
       } else {
-        await sendWhatsAppText(senderDigits, "Sorry, something went wrong. Try again later.");
+        await sendWhatsAppText(senderDigits, "❗ Something went wrong — please try again later.");
         logEvent({
           type: "whatsapp.imdb.done",
           imdbId,
@@ -354,7 +354,7 @@ exports.handler = async (event) => {
       const msg = e && typeof e === "object" && "message" in e ? String(e.message) : String(e);
       logEvent({ type: "whatsapp.imdb.error", senderMasked: maskPhone(senderDigits), error: msg });
       try {
-        await sendWhatsAppText(senderDigits, "Sorry, something went wrong. Try again later.");
+        await sendWhatsAppText(senderDigits, "❗ Something went wrong — please try again later.");
       } catch {
         /* ignore */
       }
