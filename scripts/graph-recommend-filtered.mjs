@@ -310,6 +310,7 @@ function printSetup(opts, listName, listTypeLabel, positiveItems, forwardEntries
   console.log(`Source: ${opts.source} (${opts.source === "similar" ? "TMDB /similar" : "TMDB /recommendations"})`);
   console.log(`Quality filter: ${filterStatus}`);
   console.log(`Diversity: ${opts.diversity ? "ON (graph pruning)" : "OFF (use --diversity to enable)"}`);
+  console.log(`Cross-list exclusion: ${opts.crossList ? "ON" : "OFF (use --cross-list to enable)"}`);
   console.log(`IMDb boost: ${opts.imdbBoost ? `ON (baseline=${opts.imdbBaseline})` : "OFF (use --imdb-boost to enable)"}`);
   if (opts.typeFilter !== "all") console.log(`Type filter: ${opts.typeFilter}`);
   console.log(`Positive signal: ${positiveItems.length} titles (${positiveItems.filter(i => i.status === "watched").length} watched, ${positiveItems.filter(i => i.status === "archive").length} archived)`);
@@ -672,6 +673,45 @@ function printFilterSummary(pool, unfilteredTop, filteredTop, diversityTop, topK
   console.log();
 }
 
+// ─── Cross-list exclusion helpers ────────────────────────────────────────────
+
+function collectWatchedTmdbIds(listData, registry, out) {
+  const watched = new Set(listData.watched || []);
+  const archive = new Set(listData.archive || []);
+  for (const item of listData.items || []) {
+    const rid = item.registryId;
+    if (!rid) continue;
+    if (!watched.has(rid) && !archive.has(rid)) continue;
+    const reg = registry[rid];
+    if (reg?.tmdbId) out.add(String(reg.tmdbId));
+  }
+}
+
+async function loadCrossListExcludeTmdbIds(db, targetListId, memberUids, registry) {
+  const excludeTmdbIds = new Set();
+  const processed = new Set([targetListId]);
+
+  for (const uid of memberUids) {
+    const snap = await db.collection("users").doc(uid).collection("personalLists").get();
+    for (const doc of snap.docs) {
+      if (processed.has(doc.id)) continue;
+      processed.add(doc.id);
+      collectWatchedTmdbIds(doc.data(), registry, excludeTmdbIds);
+    }
+  }
+
+  const sharedSnap = await db.collection("sharedLists").get();
+  for (const doc of sharedSnap.docs) {
+    if (processed.has(doc.id)) continue;
+    const docMemberUids = extractMemberUids(doc.data().members || []);
+    if (!docMemberUids.some(uid => memberUids.includes(uid))) continue;
+    processed.add(doc.id);
+    collectWatchedTmdbIds(doc.data(), registry, excludeTmdbIds);
+  }
+
+  return excludeTmdbIds;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -679,7 +719,7 @@ async function main() {
   const listId = process.argv[2];
   if (!listId || listId.startsWith("--")) {
     console.error("Usage: node scripts/graph-recommend-filtered.mjs <listId> [--uid <uid>] [--type movie|show|all] [--top <k>] [--source recs|similar]");
-    console.error("       [--min-rating 6.0] [--min-votes-en 50000] [--min-votes-foreign 3000] [--pool <n>] [--no-filter] [--allow-unknown] [--diversity]");
+    console.error("       [--min-rating 6.0] [--min-votes-en 50000] [--min-votes-foreign 3000] [--pool <n>] [--no-filter] [--allow-unknown] [--diversity] [--cross-list]");
     console.error("       [--w-favorite 1.5] [--w-watched 1.0] [--w-unliked 0.3] [--w-unwatched 0.0] [--imdb-boost] [--imdb-baseline 7.0]");
     process.exit(1);
   }
@@ -700,6 +740,7 @@ async function main() {
   const noFilter = argv.includes("--no-filter");
   const allowUnknown = argv.includes("--allow-unknown");
   const diversity = argv.includes("--diversity");
+  const crossList = argv.includes("--cross-list");
   const imdbBoost = argv.includes("--imdb-boost");
   const imdbBaseline = parseFloat(getArg("--imdb-baseline", "7.0"));
   const wFavorite = parseFloat(getArg("--w-favorite", "1.5"));
@@ -722,7 +763,7 @@ async function main() {
     console.error(`Invalid --pool: must be >= --top (${topK})`); process.exit(1);
   }
 
-  const opts = { typeFilter, topK, source, minRating, minVotesEn, minVotesForeign, noFilter, allowUnknown, diversity, imdbBoost, imdbBaseline, wFavorite, wWatched, wUnliked, wUnwatched, poolSize };
+  const opts = { typeFilter, topK, source, minRating, minVotesEn, minVotesForeign, noFilter, allowUnknown, diversity, crossList, imdbBoost, imdbBaseline, wFavorite, wWatched, wUnliked, wUnwatched, poolSize };
 
   const FORWARD_INDEX_PATH = INDEX_PATHS[source].forward;
   const INVERTED_INDEX_PATH = INDEX_PATHS[source].inverted;
@@ -891,12 +932,29 @@ async function main() {
     console.log(`  ${notInIndex} positive title${notInIndex !== 1 ? "s" : ""} not in forward index`);
   }
 
-  // ─── Exclude watched/archived ─────────────────────────────────────────────
+  // ─── Exclude watched/archived — current list ─────────────────────────────
+  const currentExcludeTmdbIds = new Set();
   let noTmdbIdSkipped = 0;
   for (const item of listItems) {
     if (item.status !== "watched" && item.status !== "archive") continue;
     if (!item.tmdbId) { noTmdbIdSkipped++; continue; }
-    delete aggregated[item.tmdbId];
+    currentExcludeTmdbIds.add(item.tmdbId);
+  }
+  let currentExcludeCount = 0;
+  for (const tmdbId of currentExcludeTmdbIds) {
+    if (tmdbId in aggregated) { delete aggregated[tmdbId]; currentExcludeCount++; }
+  }
+
+  // ─── Cross-list exclusion (--cross-list flag) ─────────────────────────────
+  let crossListExcludeCount = 0;
+  if (opts.crossList) {
+    const crossListExcludeTmdbIds = await loadCrossListExcludeTmdbIds(db, listId, memberUids, registry);
+    for (const tmdbId of crossListExcludeTmdbIds) {
+      if (!currentExcludeTmdbIds.has(tmdbId) && tmdbId in aggregated) {
+        delete aggregated[tmdbId];
+        crossListExcludeCount++;
+      }
+    }
   }
 
   const afterExclusionCount = Object.keys(aggregated).length;
@@ -910,7 +968,11 @@ async function main() {
 
   console.log(`\nRecommendation graph for this list:`);
   console.log(`  ${mappedCount} positive titles mapped to forward index`);
-  console.log(`  After excluding watched/archived: ${afterExclusionCount} candidates`);
+  console.log(`  Excluded from current list: ${currentExcludeCount}`);
+  if (opts.crossList) {
+    console.log(`  Excluded from cross-list: ${crossListExcludeCount}`);
+  }
+  console.log(`  After exclusion: ${afterExclusionCount} candidates`);
   console.log(`  Count distribution: 1 ref=${dist[1]}  2 refs=${dist[2]}  3 refs=${dist[3]}  4+=${dist["4+"]}`);
 
   if (afterExclusionCount === 0) {

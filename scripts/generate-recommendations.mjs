@@ -283,6 +283,33 @@ async function enrichRec(rec, tmdbToRegistry, tmdbCache) {
   };
 }
 
+// ─── Collect watched/archived tmdbIds from a list's raw data ─────────────────
+function collectWatchedTmdbIds(listData, registry, out) {
+  const watched = new Set(listData.watched || []);
+  const archive = new Set(listData.archive || []);
+  for (const item of listData.items || []) {
+    const rid = item.registryId;
+    if (!rid) continue;
+    if (!watched.has(rid) && !archive.has(rid)) continue;
+    const reg = registry[rid];
+    if (reg?.tmdbId) out.add(String(reg.tmdbId));
+  }
+}
+
+// ─── Build cross-list exclude set for a target list ──────────────────────────
+// Uses already-loaded listsMap (no extra Firestore reads).
+// "Related" means: any list that shares at least one member UID with the target.
+function getCrossListExcludeTmdbIds(targetList, listsMap, registry) {
+  const targetUids = new Set(targetList.memberUids);
+  const crossListIds = new Set();
+  for (const [listId, otherList] of listsMap) {
+    if (listId === targetList.id) continue;
+    if (!otherList.memberUids.some(uid => targetUids.has(uid))) continue;
+    collectWatchedTmdbIds(otherList.data, registry, crossListIds);
+  }
+  return crossListIds;
+}
+
 // ─── Build list items with status ────────────────────────────────────────────
 function buildListItems(listData, registry, favorites) {
   const watched    = new Set(listData.watched    || []);
@@ -525,10 +552,28 @@ async function main() {
     // Aggregate from forward index
     const aggregated = aggregateRecs(positiveItems, forwardIndex);
 
-    // Exclude watched/archived by tmdbId
+    // Exclude watched/archived by tmdbId — current list
+    const currentExcludeTmdbIds = new Set();
     for (const item of listItems) {
       if (item.status !== "watched" && item.status !== "archive") continue;
-      if (item.tmdbId) delete aggregated[item.tmdbId];
+      if (item.tmdbId) currentExcludeTmdbIds.add(item.tmdbId);
+    }
+    let currentExcludeCount = 0;
+    for (const tmdbId of currentExcludeTmdbIds) {
+      if (tmdbId in aggregated) { delete aggregated[tmdbId]; currentExcludeCount++; }
+    }
+
+    // Cross-list exclusion: also exclude titles watched/archived on any related list
+    const crossListExcludeTmdbIds = getCrossListExcludeTmdbIds(list, listsMap, registry);
+    let crossListExcludeCount = 0;
+    for (const tmdbId of crossListExcludeTmdbIds) {
+      if (!currentExcludeTmdbIds.has(tmdbId) && tmdbId in aggregated) {
+        delete aggregated[tmdbId];
+        crossListExcludeCount++;
+      }
+    }
+    if (crossListExcludeCount > 0 || currentExcludeCount > 0) {
+      console.log(`    Excluded ${currentExcludeCount} from current list, ${crossListExcludeCount} from cross-list`);
     }
 
     if (Object.keys(aggregated).length === 0) {
