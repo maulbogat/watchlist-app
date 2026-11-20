@@ -111,6 +111,8 @@ Open **`http://localhost:5173`** (or the URL Vite prints). The dev server uses `
 
 ## Vercel deployment (bookmarklet)
 
+**CLI deploys (`vercel --prod`)** upload the local working directory, not just tracked files. **`.vercelignore`** excludes secrets (`.env*`, `serviceAccountKey.json`), the ~1.2 GB **`data/`** dumps (which otherwise fail with *File size limit exceeded (100 MB)*), and **`backups/`**. A CLI deploy also ships any **uncommitted** changes — to pick up new env vars only, prefer **Vercel → Deployments → ⋯ → Redeploy**.
+
 ### Vercel migration (from Netlify)
 
 The project was migrated from **Netlify** to **Vercel**: former **`netlify/functions/`** handlers live under root **`api/*.js`**. **`src/api-lib/vercel-adapter.js`** keeps Netlify-shaped handler wiring while exposing standard Node **`(req, res)`** to Vercel. **`vercel.json`** replaces Netlify scheduled functions with **Vercel Cron** (e.g. **`/api/check-upcoming`** at **03:00 UTC**). On the **Hobby** plan, **12** serverless function slots are available by default; this repo defines **9** serverless API routes (including **`api/admin/[segment].js`**, which serves all **`/api/admin/*`** admin endpoints) — confirm your Vercel plan’s limits. **`vercel.json`** sets **`npm run build:react`**, **`outputDirectory`: `dist/`** (includes `index.html`, `add.html`, hashed assets), SPA rewrite (excluding **`/api/*`**), cron, and per-function **`maxDuration`** (**60s** for heavy routes including **`/api/whatsapp-webhook`** and **`/api/admin/[segment]`**; **30s** for **`/api/whatsapp-verify`**).

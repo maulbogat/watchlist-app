@@ -1,0 +1,25 @@
+# Files `vercel` CLI deploys must never upload.
+# Git-integrated deploys only see tracked files; CLI deploys upload the working directory,
+# so anything local-only (secrets, large data, backups) has to be excluded here explicitly.
+
+# Secrets
+.env
+.env.*
+!.env.example
+serviceAccountKey.json
+
+# Local data dumps (~1.2 GB; exceeds Vercel's 100 MB file limit)
+data/
+
+# Backups (user data; not needed by the build or API routes)
+backups/
+watchlist-backup.json
+
+# Build output / tooling (rebuilt on Vercel)
+dist/
+build/
+.claude/
+.cursor/
+.netlify/
+.idea/
+.vscode/
